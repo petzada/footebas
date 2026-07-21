@@ -2,13 +2,14 @@
 
 Última atualização: 2026-07-21
 
-| Fase                           | Estado       | Evidência                                      |
-| ------------------------------ | ------------ | ---------------------------------------------- |
-| 0 — Baseline reproduzível      | concluída    | `pnpm check` verde; build e smoke              |
-| 1 — Laboratório determinístico | concluída    | `pnpm test:phase1`: 10k partidas + 1k épocas   |
-| 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes |
-| 3 — Elenco e matchday          | em progresso | modelo completo e decisões durante a partida   |
-| 4–9                            | pendente     | execução estritamente sequencial pelos gates   |
+| Fase                           | Estado       | Evidência                                       |
+| ------------------------------ | ------------ | ----------------------------------------------- |
+| 0 — Baseline reproduzível      | concluída    | `pnpm check` verde; build e smoke               |
+| 1 — Laboratório determinístico | concluída    | `pnpm test:phase1`: 10k partidas + 1k épocas    |
+| 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes  |
+| 3 — Elenco e matchday          | concluída    | matchday reproduzível e acessível; gates verdes |
+| 4 — Mundo vivo                 | em progresso | carreira longa, mercado, finanças e base        |
+| 5–9                            | pendente     | execução estritamente sequencial pelos gates    |
 
 ## Decisões operacionais
 
@@ -45,3 +46,16 @@
 - Conteúdo autoritativo: oito clubes e 200 atletas reais do Markdown bruto; atributos somente `derived`, versionados e com proveniência.
 - Web PWA mobile-first: onboarding curto, navegação, elenco, formações/táticas, feed pulável, resultado, tabela e recarga por port fake.
 - `pnpm check`: formatter, typecheck, lint, 74 testes, builds (incluindo Next) e smoke verdes.
+
+## Gate da Fase 3
+
+- Elenco completo: força, até duas características, posições/lado, condição, moral, ritmo, lesões, suspensões, cartões, notas e estatísticas.
+- Os seis atributos ocultos influenciam o domínio, mas read models e web expõem somente estimativas textuais.
+- Titulares, banco e reservas; formações validadas e automações determinísticas `best`, `rest` e `develop`.
+- Tática compacta com mentalidade, construção, foco, pressão, linha defensiva e marcação.
+- Preparação informa adversário, forma, força aproximada e desfalques antes da decisão.
+- Substituições e mudanças táticas em minutos discretos são imutáveis, afetam o resultado e reproduzem exatamente.
+- API rejeita escalações inválidas antes de persistir/enfileirar e impede instruções sobre o time adversário.
+- Web oferece alternativa sem drag-and-drop, teclado, feed 1×/2×/4×, resultado instantâneo e skip em um toque.
+- Playthrough `phase-three-playthrough-v1`: 14/14 rodadas com informação, consequência e replay, zero falhas.
+- `pnpm check`: formatter, typecheck, lint, 88 testes, builds (incluindo Next) e smoke verdes.
