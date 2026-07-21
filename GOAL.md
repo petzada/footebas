@@ -142,15 +142,15 @@ Comece pela Fase 0 agora.
 
 Ordem típica de necessidade (o executor refinará):
 
-1. Aprovar/confirmar LICENSE definitiva do repositório  
-2. Criar projeto Supabase (Auth Google + magic link) e preencher env de staging/produção  
-3. Provisionar Postgres/Redis gerenciados (ou aceitar Compose só em staging)  
-4. Configurar DNS / hospedagem web + API + worker  
-5. Ativar billing real (chaves, webhooks, produtos)  
-6. Revisar jurídico/comercial de marcas, nomes, bases e assets  
-7. Termos, privacidade, exclusão/exportação de dados  
-8. Beta fechada com 3–5 pessoas (critério qualitativo da Fase 9)  
-9. Aceite humano final + publicação pública  
+1. Aprovar/confirmar LICENSE definitiva do repositório
+2. Criar projeto Supabase (Auth Google + magic link) e preencher env de staging/produção
+3. Provisionar Postgres/Redis gerenciados (ou aceitar Compose só em staging)
+4. Configurar DNS / hospedagem web + API + worker
+5. Ativar billing real (chaves, webhooks, produtos)
+6. Revisar jurídico/comercial de marcas, nomes, bases e assets
+7. Termos, privacidade, exclusão/exportação de dados
+8. Beta fechada com 3–5 pessoas (critério qualitativo da Fase 9)
+9. Aceite humano final + publicação pública
 
 O executor cria/atualiza esse arquivo durante a corrida; não precisa existir antes do disparo.
 
@@ -172,9 +172,9 @@ O executor cria/atualiza esse arquivo durante a corrida; não precisa existir an
 
 ## Checklist do responsável antes de dormir
 
-- [ ] Aceitar ou alterar D1–D4 e a tabela de defaults acima  
-- [ ] Se escolher D1-A: atualizar `docs/08` + `docs/00` #11 **antes** (eu não alterei nada ainda)  
-- [ ] Garantir máquina com Node LTS, pnpm, Docker (para Fase 2+), git limpo o suficiente  
-- [ ] Definir no `/goal` um orçamento de tokens/contexto explicitamente muito amplo, no maior valor acordado e suportado  
-- [ ] Disparar o Codex com o bloco **PROMPT DO `/goal`**, mantendo o agente principal como orquestrador e usando workers GPT-5.6 Sol  
-- [ ] Não invocar grilling no meio da corrida  
+- [ ] Aceitar ou alterar D1–D5 e a tabela de defaults acima
+- [ ] Se escolher D1-A: atualizar `docs/08` + `docs/00` #11 **antes** (eu não alterei nada ainda)
+- [ ] Garantir máquina com Node LTS, pnpm, Docker (para Fase 2+), git limpo o suficiente
+- [ ] Definir no `/goal` um orçamento de tokens/contexto explicitamente muito amplo, no maior valor acordado e suportado
+- [ ] Disparar o Codex com o bloco **PROMPT DO `/goal`**, mantendo o agente principal como orquestrador e usando workers GPT-5.6 Sol
+- [ ] Não invocar grilling no meio da corrida
