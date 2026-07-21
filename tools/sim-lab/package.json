@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "calibrate": "tsx src/cli.ts --calibrate --matches=10000",
     "lint": "eslint src --max-warnings=0",
     "smoke": "tsx src/cli.ts --smoke",
     "test": "vitest run --config ../../vitest.config.ts",
