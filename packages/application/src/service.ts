@@ -165,10 +165,13 @@ export class FootebasApplication {
         'VERSION_CONFLICT',
         'new careers require expectedVersion 0',
       );
-    const careerId = `career_${createHash('sha256').update(command.commandId).digest('hex').slice(0, 20)}`;
+    const careerId = `career_${createHash('sha256')
+      .update(`${userId}:${command.idempotencyKey}`)
+      .digest('hex')
+      .slice(0, 20)}`;
     const response = await this.deps.unitOfWork.executeIdempotent(
       careerId,
-      command.commandId,
+      command.idempotencyKey,
       async (tx) => {
         const content = createFixtureContent();
         const firstDate = GameDate.parse(command.payload.startDate).addDays(7);
@@ -219,7 +222,7 @@ export class FootebasApplication {
     let jobToEnqueue: SimulationJob | undefined;
     const response = await this.deps.unitOfWork.executeIdempotent(
       careerId,
-      command.commandId,
+      command.idempotencyKey,
       async (tx) => {
         const save = await this.load(tx, careerId, userId);
         if (save.version !== command.expectedVersion)

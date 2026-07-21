@@ -211,6 +211,17 @@ describe('server-authoritative application slice', () => {
     expect(await app.checksum(token, first.careerId)).toBe(checksum);
   });
 
+  it('deduplicates retries by idempotency key when command ids change', async () => {
+    const { app, token } = setup();
+    const first = command('CreateCareer', 'command_retry_a', 0, {
+      managerName: 'Ada',
+      startDate: '2026-01-01',
+    });
+    const retried = { ...first, commandId: 'command_retry_b' };
+    const accepted = await app.execute(token, first);
+    expect(await app.execute(token, retried)).toEqual(accepted);
+  });
+
   it('rolls back injected failure and retries once without partial result', async () => {
     let fail = true;
     const { app, token } = setup(() => {
