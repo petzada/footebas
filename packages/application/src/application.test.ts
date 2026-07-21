@@ -188,9 +188,29 @@ describe('server-authoritative application slice', () => {
       absences: expect.any(Array),
     });
     const side = next.homeClub.id === 'club_1' ? 'home' : 'away';
+    const opponentSide = side === 'home' ? 'away' : 'home';
     const lineup = squad.lineup!;
     const playerOutId = lineup.starters.at(-1)!;
     const playerInId = lineup.bench[0]!;
+    await expect(
+      app.execute(
+        token,
+        command('SimulateMatch', 'command_opponent_instruction', 2, {
+          careerId,
+          fixtureId: next.fixtureId,
+          instructions: [
+            {
+              type: 'substitution',
+              minute: 60,
+              side: opponentSide,
+              playerOutId,
+              playerInId,
+              position: 'ST',
+            },
+          ],
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await app.execute(
       token,
       command('SimulateMatch', 'command_phase3_match', 2, {

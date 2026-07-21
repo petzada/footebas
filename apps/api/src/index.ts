@@ -80,6 +80,7 @@ export async function buildApi(
             'CreateCareer',
             'SelectClub',
             'SetLineup',
+            'AutoPickLineup',
             'SetTactics',
             'AdvanceDate',
             'SimulateMatch',

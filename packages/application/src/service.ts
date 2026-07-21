@@ -385,6 +385,21 @@ export class FootebasApplication {
                 'VALIDATION_ERROR',
                 'throughDate does not reach the next fixture',
               );
+            if (command.type === 'SimulateMatch') {
+              const managedSide =
+                fixture.homeClubId === snapshot.selectedClubId
+                  ? 'home'
+                  : 'away';
+              if (
+                command.payload.instructions?.some(
+                  ({ side }) => side !== managedSide,
+                )
+              )
+                throw new ApplicationError(
+                  'FORBIDDEN',
+                  'match instructions can only target the managed club',
+                );
+            }
             const jobId = this.deps.ids.next('job');
             snapshot.pendingJobId = jobId;
             job = {
