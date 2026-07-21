@@ -1,0 +1,626 @@
+# Footebas — Roadmap de Desenvolvimento do Zero ao MVP
+
+> **Status:** roadmap operacional proposto
+>
+> **Base normativa:** `docs/08-mvp-fonte-de-verdade.md`
+>
+> **Modelo de execução:** desenvolvedor solo, com apoio de Codex, Claude Code e Cursor
+>
+> **Estratégia:** vertical slices orientados a risco
+>
+> **Unidade das estimativas:** semanas de trabalho efetivo em dedicação integral, sem datas de calendário
+
+---
+
+## 1. Objetivo deste roadmap
+
+Transformar a fundação documental existente em um MVP comercial funcional, coerente e publicável do Footebas:
+um manager de futebol web, PWA mobile-first, online e server-authoritative, com carreiras longas, rodadas rápidas,
+competições brasileiras, ranking global de treinador e monetização sem pay-to-win agressivo.
+
+Este documento não redefine o produto. Ele converte as decisões já tomadas em uma sequência executável, com
+dependências, entregáveis, testes e critérios de saída. O lançamento público continua sendo o **MVP completo**;
+as fases abaixo são marcos internos, demos locais e alphas controlados.
+
+## 2. Estado atual da codebase
+
+### 2.1 O que existe
+
+- Documentação normativa e de apoio em `docs/00` a `docs/08`.
+- Documento detalhado anterior em `footebas-mvp.md`.
+- Pesquisa histórica em `brasfoot-consolidado.md` e briefing em `footebas-briefing.md`.
+- Seis levantamentos de elencos e competições de 2026 em `dados/elencos/`.
+- Skills locais para frontend, shadcn, arquitetura e práticas de Postgres.
+
+### 2.2 O que ainda não existe
+
+- Aplicações web, API e worker.
+- Monorepo, pacotes TypeScript e configuração de build.
+- Engine, modelo de domínio e contratos de API.
+- Schema, migrations, seeds ou instância de banco configurada.
+- Autenticação, filas, cache, storage ou ambientes de deploy.
+- Design system, telas, PWA ou visualizador de partida.
+- Testes automatizados, CI/CD, telemetria e observabilidade.
+- Pipeline que converta os levantamentos em conteúdo válido para o jogo.
+- Histórico de commits: o branch `main` ainda não possui commit inicial.
+
+Portanto, o estado real é **fundação documental + dados de pesquisa**, não uma aplicação parcialmente implementada.
+
+## 3. Hierarquia das decisões
+
+Em caso de divergência durante o desenvolvimento, aplicar esta ordem:
+
+1. Decisões explícitas do responsável pelo produto.
+2. `docs/08-mvp-fonte-de-verdade.md` — escopo normativo do MVP.
+3. `docs/00-visao-e-decisoes.md` — log consolidado de decisões.
+4. `docs/01` a `docs/07` — detalhamento por área.
+5. `footebas-mvp.md` — referência detalhada quando não conflitar com a suite normativa.
+6. `footebas-briefing.md` e `brasfoot-consolidado.md` — contexto e inspiração, não escopo vigente.
+
+### 3.1 Override explícito de conteúdo
+
+Os elencos reais presentes em `dados/elencos/` **serão utilizados na plataforma**, por decisão explícita do
+responsável pelo produto. Essa decisão substitui, apenas nesse ponto, a diretriz anterior de uma base oficial
+exclusivamente fictícia. O restante da documentação continua vigente.
+
+Consequências práticas:
+
+- Os arquivos atuais são **fontes brutas de pesquisa**, não seeds de produção.
+- Clubes e jogadores repetidos entre Série A/B/C, estaduais, Copa e continental precisam formar entidades únicas.
+- Participação em competição deve ser modelada separadamente do elenco do clube.
+- Origem, data, cobertura, divergências e confiança devem acompanhar cada snapshot importado.
+- Uma revisão jurídica/comercial sobre marcas, nomes, bases de dados e assets permanece um gate anterior ao
+  lançamento público, sem impedir o desenvolvimento e os testes internos.
+
+### 3.2 Divergências documentais já resolvidas
+
+Não reabrir durante a implementação:
+
+| Tema | Decisão vigente |
+|---|---|
+| Plataforma | PWA web **mobile-first**; desktop é enhancement multi-painel |
+| Operação | Online obrigatório; universo isolado por carreira no servidor |
+| Simulação | Server-authoritative, em lote, por worker; nunca no cliente ou no processo da API |
+| Competições | 3 divisões + copa nacional + estaduais simplificados + continental |
+| Conteúdo | Elencos reais de `dados/`, conforme override acima |
+| Partida | Resultado instantâneo + narração/feed + 2D leve; 3D fica pós-MVP |
+| Jogador | Força única + até 2 características visíveis; atributos ocultos completos |
+| Social | Ranking global de treinador; sem multiplayer no MVP |
+| Monetização | Grátis + licença única + Clube Online opcional |
+| Lançamento | MVP público completo; fases são validações internas |
+
+Referências antigas a desktop-first, quatro divisões, 80 clubes, 3D no MVP ou offline-first não governam o
+desenvolvimento.
+
+## 4. Resultado esperado do MVP
+
+Ao final, uma pessoa deve conseguir:
+
+1. abrir o site no celular, criar conta e iniciar uma carreira;
+2. criar treinador e assumir um clube permitido pelo seu entitlement;
+3. entender elenco, objetivo, caixa e próximo compromisso sem tutorial longo;
+4. escalar, escolher uma tática compacta e disputar ou simular a partida;
+5. receber resultado, eventos, notas, renda, moral, condição, lesões, suspensões e atualização da tabela;
+6. contratar, vender, emprestar, renovar, rescindir e promover jovens;
+7. administrar finanças, ingressos, folha, patrocínio e estádio;
+8. atravessar temporadas com evolução, declínio, aposentadoria, acesso, rebaixamento e novas competições;
+9. ser demitida, receber proposta e trocar de clube sem perder a carreira do treinador;
+10. consultar história, notícias, recordes e ranking global;
+11. editar/importar o conteúdo permitido pelo plano;
+12. comprar a licença ou assinar o Clube Online, sem que dinheiro compre resultado esportivo.
+
+Metas centrais: primeira partida em até 5 minutos; rodada comum em até 2 minutos; avanço semanal abaixo de 3
+segundos em carga normal; save íntegro por dezenas de temporadas.
+
+## 5. Arquitetura-alvo
+
+```text
+apps/web (Next.js PWA)
+        |
+        | REST + SSE, JWT
+        v
+apps/api (Fastify) -----> PostgreSQL/Supabase
+        |
+        | jobs BullMQ
+        v
+apps/worker -----------> Redis
+        |
+        v
+packages/engine + packages/domain
+        |
+        v
+eventos, snapshot, read models e timeline da partida
+```
+
+Estrutura inicial:
+
+```text
+apps/
+  web/                 Next.js, PWA, gestão e reprodução de partidas
+  api/                 Fastify, autenticação, comandos, consultas e jobs
+  worker/              BullMQ, simulação e tarefas CPU-intensive
+packages/
+  domain/              entidades, value objects, comandos e eventos
+  engine/              regras puras, calendário, partidas, IA e progressão
+  contracts/           schemas Zod e tipos de transporte
+  database/            Prisma, migrations, repositories e read models
+  content/             schema e compilação dos datasets
+  ui/                  design system e componentes compartilhados
+  match-viewer/        feed e campo 2D render-only
+  config/              TypeScript, lint, ambiente e convenções
+  testing/             factories, seeds fixas e helpers
+tools/
+  content-pipeline/    importação, normalização e validação de conteúdo
+```
+
+Regras de fronteira:
+
+- `engine` e `domain` não importam Next.js, Fastify, Prisma, React, Supabase ou BullMQ.
+- O cliente nunca grava estado de jogo diretamente no banco.
+- A API valida autorização e comandos; o worker executa simulação pesada.
+- O 2D reproduz uma timeline calculada pelo servidor; não simula o jogo novamente.
+- Snapshot, seed e versões de engine, regras, conteúdo e schema acompanham cada carreira.
+
+## 6. Estratégia de execução para uma pessoa
+
+O limite recomendado é **um marco em progresso e uma vertical slice ativa por vez**. Cada fase precisa terminar
+com software demonstrável, não apenas camadas técnicas isoladas.
+
+Princípios de trabalho:
+
+- Definir contrato e teste de saída antes de gerar implementação com IA.
+- Manter PRs/commits pequenos e reversíveis, preferencialmente por comando ou fluxo do usuário.
+- Não permitir que dois agentes alterem simultaneamente o mesmo pacote de domínio ou migration.
+- Revisar manualmente migrations, fórmulas do engine, autorização, billing e código de concorrência.
+- Registrar decisões caras em ADRs: datas do jogo, dinheiro, PRNG, snapshot, versionamento e compatibilidade.
+- Encerrar cada fase com demonstração mobile, teste de regressão e relatório de métricas.
+- Não começar 2D, editor ou billing antes de o loop anterior passar pelo gate de qualidade.
+
+## 7. Caminho crítico
+
+```text
+Fundação
+  -> contratos de domínio
+  -> determinismo e calendário mínimo
+  -> loop autoritativo persistido
+  -> carreira multitemporada e economia
+  -> competições completas
+  -> UX/2D
+  -> conteúdo/editor
+  -> ranking/billing
+  -> hardening
+  -> MVP público
+```
+
+Calendário, economia de longo prazo, saves/versionamento, IA de mercado e concorrência por carreira são os riscos
+mais altos. Eles entram cedo e recebem testes de simulação massiva antes do polimento visual.
+
+## 8. Fases de desenvolvimento
+
+### Fase 0 — Baseline reproduzível
+
+**Estimativa:** 1–2 semanas
+
+**Mapeamento:** preparação para M1
+
+**Dependência:** roadmap aprovado e decisões normativas acessíveis
+
+**Objetivo:** qualquer agente ou máquina deve instalar, testar e subir o esqueleto local de forma previsível.
+
+**Entregáveis:**
+
+- Commit inicial revisado, `.gitignore`, licença do repositório e `README` operacional.
+- Monorepo pnpm + Turborepo e estrutura de apps/pacotes da arquitetura-alvo.
+- Node LTS fixado, TypeScript estrito, lint, formatter, Vitest e Playwright.
+- CI com install, typecheck, lint, testes e build.
+- Ambiente local com Postgres e Redis; Supabase local ou projeto de desenvolvimento documentado.
+- `.env.example`, validação de variáveis e separação entre desenvolvimento, preview e produção.
+- Convenções de IDs, dinheiro em centavos, `GameDate`, timezone, locale e erros de domínio.
+- ADRs iniciais: fronteiras do engine, PRNG/seed, save/versionamento, conteúdo e command envelope.
+- Catálogo inicial de eventos de produto e logs estruturados.
+
+**Gate de saída:** clone limpo executa uma única sequência documentada e conclui build + testes; web, API e worker
+respondem a health checks; nenhum segredo é versionado.
+
+### Fase 1 — Laboratório determinístico do jogo
+
+**Estimativa:** 4–6 semanas
+
+**Mapeamento:** primeira parte do M1
+
+**Dependência:** gate da Fase 0
+
+**Objetivo:** provar que regras, resultados e progressão são reproduzíveis e potencialmente divertidos antes de
+investir na aplicação completa.
+
+**Vertical slice:** uma liga curta, oito clubes, aproximadamente 200 jogadores, escalação, três formações, três
+mentalidades, partida instantânea, feed textual, tabela e avanço de uma temporada via harness/CLI.
+
+**Entregáveis:**
+
+- Entidades e value objects mínimos de carreira, clube, jogador, elenco, tática, competição, fixture e partida.
+- PRNG seedado e versionado; relógio/data do jogo desacoplado do relógio real.
+- Motor de partida puro com timeline de gols, chances, cartões, lesões, substituições e estatísticas.
+- Cálculo inicial de força efetiva: posição, condição, moral, ritmo, tática, mando e variação controlada.
+- Gerador de liga e classificação com critérios configuráveis.
+- Evolução mínima de condição, moral e suspensões entre rodadas.
+- Harness de balanceamento que exporta distribuições, zebras, gols, cartões e vantagem de mando.
+- Golden tests por seed e property-based tests de invariantes.
+
+**Gate de saída:** a mesma entrada/seed/versão gera bytes equivalentes; uma temporada fecha com campeão e tabela
+válidos; 10 mil partidas e ao menos mil temporadas sintéticas rodam sem estado impossível; uma partida permanece
+abaixo da meta inicial de 150 ms no ambiente de referência.
+
+**Decisão ao final:** se dez rodadas não forem compreensíveis ou não gerarem vontade de continuar, balancear o
+núcleo antes de criar infraestrutura de produto.
+
+### Fase 2 — Primeira carreira server-authoritative
+
+**Estimativa:** 5–8 semanas
+
+**Mapeamento:** segunda parte do M1
+
+**Dependência:** engine determinístico e invariantes da Fase 1
+
+**Objetivo:** entregar o primeiro fluxo real, autenticado e persistido, do cadastro ao pós-jogo.
+
+**Vertical slice:** cadastro -> criar treinador -> assumir clube -> escalar -> definir tática -> avançar -> worker
+simular -> assistir feed -> ver resultado/tabela -> fechar e recarregar o save.
+
+**Entregáveis:**
+
+- Supabase Auth com Google e magic link; API valida JWT sem acoplar domínio ao fornecedor.
+- Schema inicial, Prisma migrations, repositories e transações.
+- `GameSave` como raiz com checksum, versão otimista, seed e versões obrigatórias.
+- API Fastify REST/OpenAPI com `CreateCareer`, `SelectClub`, `SetLineup`, `SetTactics`, `AdvanceDate` e
+  `SimulateMatch`.
+- BullMQ/Redis, worker isolado e SSE de status/progresso.
+- Idempotência nos comandos críticos e lock por carreira.
+- Read models mínimos: home, elenco, próximo jogo, tabela e pós-partida.
+- Web mobile-first com onboarding curto, navegação básica e feed skippable.
+- Recuperação segura para job com retry, timeout ou falha após persistência parcial.
+
+**Gate de saída:** primeira partida em até 5 minutos; carreira recarrega sem divergência; dois comandos de avanço
+concorrentes não duplicam rodada; retries não duplicam partidas ou transações; o cliente não possui caminho de
+escrita direta do estado canônico.
+
+### Fase 3 — Elenco e matchday completos
+
+**Estimativa:** 5–7 semanas
+
+**Mapeamento:** M1
+
+**Dependência:** fluxo autoritativo persistido da Fase 2
+
+**Objetivo:** tornar cada rodada uma decisão real de gestão, e não apenas um botão de simulação.
+
+**Entregáveis:**
+
+- Modelo completo do jogador: força, até duas características visíveis e seis dimensões ocultas.
+- Posições principal/secundárias, lado, improvisação e goleiros com características próprias.
+- Condição, moral, ritmo, lesões, suspensões, notas, cartões e estatísticas de carreira.
+- Escalação titular/banco/reservas, formação e automações de melhor time/poupar/desenvolver.
+- Tática compacta vigente: mentalidade, construção, foco, pressão, linha defensiva e marcação.
+- Preparação de partida com adversário, forma, força aproximada e desfalques.
+- Substituições e mudanças táticas em pontos discretos da simulação.
+- Resultado instantâneo, narração rápida e feed com velocidade configurável.
+- Alternativa acessível ao drag-and-drop e suporte a teclado.
+
+**Gate de saída:** toda rodada apresenta informação suficiente para uma decisão; escalações inválidas são
+rejeitadas pelo domínio; mudanças durante a partida são registradas e reproduzíveis; o caminho até a próxima
+rodada exige poucos toques no celular.
+
+### Fase 4 — Mundo vivo e carreira de longo prazo
+
+**Estimativa:** 8–12 semanas
+
+**Mapeamento:** conclusão funcional do M1
+
+**Dependência:** matchday completo e estável da Fase 3
+
+**Objetivo:** sustentar dezenas de temporadas sem colapso de elenco, economia ou narrativa.
+
+**Entregáveis:**
+
+- Contratos, alertas, renovação, recusa, rescisão e atletas livres.
+- Mercado com busca, filtros, observação, comparação, ofertas, contrapropostas, compra, venda e empréstimo.
+- IA de clubes orientada a necessidade, orçamento, faixa salarial, reputação, idade e tamanho do elenco.
+- Ledger financeiro imutável para salários, transferências, ingressos, patrocínio e premiações.
+- Preço de ingresso, público, capacidade, manutenção e ampliação de estádio.
+- Base: geração limitada, estimativa, promoção, dispensa e desenvolvimento.
+- Evolução, estagnação, declínio, aposentadoria e reposição do universo.
+- Objetivos de diretoria, torcida, confiança, demissão, propostas e troca de clube.
+- Notícias por template, histórico de temporada, campeões, artilharia, recordes e ídolos.
+- Duas divisões iniciais com acesso/rebaixamento e geração da temporada seguinte.
+- Prestígio básico do treinador e primeiro leaderboard global derivados dos eventos da carreira.
+- Compactação/arquivamento de históricos antigos e migrations explícitas de save.
+
+**Gate de saída:** simulação automatizada de 20–30 temporadas mantém quantidade de jogadores, distribuição de
+força, salários, caixa e transferências em faixas definidas; dinheiro só nasce de transação identificada; clubes da
+IA preenchem posições e não acumulam elenco indefinidamente; demissão/troca de clube preserva a carreira.
+
+### Fase 5 — Pirâmide e calendário completos do MVP
+
+**Estimativa:** 6–9 semanas
+
+**Mapeamento:** M2
+
+**Dependência:** economia, progressão e duas divisões estáveis da Fase 4
+
+**Objetivo:** entregar a identidade brasileira e a fantasia de ascensão sem quebrar o calendário.
+
+**Entregáveis:**
+
+- Motor data-driven para `LeagueStage`, `GroupStage`, `KnockoutStage`, qualificações e desempates.
+- Três divisões nacionais com acesso e rebaixamento.
+- Copa nacional em mata-mata.
+- Estaduais simplificados, turno único e estados definidos pelo conteúdo.
+- Continental com pré, grupos e mata-mata.
+- Geração da temporada seguinte a partir dos resultados da anterior.
+- Validador de calendário para conflitos, intervalo, ida/volta, participantes, fases e datas reservadas.
+- Premiações, vagas, prestígio e eventos de domínio por conquista.
+- Testes de configuração por competição, sem branches hard-coded por torneio.
+
+**Gate de saída:** milhares de temporadas fecham todas as competições; nenhum clube joga simultaneamente; todos os
+classificados, promovidos e rebaixados alimentam corretamente a temporada seguinte; todo calendário inválido é
+recusado antes do início da temporada.
+
+### Fase 6 — Experiência mobile-first e campo 2D
+
+**Estimativa:** 6–9 semanas
+
+**Mapeamento:** M3
+
+**Dependência:** loop e calendário completos das Fases 3–5
+
+**Objetivo:** transformar o sistema validado em produto claro, rápido e com identidade própria.
+
+**Entregáveis:**
+
+- Design tokens, temas claro/escuro, tipografia esportiva e iconografia consistente.
+- Shell mobile com bottom navigation; desktop com enhancement multi-painel.
+- Visão geral, caixa de entrada, calendário, elenco, tática, mercado, competições, clube, finanças, história e mundo.
+- Listas densas responsivas, busca, filtros, comparação e virtualização quando necessária.
+- Campo 2D esquemático render-only sobre a timeline, com feed, momento, xG-lite, notas e estatísticas.
+- Resultado instantâneo sempre disponível a um toque.
+- PWA instalável, estados offline/de rede claros, reconexão e prevenção de comando duplicado.
+- WCAG: semântica, foco, contraste, leitores de tela, redução de movimento e alternativas ao arraste/2D.
+- Testes E2E dos caminhos críticos em viewport mobile e desktop.
+
+**Gate de saída:** toda funcionalidade do MVP é concluível num celular; nenhuma animação bloqueia avanço; LCP da
+área autenticada fica abaixo de 2,5 s no perfil acordado; primeira partida e rodada continuam dentro das metas.
+
+### Fase 7 — Conteúdo real, editor e importação
+
+**Estimativa:** 5–8 semanas
+
+**Mapeamento:** M4
+
+**Dependência:** schemas de domínio e competição estabilizados nas Fases 4–5
+
+**Objetivo:** transformar `dados/elencos/` em conteúdo versionado, consistente e atualizável, oferecendo as
+ferramentas de edição previstas.
+
+**Pipeline recomendado:**
+
+```text
+Markdown bruto e imutável
+  -> parser por versão de formato
+  -> normalização de clubes, pessoas e posições
+  -> resolução de identidade e duplicatas
+  -> validação de cobertura e referências
+  -> snapshot canônico versionado
+  -> seed/import transacional
+  -> relatório de diferenças e rejeições
+```
+
+**Entregáveis:**
+
+- Schema canônico de conteúdo: clubes, jogadores, competições, participações, contratos, assets e proveniência.
+- Catálogo de lançamento com ao menos os 60 clubes das três divisões e os participantes adicionais necessários
+  para estaduais, copa e continental, distinguindo clubes jogáveis de participantes de apoio quando aplicável.
+- IDs estáveis independentes de nome, camisa, clube atual e competição.
+- Mapa de posições heterogêneas (`GOL`, `Goleiro`, `ATA`, `Centroavante` etc.) para enums do domínio.
+- Deduplicação entre os seis arquivos e separação entre plantel do clube e inscrição em competição.
+- Tratamento explícito de `—`, `#?`, `[parcial]`, conflitos e divergências, sem preencher por invenção silenciosa.
+- Validações de elenco mínimo, goleiros, duplicatas, participantes e referências órfãs.
+- Versionamento por data de snapshot e compatibilidade com saves existentes.
+- Interface administrativa de preview/diff e importação segura.
+- Editor básico gratuito e editor completo condicionado à licença.
+- Import/export sem execução de código arbitrário; limites, sanitização e manifesto versionado.
+
+**Gate de saída:** importação é determinística e repetível; nenhuma pessoa ou clube duplicado é criado por
+sobreposição de competições; conteúdo inválido não chega ao save; atualização de conteúdo não altera carreira já
+iniciada sem migration explícita; os relatórios permitem rastrear cada dado até o arquivo de origem.
+
+### Fase 8 — Ranking, entitlements e monetização
+
+**Estimativa:** 5–8 semanas
+
+**Mapeamento:** início do M5
+
+**Dependência:** carreira, conteúdo e UX do MVP completos nas Fases 4–7
+
+**Objetivo:** completar a proposta social e o modelo de negócio sem comprometer integridade ou velocidade.
+
+**Entregáveis:**
+
+- Prestígio do treinador derivado de eventos autoritativos: títulos, copa, continental, acessos e longevidade.
+- Leaderboards global, Ascensão/Underdog e mensal, com paginação e snapshots.
+- Proteções contra estado impossível, duplicação de pontuação e abuso básico.
+- Entitlements centralizados para grátis, licença completa e Clube Online.
+- Regras grátis/pagas da matriz normativa, incluindo escolha de clube e limites de save.
+- Provedor de billing encapsulado, webhooks assinados, idempotência, reconciliação e ambiente sandbox.
+- Fluxos de compra, restauração, renovação, cancelamento, falha e reembolso.
+- Perfil, privacidade, termos, suporte e exclusão/exportação de dados conforme requisitos aplicáveis.
+- Métricas do funil: ativação, engajamento, retenção, qualidade e conversão.
+
+**Gate de saída:** ranking só aceita conquistas produzidas pelo backend; webhooks repetidos não duplicam entitlement;
+falha no billing não corrompe carreira; usuário grátis joga o loop completo; assinatura não é necessária para o
+single-player e dinheiro real não altera atributos, resultados ou recursos esportivos.
+
+### Fase 9 — Hardening, beta fechada e lançamento
+
+**Estimativa:** 5–8 semanas
+
+**Mapeamento:** conclusão do M5 e MVP público
+
+**Dependência:** todos os gates das Fases 0–8
+
+**Objetivo:** provar que o produto sobrevive a uso real, falhas operacionais e carreiras longas.
+
+**Entregáveis:**
+
+- Sentry, logs estruturados, métricas de API/worker/filas e tracing dos comandos críticos.
+- Dashboards e alertas para erro de save, fila parada, latência, calendário inválido e falha de billing.
+- Backups automatizados, restore testado, rollback de aplicação e migration rehearsal.
+- Rate limiting, headers, CORS/CSRF conforme fluxo, gestão de segredos e revisão de autorização por recurso.
+- Testes de carga: avanços concorrentes, ranking, mercado, importação e jobs longos.
+- Matriz de compatibilidade de browser/PWA e testes em celulares modestos.
+- Alpha interno por marco, depois beta fechada instrumentada com saves descartáveis e reais.
+- Balanceamento orientado por telemetria e simulações, não por alteração manual sem baseline.
+- Landing, onboarding, suporte mínimo, status/incident playbook e checklist de lançamento.
+- Gates comerciais e jurídicos concluídos para conteúdo, billing, privacidade e termos.
+
+**Gate de saída:** zero falha conhecida de corrupção/perda de save; restore executado com sucesso; erros críticos de
+autorização resolvidos; p95 de avanço e interface dentro das metas; calendário/economia aprovados em simulação longa;
+beta confirma entendimento do loop e vontade de seguir por múltiplas temporadas.
+
+## 9. Mapeamento para os marcos normativos
+
+| Marco existente | Fases deste roadmap | Evidência de conclusão |
+|---|---|---|
+| **M1 — Núcleo autoritativo jogável** | 0–4 | Loop completo, duas divisões iniciais, feed, save, carreira longa e prestígio básico |
+| **M2 — Profundidade competitiva** | 5 | Série C, copa, estaduais, continental e calendário íntegro |
+| **M3 — Encantamento visual** | 6 | Identidade aplicada, feed polido e 2D leve skippable |
+| **M4 — Conteúdo e comunidade** | 7 | Dados reais normalizados, editor e import/export seguro |
+| **M5 — Monetização e lançamento** | 8–9 | Ranking segmentado, entitlements, billing, telemetria e hardening |
+
+## 10. Testes que acompanham todas as fases
+
+### Engine e domínio
+
+- Unitários para regras e value objects.
+- Property-based para calendários, classificação, transferências e economia.
+- Seeds fixas e golden tests para determinismo.
+- Simulação massiva de partidas, temporadas e carreiras de 20–30 anos.
+- Invariantes executadas no CI e no importador de conteúdo.
+
+### Persistência e aplicação
+
+- Integração real com Postgres e Redis, evitando mocks nas garantias críticas.
+- Contract tests entre web, API, worker e schemas Zod.
+- Migração de save com fixtures de versões anteriores.
+- Testes de idempotência, concorrência, retry e recuperação após falha.
+- E2E mobile-first para cadastro, carreira, rodada, mercado, temporada, ranking e compra.
+
+### Segurança, acessibilidade e operação
+
+- Autorização cruzada: um usuário nunca lê ou muta a carreira de outro.
+- Validação e sanitização de imports e assets.
+- Auditoria de dependências e segredos.
+- Axe/Playwright, teclado, leitores de tela e redução de movimento.
+- Load tests com filas e carreiras concorrentes.
+- Restore periódico de backup em ambiente isolado.
+
+## 11. Definition of Done do MVP
+
+O MVP só está pronto quando todos os itens abaixo forem verdadeiros:
+
+### Produto e gameplay
+
+- O loop completo funciona do cadastro à segunda temporada e continua por dezenas de temporadas.
+- Primeira partida em até 5 minutos e rodada comum em até 2 minutos.
+- Cada rodada produz ao menos uma consequência clara e, quando aplicável, uma decisão significativa.
+- Mercado, base, finanças, estádio, diretoria, torcida e carreira afetam uns aos outros.
+- Acesso, rebaixamento, copa, estaduais e continental fecham e regeneram corretamente.
+- Resultado instantâneo, feed e 2D representam a mesma simulação.
+
+### Plataforma e integridade
+
+- Estado canônico vive no servidor; engine é determinístico por seed e versão.
+- Saves possuem snapshot, eventos relevantes, checksum e versões completas.
+- Avanço, transferência e billing são idempotentes e protegidos contra concorrência.
+- Backups, restore e rollback foram testados.
+- Metas de performance são atendidas ou formalmente revisadas com evidência.
+
+### Experiência
+
+- Todo fluxo funciona de ponta a ponta no celular e também com teclado.
+- Pular para o resultado está sempre a um toque durante a apresentação da partida.
+- Alertas explicam impacto, ação e prazo.
+- Não há bloqueios por animação, energia, timer ou anúncio no loop.
+
+### Conteúdo, social e negócio
+
+- Os datasets reais possuem pipeline reproduzível, proveniência e versionamento.
+- Ranking global, Ascensão/Underdog e mensal são derivados do backend.
+- Editor básico e completo respeitam entitlements e segurança de importação.
+- Grátis, licença e Clube Online seguem a matriz normativa.
+- Telemetria mede ativação, engajamento, retenção, qualidade e conversão.
+- Gates jurídicos/comerciais necessários ao lançamento foram formalmente resolvidos.
+
+## 12. Fora do MVP
+
+Não antecipar durante os marcos acima:
+
+- Campo 3D/Three.js.
+- Sete habilidades numéricas visíveis e treino semanal.
+- Modo ranqueado normalizado.
+- Multiplayer, ligas privadas, mercado humano, draft ou co-op.
+- Seleções, Mundial e continentais europeias.
+- Estaduais completos de todos os estados/divisões.
+- Academia sub-21 formal, prêmios avançados e galeria 3D.
+- Workshop hospedado com descoberta pública.
+- IA generativa decidindo fatos do mundo ou resultados.
+- App nativo.
+
+Preparar fronteiras para essas extensões não significa implementá-las antes do MVP.
+
+## 13. Riscos principais e mitigação
+
+| Risco | Probabilidade/impacto | Mitigação no roadmap |
+|---|---|---|
+| Economia degrada após muitas temporadas | Alta/Muito alto | Ledger, simulação de 20–30 temporadas e gates na Fase 4 |
+| Calendário entra em estado inválido | Alta/Muito alto | DSL data-driven, validador pré-temporada e property tests na Fase 5 |
+| Save quebra após atualização | Média/Muito alto | Versionamento desde Fase 2, fixtures, backup e rollback |
+| IA de mercado destrói elencos | Alta/Alto | Restrições, métricas de distribuição e simulações longas |
+| Escopo excede capacidade solo | Alta/Muito alto | Uma slice ativa, gates obrigatórios e fast-follow congelado |
+| Agentes geram código inconsistente | Alta/Alto | Contratos/ADRs, CI obrigatório, revisão humana em áreas críticas |
+| Dados reais são duplicados/incompletos | Alta/Alto | Pipeline com IDs estáveis, proveniência, rejeições e diff |
+| Ranking premia apenas grind | Alta/Médio | Leaderboard Underdog e mensal; normalizado fica pós-MVP |
+| Infra online prejudica rodada rápida | Média/Alto | Batch, worker separado, SSE, retries e metas desde Fase 2 |
+| Mobile vira adaptação tardia | Média/Alto | Fluxo mobile obrigatório em todos os gates de UI |
+| Conteúdo/marcas impedem lançamento | Indefinida/Muito alto | Gate jurídico/comercial antes da beta pública |
+
+## 14. Estimativa consolidada
+
+| Bloco | Faixa |
+|---|---:|
+| Fases 0–2: fundação, laboratório e vertical slice online | 10–16 semanas |
+| Fases 3–5: matchday, carreira longa e competições | 19–28 semanas |
+| Fases 6–8: UX/2D, conteúdo/editor, ranking/billing | 16–25 semanas |
+| Fase 9: hardening e lançamento | 5–8 semanas |
+| **Total sequencial provável** | **50–77 semanas efetivas** |
+
+Para uma pessoa, o MVP descrito é um projeto de aproximadamente **12–18 meses em dedicação integral**. A faixa
+inclui integração e retrabalho razoáveis, mas não contempla espera externa por contratação, aprovação jurídica,
+licenciamento, produção artística extensa ou operação em dedicação parcial.
+
+Ferramentas de IA reduzem tempo de boilerplate, testes, documentação e investigação. Elas não removem o custo de
+balanceamento, decisões de produto, revisão de segurança, validação de saves, QA em dispositivos e operação.
+
+## 15. Próximos passos imediatos
+
+1. Revisar e aprovar este roadmap como plano operacional.
+2. Corrigir na suite documental referências antigas de numeração, escopo e conteúdo para reduzir ambiguidade.
+3. Registrar o override de elencos reais em `docs/00-visao-e-decisoes.md` e `docs/08-mvp-fonte-de-verdade.md`.
+4. Criar backlog apenas da Fase 0, com issues pequenas e critérios verificáveis.
+5. Fazer o commit inicial da documentação e dos dados brutos, preservando o estado de partida.
+6. Executar a Fase 0 sem iniciar UI de produto ou regras avançadas em paralelo.
+7. Planejar a Fase 1 somente quando o baseline estiver reproduzível e o CI estiver verde.
+
+---
+
+> **Regra de execução:** se uma entrega não melhora o loop, não reduz um risco do caminho crítico ou não é
+> necessária para lançar o MVP normativo, ela não entra no marco atual.
