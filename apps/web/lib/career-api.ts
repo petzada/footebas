@@ -5,13 +5,7 @@ import {
 } from '@/lib/phase4-model';
 
 export type Screen =
-  | 'home'
-  | 'squad'
-  | 'tactics'
-  | 'table'
-  | 'market'
-  | 'club'
-  | 'world';
+  'home' | 'squad' | 'tactics' | 'table' | 'market' | 'club' | 'world';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
 export type SquadRole = 'starter' | 'bench' | 'reserve';
 export type AutoPickStrategy = 'best' | 'rest' | 'develop';
@@ -807,7 +801,9 @@ export class InMemoryCareerApi implements CareerApiPort {
     );
     if (!contract) throw new Error('Contrato não encontrado.');
     if (contract.status === 'refused')
-      throw new Error('A negociação já foi recusada e não pode ser reaberta agora.');
+      throw new Error(
+        'A negociação já foi recusada e não pode ser reaberta agora.',
+      );
     const cost = contract.renewalDemand;
     const world = this.#worldWithLedger(
       {
@@ -900,7 +896,8 @@ export class InMemoryCareerApi implements CareerApiPort {
           id: `n-${Date.now()}`,
           tag: 'Mercado',
           headline: `${player.name} foi colocado para ${label}`,
-          detail: 'Clubes interessados podem enviar propostas na próxima rodada.',
+          detail:
+            'Clubes interessados podem enviar propostas na próxima rodada.',
         },
         ...current.world.news,
       ],
@@ -935,7 +932,10 @@ export class InMemoryCareerApi implements CareerApiPort {
       throw new Error('Informe um valor de oferta maior que zero.');
     if (kind === 'loan' && player.availability === 'free-agent')
       throw new Error('Atleta livre não pode ser contratado por empréstimo.');
-    const threshold = kind === 'loan' ? Math.max(500000, player.value * 0.08) : Math.max(player.salary * 4, player.value * 0.9);
+    const threshold =
+      kind === 'loan'
+        ? Math.max(500000, player.value * 0.08)
+        : Math.max(player.salary * 4, player.value * 0.9);
     if (amount < threshold) {
       const counterAmount = Math.round(threshold / 100000) * 100000;
       return this.#commitWorld({
@@ -998,8 +998,13 @@ export class InMemoryCareerApi implements CareerApiPort {
   async expandStadium() {
     const current = this.#require();
     const cost = current.world.stadium.expansionCost;
-    if (current.world.finances.cash - cost < current.world.finances.transferGate)
-      throw new Error('A diretoria bloqueou a obra: preserve a reserva mínima do clube.');
+    if (
+      current.world.finances.cash - cost <
+      current.world.finances.transferGate
+    )
+      throw new Error(
+        'A diretoria bloqueou a obra: preserve a reserva mínima do clube.',
+      );
     return this.#commitWorld(
       this.#worldWithLedger(
         {
@@ -1026,7 +1031,10 @@ export class InMemoryCareerApi implements CareerApiPort {
       ...current.world,
       youth: current.world.youth.map((item) =>
         item.id === playerId
-          ? { ...item, readiness: 'plano individual ativo · revisão em 4 rodadas' }
+          ? {
+              ...item,
+              readiness: 'plano individual ativo · revisão em 4 rodadas',
+            }
           : item,
       ),
     });
@@ -1043,7 +1051,12 @@ export class InMemoryCareerApi implements CareerApiPort {
         item.id === playerId ? { ...item, status: 'promoted' as const } : item,
       ),
       news: [
-        { id: `n-${Date.now()}`, tag: 'Base', headline: `${youth.name} foi promovido`, detail: 'O jovem gerado passa a treinar com o elenco principal.' },
+        {
+          id: `n-${Date.now()}`,
+          tag: 'Base',
+          headline: `${youth.name} foi promovido`,
+          detail: 'O jovem gerado passa a treinar com o elenco principal.',
+        },
         ...current.world.news,
       ],
     });
@@ -1085,7 +1098,12 @@ export class InMemoryCareerApi implements CareerApiPort {
         history: {
           ...current.world.history,
           seasons: [
-            { season: '2026', club: current.club, finish: 'Troca de clube durante a temporada', topScorer: 'Pedro · 11 gols' },
+            {
+              season: '2026',
+              club: current.club,
+              finish: 'Troca de clube durante a temporada',
+              topScorer: 'Pedro · 11 gols',
+            },
             ...current.world.history.seasons,
           ],
         },
@@ -1101,7 +1119,12 @@ export class InMemoryCareerApi implements CareerApiPort {
           ),
         },
         news: [
-          { id: `n-${Date.now()}`, tag: 'Carreira', headline: `${current.coach} assume o ${proposal.club}`, detail: `A carreira continua na ${proposal.division}; prestígio e histórico foram preservados.` },
+          {
+            id: `n-${Date.now()}`,
+            tag: 'Carreira',
+            headline: `${current.coach} assume o ${proposal.club}`,
+            detail: `A carreira continua na ${proposal.division}; prestígio e histórico foram preservados.`,
+          },
           ...current.world.news,
         ],
       },
@@ -1112,8 +1135,13 @@ export class InMemoryCareerApi implements CareerApiPort {
   #completeTransfer(playerId: string, amount: number, kind: TransferKind) {
     const current = this.#require();
     const player = current.world.market.find((item) => item.id === playerId)!;
-    if (amount > current.world.finances.cash - current.world.finances.transferGate)
-      throw new Error('A oferta ultrapassa o limite autorizado pela diretoria.');
+    if (
+      amount >
+      current.world.finances.cash - current.world.finances.transferGate
+    )
+      throw new Error(
+        'A oferta ultrapassa o limite autorizado pela diretoria.',
+      );
     const world = this.#worldWithLedger(
       {
         ...current.world,
