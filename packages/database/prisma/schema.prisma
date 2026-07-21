@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model GameSave {
+  id             String   @id @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  snapshot       Json     @db.JsonB
+  checksum       String   @db.Char(64)
+  seed           String
+  engineVersion  String   @map("engine_version")
+  rulesVersion   String   @map("rules_version")
+  contentVersion String   @map("content_version")
+  schemaVersion  String   @map("schema_version")
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  events         GameEvent[]
+  commands       CommandReceipt[]
+
+  @@index([userId, updatedAt(sort: Desc)], map: "game_saves_user_updated_idx")
+  @@map("game_saves")
+}
+
+model GameEvent {
+  id         BigInt   @id @default(autoincrement())
+  gameSaveId String   @map("game_save_id") @db.Uuid
+  ordinal    Int
+  eventType  String   @map("event_type")
+  payload    Json     @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  gameSave   GameSave @relation(fields: [gameSaveId], references: [id], onDelete: Cascade)
+
+  @@unique([gameSaveId, ordinal])
+  @@index([gameSaveId, createdAt], map: "game_events_save_created_idx")
+  @@map("game_events")
+}
+
+model CommandReceipt {
+  id         BigInt   @id @default(autoincrement())
+  gameSaveId String   @map("game_save_id") @db.Uuid
+  commandId  String   @map("command_id") @db.Uuid
+  response   Json     @db.JsonB
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  gameSave   GameSave @relation(fields: [gameSaveId], references: [id], onDelete: Cascade)
+
+  @@unique([gameSaveId, commandId], map: "command_receipts_save_command_key")
+  @@index([gameSaveId, createdAt], map: "command_receipts_save_created_idx")
+  @@map("command_receipts")
+}
