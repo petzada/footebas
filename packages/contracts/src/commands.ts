@@ -1,13 +1,18 @@
 import { z } from 'zod';
 import {
   attackDirectionSchema,
+  attackFocusSchema,
+  buildUpStyleSchema,
   commandIdSchema,
   entityIdSchema,
   formationSchema,
   gameDateSchema,
   idempotencyKeySchema,
   markingIntensitySchema,
+  markingStyleSchema,
   mentalitySchema,
+  pressingStyleSchema,
+  defensiveLineSchema,
   nonEmptyTextSchema,
   positionSchema,
   transportVersionSchema,
@@ -46,6 +51,7 @@ export const setLineupCommandSchema = z.strictObject({
     clubId: entityIdSchema,
     starters: z.array(lineupSlotSchema).length(11),
     substitutes: z.array(entityIdSchema).max(12),
+    reserves: z.array(entityIdSchema).max(100).optional(),
     captainId: entityIdSchema,
   }),
 });
@@ -58,8 +64,62 @@ export const setTacticsCommandSchema = z.strictObject({
     mentality: mentalitySchema,
     attackDirection: attackDirectionSchema,
     marking: markingIntensitySchema,
+    buildUp: buildUpStyleSchema.optional(),
+    focus: attackFocusSchema.optional(),
+    press: pressingStyleSchema.optional(),
+    defensiveLine: defensiveLineSchema.optional(),
+    markingStyle: markingStyleSchema.optional(),
   }),
 });
+export const autoPickLineupCommandSchema = z.strictObject({
+  ...envelopeFields,
+  type: z.literal('AutoPickLineup'),
+  payload: z.strictObject({
+    careerId: entityIdSchema,
+    clubId: entityIdSchema,
+    formation: formationSchema,
+    mode: z.enum(['best', 'rest', 'develop']),
+  }),
+});
+const tacticSchema = z.strictObject({
+  formation: formationSchema,
+  mentality: mentalitySchema,
+  attackDirection: attackDirectionSchema,
+  marking: markingIntensitySchema,
+  buildUp: buildUpStyleSchema.optional(),
+  focus: attackFocusSchema.optional(),
+  press: pressingStyleSchema.optional(),
+  defensiveLine: defensiveLineSchema.optional(),
+  markingStyle: markingStyleSchema.optional(),
+});
+const matchInstructionSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('substitution'),
+    minute: z.union([
+      z.literal(15),
+      z.literal(30),
+      z.literal(45),
+      z.literal(60),
+      z.literal(75),
+    ]),
+    side: z.enum(['home', 'away']),
+    playerOutId: entityIdSchema,
+    playerInId: entityIdSchema,
+    position: positionSchema,
+  }),
+  z.strictObject({
+    type: z.literal('tactical_change'),
+    minute: z.union([
+      z.literal(15),
+      z.literal(30),
+      z.literal(45),
+      z.literal(60),
+      z.literal(75),
+    ]),
+    side: z.enum(['home', 'away']),
+    tactic: tacticSchema,
+  }),
+]);
 export const advanceDateCommandSchema = z.strictObject({
   ...envelopeFields,
   type: z.literal('AdvanceDate'),
@@ -74,6 +134,7 @@ export const simulateMatchCommandSchema = z.strictObject({
   payload: z.strictObject({
     careerId: entityIdSchema,
     fixtureId: entityIdSchema,
+    instructions: z.array(matchInstructionSchema).max(12).optional(),
   }),
 });
 
@@ -81,6 +142,7 @@ export const commandSchema = z.discriminatedUnion('type', [
   createCareerCommandSchema,
   selectClubCommandSchema,
   setLineupCommandSchema,
+  autoPickLineupCommandSchema,
   setTacticsCommandSchema,
   advanceDateCommandSchema,
   simulateMatchCommandSchema,
@@ -97,6 +159,7 @@ export type CreateCareerCommand = z.infer<typeof createCareerCommandSchema>;
 export type SelectClubCommand = z.infer<typeof selectClubCommandSchema>;
 export type SetLineupCommand = z.infer<typeof setLineupCommandSchema>;
 export type SetTacticsCommand = z.infer<typeof setTacticsCommandSchema>;
+export type AutoPickLineupCommand = z.infer<typeof autoPickLineupCommandSchema>;
 export type AdvanceDateCommand = z.infer<typeof advanceDateCommandSchema>;
 export type SimulateMatchCommand = z.infer<typeof simulateMatchCommandSchema>;
 export type Command = z.infer<typeof commandSchema>;

@@ -13,9 +13,11 @@ import {
   DomainError,
   entityId,
   GameDate,
+  FORMATION_POSITIONS,
   money,
   percentage,
   strength,
+  validateLineupForMatch,
 } from './index.js';
 import type {
   ClubId,
@@ -28,6 +30,8 @@ import type {
 const playerId = (index: number): PlayerId =>
   entityId(`player_${String(index)}`, 'player');
 const clubId = (name: string): ClubId => entityId(`club_${name}`, 'club');
+const baseIds = (offset: number): readonly PlayerId[] =>
+  Array.from({ length: 12 }, (_, index) => playerId(offset + index));
 const stats: MatchStatistics = {
   shots: 1,
   shotsOnTarget: 1,
@@ -74,7 +78,12 @@ function player(index: number, club?: ClubId): Player {
 }
 
 function players(offset: number, club: ClubId): readonly Player[] {
-  return Array.from({ length: 12 }, (_, index) => player(offset + index, club));
+  return Array.from({ length: 12 }, (_, index) => {
+    const candidate = player(offset + index, club);
+    return index === 0
+      ? createPlayer({ ...candidate, position: 'GK' })
+      : candidate;
+  });
 }
 
 function lineup(club: ClubId, offset = 0): Lineup {
@@ -82,7 +91,7 @@ function lineup(club: ClubId, offset = 0): Lineup {
     clubId: club,
     starters: Array.from({ length: 11 }, (_, index) => ({
       playerId: playerId(offset + index),
-      position: index === 0 ? ('GK' as const) : ('CM' as const),
+      position: FORMATION_POSITIONS['4-4-2'][index] ?? 'CM',
     })),
     substitutes: [playerId(offset + 11)],
     captainId: playerId(offset + 1),
@@ -183,6 +192,30 @@ describe('lineup and fixtures', () => {
       }),
     ).toThrow(DomainError);
   });
+  it('rejects unavailable starters and formation mismatches at the domain boundary', () => {
+    const id = clubId('matchday');
+    const roster = players(0, id);
+    const club = createClub({
+      id,
+      name: 'Matchday',
+      shortName: 'MAT',
+      squad: roster.map(({ id: player }) => player),
+      balance: money(0),
+      reputation: percentage(50),
+    });
+    expect(
+      validateLineupForMatch(lineup(id), club, roster, '4-4-2'),
+    ).toBeDefined();
+    const injured = roster.map((candidate, index) =>
+      index === 1 ? createPlayer({ ...candidate, injuryRounds: 2 }) : candidate,
+    );
+    expect(() =>
+      validateLineupForMatch(lineup(id), club, injured, '4-4-2'),
+    ).toThrow(DomainError);
+    expect(() =>
+      validateLineupForMatch(lineup(id), club, roster, '4-3-3'),
+    ).toThrow(DomainError);
+  });
   it('enforces fixture state as a discriminated invariant', () => {
     const base = {
       id: entityId('fixture_1', 'fixture'),
@@ -271,7 +304,10 @@ describe('competition and match contracts', () => {
       id: homeId,
       name: 'Home',
       shortName: 'HOM',
-      squad: lineup(homeId).starters.map((slot) => slot.playerId),
+      squad: [
+        ...lineup(homeId).starters.map((slot) => slot.playerId),
+        ...lineup(homeId).substitutes,
+      ],
       balance: money(0),
       reputation: percentage(50),
     });
@@ -279,7 +315,10 @@ describe('competition and match contracts', () => {
       id: awayId,
       name: 'Away',
       shortName: 'AWY',
-      squad: lineup(awayId, 20).starters.map((slot) => slot.playerId),
+      squad: [
+        ...lineup(awayId, 20).starters.map((slot) => slot.playerId),
+        ...lineup(awayId, 20).substitutes,
+      ],
       balance: money(0),
       reputation: percentage(50),
     });
@@ -303,7 +342,7 @@ describe('competition and match contracts', () => {
         club: away,
         lineup: lineup(awayId, 20),
         tactic: {
-          formation: '4-3-3',
+          formation: '4-4-2',
           mentality: 'counter_attack',
           attackDirection: 'wings',
           marking: 'heavy',
@@ -357,7 +396,7 @@ describe('competition and match contracts', () => {
           id: homeId,
           name: 'Home',
           shortName: 'H',
-          squad: [],
+          squad: baseIds(offset),
           balance: money(0),
           reputation: percentage(50),
         });
@@ -365,7 +404,7 @@ describe('competition and match contracts', () => {
           id: awayId,
           name: 'Away',
           shortName: 'A',
-          squad: [],
+          squad: baseIds(offset + 20),
           balance: money(0),
           reputation: percentage(50),
         });
@@ -389,7 +428,7 @@ describe('competition and match contracts', () => {
             club: awayClub,
             lineup: awayLineup,
             tactic: createTactic({
-              formation: '4-3-3',
+              formation: '4-4-2',
               mentality: 'counter_attack',
               attackDirection: 'wings',
               marking: 'heavy',

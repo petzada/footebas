@@ -48,6 +48,25 @@ export const mentalitySchema = z.enum([
 ]);
 export const attackDirectionSchema = z.enum(['center', 'wings']);
 export const markingIntensitySchema = z.enum(['light', 'heavy', 'very_heavy']);
+export const buildUpStyleSchema = z.enum(['short', 'mixed', 'direct']);
+export const attackFocusSchema = z.enum(['center', 'wings', 'balanced']);
+export const pressingStyleSchema = z.enum(['low', 'medium', 'high']);
+export const defensiveLineSchema = z.enum(['deep', 'normal', 'high']);
+export const markingStyleSchema = z.enum(['zonal', 'mixed', 'man']);
+export const playerTraitSchema = z.enum([
+  'pace',
+  'crossing',
+  'playmaking',
+  'passing',
+  'heading',
+  'marking',
+  'tackling',
+  'finishing',
+  'positioning',
+  'aerial_command',
+  'reflexes',
+  'penalty_saving',
+]);
 
 export type EntityId = z.infer<typeof entityIdSchema>;
 export type GameDate = z.infer<typeof gameDateSchema>;

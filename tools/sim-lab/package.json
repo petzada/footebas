@@ -8,6 +8,7 @@
     "calibrate": "tsx src/cli.ts --calibrate --matches=10000",
     "lint": "eslint src --max-warnings=0",
     "phase1-gate": "tsx src/cli.ts --phase1-gate --matches=10000 --seasons=1000",
+    "phase3-gate": "tsx src/cli.ts --phase3-gate --rounds=14",
     "playthrough": "tsx src/cli.ts --playthrough --rounds=14",
     "season": "tsx src/cli.ts --season",
     "smoke": "tsx src/cli.ts --smoke",

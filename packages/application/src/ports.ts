@@ -27,6 +27,7 @@ export interface SimulationJob {
   readonly userId: string;
   readonly expectedVersion: number;
   readonly fixtureId?: string;
+  readonly instructions?: readonly import('@footebas/domain').MatchInstruction[];
 }
 export interface JobQueuePort {
   enqueue(job: SimulationJob): Promise<void>;

@@ -245,6 +245,11 @@ describe('read models and snapshots', () => {
         { type: 'goal', minute: 42, side: 'home', playerId: 'player_1' },
       ],
       tableUpdated: true,
+      playback: {
+        modes: ['instant', 'fast', 'feed'],
+        speeds: [1, 2, 4, 8],
+        canSkip: true,
+      },
     };
     expect(roundTrip(postMatchReadModelSchema, postMatch)).toEqual(postMatch);
   });

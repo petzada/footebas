@@ -27,20 +27,25 @@ import {
 } from '@footebas/database';
 import {
   GameDate,
+  FORMATION_POSITIONS,
   createLineup,
   createMatchInput,
   createTactic,
   entityId,
+  validateLineupForMatch,
   type CanonicalValue,
   type Club,
   type Fixture,
   type Lineup,
   type MatchResult,
+  type MatchInstruction,
   type Player,
   type Tactic,
 } from '@footebas/domain';
 import {
   ENGINE_VERSION,
+  autoSelectLineup,
+  createMatchPresentation,
   generateDoubleRoundRobin,
   simulateMatch,
 } from '@footebas/engine';
@@ -257,6 +262,7 @@ export class FootebasApplication {
               [
                 ...command.payload.starters.map(({ playerId }) => playerId),
                 ...command.payload.substitutes,
+                ...(command.payload.reserves ?? []),
               ].some((id) => !memberIds.has(entityId(id, 'player')))
             )
               throw new ApplicationError(
@@ -272,12 +278,69 @@ export class FootebasApplication {
               substitutes: command.payload.substitutes.map((id) =>
                 entityId(id, 'player'),
               ),
+              ...(command.payload.reserves
+                ? {
+                    reserves: command.payload.reserves.map((id) =>
+                      entityId(id, 'player'),
+                    ),
+                  }
+                : {}),
               captainId: entityId(command.payload.captainId, 'player'),
             });
             break;
           }
+          case 'AutoPickLineup': {
+            if (snapshot.selectedClubId !== command.payload.clubId)
+              throw new ApplicationError(
+                'FORBIDDEN',
+                'lineup club is not managed by this career',
+              );
+            const club = snapshot.clubs.find(
+              ({ id }) => id === command.payload.clubId,
+            )!;
+            snapshot.lineup = autoSelectLineup({
+              club,
+              players: snapshot.players,
+              formation: command.payload.formation,
+              mode: command.payload.mode,
+            });
+            snapshot.tactic = createTactic({
+              ...(snapshot.tactic ?? defaultTactic()),
+              formation: command.payload.formation,
+            });
+            break;
+          }
           case 'SetTactics':
-            snapshot.tactic = createTactic(command.payload);
+            if (
+              snapshot.lineup &&
+              snapshot.tactic?.formation !== command.payload.formation
+            )
+              snapshot.lineup = reformLineup(
+                snapshot.lineup,
+                snapshot.players,
+                command.payload.formation,
+              );
+            snapshot.tactic = createTactic({
+              formation: command.payload.formation,
+              mentality: command.payload.mentality,
+              attackDirection: command.payload.attackDirection,
+              marking: command.payload.marking,
+              ...(command.payload.buildUp
+                ? { buildUp: command.payload.buildUp }
+                : {}),
+              ...(command.payload.focus
+                ? { focus: command.payload.focus }
+                : {}),
+              ...(command.payload.press
+                ? { press: command.payload.press }
+                : {}),
+              ...(command.payload.defensiveLine
+                ? { defensiveLine: command.payload.defensiveLine }
+                : {}),
+              ...(command.payload.markingStyle
+                ? { markingStyle: command.payload.markingStyle }
+                : {}),
+            });
             break;
           case 'AdvanceDate':
           case 'SimulateMatch': {
@@ -331,6 +394,13 @@ export class FootebasApplication {
               userId,
               expectedVersion: save.version + 1,
               fixtureId: fixture.id,
+              ...(command.type === 'SimulateMatch' &&
+              command.payload.instructions
+                ? {
+                    instructions: command.payload
+                      .instructions as readonly MatchInstruction[],
+                  }
+                : {}),
             };
             break;
           }
@@ -380,7 +450,12 @@ export class FootebasApplication {
           ...fixtureData,
           date: GameDate.parse(fixtureData.date),
         } as Fixture;
-        const result = this.simulate(snapshot, fixture, save.seed);
+        const result = this.simulate(
+          snapshot,
+          fixture,
+          save.seed,
+          job.instructions,
+        );
         applyResult(snapshot, fixture, result);
         delete snapshot.pendingJobId;
         this.deps.failPoint?.('before-persist-result', job);
@@ -411,6 +486,7 @@ export class FootebasApplication {
     snapshot: Snapshot,
     fixture: Fixture,
     seed: string,
+    instructions: readonly MatchInstruction[] = [],
   ): MatchResult {
     const side = (clubId: string) => {
       const club = snapshot.clubs.find(({ id }) => id === clubId)!;
@@ -424,6 +500,22 @@ export class FootebasApplication {
         players: snapshot.players.filter((player) => player.clubId === club.id),
       };
     };
+    const managedSide =
+      fixture.homeClubId === snapshot.selectedClubId ? 'home' : 'away';
+    if (instructions.some(({ side }) => side !== managedSide))
+      throw new ApplicationError(
+        'FORBIDDEN',
+        'match instructions can only control the managed club',
+      );
+    const managedClub = snapshot.clubs.find(
+      ({ id }) => id === snapshot.selectedClubId,
+    )!;
+    validateLineupForMatch(
+      snapshot.lineup!,
+      managedClub,
+      snapshot.players,
+      snapshot.tactic!.formation,
+    );
     return simulateMatch(
       createMatchInput({
         fixtureId: fixture.id,
@@ -432,6 +524,7 @@ export class FootebasApplication {
         rulesVersion: VERSIONS.rules,
         home: side(fixture.homeClubId),
         away: side(fixture.awayClubId),
+        instructions,
       }),
     );
   }
@@ -470,18 +563,60 @@ export class FootebasApplication {
             name: p.name,
             age: p.age,
             position: p.position,
+            secondaryPositions: p.secondaryPositions,
+            ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
             strength: p.strength,
+            traits: p.traits,
             condition: p.condition,
             morale: p.morale,
+            matchSharpness: p.matchSharpness,
+            squadStatus: p.squadStatus,
             injuryRounds: p.injuryRounds,
             suspensionRounds: p.suspensionRounds,
+            availability:
+              p.injuryRounds > 0
+                ? 'injured'
+                : p.suspensionRounds > 0
+                  ? 'suspended'
+                  : 'available',
+            ...(p.lastMatchRating === undefined
+              ? {}
+              : { lastMatchRating: p.lastMatchRating }),
+            careerStats: {
+              appearances: p.careerStats.appearances,
+              goals: p.careerStats.goals,
+              assists: p.careerStats.assists,
+              yellowCards: p.careerStats.yellowCards,
+              redCards: p.careerStats.redCards,
+              ...(p.careerStats.ratedAppearances
+                ? {
+                    averageRating: Number(
+                      (
+                        (p.careerStats.ratingTotal ?? 0) /
+                        p.careerStats.ratedAppearances
+                      ).toFixed(2),
+                    ),
+                  }
+                : {}),
+            },
+            hiddenEstimates: hiddenEstimates(p),
           })),
         lineupPlayerIds: s.lineup
           ? [
               ...s.lineup.starters.map(({ playerId }) => playerId),
               ...s.lineup.substitutes,
+              ...(s.lineup.reserves ?? []),
             ]
           : [],
+        lineup:
+          s.lineup && s.tactic
+            ? {
+                formation: s.tactic.formation,
+                starters: s.lineup.starters.map(({ playerId }) => playerId),
+                bench: s.lineup.substitutes,
+                reserves: s.lineup.reserves ?? [],
+              }
+            : undefined,
       });
     });
   }
@@ -505,6 +640,7 @@ export class FootebasApplication {
           : s.lineup && s.tactic
             ? 'ready'
             : 'scheduled',
+        preparation: matchPreparation(s, f),
       });
     });
   }
@@ -564,6 +700,31 @@ export class FootebasApplication {
             playerId: event.playerId,
             card: event.card,
           });
+        else if (event.type === 'injury')
+          timeline.push({
+            type: 'injury',
+            minute: event.minute,
+            side: event.side,
+            playerId: event.playerId,
+            rounds: event.rounds,
+          });
+        else if (event.type === 'substitution')
+          timeline.push({
+            type: 'substitution',
+            minute: event.minute,
+            side: event.side,
+            playerOutId: event.playerOutId,
+            playerInId: event.playerInId,
+            ...(event.source ? { source: event.source } : {}),
+          });
+        else
+          timeline.push({
+            type: 'tactical_change',
+            minute: event.minute,
+            side: event.side,
+            formation: event.tactic.formation,
+            mentality: event.tactic.mentality,
+          });
       }
       return postMatchReadModelSchema.parse({
         ...base(save, now),
@@ -574,6 +735,7 @@ export class FootebasApplication {
         score: { home: result.homeGoals, away: result.awayGoals },
         timeline,
         tableUpdated: true,
+        playback: createMatchPresentation(result).playback,
       });
     });
   }
@@ -701,6 +863,139 @@ function sortedStandings(snapshot: Snapshot) {
       a.clubId.localeCompare(b.clubId),
   );
 }
+function reformLineup(
+  lineup: Lineup,
+  players: readonly Player[],
+  formation: Tactic['formation'],
+): Lineup {
+  const byId = new Map(players.map((player) => [player.id, player]));
+  const goalkeeper = lineup.starters.find(
+    ({ playerId }) => byId.get(playerId)?.position === 'GK',
+  );
+  if (!goalkeeper)
+    throw new ApplicationError(
+      'VALIDATION_ERROR',
+      'lineup has no goalkeeper for the selected formation',
+    );
+  const ordered = [
+    goalkeeper,
+    ...lineup.starters.filter(
+      ({ playerId }) => playerId !== goalkeeper.playerId,
+    ),
+  ];
+  return createLineup({
+    ...lineup,
+    starters: FORMATION_POSITIONS[formation].map((position, index) => ({
+      playerId: ordered[index]?.playerId ?? goalkeeper.playerId,
+      position,
+    })),
+  });
+}
+function estimate(value: number): 'low' | 'average' | 'good' | 'excellent' {
+  return value < 40
+    ? 'low'
+    : value < 65
+      ? 'average'
+      : value < 82
+        ? 'good'
+        : 'excellent';
+}
+function hiddenEstimates(player: Player) {
+  return {
+    potential: estimate(Number(player.hidden.potential)),
+    consistency: estimate(Number(player.hidden.consistency)),
+    injuryRisk:
+      Number(player.hidden.injuryProneness) < 25
+        ? ('low' as const)
+        : Number(player.hidden.injuryProneness) < 55
+          ? ('average' as const)
+          : ('high' as const),
+    adaptation: estimate(Number(player.hidden.adaptation)),
+    professionalism: estimate(Number(player.hidden.professionalism)),
+    bigGames: estimate(Number(player.hidden.bigGame)),
+  };
+}
+function matchPreparation(
+  snapshot: Snapshot,
+  fixture: Snapshot['fixtures'][number],
+) {
+  const opponentId =
+    fixture.homeClubId === snapshot.selectedClubId
+      ? fixture.awayClubId
+      : fixture.homeClubId;
+  const opponent = clubSummary(snapshot, opponentId)!;
+  const recentForm = snapshot.results
+    .filter((result) => {
+      const played = snapshot.fixtures.find(
+        ({ id }) => id === result.fixtureId,
+      );
+      return (
+        played?.homeClubId === opponentId || played?.awayClubId === opponentId
+      );
+    })
+    .slice(-5)
+    .map((result) => {
+      const played = snapshot.fixtures.find(
+        ({ id }) => id === result.fixtureId,
+      )!;
+      const goalsFor =
+        played.homeClubId === opponentId ? result.homeGoals : result.awayGoals;
+      const goalsAgainst =
+        played.homeClubId === opponentId ? result.awayGoals : result.homeGoals;
+      return goalsFor > goalsAgainst
+        ? ('W' as const)
+        : goalsFor < goalsAgainst
+          ? ('L' as const)
+          : ('D' as const);
+    });
+  const mean = (clubId: string) => {
+    const values = snapshot.players
+      .filter(
+        (player) =>
+          player.clubId === clubId &&
+          player.injuryRounds === 0 &&
+          player.suspensionRounds === 0,
+      )
+      .map(({ strength }) => Number(strength));
+    return (
+      values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
+    );
+  };
+  const difference = mean(opponentId) - mean(snapshot.selectedClubId!);
+  const approximateStrength =
+    difference < -7
+      ? ('much_weaker' as const)
+      : difference < -2
+        ? ('weaker' as const)
+        : difference <= 2
+          ? ('similar' as const)
+          : difference <= 7
+            ? ('stronger' as const)
+            : ('much_stronger' as const);
+  const absences = snapshot.players
+    .filter(
+      (player) =>
+        player.clubId === opponentId &&
+        (player.injuryRounds > 0 || player.suspensionRounds > 0),
+    )
+    .map((player) => ({
+      playerId: player.id,
+      playerName: player.name,
+      reason:
+        player.injuryRounds > 0 ? ('injury' as const) : ('suspension' as const),
+      rounds: Math.max(player.injuryRounds, player.suspensionRounds),
+    }));
+  return {
+    opponent,
+    venue:
+      fixture.homeClubId === snapshot.selectedClubId
+        ? ('home' as const)
+        : ('away' as const),
+    recentForm,
+    approximateStrength,
+    absences,
+  };
+}
 function applyResult(
   snapshot: Snapshot,
   fixture: Fixture,
@@ -734,20 +1029,54 @@ function applyResult(
     home.points += 1;
     away.points += 1;
   }
-  const starters = new Set([
-    ...(snapshot.lineup?.starters.map(({ playerId }) => playerId) ?? []),
-  ]);
-  snapshot.players = snapshot.players.map((player) =>
-    starters.has(player.id)
-      ? ({
-          ...player,
-          condition: Math.max(0, Number(player.condition) - 6),
-          matchSharpness: Math.min(100, Number(player.matchSharpness) + 2),
-          careerStats: {
-            ...player.careerStats,
-            appearances: player.careerStats.appearances + 1,
-          },
-        } as Player)
-      : player,
+  const performance = new Map(
+    (result.playerPerformances ?? []).map((item) => [item.playerId, item]),
   );
+  snapshot.players = snapshot.players.map((player) => {
+    const played = performance.get(player.id);
+    if (!played)
+      return {
+        ...player,
+        injuryRounds: Math.max(0, player.injuryRounds - 1),
+        suspensionRounds: Math.max(0, player.suspensionRounds - 1),
+        condition: Math.min(100, Number(player.condition) + 3),
+      } as Player;
+    const ratedAppearances = (player.careerStats.ratedAppearances ?? 0) + 1;
+    return {
+      ...player,
+      condition: Math.max(
+        0,
+        Math.min(100, Number(player.condition) + played.conditionDelta),
+      ),
+      morale: Math.max(
+        0,
+        Math.min(100, Number(player.morale) + played.moraleDelta),
+      ),
+      matchSharpness: Math.min(
+        100,
+        Number(player.matchSharpness) + (played.started ? 2 : 1),
+      ),
+      injuryRounds: Math.max(
+        Math.max(0, player.injuryRounds - 1),
+        played.injuryRounds,
+      ),
+      suspensionRounds: Math.max(
+        Math.max(0, player.suspensionRounds - 1),
+        played.suspensionRounds,
+      ),
+      lastMatchRating: played.rating,
+      careerStats: {
+        ...player.careerStats,
+        appearances: player.careerStats.appearances + 1,
+        goals: player.careerStats.goals + played.goals,
+        assists: player.careerStats.assists + played.assists,
+        yellowCards: player.careerStats.yellowCards + played.yellowCards,
+        redCards: player.careerStats.redCards + played.redCards,
+        ratedAppearances,
+        ratingTotal: Number(
+          ((player.careerStats.ratingTotal ?? 0) + played.rating).toFixed(1),
+        ),
+      },
+    } as Player;
+  });
 }

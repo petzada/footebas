@@ -6,6 +6,7 @@ import {
   nonEmptyTextSchema,
   percentageSchema,
   positionSchema,
+  playerTraitSchema,
   transportVersionSchema,
   versionSchema,
 } from './primitives.js';
@@ -40,17 +41,48 @@ const squadPlayerSchema = z.strictObject({
   name: nonEmptyTextSchema,
   age: z.int().min(15).max(60),
   position: positionSchema,
+  secondaryPositions: z.array(positionSchema),
+  preferredSide: z.enum(['left', 'right', 'center']).optional(),
   strength: z.number().min(1).max(100),
+  traits: z.array(playerTraitSchema).max(2),
   condition: percentageSchema,
   morale: percentageSchema,
+  matchSharpness: percentageSchema,
+  squadStatus: z.enum(['starter', 'rotation', 'backup', 'listed', 'youth']),
   injuryRounds: z.int().min(0),
   suspensionRounds: z.int().min(0),
+  availability: z.enum(['available', 'injured', 'suspended']),
+  lastMatchRating: z.number().min(1).max(10).optional(),
+  careerStats: z.strictObject({
+    appearances: z.int().min(0),
+    goals: z.int().min(0),
+    assists: z.int().min(0),
+    yellowCards: z.int().min(0),
+    redCards: z.int().min(0),
+    averageRating: z.number().min(0).max(10).optional(),
+  }),
+  hiddenEstimates: z.strictObject({
+    potential: z.enum(['low', 'average', 'good', 'excellent']),
+    consistency: z.enum(['low', 'average', 'good', 'excellent']),
+    injuryRisk: z.enum(['low', 'average', 'high']),
+    adaptation: z.enum(['low', 'average', 'good', 'excellent']),
+    professionalism: z.enum(['low', 'average', 'good', 'excellent']),
+    bigGames: z.enum(['low', 'average', 'good', 'excellent']),
+  }),
 });
 export const squadReadModelSchema = z.strictObject({
   ...readBase,
   club: clubSummarySchema,
   players: z.array(squadPlayerSchema).max(100),
-  lineupPlayerIds: z.array(entityIdSchema).max(23),
+  lineupPlayerIds: z.array(entityIdSchema).max(100),
+  lineup: z
+    .strictObject({
+      formation: z.enum(['4-4-2', '4-3-3', '3-5-2']),
+      starters: z.array(entityIdSchema).length(11),
+      bench: z.array(entityIdSchema).max(12),
+      reserves: z.array(entityIdSchema).max(100),
+    })
+    .optional(),
 });
 export const nextMatchReadModelSchema = z.strictObject({
   ...readBase,
@@ -61,6 +93,28 @@ export const nextMatchReadModelSchema = z.strictObject({
   homeClub: clubSummarySchema,
   awayClub: clubSummarySchema,
   status: z.enum(['scheduled', 'ready', 'running']),
+  preparation: z.strictObject({
+    opponent: clubSummarySchema,
+    venue: z.enum(['home', 'away']),
+    recentForm: z.array(z.enum(['W', 'D', 'L'])).max(5),
+    approximateStrength: z.enum([
+      'much_weaker',
+      'weaker',
+      'similar',
+      'stronger',
+      'much_stronger',
+    ]),
+    absences: z
+      .array(
+        z.strictObject({
+          playerId: entityIdSchema,
+          playerName: nonEmptyTextSchema,
+          reason: z.enum(['injury', 'suspension']),
+          rounds: z.int().positive(),
+        }),
+      )
+      .max(100),
+  }),
 });
 const standingRowSchema = z.strictObject({
   position: z.int().positive(),
@@ -100,6 +154,28 @@ const timelineEventSchema = z.discriminatedUnion('type', [
     playerId: entityIdSchema,
     card: z.enum(['yellow', 'red']),
   }),
+  z.strictObject({
+    type: z.literal('injury'),
+    minute: z.int().min(0).max(130),
+    side: z.enum(['home', 'away']),
+    playerId: entityIdSchema,
+    rounds: z.int().positive(),
+  }),
+  z.strictObject({
+    type: z.literal('substitution'),
+    minute: z.int().min(0).max(130),
+    side: z.enum(['home', 'away']),
+    playerOutId: entityIdSchema,
+    playerInId: entityIdSchema,
+    source: z.enum(['manager', 'automatic']).optional(),
+  }),
+  z.strictObject({
+    type: z.literal('tactical_change'),
+    minute: z.int().min(0).max(130),
+    side: z.enum(['home', 'away']),
+    formation: z.string().min(1),
+    mentality: z.string().min(1),
+  }),
 ]);
 export const postMatchReadModelSchema = z.strictObject({
   ...readBase,
@@ -110,6 +186,15 @@ export const postMatchReadModelSchema = z.strictObject({
   score: scoreSchema,
   timeline: z.array(timelineEventSchema).max(500),
   tableUpdated: z.boolean(),
+  playback: z.strictObject({
+    modes: z.tuple([
+      z.literal('instant'),
+      z.literal('fast'),
+      z.literal('feed'),
+    ]),
+    speeds: z.tuple([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]),
+    canSkip: z.literal(true),
+  }),
 });
 export type HomeReadModel = z.infer<typeof homeReadModelSchema>;
 export type SquadReadModel = z.infer<typeof squadReadModelSchema>;

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion -- playthrough fixture guarantees selected players */
+/* eslint-disable @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unsafe-assignment -- playthrough fixture guarantees selected players; Vitest asymmetric matchers are dynamic */
 import { describe, expect, it } from 'vitest';
 import { InMemoryUnitOfWork } from '@footebas/database';
 import {
@@ -100,20 +100,13 @@ describe('server-authoritative application slice', () => {
   it('plays through post-match and reloads checksum-equivalent', async () => {
     const { app, deps, token } = setup();
     const careerId = await createAndSelect(app, token);
-    const squad = await app.squad(token, careerId);
-    const goalkeeper = squad.players.find(({ position }) => position === 'GK')!;
-    const starters = [
-      goalkeeper,
-      ...squad.players.filter(({ position }) => position !== 'GK').slice(0, 10),
-    ].map(({ id: playerId, position }) => ({ playerId, position }));
     await app.execute(
       token,
-      command('SetLineup', 'command_lineup', 2, {
+      command('AutoPickLineup', 'command_lineup', 2, {
         careerId,
         clubId: 'club_1',
-        starters,
-        substitutes: [],
-        captainId: starters[0]!.playerId,
+        formation: '4-3-3',
+        mode: 'best',
       }),
     );
     await app.execute(
@@ -168,6 +161,95 @@ describe('server-authoritative application slice', () => {
     await expect(app.home(stranger, id)).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
+  });
+
+  it('projects complete decision information without leaking hidden numbers and records matchday changes', async () => {
+    const { app, token } = setup();
+    const careerId = await createAndSelect(app, token);
+    const squad = await app.squad(token, careerId);
+    expect(squad.players).toHaveLength(25);
+    expect(squad.players.every(({ traits }) => traits.length <= 2)).toBe(true);
+    expect(
+      squad.players.every(
+        (player) =>
+          typeof player.matchSharpness === 'number' &&
+          typeof player.squadStatus === 'string' &&
+          Object.values(player.hiddenEstimates).every(
+            (value) => typeof value === 'string',
+          ),
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(squad)).not.toMatch(/"hidden":\s*\{/);
+    const next = await app.nextMatch(token, careerId);
+    expect(next.preparation).toMatchObject({
+      opponent: expect.objectContaining({ id: expect.any(String) }),
+      venue: expect.stringMatching(/home|away/),
+      approximateStrength: expect.any(String),
+      absences: expect.any(Array),
+    });
+    const side = next.homeClub.id === 'club_1' ? 'home' : 'away';
+    const lineup = squad.lineup!;
+    const playerOutId = lineup.starters.at(-1)!;
+    const playerInId = lineup.bench[0]!;
+    await app.execute(
+      token,
+      command('SimulateMatch', 'command_phase3_match', 2, {
+        careerId,
+        fixtureId: next.fixtureId,
+        instructions: [
+          {
+            type: 'tactical_change',
+            minute: 45,
+            side,
+            tactic: {
+              formation: '4-4-2',
+              mentality: 'all_out_attack',
+              attackDirection: 'wings',
+              marking: 'heavy',
+              buildUp: 'direct',
+              focus: 'wings',
+              press: 'high',
+              defensiveLine: 'high',
+              markingStyle: 'man',
+            },
+          },
+          {
+            type: 'substitution',
+            minute: 60,
+            side,
+            playerOutId,
+            playerInId,
+            position: 'ST',
+          },
+        ],
+      }),
+    );
+    expect((await app.runNextJob())?.state).toBe('succeeded');
+    const post = await app.postMatch(token, careerId);
+    expect(post.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'tactical_change', minute: 45 }),
+        expect.objectContaining({
+          type: 'substitution',
+          minute: 60,
+          source: 'manager',
+        }),
+      ]),
+    );
+    expect(post.playback).toEqual({
+      modes: ['instant', 'fast', 'feed'],
+      speeds: [1, 2, 4, 8],
+      canSkip: true,
+    });
+    const after = await app.squad(token, careerId);
+    expect(
+      after.players.some(
+        ({ lastMatchRating }) => lastMatchRating !== undefined,
+      ),
+    ).toBe(true);
+    expect(
+      after.players.some(({ careerStats }) => careerStats.appearances > 0),
+    ).toBe(true);
   });
 
   it('deduplicates commands and serializes concurrent advances', async () => {

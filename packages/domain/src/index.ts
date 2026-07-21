@@ -13,8 +13,15 @@ export {
   createLineup,
   createPlayer,
   createTactic,
+  validateLineupForMatch,
+  FORMATION_POSITIONS,
   FORMATIONS,
   MENTALITIES,
+  BUILD_UP_STYLES,
+  ATTACK_FOCUSES,
+  PRESSING_STYLES,
+  DEFENSIVE_LINES,
+  MARKING_STYLES,
 } from './entities.js';
 export type {
   AttackDirection,
@@ -39,14 +46,26 @@ export type {
   FixtureId,
   MatchId,
   Tactic,
+  BuildUpStyle,
+  AttackFocus,
+  PressingStyle,
+  DefensiveLine,
+  MarkingStyle,
 } from './entities.js';
-export { createMatchInput, createMatchResult } from './match.js';
+export {
+  createMatchInput,
+  createMatchResult,
+  MATCH_DECISION_MINUTES,
+} from './match.js';
 export type {
   MatchEvent,
   MatchInput,
   MatchResult,
   MatchSide,
   MatchStatistics,
+  MatchInstruction,
+  MatchDecisionMinute,
+  PlayerMatchPerformance,
 } from './match.js';
 export {
   money,

@@ -5,6 +5,7 @@ import {
   entityId,
   type LineupSlot,
   type MatchEvent,
+  type MatchInstruction,
   type MatchInput,
   type MatchResult,
   type MatchSide,
@@ -14,7 +15,7 @@ import {
 } from '@footebas/domain';
 import { createPrng, hashSeed, type Prng } from './prng.js';
 
-export const ENGINE_VERSION = 'match-v1' as const;
+export const ENGINE_VERSION = 'match-v2' as const;
 export const POSITION_SUITABILITY = Object.freeze({
   primary: 1,
   secondary: 0.92,
@@ -148,8 +149,9 @@ function sideCalculation(side: MatchSideInput): SideCalculation {
       : side.tactic.mentality === 'counter_attack'
         ? 1.07
         : 1;
+  const focus = side.tactic.focus ?? side.tactic.attackDirection;
   const directionTraits =
-    side.tactic.attackDirection === 'wings'
+    focus === 'wings'
       ? ['pace', 'crossing', 'heading']
       : ['passing', 'playmaking', 'finishing'];
   const directionBonus =
@@ -160,6 +162,30 @@ function sideCalculation(side: MatchSideInput): SideCalculation {
       : side.tactic.marking === 'heavy'
         ? 1.035
         : 0.98;
+  const pressDefense =
+    side.tactic.press === 'high'
+      ? 1.035
+      : side.tactic.press === 'low'
+        ? 0.985
+        : 1;
+  const lineDefense =
+    side.tactic.defensiveLine === 'deep'
+      ? 1.02
+      : side.tactic.defensiveLine === 'high'
+        ? 0.985
+        : 1;
+  const buildUpAttack =
+    side.tactic.buildUp === 'direct'
+      ? 1.02
+      : side.tactic.buildUp === 'short'
+        ? 1.01
+        : 1;
+  const markingStyleDefense =
+    side.tactic.markingStyle === 'man'
+      ? 1.018
+      : side.tactic.markingStyle === 'zonal'
+        ? 1.008
+        : 1;
   const discipline =
     side.tactic.marking === 'very_heavy'
       ? 1.65
@@ -181,9 +207,20 @@ function sideCalculation(side: MatchSideInput): SideCalculation {
   return Object.freeze({
     effective,
     attack: round(
-      effective.average * mentalityAttack * directionBonus * formationAttack,
+      effective.average *
+        mentalityAttack *
+        directionBonus *
+        formationAttack *
+        buildUpAttack,
     ),
-    defense: round(effective.average * mentalityDefense * markingDefense),
+    defense: round(
+      effective.average *
+        mentalityDefense *
+        markingDefense *
+        pressDefense *
+        lineDefense *
+        markingStyleDefense,
+    ),
     control: round(effective.average * formationControl),
     discipline,
   });
@@ -279,6 +316,7 @@ function generateSideEvents(
   side: MatchSideInput,
   expectedGoals: number,
   discipline: number,
+  automaticSubstitutions: boolean,
 ): SideEvents {
   const events: MatchEvent[] = [];
   const shotCount = clamp(poisson(random, 8.2 + expectedGoals * 2.8), 2, 24);
@@ -344,10 +382,9 @@ function generateSideEvents(
       playerId: weightedPlayer(random, side, 'any'),
       rounds: random.nextInt(1, 5),
     });
-  const substitutions = Math.min(
-    side.lineup.substitutes.length,
-    random.nextInt(2, 3),
-  );
+  const substitutions = automaticSubstitutions
+    ? Math.min(side.lineup.substitutes.length, random.nextInt(2, 3))
+    : 0;
   const usedOut = new Set<PlayerId>();
   for (let index = 0; index < substitutions; index += 1) {
     const available = side.lineup.starters.filter(
@@ -361,6 +398,7 @@ function generateSideEvents(
       side: sideName,
       playerOutId: out,
       playerInId: side.lineup.substitutes[index]!,
+      source: 'automatic',
     });
   }
   return {
@@ -374,6 +412,148 @@ function generateSideEvents(
   };
 }
 
+function instructionModifier(input: MatchInput, sideName: MatchSide): number {
+  const side = input[sideName];
+  let modifier = 1;
+  for (const instruction of input.instructions ?? []) {
+    if (instruction.side !== sideName) continue;
+    const duration = (90 - instruction.minute) / 90;
+    if (instruction.type === 'substitution') {
+      const outgoing = playerFor(side, instruction.playerOutId);
+      const incoming = playerFor(side, instruction.playerInId);
+      modifier *=
+        1 +
+        ((Number(incoming.strength) - Number(outgoing.strength)) / 100) *
+          duration *
+          0.18;
+    } else {
+      const attackDelta =
+        instruction.tactic.mentality === 'all_out_attack'
+          ? 0.06
+          : instruction.tactic.mentality === 'counter_attack'
+            ? -0.015
+            : 0;
+      const pressDelta =
+        instruction.tactic.press === 'high'
+          ? 0.018
+          : instruction.tactic.press === 'low'
+            ? -0.008
+            : 0;
+      modifier *= 1 + (attackDelta + pressDelta) * duration;
+    }
+  }
+  return clamp(modifier, 0.9, 1.12);
+}
+
+function instructionEvents(
+  instructions: readonly MatchInstruction[],
+): MatchEvent[] {
+  return instructions.map((instruction) =>
+    instruction.type === 'substitution'
+      ? {
+          type: 'substitution',
+          minute: instruction.minute,
+          side: instruction.side,
+          playerOutId: instruction.playerOutId,
+          playerInId: instruction.playerInId,
+          position: instruction.position,
+          source: 'manager',
+        }
+      : {
+          type: 'tactical_change',
+          minute: instruction.minute,
+          side: instruction.side,
+          tactic: instruction.tactic,
+        },
+  );
+}
+
+function performances(
+  input: MatchInput,
+  timeline: readonly MatchEvent[],
+  sideName: MatchSide,
+  goalsFor: number,
+  goalsAgainst: number,
+) {
+  const side = input[sideName];
+  const starterIds = new Set(
+    side.lineup.starters.map(({ playerId }) => playerId),
+  );
+  const substituteEvents = timeline.filter(
+    (event): event is Extract<MatchEvent, { type: 'substitution' }> =>
+      event.type === 'substitution' && event.side === sideName,
+  );
+  const substituteIds = new Set(
+    substituteEvents.map((event) => event.playerInId),
+  );
+  return side.players
+    .filter(({ id }) => starterIds.has(id) || substituteIds.has(id))
+    .map((player) => {
+      const goals = timeline.filter(
+        (event) =>
+          event.type === 'goal' &&
+          event.side === sideName &&
+          event.scorerId === player.id,
+      ).length;
+      const assists = timeline.filter(
+        (event) =>
+          event.type === 'goal' &&
+          event.side === sideName &&
+          event.assistId === player.id,
+      ).length;
+      const yellowCards = timeline.filter(
+        (event) =>
+          event.type === 'card' &&
+          event.side === sideName &&
+          event.playerId === player.id &&
+          event.card === 'yellow',
+      ).length;
+      const redCards = timeline.filter(
+        (event) =>
+          event.type === 'card' &&
+          event.side === sideName &&
+          event.playerId === player.id &&
+          event.card === 'red',
+      ).length;
+      const injuryRounds = timeline
+        .filter(
+          (event): event is Extract<MatchEvent, { type: 'injury' }> =>
+            event.type === 'injury' &&
+            event.side === sideName &&
+            event.playerId === player.id,
+        )
+        .reduce((maximum, event) => Math.max(maximum, event.rounds), 0);
+      const jitter =
+        ((hashSeed(`${input.seed}|rating|${player.id}`) % 9) - 4) * 0.05;
+      const rating = clamp(
+        6.2 +
+          (goalsFor - goalsAgainst) * 0.12 +
+          goals * 1.05 +
+          assists * 0.55 -
+          yellowCards * 0.2 -
+          redCards * 1.2 +
+          jitter,
+        1,
+        10,
+      );
+      return Object.freeze({
+        playerId: player.id,
+        side: sideName,
+        started: starterIds.has(player.id),
+        rating: round(rating, 1),
+        goals,
+        assists,
+        yellowCards,
+        redCards,
+        conditionDelta: starterIds.has(player.id) ? -6 : -3,
+        moraleDelta:
+          goalsFor > goalsAgainst ? 3 : goalsFor < goalsAgainst ? -2 : 0,
+        injuryRounds,
+        suspensionRounds: redCards > 0 ? 1 : 0,
+      });
+    });
+}
+
 export function simulateMatch(input: MatchInput): MatchResult {
   const valid = createMatchInput(input);
   const random = createPrng(
@@ -384,23 +564,41 @@ export function simulateMatch(input: MatchInput): MatchResult {
     random,
     'home',
     valid.home,
-    matchup.expectedGoals.home,
+    matchup.expectedGoals.home * instructionModifier(valid, 'home'),
     matchup.home.discipline,
+    !(valid.instructions ?? []).some(({ side }) => side === 'home'),
   );
   const away = generateSideEvents(
     random,
     'away',
     valid.away,
-    matchup.expectedGoals.away,
+    matchup.expectedGoals.away * instructionModifier(valid, 'away'),
     matchup.away.discipline,
+    !(valid.instructions ?? []).some(({ side }) => side === 'away'),
   );
-  const timeline = [...home.events, ...away.events].sort(
+  const timeline = [
+    ...home.events,
+    ...away.events,
+    ...instructionEvents(valid.instructions ?? []),
+  ].sort(
     (left, right) =>
       left.minute - right.minute ||
-      ['chance', 'goal', 'card', 'injury', 'substitution'].indexOf(left.type) -
-        ['chance', 'goal', 'card', 'injury', 'substitution'].indexOf(
-          right.type,
-        ),
+      [
+        'tactical_change',
+        'substitution',
+        'chance',
+        'goal',
+        'card',
+        'injury',
+      ].indexOf(left.type) -
+        [
+          'tactical_change',
+          'substitution',
+          'chance',
+          'goal',
+          'card',
+          'injury',
+        ].indexOf(right.type),
   );
   const matchId = entityId(
     `match_${hashSeed(`${valid.fixtureId}|${valid.seed}|${valid.engineVersion}`).toString(16)}`,
@@ -431,6 +629,11 @@ export function simulateMatch(input: MatchInput): MatchResult {
       timeline,
       seed: valid.seed,
       engineVersion: valid.engineVersion,
+      decisions: valid.instructions ?? [],
+      playerPerformances: [
+        ...performances(valid, timeline, 'home', home.goals, away.goals),
+        ...performances(valid, timeline, 'away', away.goals, home.goals),
+      ],
     },
     valid,
   );

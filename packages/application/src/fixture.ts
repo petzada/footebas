@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/restrict-template-expressions -- raw roster sections are checked before indexed access */
 import {
   createClub,
-  createLineup,
   createPlayer,
   createTactic,
   entityId,
@@ -11,15 +10,18 @@ import {
   type Club,
   type Lineup,
   type Player,
+  type PlayerTrait,
   type Position,
   type Tactic,
 } from '@footebas/domain';
+import { autoSelectLineup } from '@footebas/engine';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export const FIXTURE_CONTENT_VERSION =
-  'serie-a-2026-eight-clubs-relative-strength-v1' as const;
-export const FIXTURE_DERIVATION_VERSION = 'relative-strength-glue-v1' as const;
+  'serie-a-2026-eight-clubs-matchday-v2' as const;
+export const FIXTURE_DERIVATION_VERSION =
+  'relative-strength-glue-matchday-v2' as const;
 export const FIXTURE_DERIVATION_SEED = 'real-sample-derived-v1' as const;
 export const FIXTURE_SOURCE =
   'dados/elencos/brasileirao-serie-a-2026.md' as const;
@@ -165,15 +167,51 @@ export function createFixtureContent(): FixtureContent {
       const derivation = hash(
         `${FIXTURE_DERIVATION_SEED}|${rawClub.name}|${rawPlayer.name}|attributes`,
       );
+      const secondary =
+        rawPlayer.position === 'GK'
+          ? []
+          : rawPlayer.position === 'ST'
+            ? [derivation % 2 === 0 ? ('RW' as const) : ('LW' as const)]
+            : rawPlayer.position === 'CB'
+              ? ['DM' as const]
+              : rawPlayer.position === 'RB' || rawPlayer.position === 'LB'
+                ? [
+                    rawPlayer.position === 'RB'
+                      ? ('RW' as const)
+                      : ('LW' as const),
+                  ]
+                : [
+                    rawPlayer.position === 'CM'
+                      ? ('AM' as const)
+                      : ('CM' as const),
+                  ];
+      const traits: readonly PlayerTrait[] =
+        rawPlayer.position === 'GK'
+          ? derivation % 2 === 0
+            ? ['reflexes', 'positioning']
+            : ['aerial_command', 'penalty_saving']
+          : rawPlayer.position === 'ST'
+            ? ['finishing', derivation % 2 === 0 ? 'heading' : 'pace']
+            : rawPlayer.position === 'RB' || rawPlayer.position === 'LB'
+              ? ['pace', 'crossing']
+              : rawPlayer.position === 'CB' || rawPlayer.position === 'DM'
+                ? ['marking', 'tackling']
+                : ['passing', 'playmaking'];
       players.push(
         createPlayer({
           id,
           name: rawPlayer.name,
           age: 19 + (derivation % 15),
           position: rawPlayer.position,
-          secondaryPositions: [],
+          secondaryPositions: secondary,
+          preferredSide:
+            rawPlayer.position === 'LB' || rawPlayer.position === 'LW'
+              ? 'left'
+              : rawPlayer.position === 'RB' || rawPlayer.position === 'RW'
+                ? 'right'
+                : 'center',
           strength: strength(rawPlayer.strength),
-          traits: [],
+          traits,
           hidden: {
             potential: percentage(60 + (derivation % 21)),
             consistency: percentage(65 + (derivation % 16)),
@@ -227,41 +265,7 @@ export function createFixtureContent(): FixtureContent {
 }
 
 export function defaultLineup(club: Club, players: readonly Player[]): Lineup {
-  const available = players.filter(({ clubId }) => clubId === club.id);
-  const wanted: readonly Position[] = [
-    'GK',
-    'RB',
-    'CB',
-    'CB',
-    'LB',
-    'CM',
-    'CM',
-    'RW',
-    'LW',
-    'ST',
-    'ST',
-  ];
-  const used = new Set<string>();
-  const starters = wanted.map((position) => {
-    const player =
-      available.find(
-        (candidate) =>
-          candidate.position === position && !used.has(candidate.id),
-      ) ?? available.find(({ id }) => !used.has(id));
-    if (!player) throw new Error('fixture squad cannot form a lineup');
-    used.add(player.id);
-    return { playerId: player.id, position };
-  });
-  const substitutes = available
-    .filter(({ id }) => !used.has(id))
-    .slice(0, 7)
-    .map(({ id }) => id);
-  return createLineup({
-    clubId: club.id,
-    starters,
-    substitutes,
-    captainId: starters[0]!.playerId,
-  });
+  return autoSelectLineup({ club, players, formation: '4-4-2', mode: 'best' });
 }
 export function defaultTactic(): Tactic {
   return createTactic({
@@ -269,5 +273,10 @@ export function defaultTactic(): Tactic {
     mentality: 'balanced',
     attackDirection: 'center',
     marking: 'heavy',
+    buildUp: 'mixed',
+    focus: 'balanced',
+    press: 'medium',
+    defensiveLine: 'normal',
+    markingStyle: 'mixed',
   });
 }

@@ -1,5 +1,11 @@
 import { DomainError } from './errors.js';
-import { createPlayer } from './entities.js';
+import {
+  createClub,
+  createLineup,
+  createPlayer,
+  createTactic,
+  validateLineupForMatch,
+} from './entities.js';
 import type {
   Club,
   FixtureId,
@@ -9,6 +15,24 @@ import type {
   PlayerId,
   Tactic,
 } from './entities.js';
+
+export const MATCH_DECISION_MINUTES = [15, 30, 45, 60, 75] as const;
+export type MatchDecisionMinute = (typeof MATCH_DECISION_MINUTES)[number];
+export type MatchInstruction =
+  | Readonly<{
+      type: 'substitution';
+      minute: MatchDecisionMinute;
+      side: MatchSide;
+      playerOutId: PlayerId;
+      playerInId: PlayerId;
+      position: Lineup['starters'][number]['position'];
+    }>
+  | Readonly<{
+      type: 'tactical_change';
+      minute: MatchDecisionMinute;
+      side: MatchSide;
+      tactic: Tactic;
+    }>;
 
 export interface MatchSideInput {
   readonly club: Club;
@@ -24,6 +48,7 @@ export interface MatchInput {
   readonly rulesVersion: string;
   readonly home: Readonly<MatchSideInput>;
   readonly away: Readonly<MatchSideInput>;
+  readonly instructions?: readonly MatchInstruction[];
 }
 function snapshotSide(
   side: MatchSideInput,
@@ -56,6 +81,9 @@ function snapshotSide(
     );
   return Object.freeze({
     ...side,
+    club: createClub(side.club),
+    lineup: createLineup(side.lineup),
+    tactic: createTactic(side.tactic),
     players: Object.freeze(side.players.map((player) => createPlayer(player))),
   });
 }
@@ -80,13 +108,91 @@ export function createMatchInput(input: MatchInput): MatchInput {
     );
   const home = snapshotSide(input.home, 'home');
   const away = snapshotSide(input.away, 'away');
+  validateLineupForMatch(
+    home.lineup,
+    home.club,
+    home.players,
+    home.tactic.formation,
+  );
+  validateLineupForMatch(
+    away.lineup,
+    away.club,
+    away.players,
+    away.tactic.formation,
+  );
   const homeIds = new Set(home.players.map(({ id }) => id));
   if (away.players.some(({ id }) => homeIds.has(id)))
     throw new DomainError(
       'INVALID_ENTITY',
       'players cannot appear on both match sides',
     );
-  return Object.freeze({ ...input, home, away });
+  const instructions = [...(input.instructions ?? [])];
+  let previousMinute = 0;
+  const substitutions = { home: 0, away: 0 };
+  const playersOut = new Set<PlayerId>();
+  const playersIn = new Set<PlayerId>();
+  for (const instruction of instructions) {
+    if (
+      !MATCH_DECISION_MINUTES.includes(instruction.minute) ||
+      instruction.minute < previousMinute
+    )
+      throw new DomainError(
+        'INVALID_ENTITY',
+        'match instructions must use ordered decision minutes',
+      );
+    const side = instruction.side === 'home' ? home : away;
+    if (instruction.type === 'substitution') {
+      substitutions[instruction.side] += 1;
+      if (substitutions[instruction.side] > 5)
+        throw new DomainError(
+          'INVALID_ENTITY',
+          'a side cannot plan more than five substitutions',
+        );
+      if (
+        playersOut.has(instruction.playerOutId) ||
+        playersIn.has(instruction.playerInId)
+      )
+        throw new DomainError(
+          'INVALID_ENTITY',
+          'substitution players cannot be reused',
+        );
+      const starterIds = side.lineup.starters.map(({ playerId }) => playerId);
+      if (
+        !starterIds.includes(instruction.playerOutId) ||
+        !side.lineup.substitutes.includes(instruction.playerInId)
+      )
+        throw new DomainError(
+          'INVALID_ENTITY',
+          'substitution must exchange a starter with a bench player',
+        );
+      const incoming = side.players.find(
+        ({ id }) => id === instruction.playerInId,
+      );
+      if (
+        !incoming ||
+        incoming.injuryRounds > 0 ||
+        incoming.suspensionRounds > 0
+      )
+        throw new DomainError('INVALID_ENTITY', 'substitute is unavailable');
+      playersOut.add(instruction.playerOutId);
+      playersIn.add(instruction.playerInId);
+    } else createTactic(instruction.tactic);
+    previousMinute = instruction.minute;
+  }
+  return Object.freeze({
+    ...input,
+    home,
+    away,
+    instructions: Object.freeze(
+      instructions.map((instruction) =>
+        Object.freeze(
+          instruction.type === 'tactical_change'
+            ? { ...instruction, tactic: createTactic(instruction.tactic) }
+            : { ...instruction },
+        ),
+      ),
+    ),
+  });
 }
 
 export type MatchSide = 'home' | 'away';
@@ -119,7 +225,30 @@ export type MatchEvent =
       side: MatchSide;
       playerOutId: PlayerId;
       playerInId: PlayerId;
+      position?: Lineup['starters'][number]['position'];
+      source?: 'manager' | 'automatic';
+    }>
+  | Readonly<{
+      type: 'tactical_change';
+      minute: number;
+      side: MatchSide;
+      tactic: Tactic;
     }>;
+
+export interface PlayerMatchPerformance {
+  readonly playerId: PlayerId;
+  readonly side: MatchSide;
+  readonly started: boolean;
+  readonly rating: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
+  readonly conditionDelta: number;
+  readonly moraleDelta: number;
+  readonly injuryRounds: number;
+  readonly suspensionRounds: number;
+}
 export interface MatchStatistics {
   readonly shots: number;
   readonly shotsOnTarget: number;
@@ -138,6 +267,8 @@ export interface MatchResult {
   readonly timeline: readonly MatchEvent[];
   readonly seed: string;
   readonly engineVersion: string;
+  readonly decisions?: readonly MatchInstruction[];
+  readonly playerPerformances?: readonly PlayerMatchPerformance[];
 }
 function validateStatistics(
   statistics: MatchStatistics,
@@ -180,6 +311,7 @@ function eventPlayerIds(event: MatchEvent): readonly PlayerId[] {
       return [event.playerId];
     case 'substitution':
       return [event.playerOutId, event.playerInId];
+    case 'tactical_change':
     case 'chance':
       return [];
   }
@@ -230,6 +362,7 @@ export function createMatchResult(
         'INVALID_ENTITY',
         'substitution players must differ',
       );
+    if (event.type === 'tactical_change') createTactic(event.tactic);
     if (matchInput !== undefined) {
       const snapshotIds = new Set(
         matchInput[event.side].players.map(({ id }) => id),
@@ -248,6 +381,12 @@ export function createMatchResult(
     away: Object.freeze({ ...input.away }),
     timeline: Object.freeze(
       input.timeline.map((event) => Object.freeze({ ...event })),
+    ),
+    decisions: Object.freeze([...(input.decisions ?? [])]),
+    playerPerformances: Object.freeze(
+      (input.playerPerformances ?? []).map((performance) =>
+        Object.freeze({ ...performance }),
+      ),
     ),
   });
 }

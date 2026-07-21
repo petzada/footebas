@@ -26,6 +26,9 @@ export interface CareerStats {
   readonly assists: number;
   readonly yellowCards: number;
   readonly redCards: number;
+  readonly ratedAppearances?: number;
+  readonly ratingTotal?: number;
+  readonly manOfTheMatch?: number;
 }
 
 export interface Player {
@@ -57,6 +60,7 @@ export interface Player {
   readonly injuryRounds: number;
   readonly suspensionRounds: number;
   readonly careerStats: Readonly<CareerStats>;
+  readonly lastMatchRating?: number;
 }
 
 function nonEmpty(value: string, field: string): void {
@@ -102,7 +106,37 @@ export function createPlayer(input: Player): Player {
   natural(input.injuryRounds, 'player.injuryRounds');
   natural(input.suspensionRounds, 'player.suspensionRounds');
   for (const [key, value] of Object.entries(input.careerStats))
-    natural(value, `player.careerStats.${key}`);
+    if (key === 'ratingTotal') {
+      if (!Number.isFinite(value) || value < 0)
+        throw new DomainError(
+          'INVALID_ENTITY',
+          'ratingTotal must be finite and non-negative',
+        );
+    } else natural(value, `player.careerStats.${key}`);
+  if (
+    input.lastMatchRating !== undefined &&
+    (!Number.isFinite(input.lastMatchRating) ||
+      input.lastMatchRating < 1 ||
+      input.lastMatchRating > 10)
+  )
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'lastMatchRating must be from 1 to 10',
+    );
+  const goalkeeperTraits = new Set<PlayerTrait>([
+    'positioning',
+    'aerial_command',
+    'reflexes',
+    'penalty_saving',
+  ]);
+  if (
+    input.position !== 'GK' &&
+    input.traits.some((trait) => goalkeeperTraits.has(trait))
+  )
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'goalkeeper traits are exclusive to goalkeepers',
+    );
   return Object.freeze({
     ...input,
     secondaryPositions: Object.freeze([...input.secondaryPositions]),
@@ -143,18 +177,40 @@ export const ATTACK_DIRECTIONS = ['center', 'wings'] as const;
 export type AttackDirection = (typeof ATTACK_DIRECTIONS)[number];
 export const MARKING_INTENSITIES = ['light', 'heavy', 'very_heavy'] as const;
 export type MarkingIntensity = (typeof MARKING_INTENSITIES)[number];
+export const BUILD_UP_STYLES = ['short', 'mixed', 'direct'] as const;
+export type BuildUpStyle = (typeof BUILD_UP_STYLES)[number];
+export const ATTACK_FOCUSES = ['center', 'wings', 'balanced'] as const;
+export type AttackFocus = (typeof ATTACK_FOCUSES)[number];
+export const PRESSING_STYLES = ['low', 'medium', 'high'] as const;
+export type PressingStyle = (typeof PRESSING_STYLES)[number];
+export const DEFENSIVE_LINES = ['deep', 'normal', 'high'] as const;
+export type DefensiveLine = (typeof DEFENSIVE_LINES)[number];
+export const MARKING_STYLES = ['zonal', 'mixed', 'man'] as const;
+export type MarkingStyle = (typeof MARKING_STYLES)[number];
 export interface Tactic {
   readonly formation: Formation;
   readonly mentality: Mentality;
   readonly attackDirection: AttackDirection;
   readonly marking: MarkingIntensity;
+  readonly buildUp?: BuildUpStyle;
+  readonly focus?: AttackFocus;
+  readonly press?: PressingStyle;
+  readonly defensiveLine?: DefensiveLine;
+  readonly markingStyle?: MarkingStyle;
 }
 export function createTactic(input: Tactic): Tactic {
   if (
     !FORMATIONS.includes(input.formation) ||
     !MENTALITIES.includes(input.mentality) ||
     !ATTACK_DIRECTIONS.includes(input.attackDirection) ||
-    !MARKING_INTENSITIES.includes(input.marking)
+    !MARKING_INTENSITIES.includes(input.marking) ||
+    (input.buildUp !== undefined && !BUILD_UP_STYLES.includes(input.buildUp)) ||
+    (input.focus !== undefined && !ATTACK_FOCUSES.includes(input.focus)) ||
+    (input.press !== undefined && !PRESSING_STYLES.includes(input.press)) ||
+    (input.defensiveLine !== undefined &&
+      !DEFENSIVE_LINES.includes(input.defensiveLine)) ||
+    (input.markingStyle !== undefined &&
+      !MARKING_STYLES.includes(input.markingStyle))
   ) {
     throw new DomainError(
       'INVALID_ENTITY',
@@ -172,6 +228,7 @@ export interface Lineup {
   readonly clubId: ClubId;
   readonly starters: readonly LineupSlot[];
   readonly substitutes: readonly PlayerId[];
+  readonly reserves?: readonly PlayerId[];
   readonly captainId: PlayerId;
 }
 export function createLineup(input: Lineup): Lineup {
@@ -182,6 +239,13 @@ export function createLineup(input: Lineup): Lineup {
     );
   const starterIds = input.starters.map(({ playerId }) => playerId);
   const all = [...starterIds, ...input.substitutes];
+  if (input.substitutes.length > 12)
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'lineup bench cannot exceed 12 players',
+    );
+  const reserves = input.reserves ?? [];
+  all.push(...reserves);
   if (new Set(all).size !== all.length)
     throw new DomainError('INVALID_ENTITY', 'lineup players must be unique');
   if (!starterIds.includes(input.captainId))
@@ -197,7 +261,72 @@ export function createLineup(input: Lineup): Lineup {
       input.starters.map((slot) => Object.freeze({ ...slot })),
     ),
     substitutes: Object.freeze([...input.substitutes]),
+    reserves: Object.freeze([...reserves]),
   });
+}
+
+export const FORMATION_POSITIONS = Object.freeze({
+  '4-4-2': ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CM', 'RW', 'LW', 'ST', 'ST'],
+  '4-3-3': ['GK', 'RB', 'CB', 'CB', 'LB', 'DM', 'CM', 'AM', 'RW', 'LW', 'ST'],
+  '3-5-2': ['GK', 'CB', 'CB', 'CB', 'RB', 'LB', 'DM', 'CM', 'AM', 'ST', 'ST'],
+} as const satisfies Readonly<Record<Formation, readonly Position[]>>);
+
+/** Validates the authoritative matchday roster, including availability and formation shape. */
+export function validateLineupForMatch(
+  lineup: Lineup,
+  club: Club,
+  players: readonly Player[],
+  formation: Formation,
+): Lineup {
+  const valid = createLineup(lineup);
+  if (valid.clubId !== club.id)
+    throw new DomainError('INVALID_ENTITY', 'lineup belongs to another club');
+  const members = new Set(club.squad);
+  const byId = new Map(players.map((player) => [player.id, player]));
+  const selected = [
+    ...valid.starters.map(({ playerId }) => playerId),
+    ...valid.substitutes,
+    ...(valid.reserves ?? []),
+  ];
+  if (selected.some((id) => !members.has(id) || !byId.has(id)))
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'lineup contains a player outside the club snapshot',
+    );
+  for (const playerId of [
+    ...valid.starters.map((slot) => slot.playerId),
+    ...valid.substitutes,
+  ]) {
+    const player = byId.get(playerId);
+    if (!player)
+      throw new DomainError(
+        'INVALID_ENTITY',
+        'selected player is absent from snapshot',
+      );
+    if (player.injuryRounds > 0 || player.suspensionRounds > 0)
+      throw new DomainError(
+        'INVALID_ENTITY',
+        'injured or suspended players cannot be selected for matchday',
+      );
+  }
+  const goalkeeperSlot = valid.starters.find(
+    ({ position }) => position === 'GK',
+  );
+  if (!goalkeeperSlot)
+    throw new DomainError('INVALID_ENTITY', 'lineup has no goalkeeper slot');
+  if (byId.get(goalkeeperSlot.playerId)?.position !== 'GK')
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'the goalkeeper slot requires a goalkeeper',
+    );
+  const expected = [...FORMATION_POSITIONS[formation]].sort();
+  const actual = valid.starters.map(({ position }) => position).sort();
+  if (expected.join('|') !== actual.join('|'))
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'lineup slots do not match the selected formation',
+    );
+  return valid;
 }
 
 export type CareerStatus = 'active' | 'ended';

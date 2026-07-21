@@ -14,6 +14,7 @@ import {
   type Mentality,
   type Player,
   type Position,
+  FORMATION_POSITIONS,
 } from '@footebas/domain';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -53,6 +54,10 @@ function match(
 ): MatchInput {
   function side(label: 'home' | 'away', value: number) {
     const clubId = entityId(`${label}_club`, 'club');
+    const formation =
+      label === 'home'
+        ? (options.homeFormation ?? '4-4-2')
+        : (options.awayFormation ?? '4-4-2');
     const players: Player[] = Array.from({ length: 16 }, (_, index) =>
       createPlayer({
         id: entityId(`${label}_player_${String(index)}`, 'player'),
@@ -97,10 +102,6 @@ function match(
         },
       }),
     );
-    const formation =
-      label === 'home'
-        ? (options.homeFormation ?? '4-4-2')
-        : (options.awayFormation ?? '4-4-2');
     const mentality =
       label === 'home'
         ? (options.homeMentality ?? 'balanced')
@@ -119,7 +120,7 @@ function match(
         clubId,
         starters: players.slice(0, 11).map((player, index) => ({
           playerId: player.id,
-          position: slots[index]!,
+          position: FORMATION_POSITIONS[formation][index]!,
         })),
         substitutes: players.slice(11).map(({ id }) => id),
         captainId: players[0]!.id,
@@ -154,44 +155,44 @@ describe('simulateMatch', () => {
       first: result.timeline.slice(0, 4),
     }).toMatchInlineSnapshot(`
       {
-        "events": 36,
+        "events": 43,
         "first": [
           {
-            "minute": 3,
-            "side": "home",
-            "type": "chance",
-            "xg": 0.252,
-          },
-          {
             "minute": 4,
-            "side": "home",
+            "side": "away",
             "type": "chance",
-            "xg": 0.097,
+            "xg": 0.111,
           },
           {
-            "minute": 6,
+            "minute": 9,
             "side": "home",
             "type": "chance",
-            "xg": 0.037,
+            "xg": 0.151,
           },
           {
-            "minute": 18,
+            "minute": 10,
             "side": "home",
             "type": "chance",
-            "xg": 0.186,
+            "xg": 0.356,
+          },
+          {
+            "minute": 10,
+            "scorerId": "home_player_5",
+            "side": "home",
+            "type": "goal",
           },
         ],
         "score": [
-          2,
-          2,
+          3,
+          0,
         ],
         "shots": [
-          13,
-          11,
+          14,
+          10,
         ],
         "xg": [
-          2.2,
-          1.711,
+          2.799,
+          1.542,
         ],
       }
     `);
