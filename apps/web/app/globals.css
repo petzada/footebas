@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Archivo Variable", sans-serif;
+  --font-display: "Rajdhani", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root { --radius: .65rem; --background: oklch(.14 .025 155); --foreground: oklch(.96 .015 105); --card: oklch(.18 .03 155); --card-foreground: oklch(.96 .015 105); --popover: oklch(.18 .03 155); --popover-foreground: oklch(.96 .015 105); --primary: oklch(.72 .17 145); --primary-foreground: oklch(.14 .03 155); --secondary: oklch(.25 .035 155); --secondary-foreground: oklch(.94 .015 105); --muted: oklch(.23 .025 155); --muted-foreground: oklch(.7 .025 145); --accent: oklch(.74 .18 55); --accent-foreground: oklch(.16 .025 45); --destructive: oklch(.65 .2 25); --border: oklch(.31 .035 150); --input: oklch(.27 .035 150); --ring: oklch(.72 .17 145); }
+
+* { border-color: var(--border); }
+html { background: var(--background); }
+body { min-height: 100dvh; background: radial-gradient(circle at 50% -20%, oklch(.3 .08 145 / .45), transparent 42%), var(--background); color: var(--foreground); font-family: "Archivo Variable", sans-serif; }
+button, a, input { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
