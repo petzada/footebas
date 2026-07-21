@@ -83,10 +83,17 @@ export const FORMATIONS = ['4-4-2', '4-3-3', '3-5-2'] as const;
 export type Formation = (typeof FORMATIONS)[number];
 export const MENTALITIES = ['balanced', 'all_out_attack', 'counter_attack'] as const;
 export type Mentality = (typeof MENTALITIES)[number];
-export type AttackDirection = 'center' | 'wings';
-export type MarkingIntensity = 'light' | 'heavy' | 'very_heavy';
+export const ATTACK_DIRECTIONS = ['center', 'wings'] as const;
+export type AttackDirection = (typeof ATTACK_DIRECTIONS)[number];
+export const MARKING_INTENSITIES = ['light', 'heavy', 'very_heavy'] as const;
+export type MarkingIntensity = (typeof MARKING_INTENSITIES)[number];
 export interface Tactic { readonly formation: Formation; readonly mentality: Mentality; readonly attackDirection: AttackDirection; readonly marking: MarkingIntensity }
-export function createTactic(input: Tactic): Tactic { return Object.freeze({ ...input }); }
+export function createTactic(input: Tactic): Tactic {
+  if (!FORMATIONS.includes(input.formation) || !MENTALITIES.includes(input.mentality) || !ATTACK_DIRECTIONS.includes(input.attackDirection) || !MARKING_INTENSITIES.includes(input.marking)) {
+    throw new DomainError('INVALID_ENTITY', 'tactic contains an unsupported option');
+  }
+  return Object.freeze({ ...input });
+}
 
 export interface LineupSlot { readonly playerId: PlayerId; readonly position: Position }
 export interface Lineup { readonly clubId: ClubId; readonly starters: readonly LineupSlot[]; readonly substitutes: readonly PlayerId[]; readonly captainId: PlayerId }
