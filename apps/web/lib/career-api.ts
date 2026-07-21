@@ -1,4 +1,17 @@
-export type Screen = 'home' | 'squad' | 'tactics' | 'table';
+import {
+  createPhase4View,
+  type Phase4View,
+  type TransferKind,
+} from '@/lib/phase4-model';
+
+export type Screen =
+  | 'home'
+  | 'squad'
+  | 'tactics'
+  | 'table'
+  | 'market'
+  | 'club'
+  | 'world';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
 export type SquadRole = 'starter' | 'bench' | 'reserve';
 export type AutoPickStrategy = 'best' | 'rest' | 'develop';
@@ -89,6 +102,7 @@ export interface CareerView {
   players: readonly PlayerView[];
   standings: readonly StandingView[];
   opponent: OpponentView;
+  world: Phase4View;
   lastResult?: MatchResultView;
 }
 
@@ -122,6 +136,27 @@ export interface CareerApiPort {
     incomingId: string;
   }): Promise<MatchUpdate>;
   changeMatchTactics(input: Partial<TacticsView>): Promise<MatchUpdate>;
+  renewContract(playerId: string, months: 6 | 12 | 24): Promise<CareerView>;
+  refuseContract(playerId: string): Promise<CareerView>;
+  terminateContract(playerId: string): Promise<CareerView>;
+  setSquadMarketStatus(
+    playerId: string,
+    status: 'listed' | 'loan-listed',
+  ): Promise<CareerView>;
+  scoutMarketPlayer(playerId: string): Promise<CareerView>;
+  submitTransferOffer(input: {
+    playerId: string;
+    amount: number;
+    kind: TransferKind;
+  }): Promise<CareerView>;
+  acceptTransferCounter(playerId: string): Promise<CareerView>;
+  setTicketPrice(price: number): Promise<CareerView>;
+  maintainStadium(): Promise<CareerView>;
+  expandStadium(): Promise<CareerView>;
+  developYouth(playerId: string): Promise<CareerView>;
+  promoteYouth(playerId: string): Promise<CareerView>;
+  releaseYouth(playerId: string): Promise<CareerView>;
+  acceptJobProposal(proposalId: string): Promise<CareerView>;
   finishMatch(): Promise<CareerView>;
   instantResult(): Promise<CareerView>;
 }
@@ -575,6 +610,7 @@ export class InMemoryCareerApi implements CareerApiPort {
       players: createRoster(),
       standings: initialTable,
       opponent: opponents[0],
+      world: createPhase4View(coach.trim(), ''),
     };
   }
 
@@ -582,7 +618,11 @@ export class InMemoryCareerApi implements CareerApiPort {
     this.#require();
     if (!['Flamengo', 'Fluminense', 'Atlético Mineiro'].includes(club))
       throw new Error('Clube indisponível.');
-    this.#career = { ...this.#career!, club };
+    this.#career = {
+      ...this.#career!,
+      club,
+      world: createPhase4View(this.#career!.coach, club),
+    };
   }
 
   async getCareer() {
@@ -760,6 +800,366 @@ export class InMemoryCareerApi implements CareerApiPort {
     return structuredClone(currentEvent);
   }
 
+  async renewContract(playerId: string, months: 6 | 12 | 24) {
+    const current = this.#require();
+    const contract = current.world.contracts.find(
+      (item) => item.playerId === playerId,
+    );
+    if (!contract) throw new Error('Contrato não encontrado.');
+    if (contract.status === 'refused')
+      throw new Error('A negociação já foi recusada e não pode ser reaberta agora.');
+    const cost = contract.renewalDemand;
+    const world = this.#worldWithLedger(
+      {
+        ...current.world,
+        contracts: current.world.contracts.map((item) =>
+          item.playerId === playerId
+            ? {
+                ...item,
+                monthsRemaining: months,
+                salary: item.renewalDemand,
+                status: 'renewed' as const,
+              }
+            : item,
+        ),
+        contractAlerts: current.world.contractAlerts.filter(
+          (alert) => !alert.includes(contract.playerName),
+        ),
+        finances: {
+          ...current.world.finances,
+          wageBill: current.world.finances.wageBill - contract.salary + cost,
+        },
+      },
+      `Renovação · ${contract.playerName} · ${months} meses`,
+      'contract',
+      -cost,
+    );
+    return this.#commitWorld(world);
+  }
+
+  async refuseContract(playerId: string) {
+    const current = this.#require();
+    const contract = current.world.contracts.find(
+      (item) => item.playerId === playerId,
+    );
+    if (!contract) throw new Error('Contrato não encontrado.');
+    return this.#commitWorld({
+      ...current.world,
+      contracts: current.world.contracts.map((item) =>
+        item.playerId === playerId
+          ? { ...item, status: 'refused' as const }
+          : item,
+      ),
+      contractAlerts: [
+        ...current.world.contractAlerts.filter(
+          (alert) => !alert.includes(contract.playerName),
+        ),
+        `${contract.playerName} deixará o clube ao fim do vínculo.`,
+      ],
+    });
+  }
+
+  async terminateContract(playerId: string) {
+    const current = this.#require();
+    const contract = current.world.contracts.find(
+      (item) => item.playerId === playerId,
+    );
+    if (!contract) throw new Error('Contrato não encontrado.');
+    const cost = contract.salary * Math.max(1, contract.monthsRemaining);
+    if (cost > current.world.finances.cash)
+      throw new Error('Caixa insuficiente para pagar a rescisão.');
+    const world = this.#worldWithLedger(
+      {
+        ...current.world,
+        contracts: current.world.contracts.filter(
+          (item) => item.playerId !== playerId,
+        ),
+        contractAlerts: current.world.contractAlerts.filter(
+          (alert) => !alert.includes(contract.playerName),
+        ),
+      },
+      `Rescisão · ${contract.playerName}`,
+      'contract',
+      -cost,
+    );
+    return this.#commitWorld(world);
+  }
+
+  async setSquadMarketStatus(
+    playerId: string,
+    status: 'listed' | 'loan-listed',
+  ) {
+    const current = this.#require();
+    const player = current.players.find((item) => item.id === playerId);
+    if (!player) throw new Error('Jogador não encontrado.');
+    const label = status === 'listed' ? 'venda' : 'empréstimo';
+    return this.#commitWorld({
+      ...current.world,
+      news: [
+        {
+          id: `n-${Date.now()}`,
+          tag: 'Mercado',
+          headline: `${player.name} foi colocado para ${label}`,
+          detail: 'Clubes interessados podem enviar propostas na próxima rodada.',
+        },
+        ...current.world.news,
+      ],
+    });
+  }
+
+  async scoutMarketPlayer(playerId: string) {
+    const current = this.#require();
+    if (!current.world.market.some((player) => player.id === playerId))
+      throw new Error('Atleta não encontrado no mercado.');
+    return this.#commitWorld({
+      ...current.world,
+      market: current.world.market.map((player) =>
+        player.id === playerId ? { ...player, scouted: true } : player,
+      ),
+    });
+  }
+
+  async submitTransferOffer({
+    playerId,
+    amount,
+    kind,
+  }: {
+    playerId: string;
+    amount: number;
+    kind: TransferKind;
+  }) {
+    const current = this.#require();
+    const player = current.world.market.find((item) => item.id === playerId);
+    if (!player) throw new Error('Atleta não encontrado no mercado.');
+    if (!Number.isFinite(amount) || amount <= 0)
+      throw new Error('Informe um valor de oferta maior que zero.');
+    if (kind === 'loan' && player.availability === 'free-agent')
+      throw new Error('Atleta livre não pode ser contratado por empréstimo.');
+    const threshold = kind === 'loan' ? Math.max(500000, player.value * 0.08) : Math.max(player.salary * 4, player.value * 0.9);
+    if (amount < threshold) {
+      const counterAmount = Math.round(threshold / 100000) * 100000;
+      return this.#commitWorld({
+        ...current.world,
+        market: current.world.market.map((item) =>
+          item.id === playerId
+            ? {
+                ...item,
+                offerStatus: 'countered' as const,
+                counterAmount,
+                pendingKind: kind,
+              }
+            : item,
+        ),
+      });
+    }
+    return this.#completeTransfer(playerId, amount, kind);
+  }
+
+  async acceptTransferCounter(playerId: string) {
+    const current = this.#require();
+    const player = current.world.market.find((item) => item.id === playerId);
+    if (!player || player.offerStatus !== 'countered' || !player.counterAmount)
+      throw new Error('Não há contraproposta disponível.');
+    return this.#completeTransfer(
+      playerId,
+      player.counterAmount,
+      player.pendingKind ?? (player.availability === 'loan' ? 'loan' : 'buy'),
+    );
+  }
+
+  async setTicketPrice(price: number) {
+    const current = this.#require();
+    if (!Number.isFinite(price) || price < 10 || price > 250)
+      throw new Error('O ingresso deve custar entre R$ 10 e R$ 250.');
+    return this.#commitWorld({
+      ...current.world,
+      stadium: { ...current.world.stadium, ticketPrice: Math.round(price) },
+    });
+  }
+
+  async maintainStadium() {
+    const current = this.#require();
+    const cost = 850000;
+    if (current.world.finances.cash < cost)
+      throw new Error('Caixa insuficiente para a manutenção.');
+    return this.#commitWorld(
+      this.#worldWithLedger(
+        {
+          ...current.world,
+          stadium: { ...current.world.stadium, maintenance: 'em dia' },
+        },
+        'Estádio · manutenção preventiva',
+        'stadium',
+        -cost,
+      ),
+    );
+  }
+
+  async expandStadium() {
+    const current = this.#require();
+    const cost = current.world.stadium.expansionCost;
+    if (current.world.finances.cash - cost < current.world.finances.transferGate)
+      throw new Error('A diretoria bloqueou a obra: preserve a reserva mínima do clube.');
+    return this.#commitWorld(
+      this.#worldWithLedger(
+        {
+          ...current.world,
+          stadium: {
+            ...current.world.stadium,
+            capacity: current.world.stadium.capacity + 5000,
+            expansionCost: Math.round(cost * 1.25),
+          },
+        },
+        'Estádio · ampliação de 5.000 lugares',
+        'stadium',
+        -cost,
+      ),
+    );
+  }
+
+  async developYouth(playerId: string) {
+    const current = this.#require();
+    const youth = current.world.youth.find((item) => item.id === playerId);
+    if (!youth || youth.status !== 'academy')
+      throw new Error('Jovem indisponível para desenvolvimento.');
+    return this.#commitWorld({
+      ...current.world,
+      youth: current.world.youth.map((item) =>
+        item.id === playerId
+          ? { ...item, readiness: 'plano individual ativo · revisão em 4 rodadas' }
+          : item,
+      ),
+    });
+  }
+
+  async promoteYouth(playerId: string) {
+    const current = this.#require();
+    const youth = current.world.youth.find((item) => item.id === playerId);
+    if (!youth || youth.status !== 'academy')
+      throw new Error('Jovem indisponível para promoção.');
+    return this.#commitWorld({
+      ...current.world,
+      youth: current.world.youth.map((item) =>
+        item.id === playerId ? { ...item, status: 'promoted' as const } : item,
+      ),
+      news: [
+        { id: `n-${Date.now()}`, tag: 'Base', headline: `${youth.name} foi promovido`, detail: 'O jovem gerado passa a treinar com o elenco principal.' },
+        ...current.world.news,
+      ],
+    });
+  }
+
+  async releaseYouth(playerId: string) {
+    const current = this.#require();
+    const youth = current.world.youth.find((item) => item.id === playerId);
+    if (!youth || youth.status !== 'academy')
+      throw new Error('Jovem indisponível para dispensa.');
+    return this.#commitWorld({
+      ...current.world,
+      youth: current.world.youth.map((item) =>
+        item.id === playerId ? { ...item, status: 'released' as const } : item,
+      ),
+    });
+  }
+
+  async acceptJobProposal(proposalId: string) {
+    const current = this.#require();
+    const proposal = current.world.board.proposals.find(
+      (item) => item.id === proposalId,
+    );
+    if (!proposal) throw new Error('Proposta de trabalho indisponível.');
+    this.#career = {
+      ...current,
+      club: proposal.club,
+      world: {
+        ...current.world,
+        board: {
+          ...current.world.board,
+          confidence: 55,
+          fanConfidence: 50,
+          objective: proposal.objective,
+          status: 'Novo trabalho iniciado',
+          firingRisk: 'sem risco imediato',
+          proposals: [],
+        },
+        history: {
+          ...current.world.history,
+          seasons: [
+            { season: '2026', club: current.club, finish: 'Troca de clube durante a temporada', topScorer: 'Pedro · 11 gols' },
+            ...current.world.history.seasons,
+          ],
+        },
+        leaderboards: {
+          global: current.world.leaderboards.global.map((row) =>
+            row.highlight ? { ...row, club: proposal.club } : row,
+          ),
+          underdog: current.world.leaderboards.underdog.map((row) =>
+            row.highlight ? { ...row, club: proposal.club } : row,
+          ),
+          monthly: current.world.leaderboards.monthly.map((row) =>
+            row.highlight ? { ...row, club: proposal.club } : row,
+          ),
+        },
+        news: [
+          { id: `n-${Date.now()}`, tag: 'Carreira', headline: `${current.coach} assume o ${proposal.club}`, detail: `A carreira continua na ${proposal.division}; prestígio e histórico foram preservados.` },
+          ...current.world.news,
+        ],
+      },
+    };
+    return structuredClone(this.#career);
+  }
+
+  #completeTransfer(playerId: string, amount: number, kind: TransferKind) {
+    const current = this.#require();
+    const player = current.world.market.find((item) => item.id === playerId)!;
+    if (amount > current.world.finances.cash - current.world.finances.transferGate)
+      throw new Error('A oferta ultrapassa o limite autorizado pela diretoria.');
+    const world = this.#worldWithLedger(
+      {
+        ...current.world,
+        market: current.world.market.map((item) =>
+          item.id === playerId ? acceptedMarketPlayer(item) : item,
+        ),
+      },
+      `${kind === 'loan' ? 'Empréstimo' : 'Transferência'} · ${player.name} · ${player.club}`,
+      'transfer',
+      -amount,
+    );
+    return this.#commitWorld(world);
+  }
+
+  #worldWithLedger(
+    world: Phase4View,
+    sourceLabel: string,
+    category: Phase4View['finances']['ledger'][number]['category'],
+    amount: number,
+  ): Phase4View {
+    const balance = world.finances.cash + amount;
+    return {
+      ...world,
+      finances: {
+        ...world.finances,
+        cash: balance,
+        ledger: [
+          {
+            id: `l-${Date.now()}`,
+            date: '09/07',
+            sourceLabel,
+            category,
+            amount,
+            balance,
+          },
+          ...world.finances.ledger,
+        ],
+      },
+    };
+  }
+
+  #commitWorld(world: Phase4View) {
+    this.#career = { ...this.#require(), world };
+    return structuredClone(this.#career);
+  }
+
   async finishMatch() {
     if (this.#eventIndex < 0) throw new Error('A partida ainda não começou.');
     return this.#commitResult();
@@ -815,6 +1215,17 @@ export class InMemoryCareerApi implements CareerApiPort {
     if (!this.#career) throw new Error('Carreira não encontrada.');
     return this.#career;
   }
+}
+
+function acceptedMarketPlayer(
+  player: Phase4View['market'][number],
+): Phase4View['market'][number] {
+  return {
+    ...player,
+    offerStatus: 'accepted',
+    counterAmount: undefined,
+    pendingKind: undefined,
+  };
 }
 
 const initialTable: StandingView[] = [

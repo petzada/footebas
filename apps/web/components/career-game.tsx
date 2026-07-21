@@ -7,6 +7,8 @@ import {
   ChartBar,
   CheckCircle,
   ClipboardText,
+  Buildings,
+  GlobeHemisphereWest,
   House,
   Lightning,
   ListChecks,
@@ -15,6 +17,7 @@ import {
   ShieldWarning,
   SoccerBall,
   Sparkle,
+  Storefront,
   Strategy,
   Trophy,
   UserSwitch,
@@ -64,6 +67,11 @@ import {
   type TacticsView,
 } from '@/lib/career-api';
 import { cn } from '@/lib/utils';
+import {
+  ClubScreen,
+  MarketScreen,
+  WorldScreen,
+} from '@/components/phase4-screens';
 
 type Stage = 'login' | 'coach' | 'club' | 'game' | 'match' | 'result';
 
@@ -214,8 +222,29 @@ export function CareerGame({
               })
             }
           />
-        ) : (
+        ) : screen === 'table' ? (
           <Standings career={career} />
+        ) : screen === 'market' ? (
+          <MarketScreen
+            career={career}
+            api={api}
+            onCareerChange={setCareer}
+            reportError={setError}
+          />
+        ) : screen === 'club' ? (
+          <ClubScreen
+            career={career}
+            api={api}
+            onCareerChange={setCareer}
+            reportError={setError}
+          />
+        ) : (
+          <WorldScreen
+            career={career}
+            api={api}
+            onCareerChange={setCareer}
+            reportError={setError}
+          />
         )}
       </main>
       {stage === 'game' && <BottomNav screen={screen} setScreen={setScreen} />}
@@ -386,6 +415,17 @@ const navItems = [
   ['squad', 'Elenco', ListChecks],
   ['tactics', 'Táticas', Strategy],
   ['table', 'Tabela', ChartBar],
+  ['market', 'Mercado', Storefront],
+  ['club', 'Clube', Buildings],
+  ['world', 'Mundo', GlobeHemisphereWest],
+] as const;
+
+const mobileNavItems = [
+  ['home', 'Início', House],
+  ['squad', 'Elenco', ListChecks],
+  ['market', 'Mercado', Storefront],
+  ['club', 'Clube', Buildings],
+  ['world', 'Mundo', GlobeHemisphereWest],
 ] as const;
 
 function Topbar({ career }: { career: CareerView }) {
@@ -449,9 +489,9 @@ function BottomNav({
   return (
     <nav
       aria-label="Navegação inferior"
-      className="fixed inset-x-0 bottom-0 grid grid-cols-4 border-t bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 grid grid-cols-5 border-t bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden"
     >
-      {navItems.map(([id, label, Icon]) => (
+      {mobileNavItems.map(([id, label, Icon]) => (
         <button
           key={id}
           aria-current={screen === id ? 'page' : undefined}
