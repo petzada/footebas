@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryUnitOfWork } from '@footebas/database';
 import {
   ApplicationError,
+  createFixtureContent,
   FakeBearerAuth,
   FakeClock,
   FootebasApplication,
@@ -73,14 +74,38 @@ async function createAndSelect(app: FootebasApplication, token: string) {
 }
 
 describe('server-authoritative application slice', () => {
+  it('builds the fixture from the real roster sample with derived provenance', () => {
+    const content = createFixtureContent();
+    expect(content.clubs.map(({ name }) => name)).toEqual([
+      'Flamengo',
+      'Palmeiras',
+      'Atlético Mineiro',
+      'Fluminense',
+      'São Paulo',
+      'Botafogo',
+      'Corinthians',
+      'Bahia',
+    ]);
+    expect(content.players).toHaveLength(200);
+    expect(
+      content.players.some(({ name }) => name.startsWith('Jogador ')),
+    ).toBe(false);
+    expect(content.provenance).toMatchObject({
+      source: 'dados/elencos/brasileirao-serie-a-2026.md',
+      identity: 'raw-markdown',
+      attributes: 'derived',
+    });
+  });
+
   it('plays through post-match and reloads checksum-equivalent', async () => {
     const { app, deps, token } = setup();
     const careerId = await createAndSelect(app, token);
     const squad = await app.squad(token, careerId);
-    const starters = squad.lineupPlayerIds.slice(0, 11).map((playerId) => ({
-      playerId,
-      position: squad.players.find(({ id }) => id === playerId)!.position,
-    }));
+    const goalkeeper = squad.players.find(({ position }) => position === 'GK')!;
+    const starters = [
+      goalkeeper,
+      ...squad.players.filter(({ position }) => position !== 'GK').slice(0, 10),
+    ].map(({ id: playerId, position }) => ({ playerId, position }));
     await app.execute(
       token,
       command('SetLineup', 'command_lineup', 2, {

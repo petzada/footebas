@@ -234,7 +234,10 @@ function statusEvent(
       data: {
         code: status.errorCode ?? 'JOB_FAILED',
         message: 'simulation failed',
-        retryable: status.attempt < 20,
+        retryable:
+          status.errorCode !== 'MAX_ATTEMPTS_EXCEEDED' &&
+          status.errorCode !== 'WORKER_TIMEOUT' &&
+          status.attempt < 20,
       },
     };
   if (status.state === 'running')

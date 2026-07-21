@@ -46,6 +46,7 @@ import {
 } from '@footebas/engine';
 import { createHash } from 'node:crypto';
 import {
+  FIXTURE_CONTENT_VERSION,
   createFixtureContent,
   defaultLineup,
   defaultTactic,
@@ -65,7 +66,7 @@ const VERSIONS = {
   schema: 'game-save-v1',
   engine: ENGINE_VERSION,
   rules: 'league-v1',
-  content: 'fixture-v1',
+  content: FIXTURE_CONTENT_VERSION,
 } as const;
 const COMPETITION_ID = entityId('competition_fixture_league', 'competition');
 const asCanonical = (value: unknown): CanonicalValue => value as CanonicalValue;
@@ -92,6 +93,7 @@ interface Snapshot {
   tactic?: Tactic;
   results: MatchResult[];
   standings: Standing[];
+  contentProvenance: ReturnType<typeof createFixtureContent>['provenance'];
   pendingJobId?: string;
 }
 
@@ -183,6 +185,7 @@ export class FootebasApplication {
           players: [...content.players],
           fixtures,
           results: [],
+          contentProvenance: content.provenance,
           standings: content.clubs.map(({ id }) => ({
             clubId: id,
             played: 0,
@@ -213,6 +216,7 @@ export class FootebasApplication {
     command: Exclude<Command, { type: 'CreateCareer' }>,
   ): Promise<CommandAccepted> {
     const careerId = command.payload.careerId;
+    let jobToEnqueue: SimulationJob | undefined;
     const response = await this.deps.unitOfWork.executeIdempotent(
       careerId,
       command.commandId,
@@ -333,10 +337,14 @@ export class FootebasApplication {
           seed: save.seed,
           versions: save.versions,
         });
-        if (job) await this.deps.jobs.enqueue(job);
+        jobToEnqueue = job;
         return asCanonical(this.accepted(command, updated, job?.id));
       },
     );
+    if (jobToEnqueue) {
+      await this.setJobStatus(jobToEnqueue, 'queued', 1);
+      await this.deps.jobs.enqueue(jobToEnqueue);
+    }
     return commandAcceptedSchema.parse(response);
   }
 
@@ -345,11 +353,9 @@ export class FootebasApplication {
     if (!job) return undefined;
     const prior = await this.deps.jobs.status(job.id);
     if (prior?.state === 'succeeded') return prior;
-    await this.setJobStatus(
-      job,
-      'running',
-      prior?.attempt ? prior.attempt + 1 : 1,
-    );
+    const attempt =
+      prior?.state === 'failed' ? prior.attempt + 1 : (prior?.attempt ?? 1);
+    await this.setJobStatus(job, 'running', attempt);
     try {
       await this.deps.unitOfWork.withCareerLock(job.careerId, async (tx) => {
         const save = await this.load(tx, job.careerId, job.userId);

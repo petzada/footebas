@@ -86,6 +86,7 @@ export class WorkerRuntime {
               : 'MAX_ATTEMPTS_EXCEEDED',
         };
         await this.queue.deadLetter(status.jobId, terminal);
+        this.healthy = false;
         this.lastError = terminal.errorCode;
         return { kind: 'terminal', status: terminal };
       }
