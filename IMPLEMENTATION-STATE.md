@@ -9,8 +9,9 @@
 | 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes  |
 | 3 — Elenco e matchday          | concluída    | matchday reproduzível e acessível; gates verdes |
 | 4 — Mundo vivo                 | concluída    | economia/carreira 25 épocas; API e gates verdes |
-| 5 — Pirâmide e calendário      | em progresso | DSL de competições e calendário                 |
-| 6–9                            | pendente     | execução estritamente sequencial pelos gates    |
+| 5 — Pirâmide e calendário      | concluída    | engine canônico; gate de 2.000 épocas verde     |
+| 6 — Experiência e campo 2D     | em progresso | shell mobile, acessibilidade e timeline 2D      |
+| 7–9                            | pendente     | execução estritamente sequencial pelos gates    |
 
 ## Decisões operacionais
 
@@ -71,3 +72,15 @@
 - Web mobile-first cobre mercado, contratos, finanças, estádio, base, diretoria, empregos, notícias, história e leaderboards.
 - Stress de 25 temporadas: zero falhas, 920 jogadores finais, força média 58,45, salário médio 9.498,86 e caixa mundial 9.461.620.523.
 - `pnpm check`: formatter, typecheck, lint, 121 testes, builds (incluindo Next) e smoke verdes.
+
+## Gate da Fase 5
+
+- DSL canônica e data-driven para liga, grupos e mata-mata, incluindo byes, qualificação e desempates determinísticos.
+- Configuração versionada cobre Séries A/B/C, Copa do Brasil, cinco estaduais simplificados e continental com pré, grupos e mata-mata.
+- Validador recusa conflitos, descanso insuficiente, pernas/mandos incorretos, participantes/fases inválidos e datas reservadas.
+- Resultados alimentam acesso, rebaixamento, vagas continentais, premiações, prestígio e eventos da temporada seguinte.
+- Serviço autoritativo usa adapter engine-backed com ownership, lock, versão otimista e idempotência por fingerprint canônico.
+- Web mobile-first expõe competições, calendário, qualificação, prêmios/prestígio e transição da temporada.
+- Gate canônico: 2.000 épocas, 2.648.000 partidas, dez competições/época, zero falhas em 37,44 s.
+- Transições observadas: 16.000 promoções, 16.000 rebaixamentos e 20.000 classificações continentais.
+- `pnpm check`: formatter, typecheck, lint, 145 testes, builds (incluindo Next) e smoke verdes.
