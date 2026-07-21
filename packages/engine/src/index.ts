@@ -43,6 +43,31 @@ export {
   ledgerConservationErrors,
   migrateCareerWorldSave,
 } from './career-world.js';
+export {
+  evaluateKnockoutRound,
+  evaluateRankingStage,
+  generateCompetitionAwards,
+  generateNextSeason,
+  resolveStageParticipants,
+  scheduleCompetitionStage,
+} from './competition.js';
+export type { ScheduledStage, SeasonGeneration } from './competition.js';
+export {
+  assertValidCompetitionCalendar,
+  InvalidCalendarError,
+  validateCompetitionCalendar,
+} from './calendar.js';
+export {
+  BRAZILIAN_RANKING_RULE,
+  createMvpCompetitionSystem,
+} from './mvp-competitions.js';
+export type { MvpCompetitionSystem } from './mvp-competitions.js';
+export type {
+  CalendarValidationInput,
+  CalendarValidationResult,
+  CalendarViolation,
+  CalendarViolationCode,
+} from './calendar.js';
 export type {
   CareerArchive,
   CareerClub,
