@@ -272,12 +272,9 @@ function Onboarding(props: {
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 {[
-                  ['Atlético Aurora', 'Elenco técnico · pressão por acesso'],
-                  ['Esporte Litorâneo', 'Torcida quente · contra-ataque'],
-                  [
-                    'Ferroviário Central',
-                    'Base forte · projeto de longo prazo',
-                  ],
+                  ['Flamengo', 'Elenco técnico · pressão por títulos'],
+                  ['Fluminense', 'Torcida exigente · jogo apoiado'],
+                  ['Atlético Mineiro', 'Elenco experiente · intensidade alta'],
                 ].map(([club, note]) => (
                   <Button
                     key={club}
@@ -416,7 +413,7 @@ function Home({
             <span className="mx-3 text-muted-foreground">×</span>
             {career.nextOpponent}
           </CardTitle>
-          <CardDescription>Hoje · 20:30 · Campo do Povo</CardDescription>
+          <CardDescription>Hoje · 20:30 · mando do Flamengo</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-3 rounded-lg bg-muted p-4 text-center">

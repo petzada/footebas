@@ -47,18 +47,18 @@ export interface CareerApiPort {
 }
 
 const roster: PlayerView[] = [
-  ['p1', 'Caio Ventura', 'GOL', 72],
-  ['p2', 'Breno Luz', 'LD', 68],
-  ['p3', 'Ícaro Reis', 'ZAG', 73],
-  ['p4', 'Davi Sena', 'ZAG', 70],
-  ['p5', 'Luan Prado', 'LE', 69],
-  ['p6', 'Nando Brás', 'VOL', 74],
-  ['p7', 'Ravi Melo', 'MC', 71],
-  ['p8', 'Téo Farias', 'MEI', 76],
-  ['p9', 'Cauã Neri', 'PD', 75],
-  ['p10', 'Jota Vale', 'ATA', 78],
-  ['p11', 'Miro Dantas', 'PE', 73],
-  ['p12', 'Gui Porto', 'ATA', 67],
+  ['p1', 'Agustín Rossi', 'GOL', 81],
+  ['p2', 'Emerson Royal', 'LD', 83],
+  ['p3', 'Léo Ortiz', 'ZAG', 82],
+  ['p4', 'Léo Pereira', 'ZAG', 79],
+  ['p5', 'Ayrton Lucas', 'LE', 84],
+  ['p6', 'Erick Pulgar', 'VOL', 81],
+  ['p7', 'Nicolás de la Cruz', 'MC', 82],
+  ['p8', 'Giorgian de Arrascaeta', 'MEI', 82],
+  ['p9', 'Gonzalo Plata', 'PD', 80],
+  ['p10', 'Lucas Paquetá', 'MEI', 82],
+  ['p11', 'Samuel Lino', 'PE', 81],
+  ['p12', 'Luiz Araújo', 'PD', 79],
 ].map(([id, name, position, rating], index) => ({
   id: String(id),
   name: String(name),
@@ -80,7 +80,7 @@ export class InMemoryCareerApi implements CareerApiPort {
       coach,
       club: '',
       round: 1,
-      nextOpponent: 'União Serrana',
+      nextOpponent: 'Palmeiras',
       formation: '4-3-3',
       tactic: 'equilibrio',
       players: roster,
@@ -118,28 +118,28 @@ export class InMemoryCareerApi implements CareerApiPort {
       {
         progress: 18,
         minute: 12,
-        message: 'Aurora pressiona pela direita',
+        message: 'Flamengo pressiona pela direita',
         score: '0 × 0',
         done: false,
       },
       {
         progress: 53,
         minute: 48,
-        message: 'GOL! Jota Vale completa o cruzamento',
+        message: 'GOL! Lucas Paquetá completa o cruzamento',
         score: '1 × 0',
         done: false,
       },
       {
         progress: 82,
         minute: 76,
-        message: 'Caio Ventura salva no canto',
+        message: 'Agustín Rossi salva no canto',
         score: '1 × 0',
         done: false,
       },
       {
         progress: 100,
         minute: 90,
-        message: 'Fim de jogo no Campo do Povo',
+        message: 'Fim de jogo',
         score: '1 × 0',
         done: true,
       },
@@ -152,7 +152,7 @@ export class InMemoryCareerApi implements CareerApiPort {
     this.#career = {
       ...current,
       round: current.round + 1,
-      nextOpponent: 'Ferroviário Central',
+      nextOpponent: 'Atlético Mineiro',
       lastResult: {
         score: '1 × 0',
         headline: 'Vitória com cara de time grande',
@@ -172,8 +172,8 @@ export class InMemoryCareerApi implements CareerApiPort {
 }
 
 const initialTable: StandingView[] = [
-  { position: 1, club: 'União Serrana', played: 1, points: 3 },
-  { position: 2, club: 'Atlético Aurora', played: 0, points: 0 },
-  { position: 3, club: 'Ferroviário Central', played: 1, points: 0 },
-  { position: 4, club: 'Esporte Litorâneo', played: 0, points: 0 },
+  { position: 1, club: 'Palmeiras', played: 1, points: 3 },
+  { position: 2, club: 'Flamengo', played: 0, points: 0 },
+  { position: 3, club: 'Atlético Mineiro', played: 1, points: 0 },
+  { position: 4, club: 'Fluminense', played: 0, points: 0 },
 ];

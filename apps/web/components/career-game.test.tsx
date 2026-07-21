@@ -9,7 +9,7 @@ async function onboard() {
   await screen.findByLabelText(/nome do treinador/i);
   fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
   await screen.findByText(/escolha seu desafio/i);
-  fireEvent.click(screen.getByRole('button', { name: /atlético aurora/i }));
+  fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
   await screen.findByRole('button', { name: /avançar partida/i });
 }
 
@@ -38,11 +38,11 @@ describe('carreira mobile-first', () => {
     const api = new InMemoryCareerApi();
     await api.login('a@b.com');
     await api.createCareer({ coach: 'Ana' });
-    await api.selectClub('Atlético Aurora');
+    await api.selectClub('Flamengo');
     const before = await api.getCareer();
     expect(before).not.toBeNull();
     (before!.players[0] as { name: string }).name = 'alteração indevida';
-    expect((await api.getCareer())!.players[0]!.name).toBe('Caio Ventura');
+    expect((await api.getCareer())!.players[0]!.name).toBe('Agustín Rossi');
     const task = api.advanceMatch(() => undefined);
     await vi.runAllTimersAsync();
     await task;
@@ -53,7 +53,7 @@ describe('carreira mobile-first', () => {
     const api = new InMemoryCareerApi();
     await api.login('a@b.com');
     await api.createCareer({ coach: 'Bia' });
-    await api.selectClub('Esporte Litorâneo');
+    await api.selectClub('Fluminense');
     render(<CareerGame api={api} />);
     fireEvent.change(screen.getByLabelText(/seu e-mail/i), {
       target: { value: 'a@b.com' },
