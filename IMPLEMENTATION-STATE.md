@@ -8,8 +8,9 @@
 | 1 — Laboratório determinístico | concluída    | `pnpm test:phase1`: 10k partidas + 1k épocas    |
 | 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes  |
 | 3 — Elenco e matchday          | concluída    | matchday reproduzível e acessível; gates verdes |
-| 4 — Mundo vivo                 | em progresso | carreira longa, mercado, finanças e base        |
-| 5–9                            | pendente     | execução estritamente sequencial pelos gates    |
+| 4 — Mundo vivo                 | concluída    | economia/carreira 25 épocas; API e gates verdes |
+| 5 — Pirâmide e calendário     | em progresso | DSL de competições e calendário                  |
+| 6–9                            | pendente     | execução estritamente sequencial pelos gates    |
 
 ## Decisões operacionais
 
@@ -59,3 +60,14 @@
 - Web oferece alternativa sem drag-and-drop, teclado, feed 1×/2×/4×, resultado instantâneo e skip em um toque.
 - Playthrough `phase-three-playthrough-v1`: 14/14 rodadas com informação, consequência e replay, zero falhas.
 - `pnpm check`: formatter, typecheck, lint, 88 testes, builds (incluindo Next) e smoke verdes.
+
+## Gate da Fase 4
+
+- Mundo de carreira puro e determinístico com 40 clubes, 960 identidades reais e atributos derivados com proveniência.
+- Contratos, transferências, empréstimos, agentes livres e IA de mercado conservam dinheiro em ledger balanceado por origem.
+- Estádio, público, base, evolução, diretoria, demissão e troca de clube preservam a identidade e o histórico do treinador.
+- Fastify, aplicação e engine avançam a temporada no mesmo pipeline autoritativo, com ownership, lock, versão otimista e commit atômico.
+- Replay usa fingerprint exato; saves e arquivos canônicos validam checksum; migração e compactação possuem adapters in-memory.
+- Web mobile-first cobre mercado, contratos, finanças, estádio, base, diretoria, empregos, notícias, história e leaderboards.
+- Stress de 25 temporadas: zero falhas, 920 jogadores finais, força média 58,45, salário médio 9.498,86 e caixa mundial 9.461.620.523.
+- `pnpm check`: formatter, typecheck, lint, 121 testes, builds (incluindo Next) e smoke verdes.
