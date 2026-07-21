@@ -7,6 +7,9 @@
     "build": "tsc -p tsconfig.json",
     "calibrate": "tsx src/cli.ts --calibrate --matches=10000",
     "lint": "eslint src --max-warnings=0",
+    "phase1-gate": "tsx src/cli.ts --phase1-gate --matches=10000 --seasons=1000",
+    "playthrough": "tsx src/cli.ts --playthrough --rounds=14",
+    "season": "tsx src/cli.ts --season",
     "smoke": "tsx src/cli.ts --smoke",
     "test": "vitest run --config ../../vitest.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
