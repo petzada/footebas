@@ -203,6 +203,42 @@ Objetivo recomendado para o futuro `/goal`:
 > of Done estiverem completas, restando exclusivamente ações humanas ou externas reunidas em um único checklist
 > verificável.
 
+### 6.2 Orquestração dos agentes durante o `/goal`
+
+O agente principal do objetivo atua como **arquiteto e coordenador**, preservando contexto para decisões, sequência
+de fases e validação final. A implementação substantiva é delegada a agentes novos e especializados por fatia.
+
+Política obrigatória:
+
+- Criar o `/goal` com orçamento de execução/contexto explicitamente amplo, no maior valor acordado e suportado no
+  momento da criação. Esgotamento de orçamento nunca equivale a conclusão.
+- Usar **GPT-5.6 Sol** (`gpt-5.6-sol`) nos agentes de implementação.
+- O agente principal decompõe cada fase em tarefas independentes, com arquivos e contratos de propriedade claros.
+- Cada agente recebe contexto enxuto: objetivo da tarefa, fase do roadmap, documentos normativos indispensáveis,
+  interfaces afetadas, testes esperados e estado atual registrado no repositório — não o histórico inteiro.
+- Dentro de uma fase, executar em paralelo apenas tarefas realmente independentes. Limitar a concorrência à
+  capacidade disponível e nunca atribuir o mesmo pacote de domínio, migration ou arquivo a dois agentes.
+- Escritores paralelos usam branch/worktree isolado. Se isolamento não estiver disponível, alterações e commits são
+  serializados; somente análises e leituras podem continuar em paralelo.
+- O próprio agente responsável pela tarefa implementa, testa e cria commit pequeno com staging explícito apenas dos
+  arquivos sob sua responsabilidade.
+- O retorno ao agente principal é curto: status, hash do commit, testes executados, decisões tomadas e eventual
+  desvio/bloqueio. Não devolver transcrições extensas ou todo o raciocínio.
+- O agente principal integra os commits, executa apenas o smoke/gate necessário para confirmar a integração, atualiza
+  o estado durável e então dispara a próxima onda ou fase.
+- Usar agentes novos entre tarefas/fases para renovar a janela de contexto; não concentrar toda a implementação num
+  único agente longo.
+- Manter `IMPLEMENTATION-STATE.md` como memória durável: fase atual, tarefas, responsáveis, commits, gates, decisões,
+  pendências externas e próximo passo. O repositório, não a conversa, é a fonte de continuidade operacional.
+
+Antes de concluir o objetivo, o agente principal realiza uma auditoria final rápida e transversal:
+
+1. confronta `docs/00`, `docs/08`, este roadmap e os overrides explícitos com o que existe na codebase;
+2. verifica a matriz decisão/feature -> implementação -> testes -> migration/telemetria quando aplicável;
+3. executa a suíte de topo e os smoke tests dos fluxos críticos;
+4. delega correções de qualquer lacuna encontrada a novos agentes 5.6 Sol;
+5. só encerra quando não houver pendência de código e restarem apenas ações humanas/externas no checklist final.
+
 ## 7. Caminho crítico
 
 ```text
