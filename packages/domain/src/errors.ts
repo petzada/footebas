@@ -1,5 +1,9 @@
 export type DomainErrorCode =
-  'INVALID_CANONICAL_VALUE' | 'INVALID_GAME_DATE' | 'INVALID_ID';
+  | 'INVALID_CANONICAL_VALUE'
+  | 'INVALID_ENTITY'
+  | 'INVALID_GAME_DATE'
+  | 'INVALID_ID'
+  | 'INVALID_VALUE';
 
 export class DomainError extends Error {
   public override readonly name = 'DomainError';
