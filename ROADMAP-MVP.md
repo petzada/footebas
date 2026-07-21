@@ -42,7 +42,8 @@ as fases abaixo são marcos internos, demos locais e alphas controlados.
 - Design system, telas, PWA ou visualizador de partida.
 - Testes automatizados, CI/CD, telemetria e observabilidade.
 - Pipeline que converta os levantamentos em conteúdo válido para o jogo.
-- Histórico de commits: o branch `main` ainda não possui commit inicial.
+- O histórico atual contém apenas decisões e roadmaps; ainda não há commit de aplicação executável nem baseline
+  consolidado de toda a documentação e dos dados.
 
 Portanto, o estado real é **fundação documental + dados de pesquisa**, não uma aplicação parcialmente implementada.
 
@@ -86,7 +87,7 @@ Não reabrir durante a implementação:
 | Partida | Resultado instantâneo + narração/feed + 2D leve; 3D fica pós-MVP |
 | Jogador | Força única + até 2 características visíveis; atributos ocultos completos |
 | Social | Ranking global de treinador; sem multiplayer no MVP |
-| Monetização | Grátis + licença única + Clube Online opcional |
+| Monetização | Grátis + licença única via Woovi/PIX; Clube Online/Stripe ficam pós-MVP |
 | Lançamento | MVP público completo; fases são validações internas |
 
 Referências antigas a desktop-first, quatro divisões, 80 clubes, 3D no MVP ou offline-first não governam o
@@ -107,7 +108,7 @@ Ao final, uma pessoa deve conseguir:
 9. ser demitida, receber proposta e trocar de clube sem perder a carreira do treinador;
 10. consultar história, notícias, recordes e ranking global;
 11. editar/importar o conteúdo permitido pelo plano;
-12. comprar a licença ou assinar o Clube Online, sem que dinheiro compre resultado esportivo.
+12. comprar a licença única via PIX, sem que dinheiro compre resultado esportivo.
 
 Metas centrais: primeira partida em até 5 minutos; rodada comum em até 2 minutos; avanço semanal abaixo de 3
 segundos em carga normal; save íntegro por dezenas de temporadas.
@@ -198,7 +199,8 @@ pedir aprovação humana entre elas. Nesse modo:
 Objetivo recomendado para o futuro `/goal`:
 
 > Implementar integralmente o MVP do Footebas descrito neste roadmap e na fonte normativa, executando as Fases
-> 0–9 em ordem, utilizando os elencos reais autorizados, corrigindo automaticamente gates que falharem,
+> 0–9 em ordem, utilizando os elencos reais autorizados e monetização grátis + licença única via Woovi/PIX,
+> sem assinatura no MVP, corrigindo automaticamente gates que falharem,
 > preservando todas as decisões registradas e só concluir quando toda implementação automatizável e a Definition
 > of Done estiverem completas, restando exclusivamente ações humanas ou externas reunidas em um único checklist
 > verificável.
@@ -210,14 +212,17 @@ de fases e validação final. A implementação substantiva é delegada a agente
 
 Política obrigatória:
 
-- Criar o `/goal` com orçamento de execução/contexto explicitamente amplo, no maior valor acordado e suportado no
-  momento da criação. Esgotamento de orçamento nunca equivale a conclusão.
+- Criar o `/goal` com `token_budget: 1000000`; se a plataforma rejeitar, usar o maior valor aceito. Esgotamento de
+  orçamento nunca equivale a conclusão.
 - Usar **GPT-5.6 Sol** (`gpt-5.6-sol`) nos agentes de implementação.
+- Na Fase 0, manter um único escritor no workspace principal até existir commit-base limpo; somente depois abrir
+  paralelismo de escrita.
 - O agente principal decompõe cada fase em tarefas independentes, com arquivos e contratos de propriedade claros.
 - Cada agente recebe contexto enxuto: objetivo da tarefa, fase do roadmap, documentos normativos indispensáveis,
   interfaces afetadas, testes esperados e estado atual registrado no repositório — não o histórico inteiro.
-- Dentro de uma fase, executar em paralelo apenas tarefas realmente independentes. Limitar a concorrência à
-  capacidade disponível e nunca atribuir o mesmo pacote de domínio, migration ou arquivo a dois agentes.
+- Criar workers com `model: "gpt-5.6-sol"` e `fork_turns: "none"`; fornecer todo o contexto necessário na tarefa.
+- Dentro de uma fase, executar em paralelo apenas tarefas realmente independentes, com até três workers além do
+  principal, e nunca atribuir o mesmo pacote de domínio, migration ou arquivo a dois agentes.
 - Escritores paralelos usam branch/worktree isolado. Se isolamento não estiver disponível, alterações e commits são
   serializados; somente análises e leituras podem continuar em paralelo.
 - O próprio agente responsável pela tarefa implementa, testa e cria commit pequeno com staging explícito apenas dos
@@ -238,6 +243,20 @@ Antes de concluir o objetivo, o agente principal realiza uma auditoria final rá
 3. executa a suíte de topo e os smoke tests dos fluxos críticos;
 4. delega correções de qualquer lacuna encontrada a novos agentes 5.6 Sol;
 5. só encerra quando não houver pendência de código e restarem apenas ações humanas/externas no checklist final.
+
+### 6.3 Override operacional do `/goal`
+
+A arquitetura final continua server-authoritative com Postgres/Supabase, Redis/BullMQ, storage, autenticação e
+serviços externos. Porém, durante o `/goal` autônomo, a decisão D4 de `GOAL.md` prevalece:
+
+- não executar Docker, banco, Redis, Supabase, browser E2E, SaaS ou pagamento real;
+- implementar ports, adapters reais compiláveis quando possível e fakes/in-memory testáveis;
+- validar toda a lógica automatizável com testes locais sem infraestrutura externa;
+- enviar conexões, credenciais e validações reais para `FINALIZATION-CHECKLIST.md`;
+- interpretar cada gate durante o `/goal` como a parcela testável pelo agente, sem declarar que a validação de
+  produção já ocorreu.
+
+Esse override altera a forma de validar a implementação autônoma, não a arquitetura do produto final.
 
 ## 7. Caminho crítico
 
@@ -529,16 +548,18 @@ iniciada sem migration explícita; os relatórios permitem rastrear cada dado at
 - Prestígio do treinador derivado de eventos autoritativos: títulos, copa, continental, acessos e longevidade.
 - Leaderboards global, Ascensão/Underdog e mensal, com paginação e snapshots.
 - Proteções contra estado impossível, duplicação de pontuação e abuso básico.
-- Entitlements centralizados para grátis, licença completa e Clube Online.
+- Entitlements centralizados para grátis e licença completa.
 - Regras grátis/pagas da matriz normativa, incluindo escolha de clube e limites de save.
-- Provedor de billing encapsulado, webhooks assinados, idempotência, reconciliação e ambiente sandbox.
-- Fluxos de compra, restauração, renovação, cancelamento, falha e reembolso.
+- Provedor de billing encapsulado (**Woovi**, PIX QR Code) para licença única: criação de cobrança, consulta de
+  status, expiração, confirmação por webhook idempotente e reembolso, com adapter fake/fixtures locais durante o
+  `/goal`; cobrança real só no checklist final.
+- Fluxos de compra, restauração de entitlement, expiração, confirmação, falha e reembolso.
 - Perfil, privacidade, termos, suporte e exclusão/exportação de dados conforme requisitos aplicáveis.
 - Métricas do funil: ativação, engajamento, retenção, qualidade e conversão.
 
 **Gate de saída:** ranking só aceita conquistas produzidas pelo backend; webhooks repetidos não duplicam entitlement;
-falha no billing não corrompe carreira; usuário grátis joga o loop completo; assinatura não é necessária para o
-single-player e dinheiro real não altera atributos, resultados ou recursos esportivos.
+falha no billing não corrompe carreira; usuário grátis joga o loop completo; licença é pagamento único e dinheiro
+real não altera atributos, resultados ou recursos esportivos.
 
 ### Fase 9 — Hardening, beta fechada e lançamento
 
@@ -581,7 +602,7 @@ ou cada pendência externa explicitamente identificada como bloqueio real do lan
 | **M2 — Profundidade competitiva** | 5 | Série C, copa, estaduais, continental e calendário íntegro |
 | **M3 — Encantamento visual** | 6 | Identidade aplicada, feed polido e 2D leve skippable |
 | **M4 — Conteúdo e comunidade** | 7 | Dados reais normalizados, editor e import/export seguro |
-| **M5 — Monetização e lançamento** | 8–9 | Ranking segmentado, entitlements, billing, telemetria e hardening |
+| **M5 — Monetização e lançamento** | 8–9 | Ranking segmentado, licença Woovi/PIX, entitlements, telemetria e hardening |
 
 ## 10. Testes que acompanham todas as fases
 
@@ -599,7 +620,9 @@ ou cada pendência externa explicitamente identificada como bloqueio real do lan
 
 ### Persistência e aplicação
 
-- Integração real com Postgres e Redis, evitando mocks nas garantias críticas.
+- Integração real com Postgres e Redis, evitando mocks nas garantias críticas — **exceto durante o `/goal`
+  autônomo definido em `GOAL.md`**, em que valem adapters in-memory e a conexão/teste real fica para o
+  `FINALIZATION-CHECKLIST.md` (Supabase e demais serviços no final).
 - Contract tests entre web, API, worker e schemas Zod.
 - Migração de save com fixtures de versões anteriores.
 - Testes de idempotência, concorrência, retry e recuperação após falha.
@@ -647,7 +670,7 @@ O MVP só está pronto quando todos os itens abaixo forem verdadeiros:
 - Os datasets reais possuem pipeline reproduzível, proveniência e versionamento.
 - Ranking global, Ascensão/Underdog e mensal são derivados do backend.
 - Editor básico e completo respeitam entitlements e segurança de importação.
-- Grátis, licença e Clube Online seguem a matriz normativa.
+- Grátis e licença única via Woovi/PIX seguem a matriz normativa.
 - Telemetria mede ativação, engajamento, retenção, qualidade e conversão.
 - Gates jurídicos/comerciais necessários ao lançamento foram formalmente resolvidos.
 
@@ -665,6 +688,7 @@ Não antecipar durante os marcos acima:
 - Workshop hospedado com descoberta pública.
 - IA generativa decidindo fatos do mundo ou resultados.
 - App nativo.
+- Clube Online, assinatura/recorrência e integração Stripe.
 
 Preparar fronteiras para essas extensões não significa implementá-las antes do MVP.
 
@@ -690,7 +714,7 @@ Preparar fronteiras para essas extensões não significa implementá-las antes d
 |---|---:|
 | Fases 0–2: baseline mínimo, laboratório e vertical slice online | 10–15 semanas |
 | Fases 3–5: matchday, carreira longa e competições | 19–28 semanas |
-| Fases 6–8: UX/2D, conteúdo/editor, ranking/billing | 16–25 semanas |
+| Fases 6–8: UX/2D, conteúdo/editor, ranking/licença PIX | 16–25 semanas |
 | Fase 9: hardening e lançamento | 5–8 semanas |
 | **Total sequencial provável** | **50–76 semanas efetivas** |
 
@@ -704,8 +728,10 @@ balanceamento, decisões de produto, revisão de segurança, validação de save
 ## 15. Próximos passos imediatos
 
 1. Aprovar este roadmap como plano operacional do objetivo completo.
-2. Registrar o override de elencos reais na documentação normativa durante a própria execução.
-3. Criar um único `/goal` com o objetivo recomendado na seção 6.1 e sem orçamento artificial de tokens.
+2. ~~Registrar o override de elencos reais na documentação normativa~~ **feito** (`docs/08`, `docs/00`, `docs/03`,
+   `docs/06` + cola `dados/elencos/forca-relativa-cola.md`).
+3. Criar um único `/goal` com o objetivo do `GOAL.md` e `token_budget: 1000000`; se rejeitado, usar o maior valor
+   aceito pela plataforma.
 4. Fazer o baseline inicial da documentação e dos dados brutos, preservando o estado de partida.
 5. Executar automaticamente as Fases 0–9 em ordem, corrigindo gates antes de avançar e sem pedir aprovações
    intermediárias.

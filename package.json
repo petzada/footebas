@@ -1,0 +1,33 @@
+{
+  "name": "footebas",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Footebas — simulador de gestão de futebol determinístico e server-authoritative.",
+  "packageManager": "pnpm@10.6.2",
+  "engines": {
+    "node": ">=22.14.0 <25",
+    "pnpm": "10.6.2"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm smoke",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "turbo run lint",
+    "smoke": "pnpm --filter @footebas/sim-lab smoke",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.1",
+    "eslint": "10.7.0",
+    "fast-check": "4.9.0",
+    "prettier": "3.9.5",
+    "tsx": "4.23.1",
+    "turbo": "2.10.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  }
+}
