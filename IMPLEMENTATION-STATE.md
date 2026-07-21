@@ -2,12 +2,13 @@
 
 Última atualização: 2026-07-21
 
-| Fase                           | Estado       | Evidência                                    |
-| ------------------------------ | ------------ | -------------------------------------------- |
-| 0 — Baseline reproduzível      | concluída    | `pnpm check` verde; build e smoke            |
-| 1 — Laboratório determinístico | concluída    | `pnpm test:phase1`: 10k partidas + 1k épocas |
-| 2 — Primeira carreira          | em progresso | próximo gate server-authoritative com fakes  |
-| 3–9                            | pendente     | execução estritamente sequencial pelos gates |
+| Fase                           | Estado       | Evidência                                      |
+| ------------------------------ | ------------ | ---------------------------------------------- |
+| 0 — Baseline reproduzível      | concluída    | `pnpm check` verde; build e smoke              |
+| 1 — Laboratório determinístico | concluída    | `pnpm test:phase1`: 10k partidas + 1k épocas   |
+| 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes |
+| 3 — Elenco e matchday          | em progresso | modelo completo e decisões durante a partida   |
+| 4–9                            | pendente     | execução estritamente sequencial pelos gates   |
 
 ## Decisões operacionais
 
@@ -33,3 +34,14 @@
 - Stress: 1.000 temporadas completas / 56.000 partidas, zero estado impossível.
 - Amostra real: oito clubes e 200 jogadores lidos do Markdown bruto; atributos somente `derived` com proveniência.
 - Playthrough automatizado: 14 rodadas, decisões registradas e proxies de variação/consequência verdes.
+
+## Gate da Fase 2
+
+- Fluxo real autenticado: criar carreira, escolher clube, escalar, definir tática, avançar, simular, acompanhar job/SSE, consultar pós-jogo e recarregar.
+- Fastify REST/OpenAPI e read models de home, elenco, próximo jogo, tabela e pós-partida; nenhuma escrita canônica direta pelo cliente.
+- Persistência in-memory transacional com checksum, versões obrigatórias, lock por carreira, versão otimista e idempotência pela chave contratual.
+- Worker isolado sobre a mesma fila, com queued/running/succeeded/failed, retry/backoff, timeout lógico, dead-letter, health e shutdown.
+- Gate adversarial: retry não duplica partida, dois avanços concorrentes produzem uma rodada, falha parcial faz rollback e recarga preserva checksum.
+- Conteúdo autoritativo: oito clubes e 200 atletas reais do Markdown bruto; atributos somente `derived`, versionados e com proveniência.
+- Web PWA mobile-first: onboarding curto, navegação, elenco, formações/táticas, feed pulável, resultado, tabela e recarga por port fake.
+- `pnpm check`: formatter, typecheck, lint, 74 testes, builds (incluindo Next) e smoke verdes.
