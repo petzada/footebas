@@ -132,7 +132,7 @@ packages/engine + packages/domain
 eventos, snapshot, read models e timeline da partida
 ```
 
-Estrutura inicial:
+Estrutura-alvo, construída progressivamente e completa a partir da Fase 2:
 
 ```text
 apps/
@@ -150,6 +150,7 @@ packages/
   config/              TypeScript, lint, ambiente e convenções
   testing/             factories, seeds fixas e helpers
 tools/
+  sim-lab/             CLI, playthrough e relatórios Monte Carlo do engine
   content-pipeline/    importação, normalização e validação de conteúdo
 ```
 
@@ -171,10 +172,36 @@ Princípios de trabalho:
 - Definir contrato e teste de saída antes de gerar implementação com IA.
 - Manter PRs/commits pequenos e reversíveis, preferencialmente por comando ou fluxo do usuário.
 - Não permitir que dois agentes alterem simultaneamente o mesmo pacote de domínio ou migration.
-- Revisar manualmente migrations, fórmulas do engine, autorização, billing e código de concorrência.
+- Submeter migrations, fórmulas do engine, autorização, billing e concorrência a testes reforçados e revisão por
+  agente distinto; a revisão humana consolidada ocorre na Fase 9.
 - Registrar decisões caras em ADRs: datas do jogo, dinheiro, PRNG, snapshot, versionamento e compatibilidade.
-- Encerrar cada fase com demonstração mobile, teste de regressão e relatório de métricas.
+- Encerrar cada fase com uma demonstração executável adequada ao estágio, testes de regressão e relatório de métricas.
 - Não começar 2D, editor ou billing antes de o loop anterior passar pelo gate de qualidade.
+
+### 6.1 Execução contínua por `/goal`
+
+O plano foi desenhado para poder ser executado por um único objetivo de longa duração, cobrindo as Fases 0–9 sem
+pedir aprovação humana entre elas. Nesse modo:
+
+- O objetivo terminal é o **MVP completo e aderente à Definition of Done**, não a conclusão isolada de uma fase.
+- Os gates intermediários são verificações automáticas de qualidade, não pontos de pausa para aprovação.
+- Quando um gate falhar, o executor diagnostica, corrige e repete a validação antes de avançar.
+- Cada fase gera evidências versionadas: testes, benchmarks, relatórios de simulação, migrations e decisões.
+- A execução só para por bloqueio real que exija nova autoridade, segredo indisponível ou ação externa irreversível.
+- Quando uma integração depender de credenciais ou produção, o executor implementa contrato, adapter, sandbox/fake e
+  testes; registra a ativação real no checklist final e continua nas demais tarefas independentes.
+- Testes humanos, credenciais de produção, DNS, contratação de serviços, revisão jurídica/comercial e publicação
+  pública ficam concentrados na Fase 9.
+- O objetivo não pode ser marcado como concluído enquanto houver feature do MVP, teste obrigatório, migration,
+  integração ou critério da Definition of Done pendente.
+
+Objetivo recomendado para o futuro `/goal`:
+
+> Implementar integralmente o MVP do Footebas descrito neste roadmap e na fonte normativa, executando as Fases
+> 0–9 em ordem, utilizando os elencos reais autorizados, corrigindo automaticamente gates que falharem,
+> preservando todas as decisões registradas e só concluir quando toda implementação automatizável e a Definition
+> of Done estiverem completas, restando exclusivamente ações humanas ou externas reunidas em um único checklist
+> verificável.
 
 ## 7. Caminho crítico
 
@@ -199,28 +226,29 @@ mais altos. Eles entram cedo e recebem testes de simulação massiva antes do po
 
 ### Fase 0 — Baseline reproduzível
 
-**Estimativa:** 1–2 semanas
+**Estimativa:** 2–5 dias úteis
 
 **Mapeamento:** preparação para M1
 
 **Dependência:** roadmap aprovado e decisões normativas acessíveis
 
-**Objetivo:** qualquer agente ou máquina deve instalar, testar e subir o esqueleto local de forma previsível.
+**Objetivo:** qualquer agente ou máquina deve instalar, testar e executar o laboratório do engine de forma
+previsível, sem antecipar infraestrutura de produto.
 
 **Entregáveis:**
 
 - Commit inicial revisado, `.gitignore`, licença do repositório e `README` operacional.
-- Monorepo pnpm + Turborepo e estrutura de apps/pacotes da arquitetura-alvo.
-- Node LTS fixado, TypeScript estrito, lint, formatter, Vitest e Playwright.
+- Monorepo pnpm + Turborepo apenas com `domain`, `engine`, `testing`, `config` e `tools/sim-lab` ativos.
+- Node LTS fixado, TypeScript estrito, lint, formatter, Vitest e fast-check.
 - CI com install, typecheck, lint, testes e build.
-- Ambiente local com Postgres e Redis; Supabase local ou projeto de desenvolvimento documentado.
-- `.env.example`, validação de variáveis e separação entre desenvolvimento, preview e produção.
-- Convenções de IDs, dinheiro em centavos, `GameDate`, timezone, locale e erros de domínio.
-- ADRs iniciais: fronteiras do engine, PRNG/seed, save/versionamento, conteúdo e command envelope.
-- Catálogo inicial de eventos de produto e logs estruturados.
+- Convenções mínimas de IDs, `GameDate`, erros de domínio e serialização canônica.
+- ADRs mínimos: fronteiras do engine, PRNG/seed, relógio do jogo e determinismo.
+- Comando único para executar um smoke test determinístico no `sim-lab`.
+- Registro explícito de que Next.js, Fastify, Playwright, Prisma, Postgres, Redis, Supabase e BullMQ só entram na
+  Fase 2.
 
-**Gate de saída:** clone limpo executa uma única sequência documentada e conclui build + testes; web, API e worker
-respondem a health checks; nenhum segredo é versionado.
+**Gate de saída:** clone limpo executa uma única sequência documentada e conclui install, typecheck, lint, testes,
+build e smoke test do laboratório; nenhum serviço externo ou segredo é necessário.
 
 ### Fase 1 — Laboratório determinístico do jogo
 
@@ -233,8 +261,19 @@ respondem a health checks; nenhum segredo é versionado.
 **Objetivo:** provar que regras, resultados e progressão são reproduzíveis e potencialmente divertidos antes de
 investir na aplicação completa.
 
-**Vertical slice:** uma liga curta, oito clubes, aproximadamente 200 jogadores, escalação, três formações, três
-mentalidades, partida instantânea, feed textual, tabela e avanço de uma temporada via harness/CLI.
+**Vertical slice:** oito clubes, turno e returno (**14 rodadas**), aproximadamente 200 jogadores, escalação, três
+formações, três mentalidades, partida instantânea, feed textual, tabela e encerramento/reinício de temporada via
+harness/CLI.
+
+**Ordem interna obrigatória:**
+
+1. Formalizar `Player`, `Club`, `Lineup`, `Tactic`, `MatchInput`, `MatchResult` e os value objects indispensáveis.
+2. Implementar e testar o PRNG determinístico/versionado, sem `Math.random`, relógio real ou estado global.
+3. Implementar `simulateMatch(input: MatchInput): MatchResult` com placar, estatísticas e timeline.
+4. Construir o laboratório Monte Carlo e definir bandas versionadas de calibração.
+5. Implementar `LeagueTable`, geração das 14 rodadas e `advanceRound()`.
+6. Conectar escalação, adequação posicional e três mentalidades ao resultado probabilístico.
+7. Disponibilizar o harness interativo e executar uma temporada completa.
 
 **Entregáveis:**
 
@@ -242,17 +281,23 @@ mentalidades, partida instantânea, feed textual, tabela e avanço de uma tempor
 - PRNG seedado e versionado; relógio/data do jogo desacoplado do relógio real.
 - Motor de partida puro com timeline de gols, chances, cartões, lesões, substituições e estatísticas.
 - Cálculo inicial de força efetiva: posição, condição, moral, ritmo, tática, mando e variação controlada.
-- Gerador de liga e classificação com critérios configuráveis.
+- Gerador de liga em turno e returno e classificação com critérios configuráveis.
 - Evolução mínima de condição, moral e suspensões entre rodadas.
-- Harness de balanceamento que exporta distribuições, zebras, gols, cartões e vantagem de mando.
-- Golden tests por seed e property-based tests de invariantes.
+- Fixture sintética controlada para calibração e uma amostra separada de oito clubes reais para validação de
+  integração; os levantamentos reais continuam sendo conteúdo obrigatório do produto final.
+- Harness Monte Carlo que exporta distribuições, zebras, gols, cartões, mando e efeito de decisões.
+- Golden tests por seed, property-based tests de invariantes e relatórios estatísticos de calibração.
 
-**Gate de saída:** a mesma entrada/seed/versão gera bytes equivalentes; uma temporada fecha com campeão e tabela
-válidos; 10 mil partidas e ao menos mil temporadas sintéticas rodam sem estado impossível; uma partida permanece
-abaixo da meta inicial de 150 ms no ambiente de referência.
+**Gate técnico de saída:** a mesma entrada/seed/versão gera saída canônica equivalente; uma temporada de 14
+rodadas fecha com campeão e tabela válidos; 10 mil partidas e ao menos mil temporadas sintéticas rodam sem estado
+impossível; favoritismo cresce de forma monotônica por faixa de diferença de força; zebras permanecem possíveis;
+mando e decisões táticas têm efeito mensurável sem garantir vitória; as distribuições permanecem nas bandas
+versionadas; uma partida fica abaixo da meta inicial de 150 ms no ambiente de referência.
 
-**Decisão ao final:** se dez rodadas não forem compreensíveis ou não gerarem vontade de continuar, balancear o
-núcleo antes de criar infraestrutura de produto.
+**Validação contínua sem pausa humana:** durante o `/goal`, o executor realiza playthroughs automatizados e
+adversariais de ao menos dez das 14 rodadas, registra as decisões e verifica legibilidade, variação e consequências
+por proxies mensuráveis. A validação humana de diversão não bloqueia a transição para a Fase 2; ela ocorre na beta
+da Fase 9. Se a beta reprovar o loop, o objetivo permanece incompleto e retorna à Fase 1 para recalibração.
 
 ### Fase 2 — Primeira carreira server-authoritative
 
@@ -477,14 +522,20 @@ single-player e dinheiro real não altera atributos, resultados ou recursos espo
 - Rate limiting, headers, CORS/CSRF conforme fluxo, gestão de segredos e revisão de autorização por recurso.
 - Testes de carga: avanços concorrentes, ranking, mercado, importação e jobs longos.
 - Matriz de compatibilidade de browser/PWA e testes em celulares modestos.
-- Alpha interno por marco, depois beta fechada instrumentada com saves descartáveis e reais.
+- Smoke tests e playthroughs automatizados por marco; beta humana fechada somente nesta fase, com saves
+  descartáveis e reais.
 - Balanceamento orientado por telemetria e simulações, não por alteração manual sem baseline.
 - Landing, onboarding, suporte mínimo, status/incident playbook e checklist de lançamento.
 - Gates comerciais e jurídicos concluídos para conteúdo, billing, privacidade e termos.
+- `FINALIZATION-CHECKLIST.md` consolidando credenciais de produção, DNS, billing real, serviços contratados,
+  revisão jurídica/comercial, aceite humano e publicação.
+- Teste qualitativo com 3–5 pessoas: cada uma consegue jogar pelo menos 10 das 14 rodadas, toma decisões de
+  escalação/tática, compreende os resultados e manifesta vontade de concluir ou reiniciar a temporada.
 
 **Gate de saída:** zero falha conhecida de corrupção/perda de save; restore executado com sucesso; erros críticos de
 autorização resolvidos; p95 de avanço e interface dentro das metas; calendário/economia aprovados em simulação longa;
-beta confirma entendimento do loop e vontade de seguir por múltiplas temporadas.
+beta confirma entendimento do loop e vontade de seguir por múltiplas temporadas; checklist manual final executado
+ou cada pendência externa explicitamente identificada como bloqueio real do lançamento.
 
 ## 9. Mapeamento para os marcos normativos
 
@@ -500,10 +551,14 @@ beta confirma entendimento do loop e vontade de seguir por múltiplas temporadas
 
 ### Engine e domínio
 
-- Unitários para regras e value objects.
-- Property-based para calendários, classificação, transferências e economia.
-- Seeds fixas e golden tests para determinismo.
-- Simulação massiva de partidas, temporadas e carreiras de 20–30 anos.
+- **Testes unitários:** exemplos conhecidos de regras e value objects.
+- **Golden tests:** seeds e entradas fixas comprovam determinismo e detectam alteração de resultado entre versões.
+- **Property-based tests:** entradas geradas procuram violações de invariantes em partidas, calendários,
+  classificação, transferências e economia.
+- **Simulação Monte Carlo:** milhares de partidas, temporadas e carreiras calibram distribuições, favoritismo,
+  zebras, mando, gols, cartões, lesões e efeitos táticos.
+- Os testes de propriedade verificam o que nunca pode acontecer; Monte Carlo mede com que frequência os resultados
+  válidos acontecem. Um não substitui o outro.
 - Invariantes executadas no CI e no importador de conteúdo.
 
 ### Persistência e aplicação
@@ -597,11 +652,11 @@ Preparar fronteiras para essas extensões não significa implementá-las antes d
 
 | Bloco | Faixa |
 |---|---:|
-| Fases 0–2: fundação, laboratório e vertical slice online | 10–16 semanas |
+| Fases 0–2: baseline mínimo, laboratório e vertical slice online | 10–15 semanas |
 | Fases 3–5: matchday, carreira longa e competições | 19–28 semanas |
 | Fases 6–8: UX/2D, conteúdo/editor, ranking/billing | 16–25 semanas |
 | Fase 9: hardening e lançamento | 5–8 semanas |
-| **Total sequencial provável** | **50–77 semanas efetivas** |
+| **Total sequencial provável** | **50–76 semanas efetivas** |
 
 Para uma pessoa, o MVP descrito é um projeto de aproximadamente **12–18 meses em dedicação integral**. A faixa
 inclui integração e retrabalho razoáveis, mas não contempla espera externa por contratação, aprovação jurídica,
@@ -612,13 +667,15 @@ balanceamento, decisões de produto, revisão de segurança, validação de save
 
 ## 15. Próximos passos imediatos
 
-1. Revisar e aprovar este roadmap como plano operacional.
-2. Corrigir na suite documental referências antigas de numeração, escopo e conteúdo para reduzir ambiguidade.
-3. Registrar o override de elencos reais em `docs/00-visao-e-decisoes.md` e `docs/08-mvp-fonte-de-verdade.md`.
-4. Criar backlog apenas da Fase 0, com issues pequenas e critérios verificáveis.
-5. Fazer o commit inicial da documentação e dos dados brutos, preservando o estado de partida.
-6. Executar a Fase 0 sem iniciar UI de produto ou regras avançadas em paralelo.
-7. Planejar a Fase 1 somente quando o baseline estiver reproduzível e o CI estiver verde.
+1. Aprovar este roadmap como plano operacional do objetivo completo.
+2. Registrar o override de elencos reais na documentação normativa durante a própria execução.
+3. Criar um único `/goal` com o objetivo recomendado na seção 6.1 e sem orçamento artificial de tokens.
+4. Fazer o baseline inicial da documentação e dos dados brutos, preservando o estado de partida.
+5. Executar automaticamente as Fases 0–9 em ordem, corrigindo gates antes de avançar e sem pedir aprovações
+   intermediárias.
+6. Manter `FINALIZATION-CHECKLIST.md` acumulando somente ações que realmente dependam do responsável ou de serviço
+   externo.
+7. Apresentar o MVP completo, as evidências de cada gate e o checklist manual em uma única revisão final.
 
 ---
 
