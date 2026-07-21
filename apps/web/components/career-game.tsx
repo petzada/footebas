@@ -8,6 +8,7 @@ import {
   CheckCircle,
   ClipboardText,
   Buildings,
+  CalendarDots,
   GlobeHemisphereWest,
   House,
   Lightning,
@@ -72,6 +73,7 @@ import {
   MarketScreen,
   WorldScreen,
 } from '@/components/phase4-screens';
+import { CompetitionScreens } from '@/components/competition-screens';
 
 type Stage = 'login' | 'coach' | 'club' | 'game' | 'match' | 'result';
 
@@ -238,6 +240,8 @@ export function CareerGame({
             onCareerChange={setCareer}
             reportError={setError}
           />
+        ) : screen === 'competitions' ? (
+          <CompetitionScreens />
         ) : (
           <WorldScreen
             career={career}
@@ -417,6 +421,7 @@ const navItems = [
   ['table', 'Tabela', ChartBar],
   ['market', 'Mercado', Storefront],
   ['club', 'Clube', Buildings],
+  ['competitions', 'Competições', CalendarDots],
   ['world', 'Mundo', GlobeHemisphereWest],
 ] as const;
 
@@ -425,6 +430,7 @@ const mobileNavItems = [
   ['squad', 'Elenco', ListChecks],
   ['market', 'Mercado', Storefront],
   ['club', 'Clube', Buildings],
+  ['competitions', 'Comp.', CalendarDots],
   ['world', 'Mundo', GlobeHemisphereWest],
 ] as const;
 
@@ -489,7 +495,7 @@ function BottomNav({
   return (
     <nav
       aria-label="Navegação inferior"
-      className="fixed inset-x-0 bottom-0 grid grid-cols-5 border-t bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 grid grid-cols-6 border-t bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden"
     >
       {mobileNavItems.map(([id, label, Icon]) => (
         <button

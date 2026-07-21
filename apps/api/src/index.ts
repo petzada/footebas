@@ -7,6 +7,10 @@ import {
   PhaseFourAuthorizationError,
   PhaseFourConflictError,
   PhaseFourNotFoundError,
+  PhaseFiveAuthorizationError,
+  PhaseFiveCompetitionService,
+  PhaseFiveConflictError,
+  PhaseFiveNotFoundError,
   type AuthPort,
   type FootebasApplication,
   type JobQueuePort,
@@ -24,6 +28,11 @@ import {
   phaseFourHistoryReadModelSchema,
   phaseFourLeaderboardReadModelSchema,
   phaseFourReceiptSchema,
+  competitionCalendarReadModelSchema,
+  competitionPyramidReadModelSchema,
+  nextSeasonTransitionReadModelSchema,
+  phaseFiveCommandSchema,
+  phaseFiveReceiptSchema,
   type ApiError,
   type JobSseEvent,
   type JobStatus,
@@ -39,6 +48,10 @@ export interface ApiDependencies {
   readonly bodyLimit?: number;
   readonly phaseFour?: Readonly<{
     application: PhaseFourApplicationService;
+    auth: AuthPort;
+  }>;
+  readonly phaseFive?: Readonly<{
+    application: PhaseFiveCompetitionService;
     auth: AuthPort;
   }>;
 }
@@ -265,6 +278,50 @@ export async function buildApi(
     );
   }
 
+  if (deps.phaseFive !== undefined) {
+    const phaseFive = deps.phaseFive;
+    app.post(
+      '/v1/phase-five/commands',
+      { schema: { ...commonSchema, body: { type: 'object' } } },
+      async (request, reply) => {
+        const identity = await phaseFive.auth.authenticate(bearer(request));
+        const command = phaseFiveCommandSchema.parse(request.body);
+        return reply.send(
+          phaseFiveReceiptSchema.parse(
+            await phaseFive.application.execute(identity.userId, command),
+          ),
+        );
+      },
+    );
+    const phaseFiveReads = {
+      competitions: {
+        query: phaseFive.application.pyramid.bind(phaseFive.application),
+        schema: competitionPyramidReadModelSchema,
+      },
+      calendar: {
+        query: phaseFive.application.calendar.bind(phaseFive.application),
+        schema: competitionCalendarReadModelSchema,
+      },
+      'next-season': {
+        query: phaseFive.application.transition.bind(phaseFive.application),
+        schema: nextSeasonTransitionReadModelSchema,
+      },
+    } as const;
+    for (const [name, projection] of Object.entries(phaseFiveReads)) {
+      app.get(
+        `/v1/phase-five/careers/:id/${name}`,
+        { schema: { ...commonSchema, params: paramsSchema } },
+        async (request) => {
+          const identity = await phaseFive.auth.authenticate(bearer(request));
+          const { id } = paramsSchemaParse(request.params);
+          return projection.schema.parse(
+            await projection.query(identity.userId, id),
+          );
+        },
+      );
+    }
+  }
+
   app.get(
     '/v1/jobs/:id',
     { schema: { ...commonSchema, params: paramsSchema } },
@@ -420,6 +477,21 @@ function mapError(
       body: errorBody(request, 'NOT_FOUND', error.message),
     };
   if (error instanceof PhaseFourConflictError)
+    return {
+      status: 409,
+      body: errorBody(request, 'VERSION_CONFLICT', error.message),
+    };
+  if (error instanceof PhaseFiveAuthorizationError)
+    return {
+      status: 403,
+      body: errorBody(request, 'FORBIDDEN', error.message),
+    };
+  if (error instanceof PhaseFiveNotFoundError)
+    return {
+      status: 404,
+      body: errorBody(request, 'NOT_FOUND', error.message),
+    };
+  if (error instanceof PhaseFiveConflictError)
     return {
       status: 409,
       body: errorBody(request, 'VERSION_CONFLICT', error.message),

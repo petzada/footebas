@@ -6,3 +6,4 @@ export * from './primitives.js';
 export * from './read-models.js';
 export * from './snapshot.js';
 export * from './phase-four.js';
+export * from './phase-five.js';

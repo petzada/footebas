@@ -5,7 +5,14 @@ import {
 } from '@/lib/phase4-model';
 
 export type Screen =
-  'home' | 'squad' | 'tactics' | 'table' | 'market' | 'club' | 'world';
+  | 'home'
+  | 'squad'
+  | 'tactics'
+  | 'table'
+  | 'market'
+  | 'club'
+  | 'competitions'
+  | 'world';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
 export type SquadRole = 'starter' | 'bench' | 'reserve';
 export type AutoPickStrategy = 'best' | 'rest' | 'develop';
