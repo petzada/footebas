@@ -12,3 +12,11 @@ export type {
   MatchupCalculation,
   SideCalculation,
 } from './match.js';
+export { generateDoubleRoundRobin, LeagueTable } from './league.js';
+export type { LeagueRow, LeagueRules, TieBreaker } from './league.js';
+export { advanceRound, createSeasonState } from './season.js';
+export type {
+  MatchInputFactory,
+  MatchSimulator,
+  SeasonState,
+} from './season.js';
