@@ -142,10 +142,26 @@ describe('Phase 2 HTTP/application/worker integration', () => {
       squad.players.every(({ name }) => !name.startsWith('Jogador ')),
     ).toBe(true);
     const goalkeeper = squad.players.find(({ position }) => position === 'GK');
+    const formationPositions = [
+      'GK',
+      'RB',
+      'CB',
+      'CB',
+      'LB',
+      'CM',
+      'CM',
+      'RW',
+      'LW',
+      'ST',
+      'ST',
+    ];
     const starters = [
       goalkeeper,
       ...squad.players.filter(({ position }) => position !== 'GK').slice(0, 10),
-    ].map(({ id: playerId, position }) => ({ playerId, position }));
+    ].map(({ id: playerId }, index) => ({
+      playerId,
+      position: formationPositions[index],
+    }));
     expect(
       (
         await post(
@@ -155,7 +171,7 @@ describe('Phase 2 HTTP/application/worker integration', () => {
             clubId: 'club_1',
             starters,
             substitutes: [],
-            captainId: starters[0].playerId,
+            captainId: starters[1].playerId,
           }),
         )
       ).statusCode,

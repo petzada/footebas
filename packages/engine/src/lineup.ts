@@ -1,4 +1,5 @@
 import {
+  DomainError,
   FORMATION_POSITIONS,
   createLineup,
   type Club,
@@ -69,7 +70,10 @@ export function autoSelectLineup(input: AutoLineupInput): Lineup {
     (player) => player.injuryRounds === 0 && player.suspensionRounds === 0,
   );
   if (available.length < 11)
-    throw new Error('club has fewer than eleven available players');
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'club has fewer than eleven available players',
+    );
   const used = new Set<string>();
   const starters = FORMATION_POSITIONS[input.formation].map((position) => {
     const player = available
@@ -80,7 +84,8 @@ export function autoSelectLineup(input: AutoLineupInput): Lineup {
             score(left, position, input.mode) ||
           left.id.localeCompare(right.id),
       )[0];
-    if (!player) throw new Error(`cannot fill ${position}`);
+    if (!player)
+      throw new DomainError('INVALID_ENTITY', `cannot fill ${position}`);
     used.add(player.id);
     return { playerId: player.id, position };
   });
@@ -108,7 +113,11 @@ export function autoSelectLineup(input: AutoLineupInput): Lineup {
         Number(right.strength) - Number(left.strength) ||
         left.id.localeCompare(right.id),
     )[0];
-  if (!captain) throw new Error('auto lineup has no captain candidate');
+  if (!captain)
+    throw new DomainError(
+      'INVALID_ENTITY',
+      'auto lineup has no captain candidate',
+    );
   return createLineup({
     clubId: input.club.id,
     starters,

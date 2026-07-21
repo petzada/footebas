@@ -129,8 +129,14 @@ export function createMatchInput(input: MatchInput): MatchInput {
   const instructions = [...(input.instructions ?? [])];
   let previousMinute = 0;
   const substitutions = { home: 0, away: 0 };
-  const playersOut = new Set<PlayerId>();
-  const playersIn = new Set<PlayerId>();
+  const activePlayers = {
+    home: new Set(home.lineup.starters.map(({ playerId }) => playerId)),
+    away: new Set(away.lineup.starters.map(({ playerId }) => playerId)),
+  };
+  const benchPlayers = {
+    home: new Set(home.lineup.substitutes),
+    away: new Set(away.lineup.substitutes),
+  };
   for (const instruction of instructions) {
     if (
       !MATCH_DECISION_MINUTES.includes(instruction.minute) ||
@@ -148,22 +154,15 @@ export function createMatchInput(input: MatchInput): MatchInput {
           'INVALID_ENTITY',
           'a side cannot plan more than five substitutions',
         );
+      const active = activePlayers[instruction.side];
+      const bench = benchPlayers[instruction.side];
       if (
-        playersOut.has(instruction.playerOutId) ||
-        playersIn.has(instruction.playerInId)
+        !active.has(instruction.playerOutId) ||
+        !bench.has(instruction.playerInId)
       )
         throw new DomainError(
           'INVALID_ENTITY',
-          'substitution players cannot be reused',
-        );
-      const starterIds = side.lineup.starters.map(({ playerId }) => playerId);
-      if (
-        !starterIds.includes(instruction.playerOutId) ||
-        !side.lineup.substitutes.includes(instruction.playerInId)
-      )
-        throw new DomainError(
-          'INVALID_ENTITY',
-          'substitution must exchange a starter with a bench player',
+          'substitution must exchange an active player with an unused bench player',
         );
       const incoming = side.players.find(
         ({ id }) => id === instruction.playerInId,
@@ -174,8 +173,9 @@ export function createMatchInput(input: MatchInput): MatchInput {
         incoming.suspensionRounds > 0
       )
         throw new DomainError('INVALID_ENTITY', 'substitute is unavailable');
-      playersOut.add(instruction.playerOutId);
-      playersIn.add(instruction.playerInId);
+      active.delete(instruction.playerOutId);
+      active.add(instruction.playerInId);
+      bench.delete(instruction.playerInId);
     } else createTactic(instruction.tactic);
     previousMinute = instruction.minute;
   }

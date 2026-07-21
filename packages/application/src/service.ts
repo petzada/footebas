@@ -28,6 +28,7 @@ import {
 import {
   GameDate,
   FORMATION_POSITIONS,
+  DomainError,
   createLineup,
   createMatchInput,
   createTactic,
@@ -39,6 +40,7 @@ import {
   type Lineup,
   type MatchResult,
   type MatchInstruction,
+  type MatchInput,
   type Player,
   type Tactic,
 } from '@footebas/domain';
@@ -269,7 +271,7 @@ export class FootebasApplication {
                 'VALIDATION_ERROR',
                 'lineup contains a player outside the selected club',
               );
-            snapshot.lineup = createLineup({
+            const lineup = createLineup({
               clubId: entityId(command.payload.clubId, 'club'),
               starters: command.payload.starters.map((slot) => ({
                 playerId: entityId(slot.playerId, 'player'),
@@ -287,6 +289,12 @@ export class FootebasApplication {
                 : {}),
               captainId: entityId(command.payload.captainId, 'player'),
             });
+            snapshot.lineup = validateLineupForMatch(
+              lineup,
+              club,
+              snapshot.players,
+              (snapshot.tactic ?? defaultTactic()).formation,
+            );
             break;
           }
           case 'AutoPickLineup': {
@@ -400,6 +408,12 @@ export class FootebasApplication {
                   'match instructions can only target the managed club',
                 );
             }
+            const instructions =
+              command.type === 'SimulateMatch'
+                ? (command.payload.instructions as
+                    readonly MatchInstruction[] | undefined)
+                : undefined;
+            this.matchInput(snapshot, fixture, save.seed, instructions);
             const jobId = this.deps.ids.next('job');
             snapshot.pendingJobId = jobId;
             job = {
@@ -503,6 +517,17 @@ export class FootebasApplication {
     seed: string,
     instructions: readonly MatchInstruction[] = [],
   ): MatchResult {
+    return simulateMatch(
+      this.matchInput(snapshot, fixture, seed, instructions),
+    );
+  }
+
+  private matchInput(
+    snapshot: Snapshot,
+    fixture: Pick<Fixture, 'id' | 'homeClubId' | 'awayClubId'>,
+    seed: string,
+    instructions: readonly MatchInstruction[] = [],
+  ): MatchInput {
     const side = (clubId: string) => {
       const club = snapshot.clubs.find(({ id }) => id === clubId)!;
       const managed = clubId === snapshot.selectedClubId;
@@ -531,17 +556,15 @@ export class FootebasApplication {
       snapshot.players,
       snapshot.tactic!.formation,
     );
-    return simulateMatch(
-      createMatchInput({
-        fixtureId: fixture.id,
-        seed: `${seed}:${fixture.id}`,
-        engineVersion: ENGINE_VERSION,
-        rulesVersion: VERSIONS.rules,
-        home: side(fixture.homeClubId),
-        away: side(fixture.awayClubId),
-        instructions,
-      }),
-    );
+    return createMatchInput({
+      fixtureId: fixture.id,
+      seed: `${seed}:${fixture.id}`,
+      engineVersion: ENGINE_VERSION,
+      rulesVersion: VERSIONS.rules,
+      home: side(fixture.homeClubId),
+      away: side(fixture.awayClubId),
+      instructions,
+    });
   }
 
   public async home(bearer: string, careerId: string): Promise<HomeReadModel> {
@@ -806,6 +829,8 @@ export class FootebasApplication {
   }
   private translate(error: unknown): Error {
     if (error instanceof ApplicationError) return error;
+    if (error instanceof DomainError)
+      return new ApplicationError('VALIDATION_ERROR', error.message);
     if (error instanceof SaveOwnershipError)
       return new ApplicationError('FORBIDDEN', error.message);
     if (error instanceof SaveNotFoundError)

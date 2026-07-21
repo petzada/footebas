@@ -213,6 +213,43 @@ describe('phase 3 matchday core', () => {
     expect(Object.isFrozen(input.instructions)).toBe(true);
   });
 
+  it('validates sequential substitutions against the live active side and unused bench', () => {
+    const base = matchInputFactory({ seed: 'phase3-active-bench' });
+    const originalStarter = base.home.lineup.starters[10]!;
+    const firstSubstitute = base.home.lineup.substitutes[0]!;
+    const secondSubstitute = base.home.lineup.substitutes[1]!;
+    const instructions = [
+      {
+        type: 'substitution' as const,
+        minute: 45 as const,
+        side: 'home' as const,
+        playerOutId: originalStarter.playerId,
+        playerInId: firstSubstitute,
+        position: originalStarter.position,
+      },
+      {
+        type: 'substitution' as const,
+        minute: 60 as const,
+        side: 'home' as const,
+        playerOutId: firstSubstitute,
+        playerInId: secondSubstitute,
+        position: originalStarter.position,
+      },
+    ];
+    expect(createMatchInput({ ...base, instructions }).instructions).toEqual(
+      instructions,
+    );
+    expect(() =>
+      createMatchInput({
+        ...base,
+        instructions: [
+          instructions[0]!,
+          { ...instructions[1]!, playerOutId: originalStarter.playerId },
+        ],
+      }),
+    ).toThrow(/active player.*unused bench/i);
+  });
+
   it('prepares decisions and exposes skip/speed-compatible feeds', () => {
     const input = matchInputFactory({
       seed: 'phase3-presentation',
