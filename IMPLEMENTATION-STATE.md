@@ -9,7 +9,7 @@
 | 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes  |
 | 3 — Elenco e matchday          | concluída    | matchday reproduzível e acessível; gates verdes |
 | 4 — Mundo vivo                 | concluída    | economia/carreira 25 épocas; API e gates verdes |
-| 5 — Pirâmide e calendário     | em progresso | DSL de competições e calendário                  |
+| 5 — Pirâmide e calendário      | em progresso | DSL de competições e calendário                 |
 | 6–9                            | pendente     | execução estritamente sequencial pelos gates    |
 
 ## Decisões operacionais
