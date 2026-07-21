@@ -1,66 +1,171 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
 import { InMemoryCareerApi } from '@/lib/career-api';
 
-async function onboard() {
+async function onboard(api = new InMemoryCareerApi()) {
+  render(<CareerGame api={api} />);
   fireEvent.click(screen.getByRole('button', { name: /entrar no vestiário/i }));
   await screen.findByLabelText(/nome do treinador/i);
   fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
   await screen.findByText(/escolha seu desafio/i);
   fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
-  await screen.findByRole('button', { name: /avançar partida/i });
+  await screen.findByRole('button', { name: /narrar partida/i });
+  return api;
 }
 
-describe('carreira mobile-first', () => {
-  it('chega ao primeiro jogo em poucos passos e pula o feed', async () => {
-    render(<CareerGame api={new InMemoryCareerApi()} />);
+afterEach(() => vi.useRealTimers());
+
+describe('elenco e matchday mobile-first', () => {
+  it('chega à rodada em poucos toques, pula o feed e prepara a próxima', async () => {
     await onboard();
-    fireEvent.click(screen.getByRole('button', { name: /avançar partida/i }));
+    fireEvent.click(screen.getByRole('button', { name: /narrar partida/i }));
     fireEvent.click(
-      await screen.findByRole('button', { name: /pular para o resultado/i }),
+      await screen.findByRole('button', { name: /pular resultado/i }),
     );
     expect(await screen.findByText(/fim de jogo/i)).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: /preparar próxima rodada/i }),
+    );
+    expect(await screen.findByText(/rodada 2/i)).toBeTruthy();
   });
-  it('navega por elenco, tática e tabela', async () => {
-    render(<CareerGame api={new InMemoryCareerApi()} />);
+
+  it('oferece controles sem drag e seleção operável por teclado', async () => {
     await onboard();
     fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
-    expect(await screen.findByText(/elenco principal/i)).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: /táticas/i })[0]!);
-    expect(await screen.findByText(/prancheta/i)).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: /tabela/i })[0]!);
-    expect(await screen.findByText(/classificação/i)).toBeTruthy();
+    expect(await screen.findByText(/arrastar não é necessário/i)).toBeTruthy();
+    const player = screen.getByRole('button', { name: /emerson royal/i });
+    player.focus();
+    fireEvent.keyDown(player, { key: 'Enter' });
+    expect(player.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByLabelText(/detalhes de emerson royal/i)).toBeTruthy();
+    expect(
+      screen.getByRole('group', { name: /mover emerson royal/i }),
+    ).toBeTruthy();
   });
-  it('persiste somente por comandos do port e devolve cópias', async () => {
-    vi.useFakeTimers();
+
+  it('expõe feedback acessível para ação inválida', async () => {
+    await onboard();
+    fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
+    fireEvent.click(screen.getByRole('button', { name: /emerson royal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^banco$/i }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(
+      /banco aceita no máximo/i,
+    );
+  });
+
+  it('mostra preparação, controles de velocidade, feed e skip em um toque', async () => {
+    await onboard();
+    expect(screen.getByText(/raio-x do rival/i)).toBeTruthy();
+    expect(screen.getByText('≈ 82')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /narrar partida/i }));
+    expect(await screen.findByLabelText(/velocidade 4 vezes/i)).toBeTruthy();
+    expect(
+      screen.getByRole('list', { name: /feed da partida/i }).textContent,
+    ).toMatch(/bola rolando/i);
+    expect(
+      screen.getByRole('button', { name: /pular resultado/i }),
+    ).toBeTruthy();
+  });
+
+  it('aplica escalação automática e mantém até duas características visíveis', async () => {
+    const api = await onboard();
+    fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: /^poupar$/i }));
+    await waitFor(async () => {
+      const career = await api.getCareer();
+      expect(
+        career?.players.filter((player) => player.role === 'starter'),
+      ).toHaveLength(11);
+      expect(
+        career?.players.filter(
+          (player) =>
+            player.role === 'starter' && player.primaryPosition === 'GOL',
+        ),
+      ).toHaveLength(1);
+      expect(career?.players.every((player) => player.traits.length <= 2)).toBe(
+        true,
+      );
+    });
+  });
+
+  it('expõe a tática compacta completa e salva a formação', async () => {
+    const api = await onboard();
+    fireEvent.click(screen.getAllByRole('button', { name: /táticas/i })[0]!);
+    for (const label of [
+      'Formação',
+      'Mentalidade',
+      'Construção',
+      'Foco ofensivo',
+      'Pressão',
+      'Linha defensiva',
+      'Marcação',
+    ]) {
+      expect(await screen.findByText(label)).toBeTruthy();
+    }
+    fireEvent.click(screen.getByRole('radio', { name: '4-4-2' }));
+    fireEvent.click(screen.getByRole('button', { name: /salvar tática/i }));
+    await waitFor(async () =>
+      expect((await api.getCareer())?.formation).toBe('4-4-2'),
+    );
+  });
+});
+
+describe('CareerApiPort autoritativo', () => {
+  it('rejeita escalação inválida sem escrita direta no snapshot', async () => {
     const api = new InMemoryCareerApi();
     await api.login('a@b.com');
     await api.createCareer({ coach: 'Ana' });
     await api.selectClub('Flamengo');
     const before = await api.getCareer();
-    expect(before).not.toBeNull();
     (before!.players[0] as { name: string }).name = 'alteração indevida';
     expect((await api.getCareer())!.players[0]!.name).toBe('Agustín Rossi');
-    const task = api.advanceMatch(() => undefined);
-    await vi.runAllTimersAsync();
-    await task;
-    expect((await api.getCareer())!.round).toBe(2);
-    vi.useRealTimers();
+    await api.setPlayerRole('fla-22', 'reserve');
+    await expect(api.validateMatchday()).rejects.toThrow(
+      /escolha 11 titulares/i,
+    );
   });
-  it('recarrega a visão da carreira existente', async () => {
+
+  it('registra substituições e mudanças táticas em ponto discreto', async () => {
     const api = new InMemoryCareerApi();
     await api.login('a@b.com');
     await api.createCareer({ coach: 'Bia' });
-    await api.selectClub('Fluminense');
-    render(<CareerGame api={api} />);
-    fireEvent.change(screen.getByLabelText(/seu e-mail/i), {
-      target: { value: 'a@b.com' },
-    });
-    fireEvent.click(
-      screen.getByRole('button', { name: /entrar no vestiário/i }),
+    await api.selectClub('Flamengo');
+    await api.beginMatch();
+    await expect(
+      api.makeSubstitution({ outgoingId: 'fla-22', incomingId: 'fla-13' }),
+    ).rejects.toThrow(/pausas/i);
+    await api.nextMatchEvent();
+    await api.nextMatchEvent();
+    const pause = await api.nextMatchEvent();
+    expect(pause.decisionPoint).toBe(true);
+    await api.makeSubstitution({ outgoingId: 'fla-22', incomingId: 'fla-13' });
+    await api.changeMatchTactics({ mentality: 'attacking' });
+    const finished = await api.finishMatch();
+    expect(finished.lastResult?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'substitution' }),
+        expect.objectContaining({ type: 'tactics' }),
+      ]),
     );
-    await waitFor(() => expect(screen.getByText(/olá, bia/i)).toBeTruthy());
+  });
+
+  it('produz resultado instantâneo completo', async () => {
+    vi.useFakeTimers();
+    const api = new InMemoryCareerApi();
+    await api.login('a@b.com');
+    await api.createCareer({ coach: 'Caio' });
+    await api.selectClub('Flamengo');
+    const result = await api.instantResult();
+    expect(result.round).toBe(2);
+    expect(result.lastResult?.events.at(-1)?.done).toBe(true);
+    await act(async () => vi.runAllTimersAsync());
   });
 });
