@@ -46,22 +46,43 @@ const phaseKindSchema = z.enum([
   'knockout',
 ]);
 
-const competitionPhaseSchema = z.strictObject({
-  id: entityIdSchema,
-  name: nonEmptyTextSchema,
-  kind: phaseKindSchema,
-  status: z.enum(['scheduled', 'active', 'complete']),
-  startsOn: gameDateSchema,
-  endsOn: gameDateSchema,
-  participantCount: z.int().positive(),
-});
+const competitionPhaseSchema = z
+  .strictObject({
+    id: entityIdSchema,
+    name: nonEmptyTextSchema,
+    kind: phaseKindSchema,
+    status: z.enum(['scheduled', 'active', 'complete']),
+    startsOn: gameDateSchema,
+    endsOn: gameDateSchema,
+    participantCount: z.int().positive(),
+  })
+  .superRefine((phase, context) => {
+    if (phase.startsOn > phase.endsOn)
+      context.addIssue({
+        code: 'custom',
+        path: ['endsOn'],
+        message: 'Competition phase cannot end before it starts',
+      });
+  });
 
-const qualificationSchema = z.strictObject({
-  label: nonEmptyTextSchema,
-  places: z.int().positive(),
-  destinationCompetitionId: entityIdSchema.optional(),
-  destinationDivisionId: entityIdSchema.optional(),
-});
+const qualificationSchema = z
+  .strictObject({
+    label: nonEmptyTextSchema,
+    places: z.int().positive(),
+    destinationCompetitionId: entityIdSchema.optional(),
+    destinationDivisionId: entityIdSchema.optional(),
+  })
+  .superRefine((qualification, context) => {
+    const destinations = [
+      qualification.destinationCompetitionId,
+      qualification.destinationDivisionId,
+    ].filter((value) => value !== undefined);
+    if (destinations.length !== 1)
+      context.addIssue({
+        code: 'custom',
+        message: 'Qualification must own exactly one destination',
+      });
+  });
 
 const competitionSchema = z.strictObject({
   id: entityIdSchema,
@@ -100,20 +121,35 @@ const calendarEntrySchema = z.strictObject({
   awayClubId: entityIdSchema.optional(),
 });
 
-export const competitionCalendarReadModelSchema = z.strictObject({
-  version: transportVersionSchema,
-  careerId: entityIdSchema,
-  aggregateVersion: versionSchema,
-  projectedAt: instantSchema,
-  season: z.int().min(2020).max(9999),
-  status: z.enum(['draft', 'validated', 'published']),
-  validation: z.strictObject({
-    valid: z.boolean(),
-    checkedAt: instantSchema,
-    conflictCount: z.int().nonnegative(),
-  }),
-  entries: z.array(calendarEntrySchema),
-});
+export const competitionCalendarReadModelSchema = z
+  .strictObject({
+    version: transportVersionSchema,
+    careerId: entityIdSchema,
+    aggregateVersion: versionSchema,
+    projectedAt: instantSchema,
+    season: z.int().min(2020).max(9999),
+    status: z.enum(['draft', 'validated', 'published']),
+    validation: z.strictObject({
+      valid: z.boolean(),
+      checkedAt: instantSchema,
+      conflictCount: z.int().nonnegative(),
+    }),
+    entries: z.array(calendarEntrySchema),
+  })
+  .superRefine((calendar, context) => {
+    if (calendar.validation.valid && calendar.validation.conflictCount !== 0)
+      context.addIssue({
+        code: 'custom',
+        path: ['validation', 'conflictCount'],
+        message: 'Calendar validity and conflict count disagree',
+      });
+    if (calendar.status !== 'draft' && !calendar.validation.valid)
+      context.addIssue({
+        code: 'custom',
+        path: ['status'],
+        message: 'Only a valid calendar can be validated or published',
+      });
+  });
 
 const movementSchema = z.strictObject({
   clubId: entityIdSchema,
@@ -123,35 +159,44 @@ const movementSchema = z.strictObject({
   kind: z.enum(['promoted', 'relegated']),
 });
 
-export const nextSeasonTransitionReadModelSchema = z.strictObject({
-  version: transportVersionSchema,
-  careerId: entityIdSchema,
-  aggregateVersion: versionSchema,
-  projectedAt: instantSchema,
-  completedSeason: z.int().min(2020).max(9998),
-  nextSeason: z.int().min(2021).max(9999),
-  status: z.enum(['pending', 'ready', 'generated']),
-  movements: z.array(movementSchema),
-  qualifiers: z.array(
-    z.strictObject({
-      clubId: entityIdSchema,
-      clubName: nonEmptyTextSchema,
-      competitionId: entityIdSchema,
-      competitionName: nonEmptyTextSchema,
-      route: nonEmptyTextSchema,
-    }),
-  ),
-  awards: z.array(
-    z.strictObject({
-      id: entityIdSchema,
-      competitionId: entityIdSchema,
-      clubId: entityIdSchema,
-      label: nonEmptyTextSchema,
-      prize: moneySchema,
-      prestige: z.int().nonnegative(),
-    }),
-  ),
-});
+export const nextSeasonTransitionReadModelSchema = z
+  .strictObject({
+    version: transportVersionSchema,
+    careerId: entityIdSchema,
+    aggregateVersion: versionSchema,
+    projectedAt: instantSchema,
+    completedSeason: z.int().min(2020).max(9998),
+    nextSeason: z.int().min(2021).max(9999),
+    status: z.enum(['pending', 'ready', 'generated']),
+    movements: z.array(movementSchema),
+    qualifiers: z.array(
+      z.strictObject({
+        clubId: entityIdSchema,
+        clubName: nonEmptyTextSchema,
+        competitionId: entityIdSchema,
+        competitionName: nonEmptyTextSchema,
+        route: nonEmptyTextSchema,
+      }),
+    ),
+    awards: z.array(
+      z.strictObject({
+        id: entityIdSchema,
+        competitionId: entityIdSchema,
+        clubId: entityIdSchema,
+        label: nonEmptyTextSchema,
+        prize: moneySchema,
+        prestige: z.int().nonnegative(),
+      }),
+    ),
+  })
+  .superRefine((transition, context) => {
+    if (transition.nextSeason !== transition.completedSeason + 1)
+      context.addIssue({
+        code: 'custom',
+        path: ['nextSeason'],
+        message: 'nextSeason must immediately follow completedSeason',
+      });
+  });
 
 export const phaseFiveReceiptSchema = z.strictObject({
   version: transportVersionSchema,

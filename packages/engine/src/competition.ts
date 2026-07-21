@@ -19,9 +19,13 @@ import {
 } from '@footebas/domain';
 import { hashSeed } from './prng.js';
 
+export const COMPETITION_ENGINE_VERSION = 'competition-engine-v1' as const;
+
 export interface ScheduledStage {
   readonly fixtures: readonly CompetitionCalendarFixture[];
   readonly groups: Readonly<Record<string, readonly ClubId[]>>;
+  /** Entrants advanced without a fixture to close a non-power-of-two bracket. */
+  readonly byeClubIds: readonly ClubId[];
 }
 
 export interface SeasonGeneration {
@@ -194,17 +198,23 @@ export function scheduleCompetitionStage(
   const stage = definition.stages[stageIndex];
   if (stage === undefined) throw new Error(`Unknown stage ${stageId}`);
   const phaseOrder = options.phaseOrder ?? stageIndex + 1;
-  if (stage.type === 'knockout')
+  if (stage.type === 'knockout') {
+    const bracketSize = 2 ** Math.ceil(Math.log2(participants.length));
+    const byeCount = bracketSize - participants.length;
+    const byeClubIds = Object.freeze(participants.slice(0, byeCount));
+    const activeParticipants = participants.slice(byeCount);
     return Object.freeze({
       fixtures: scheduleKnockout(
         definition,
         stage,
         phaseOrder,
-        participants,
+        activeParticipants,
         options.knockoutRound ?? 1,
       ),
       groups: emptyGroups,
+      byeClubIds,
     });
+  }
   const groups =
     stage.type === 'groups'
       ? makeGroups(stage, participants)
@@ -212,6 +222,7 @@ export function scheduleCompetitionStage(
   return Object.freeze({
     fixtures: scheduleRoundRobin(definition, stage, phaseOrder, groups),
     groups,
+    byeClubIds: Object.freeze([]),
   });
 }
 

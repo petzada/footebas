@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPhaseFiveFixtureState,
+  EnginePhaseFiveSeasonGenerationAdapter,
   InMemoryPhaseFiveCompetitionAdapter,
   PhaseFiveAuthorizationError,
   PhaseFiveCompetitionService,
@@ -55,15 +56,37 @@ describe('phase five authoritative competition service', () => {
         payload: { season: 2025 },
       }),
     ).rejects.toBeInstanceOf(PhaseFiveConflictError);
+    await expect(
+      service.execute('user_phase5', {
+        ...calendarCommand,
+        commandId: 'command_reused_with_new_key',
+      }),
+    ).rejects.toBeInstanceOf(PhaseFiveConflictError);
+    await expect(
+      service.execute('user_phase5', {
+        ...calendarCommand,
+        idempotencyKey: 'phase5:calendar:new-key',
+      }),
+    ).rejects.toBeInstanceOf(PhaseFiveConflictError);
+    await expect(
+      service.execute('user_phase5', {
+        ...calendarCommand,
+        version: 2 as 1,
+      }),
+    ).rejects.toThrow();
   });
 
   it('projects promotion, relegation, qualification and awards into the next season', async () => {
     const port = new InMemoryPhaseFiveCompetitionAdapter([
       createPhaseFiveFixtureState(),
     ]);
-    const service = new PhaseFiveCompetitionService(port, {
-      now: () => new Date('2026-12-10T10:00:00.000Z'),
-    });
+    const service = new PhaseFiveCompetitionService(
+      port,
+      {
+        now: () => new Date('2026-12-10T10:00:00.000Z'),
+      },
+      new EnginePhaseFiveSeasonGenerationAdapter(),
+    );
     const receipt = await service.execute('user_phase5', {
       version: 1,
       careerId: 'career_phase5',
@@ -76,14 +99,17 @@ describe('phase five authoritative competition service', () => {
     expect(receipt.aggregateVersion).toBe(1);
     const transition = await service.transition('user_phase5', 'career_phase5');
     expect(transition.status).toBe('generated');
-    expect(transition.movements.map(({ kind }) => kind)).toEqual([
-      'promoted',
-      'relegated',
-    ]);
+    expect(
+      transition.movements.filter(({ kind }) => kind === 'promoted'),
+    ).toHaveLength(8);
+    expect(
+      transition.movements.filter(({ kind }) => kind === 'relegated'),
+    ).toHaveLength(8);
+    expect(transition.qualifiers).toHaveLength(7);
     expect(transition.qualifiers[0]?.route).toContain('Copa do Brasil');
     expect(
       transition.awards.reduce((sum, award) => sum + award.prestige, 0),
-    ).toBe(2100);
+    ).toBe(450);
     expect((await service.pyramid('user_phase5', 'career_phase5')).season).toBe(
       2027,
     );

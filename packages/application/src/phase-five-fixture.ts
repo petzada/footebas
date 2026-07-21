@@ -1,6 +1,66 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- fixed synthetic engine-plan cardinalities */
 import type { PhaseFiveCompetitionState } from './phase-five.js';
+import {
+  entityId,
+  type ClubId,
+  type CompetitionOutcome,
+} from '@footebas/domain';
+import { createMvpCompetitionSystem } from '@footebas/engine';
 
 const projectedAt = '2026-12-08T12:00:00.000Z';
+
+const clubs = (prefix: string, count: number): ClubId[] =>
+  Array.from({ length: count }, (_, index) =>
+    entityId(`${prefix}_${String(index + 1)}`, 'club'),
+  );
+
+function engineSeasonPlan() {
+  const system = createMvpCompetitionSystem(2026, []);
+  const a = clubs('serie_a_club', 20);
+  const b = clubs('serie_b_club', 20);
+  const c = clubs('serie_c_club', 20);
+  const continental = clubs('continental_club', 32);
+  const ordered = (
+    competitionId: string,
+    stageId: string,
+    clubIds: readonly ClubId[],
+  ): CompetitionOutcome => ({
+    competitionId: entityId(competitionId, 'competition'),
+    edition: 2026,
+    stages: [{ stageId, orderedClubIds: clubIds }],
+    championId: clubIds[0]!,
+    runnerUpId: clubIds[1]!,
+  });
+  const outcomes = [
+    ordered('serie_a', 'league', a),
+    ordered('serie_b', 'league', b),
+    ordered('serie_c', 'league', c),
+    ordered('copa_brasil', 'knockout', [a[2]!, b[0]!]),
+    {
+      competitionId: entityId('continental', 'competition'),
+      edition: 2026,
+      stages: [
+        { stageId: 'groups', orderedClubIds: continental },
+        { stageId: 'knockout', orderedClubIds: continental.slice(0, 16) },
+      ],
+      championId: continental[0]!,
+      runnerUpId: continental[1]!,
+    },
+  ];
+  return Object.freeze({
+    definitions: system.definitions,
+    outcomes: Object.freeze(outcomes),
+    allocations: system.nextSeasonAllocations,
+    clubNames: Object.freeze(
+      Object.fromEntries(
+        [...a, ...b, ...c, ...continental].map((clubId) => [
+          clubId,
+          clubId.replaceAll('_', ' '),
+        ]),
+      ),
+    ),
+  });
+}
 
 export function createPhaseFiveFixtureState(
   ownerId = 'user_phase5',
@@ -274,5 +334,6 @@ export function createPhaseFiveFixtureState(
         },
       ],
     },
+    seasonPlan: engineSeasonPlan(),
   };
 }

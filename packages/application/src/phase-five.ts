@@ -5,6 +5,17 @@ import type {
   PhaseFiveCommand,
   PhaseFiveReceipt,
 } from '@footebas/contracts';
+import {
+  competitionCalendarReadModelSchema,
+  competitionPyramidReadModelSchema,
+  nextSeasonTransitionReadModelSchema,
+  phaseFiveCommandSchema,
+} from '@footebas/contracts';
+import type {
+  CompetitionDefinition,
+  CompetitionOutcome,
+  SeasonAllocationRule,
+} from '@footebas/domain';
 
 export interface PhaseFiveCompetitionState {
   readonly careerId: string;
@@ -13,6 +24,26 @@ export interface PhaseFiveCompetitionState {
   readonly pyramid: CompetitionPyramidReadModel;
   readonly calendar: CompetitionCalendarReadModel;
   readonly nextSeason: NextSeasonTransitionReadModel;
+  /** Canonical engine inputs retained with the aggregate, never exposed as transport. */
+  readonly seasonPlan?: PhaseFiveEngineSeasonPlan;
+}
+
+export interface PhaseFiveEngineSeasonPlan {
+  readonly definitions: readonly CompetitionDefinition[];
+  readonly outcomes: readonly CompetitionOutcome[];
+  readonly allocations: readonly SeasonAllocationRule[];
+  readonly clubNames: Readonly<Record<string, string>>;
+}
+
+export interface PhaseFiveSeasonGenerationPort {
+  generate(
+    input: Readonly<{
+      current: PhaseFiveCompetitionState;
+      command: Extract<PhaseFiveCommand, { type: 'GenerateNextSeason' }>;
+      projectedAt: string;
+      aggregateVersion: number;
+    }>,
+  ): PhaseFiveCompetitionState;
 }
 
 export interface StoredPhaseFiveReceipt {
@@ -146,12 +177,14 @@ export class PhaseFiveCompetitionService {
   public constructor(
     private readonly port: PhaseFiveCompetitionPort,
     private readonly clock: PhaseFiveClockPort = { now: () => new Date() },
+    private readonly seasonGenerator?: PhaseFiveSeasonGenerationPort,
   ) {}
 
-  public execute(
+  public async execute(
     ownerId: string,
     command: PhaseFiveCommand,
   ): Promise<PhaseFiveReceipt> {
+    command = phaseFiveCommandSchema.parse(command);
     return this.port.withCareerLock(command.careerId, async () => {
       const current = await this.owned(ownerId, command.careerId);
       const fingerprint = JSON.stringify(canonicalize(command));
@@ -251,35 +284,28 @@ export class PhaseFiveCompetitionService {
       );
     if (current.nextSeason.status !== 'ready')
       throw new PhaseFiveConflictError('next season transition is not ready');
-    return {
-      ...current,
-      version: aggregateVersion,
-      pyramid: {
-        ...current.pyramid,
-        season: current.nextSeason.nextSeason,
-        aggregateVersion,
-        projectedAt,
-      },
-      calendar: {
-        ...current.calendar,
-        season: current.nextSeason.nextSeason,
-        status: 'draft',
-        entries: [],
-        aggregateVersion,
-        projectedAt,
-        validation: {
-          valid: false,
-          checkedAt: projectedAt,
-          conflictCount: 0,
-        },
-      },
-      nextSeason: {
-        ...current.nextSeason,
-        status: 'generated',
-        aggregateVersion,
-        projectedAt,
-      },
-    };
+    if (this.seasonGenerator === undefined)
+      throw new PhaseFiveConflictError(
+        'season generation adapter is unavailable',
+      );
+    const generated = this.seasonGenerator.generate({
+      current,
+      command,
+      projectedAt,
+      aggregateVersion,
+    });
+    if (
+      generated.careerId !== current.careerId ||
+      generated.ownerId !== current.ownerId ||
+      generated.version !== aggregateVersion
+    )
+      throw new PhaseFiveConflictError(
+        'season generation adapter violated aggregate identity or version',
+      );
+    competitionPyramidReadModelSchema.parse(generated.pyramid);
+    competitionCalendarReadModelSchema.parse(generated.calendar);
+    nextSeasonTransitionReadModelSchema.parse(generated.nextSeason);
+    return generated;
   }
 
   private async owned(

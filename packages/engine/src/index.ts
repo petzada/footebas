@@ -44,6 +44,7 @@ export {
   migrateCareerWorldSave,
 } from './career-world.js';
 export {
+  COMPETITION_ENGINE_VERSION,
   evaluateKnockoutRound,
   evaluateRankingStage,
   generateCompetitionAwards,
@@ -62,6 +63,21 @@ export {
   createMvpCompetitionSystem,
 } from './mvp-competitions.js';
 export type { MvpCompetitionSystem } from './mvp-competitions.js';
+export {
+  canonicalCompetitionId,
+  createConfiguredMvpCompetitionSystem,
+  MVP_COMPETITION_CONFIG_VERSION,
+  parseMvpCompetitionConfig,
+} from './mvp-competition-config.js';
+export type {
+  ConfiguredMvpCompetitionSystem,
+  MvpCompetitionConfig,
+  MvpContinentalConfig,
+  MvpCupConfig,
+  MvpDivisionId,
+  MvpLeagueConfig,
+  MvpStateLeagueConfig,
+} from './mvp-competition-config.js';
 export type {
   CalendarValidationInput,
   CalendarValidationResult,

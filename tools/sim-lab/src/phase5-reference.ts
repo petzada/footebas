@@ -1,23 +1,37 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion -- every indexed access follows explicit cardinality validation in the reference verifier */
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- canonical config and stage cardinalities are validated before execution */
+/* Canonical Phase 5 harness: orchestration only; all scheduling, ranking,
+ * transitions and validation execute @footebas/engine. */
+import {
+  entityId,
+  type ClubId,
+  type CompetitionCalendarFixture,
+  type CompetitionDefinition,
+  type CompetitionMatchResult,
+  type CompetitionOutcome,
+  type StageOutcome,
+} from '@footebas/domain';
+import {
+  COMPETITION_ENGINE_VERSION,
+  canonicalCompetitionId,
+  createConfiguredMvpCompetitionSystem,
+  evaluateKnockoutRound,
+  evaluateRankingStage,
+  generateCompetitionAwards,
+  generateNextSeason,
+  hashSeed,
+  resolveStageParticipants,
+  scheduleCompetitionStage,
+  validateCompetitionCalendar,
+} from '@footebas/engine';
 import type {
   CompetitionConfig,
-  ContinentalConfig,
   DivisionId,
   PhaseFiveContent,
 } from './phase5-content.js';
 
-export const PHASE_FIVE_REFERENCE_VERSION =
-  'phase-five-reference-verifier-v1' as const;
+export const PHASE_FIVE_REFERENCE_VERSION = COMPETITION_ENGINE_VERSION;
 
-export interface ReferenceFixture {
-  readonly id: string;
-  readonly competitionId: string;
-  readonly stage: string;
-  readonly matchDay: number;
-  readonly homeClubId: string;
-  readonly awayClubId: string;
-  readonly leg: number;
-}
+export type ReferenceFixture = CompetitionCalendarFixture;
 
 export interface CompetitionClosure {
   readonly competitionId: string;
@@ -43,261 +57,127 @@ export interface ReferenceSeasonResult {
   readonly next: ReferenceSeasonState;
 }
 
-function hash(text: string): number {
-  let result = 2_166_136_261;
-  for (const character of text) {
-    result ^= character.charCodeAt(0);
-    result = Math.imul(result, 16_777_619);
-  }
-  return result >>> 0;
+function canonicalClubId(value: string): ClubId {
+  return entityId(
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, ''),
+    'club',
+  );
 }
 
-function ranked(
-  clubIds: readonly string[],
+function deterministicOrder(
+  values: readonly ClubId[],
   seed: string,
-  competitionId: string,
-): readonly string[] {
-  return [...clubIds].sort(
-    (left, right) =>
-      hash(`${seed}|${competitionId}|${right}`) -
-        hash(`${seed}|${competitionId}|${left}`) || left.localeCompare(right),
+): readonly ClubId[] {
+  return Object.freeze(
+    [...values].sort(
+      (left, right) =>
+        hashSeed(`${seed}|${left}`) - hashSeed(`${seed}|${right}`) ||
+        left.localeCompare(right),
+    ),
   );
 }
 
-function roundRobinRounds(
-  clubIds: readonly string[],
-  legs: number,
-): readonly (readonly (readonly [string, string])[])[] {
-  if (clubIds.length < 2 || legs < 1)
-    throw new Error('Round robin requires at least two clubs and one leg');
-  const bye = '__bye__';
-  const rotating = clubIds.length % 2 === 0 ? [...clubIds] : [...clubIds, bye];
-  const firstLeg: (readonly (readonly [string, string])[])[] = [];
-  for (let round = 0; round < rotating.length - 1; round += 1) {
-    const matches: (readonly [string, string])[] = [];
-    for (let index = 0; index < rotating.length / 2; index += 1) {
-      const left = rotating[index]!;
-      const right = rotating[rotating.length - 1 - index]!;
-      if (left !== bye && right !== bye)
-        matches.push(round % 2 === 0 ? [left, right] : [right, left]);
-    }
-    firstLeg.push(matches);
-    rotating.splice(1, 0, rotating.pop()!);
-  }
-  const rounds: (readonly (readonly [string, string])[])[] = [];
-  for (let leg = 0; leg < legs; leg += 1)
-    for (const matches of firstLeg)
-      rounds.push(
-        leg % 2 === 0
-          ? matches
-          : matches.map(([home, away]) => [away, home] as const),
-      );
-  return rounds;
-}
-
-function addRoundRobin(
-  fixtures: ReferenceFixture[],
-  input: Readonly<{
-    season: number;
-    competitionId: string;
-    stage: string;
-    clubIds: readonly string[];
-    legs: number;
-    firstMatchDay: number;
-    matchDayInterval: number;
-  }>,
-): number {
-  const rounds = roundRobinRounds(input.clubIds, input.legs);
-  let count = 0;
-  rounds.forEach((matches, round) => {
-    matches.forEach(([homeClubId, awayClubId], match) => {
-      fixtures.push({
-        id: `s${String(input.season)}:${input.competitionId}:${input.stage}:r${String(round + 1)}:m${String(match + 1)}`,
-        competitionId: input.competitionId,
-        stage: input.stage,
-        matchDay: input.firstMatchDay + round * input.matchDayInterval,
-        homeClubId,
-        awayClubId,
-        leg: Math.floor(round / (rounds.length / input.legs)) + 1,
-      });
-      count += 1;
-    });
-  });
-  return count;
-}
-
-function pairWinner(
-  homeClubId: string,
-  awayClubId: string,
+function resultFor(
+  fixture: CompetitionCalendarFixture,
   seed: string,
-  stage: string,
-): string {
-  return ranked([homeClubId, awayClubId], seed, stage)[0]!;
-}
-
-function addKnockoutPair(
-  fixtures: ReferenceFixture[],
-  input: Readonly<{
-    season: number;
-    competitionId: string;
-    stage: string;
-    homeClubId: string;
-    awayClubId: string;
-    matchDays: readonly number[];
-  }>,
-): string {
-  input.matchDays.forEach((matchDay, index) => {
-    fixtures.push({
-      id: `s${String(input.season)}:${input.competitionId}:${input.stage}:${input.homeClubId}:${input.awayClubId}:l${String(index + 1)}`,
-      competitionId: input.competitionId,
-      stage: input.stage,
-      matchDay,
-      homeClubId: index % 2 === 0 ? input.homeClubId : input.awayClubId,
-      awayClubId: index % 2 === 0 ? input.awayClubId : input.homeClubId,
-      leg: index + 1,
-    });
+): CompetitionMatchResult {
+  return Object.freeze({
+    fixtureId: fixture.id,
+    homeGoals: hashSeed(`${seed}|${fixture.id}|home`) % 5,
+    awayGoals: hashSeed(`${seed}|${fixture.id}|away`) % 5,
   });
-  return pairWinner(
-    input.homeClubId,
-    input.awayClubId,
-    `season-${String(input.season)}`,
-    `${input.competitionId}:${input.stage}`,
-  );
 }
 
-function addCup(
-  fixtures: ReferenceFixture[],
-  config: CompetitionConfig,
-  season: number,
-  clubIds: readonly string[],
-): Readonly<{ champion: string; matches: number }> {
-  const cup = config.nationalCup;
-  let participants = ranked(
-    clubIds,
-    `season-${String(season)}`,
-    `${cup.id}:seed`,
-  );
-  const bracketSize = 2 ** Math.ceil(Math.log2(participants.length));
-  const byes = bracketSize - participants.length;
-  let dayCursor = 0;
-  let matches = 0;
-  for (let round = 0; round < cup.legsByRound.length; round += 1) {
-    const next: string[] = [];
-    const roundByes = round === 0 ? byes : 0;
-    next.push(...participants.slice(0, roundByes));
-    const legs = cup.legsByRound[round]!;
-    const matchDays = cup.matchDays.slice(dayCursor, dayCursor + legs);
-    dayCursor += legs;
-    for (let index = roundByes; index < participants.length; index += 2) {
-      const homeClubId = participants[index]!;
-      const awayClubId = participants[index + 1];
-      if (awayClubId === undefined) {
-        next.push(homeClubId);
-        continue;
-      }
-      next.push(
-        addKnockoutPair(fixtures, {
-          season,
-          competitionId: cup.id,
-          stage: `round-${String(round + 1)}`,
-          homeClubId,
-          awayClubId,
-          matchDays,
-        }),
+interface PlayedCompetition {
+  readonly outcome: CompetitionOutcome;
+  readonly fixtures: readonly CompetitionCalendarFixture[];
+  readonly stageParticipants: Readonly<Record<string, readonly ClubId[]>>;
+  readonly entrants: number;
+}
+
+function playCompetition(
+  definition: CompetitionDefinition,
+  seededByStage: Readonly<Record<string, readonly ClubId[]>>,
+  edition: number,
+  seed: string,
+): PlayedCompetition {
+  const outcomes: StageOutcome[] = [];
+  const fixtures: CompetitionCalendarFixture[] = [];
+  const stageParticipants: Record<string, readonly ClubId[]> = {};
+  let entrants = 0;
+  for (const stage of definition.stages) {
+    const seeded = seededByStage[stage.id] ?? [];
+    const participants = resolveStageParticipants(stage, seeded, outcomes);
+    if (outcomes.length === 0) entrants = participants.length;
+    const scheduled = scheduleCompetitionStage(
+      definition,
+      stage.id,
+      deterministicOrder(participants, `${seed}|${stage.id}|seeding`),
+    );
+    const byes = new Set(scheduled.byeClubIds);
+    const activeParticipants = participants.filter(
+      (clubId) => !byes.has(clubId),
+    );
+    stageParticipants[stage.id] = Object.freeze(activeParticipants);
+    fixtures.push(...scheduled.fixtures);
+    const results = scheduled.fixtures.map((fixture) =>
+      resultFor(fixture, `${seed}|${stage.id}`),
+    );
+    let outcome: StageOutcome;
+    if (stage.type === 'knockout') {
+      const played = evaluateKnockoutRound(
+        stage,
+        scheduled.fixtures,
+        results,
+        `${seed}|${stage.id}`,
       );
-      matches += legs;
-    }
-    participants = next;
-  }
-  if (participants.length !== 1)
-    throw new Error(
-      `${cup.id} bracket did not close; ${String(participants.length)} remain`,
-    );
-  return { champion: participants[0]!, matches };
-}
-
-function addContinental(
-  fixtures: ReferenceFixture[],
-  config: ContinentalConfig,
-  season: number,
-  direct: readonly string[],
-  preliminary: readonly string[],
-): Readonly<{ champion: string; matches: number; participants: number }> {
-  const preliminaryWinners: string[] = [];
-  let matches = 0;
-  for (let index = 0; index < preliminary.length; index += 2) {
-    preliminaryWinners.push(
-      addKnockoutPair(fixtures, {
-        season,
-        competitionId: config.id,
-        stage: 'preliminary',
-        homeClubId: preliminary[index]!,
-        awayClubId: preliminary[index + 1]!,
-        matchDays: config.preliminaryMatchDays,
-      }),
-    );
-    matches += config.preliminaryLegs;
-  }
-  const groupParticipants = [...direct, ...preliminaryWinners];
-  const knockout: string[] = [];
-  for (let group = 0; group < config.groupCount; group += 1) {
-    const groupClubs = groupParticipants.filter(
-      (_clubId, index) => index % config.groupCount === group,
-    );
-    const rounds = roundRobinRounds(groupClubs, 2);
-    rounds.forEach((roundMatches, round) => {
-      roundMatches.forEach(([homeClubId, awayClubId], match) => {
-        fixtures.push({
-          id: `s${String(season)}:${config.id}:group-${String(group + 1)}:r${String(round + 1)}:m${String(match + 1)}`,
-          competitionId: config.id,
-          stage: `group-${String(group + 1)}`,
-          matchDay: config.groupMatchDays[round]!,
-          homeClubId,
-          awayClubId,
-          leg: round < config.groupSize - 1 ? 1 : 2,
-        });
-        matches += 1;
+      const winners = played.orderedClubIds.slice(
+        0,
+        activeParticipants.length / 2,
+      );
+      const losers = played.orderedClubIds.slice(activeParticipants.length / 2);
+      outcome = Object.freeze({
+        stageId: stage.id,
+        orderedClubIds: Object.freeze([
+          ...scheduled.byeClubIds,
+          ...winners,
+          ...losers,
+        ]),
       });
-    });
-    knockout.push(
-      ...ranked(
-        groupClubs,
-        `season-${String(season)}`,
-        `${config.id}:group-${String(group + 1)}`,
-      ).slice(0, config.qualifiersPerGroup),
-    );
-  }
-  let roundParticipants = knockout;
-  let matchDayCursor = 0;
-  let knockoutRound = 1;
-  while (roundParticipants.length > 1) {
-    const next: string[] = [];
-    const matchDays = config.knockoutMatchDays.slice(
-      matchDayCursor,
-      matchDayCursor + config.knockoutLegs,
-    );
-    for (let index = 0; index < roundParticipants.length; index += 2) {
-      next.push(
-        addKnockoutPair(fixtures, {
-          season,
-          competitionId: config.id,
-          stage: `knockout-${String(knockoutRound)}`,
-          homeClubId: roundParticipants[index]!,
-          awayClubId: roundParticipants[index + 1]!,
-          matchDays,
-        }),
+    } else {
+      outcome = evaluateRankingStage(
+        stage,
+        participants,
+        scheduled.fixtures,
+        results,
+        `${seed}|${stage.id}`,
       );
-      matches += config.knockoutLegs;
     }
-    roundParticipants = next;
-    knockoutRound += 1;
-    matchDayCursor += config.knockoutLegs;
+    outcomes.push(outcome);
   }
-  return {
-    champion: roundParticipants[0]!,
-    matches,
-    participants: direct.length + preliminary.length,
-  };
+  const final = outcomes.at(-1);
+  const champion = final?.orderedClubIds[0];
+  if (final === undefined || champion === undefined)
+    throw new Error(`${definition.id} did not produce a champion`);
+  return Object.freeze({
+    outcome: Object.freeze({
+      competitionId: definition.id,
+      edition,
+      stages: Object.freeze(outcomes),
+      championId: champion,
+      ...(final.orderedClubIds[1] === undefined
+        ? {}
+        : { runnerUpId: final.orderedClubIds[1] }),
+    }),
+    fixtures: Object.freeze(fixtures),
+    stageParticipants: Object.freeze(stageParticipants),
+    entrants,
+  });
 }
 
 export function initialReferenceState(
@@ -306,112 +186,69 @@ export function initialReferenceState(
   const divisions = Object.fromEntries(
     (['serie-a', 'serie-b', 'serie-c'] as const).map((division) => [
       division,
-      content.clubs
-        .filter(({ initialDivision }) => initialDivision === division)
-        .map(({ id }) => id),
+      Object.freeze(
+        content.clubs
+          .filter(({ initialDivision }) => initialDivision === division)
+          .map(({ id }) => canonicalClubId(id)),
+      ),
     ]),
   ) as unknown as Record<DivisionId, readonly string[]>;
   return Object.freeze({
     season: 1,
-    divisions,
-    continentalDirect: content.config.continental.initialDirectClubIds,
-    continentalPreliminary:
-      content.config.continental.initialPreliminaryClubIds,
+    divisions: Object.freeze(divisions),
+    continentalDirect: Object.freeze(
+      content.config.continental.initialDirectClubIds.map(canonicalClubId),
+    ),
+    continentalPreliminary: Object.freeze(
+      content.config.continental.initialPreliminaryClubIds.map(canonicalClubId),
+    ),
   });
 }
 
-export function expectedNextState(
-  state: ReferenceSeasonState,
-  rankings: Readonly<Record<DivisionId, readonly string[]>>,
-  cupChampion: string,
-  config: CompetitionConfig,
-): ReferenceSeasonState {
-  const leagueA = config.nationalLeagues.find(
-    ({ division }) => division === 'serie-a',
-  )!;
-  const leagueB = config.nationalLeagues.find(
-    ({ division }) => division === 'serie-b',
-  )!;
-  const leagueC = config.nationalLeagues.find(
-    ({ division }) => division === 'serie-c',
-  )!;
-  const promotedB = rankings['serie-b'].slice(0, leagueB.promoted);
-  const promotedC = rankings['serie-c'].slice(0, leagueC.promoted);
-  const relegatedA = rankings['serie-a'].slice(-leagueA.relegated);
-  const relegatedB = rankings['serie-b'].slice(-leagueB.relegated);
-  const nextA = [
-    ...rankings['serie-a'].slice(
-      0,
-      rankings['serie-a'].length - leagueA.relegated,
-    ),
-    ...promotedB,
-  ];
-  const nextB = [
-    ...rankings['serie-b'].slice(
-      leagueB.promoted,
-      rankings['serie-b'].length - leagueB.relegated,
-    ),
-    ...relegatedA,
-    ...promotedC,
-  ];
-  const nextC = [...rankings['serie-c'].slice(leagueC.promoted), ...relegatedB];
-  const orderedQualification = [
-    cupChampion,
-    ...rankings['serie-a'],
-    ...rankings['serie-b'],
-    ...rankings['serie-c'],
-  ].filter((clubId, index, values) => values.indexOf(clubId) === index);
-  const direct = orderedQualification.slice(0, config.continental.directSlots);
-  const directSet = new Set(direct);
-  const preliminary = orderedQualification
-    .filter((clubId) => !directSet.has(clubId))
-    .slice(0, config.continental.preliminarySlots);
-  return Object.freeze({
-    season: state.season + 1,
-    divisions: Object.freeze({
-      'serie-a': Object.freeze(nextA),
-      'serie-b': Object.freeze(nextB),
-      'serie-c': Object.freeze(nextC),
-    }),
-    continentalDirect: Object.freeze(direct),
-    continentalPreliminary: Object.freeze(preliminary),
-  });
+function yearForSeason(season: number): number {
+  const year = 2025 + season;
+  if (year > 9999) throw new Error('Phase five season exceeds game-date range');
+  return year;
+}
+
+function stageMap(
+  target: Record<string, Record<string, readonly ClubId[]>>,
+  competitionId: string,
+  participants: Readonly<Record<string, readonly ClubId[]>>,
+): void {
+  target[competitionId] = { ...participants };
 }
 
 export function validateReferenceCalendar(
   fixtures: readonly ReferenceFixture[],
   config: CompetitionConfig,
 ): readonly string[] {
-  const failures: string[] = [];
-  const fixtureIds = new Set<string>();
-  const clubDays = new Map<string, number[]>();
+  if (fixtures.length === 0) return ['calendar has no fixtures'];
+  const year = Number(fixtures[0]!.date.slice(0, 4));
+  const system = createConfiguredMvpCompetitionSystem(config, year);
+  const participants: Record<string, Record<string, readonly ClubId[]>> = {};
   for (const fixture of fixtures) {
-    if (fixtureIds.has(fixture.id))
-      failures.push(`duplicate fixture ID ${fixture.id}`);
-    fixtureIds.add(fixture.id);
-    if (fixture.homeClubId === fixture.awayClubId)
-      failures.push(`${fixture.id}: club plays itself`);
-    if (fixture.matchDay < 0 || fixture.matchDay >= config.seasonDays)
-      failures.push(`${fixture.id}: match day outside season`);
-    for (const clubId of [fixture.homeClubId, fixture.awayClubId]) {
-      const days = clubDays.get(clubId) ?? [];
-      if (days.includes(fixture.matchDay))
-        failures.push(
-          `${clubId}: simultaneous matches on day ${String(fixture.matchDay)}`,
-        );
-      days.push(fixture.matchDay);
-      clubDays.set(clubId, days);
-    }
+    const byStage = participants[fixture.competitionId] ?? {};
+    const clubs = new Set(byStage[fixture.stageId] ?? []);
+    clubs.add(fixture.homeClubId);
+    clubs.add(fixture.awayClubId);
+    byStage[fixture.stageId] = Object.freeze([...clubs]);
+    participants[fixture.competitionId] = byStage;
   }
-  for (const [clubId, unsorted] of clubDays) {
-    const days = [...unsorted].sort((left, right) => left - right);
-    for (let index = 1; index < days.length; index += 1)
-      if (days[index]! - days[index - 1]! <= config.minimumRestDays)
-        failures.push(
-          `${clubId}: only ${String(days[index]! - days[index - 1]! - 1)} rest days before day ${String(days[index])}`,
-        );
-  }
-  return failures;
+  const validation = validateCompetitionCalendar({
+    fixtures,
+    competitions: system.definitions,
+    stageParticipants: participants,
+    minimumIntervalDays: system.minimumIntervalDays,
+    reservedDates: system.reservedDates,
+  });
+  return Object.freeze(
+    validation.violations.map(({ code, message }) =>
+      code === 'MINIMUM_INTERVAL'
+        ? `${code} rest days: ${message}`
+        : `${code}: ${message}`,
+    ),
+  );
 }
 
 export function simulateReferenceSeason(
@@ -419,91 +256,151 @@ export function simulateReferenceSeason(
   state: ReferenceSeasonState,
   seed: string,
 ): ReferenceSeasonResult {
-  const fixtures: ReferenceFixture[] = [];
-  const closures: CompetitionClosure[] = [];
+  const system = createConfiguredMvpCompetitionSystem(
+    content.config,
+    yearForSeason(state.season),
+  );
+  const played: PlayedCompetition[] = [];
   const rankings = {} as Record<DivisionId, readonly string[]>;
+  const fixtures: CompetitionCalendarFixture[] = [];
+  const calendarParticipants: Record<
+    string,
+    Record<string, readonly ClubId[]>
+  > = {};
+  const definitionById = new Map(
+    system.definitions.map((definition) => [definition.id, definition]),
+  );
+
   for (const league of content.config.nationalLeagues) {
-    const clubIds = state.divisions[league.division];
-    if (clubIds.length !== league.clubs)
-      throw new Error(`${league.id} expected ${String(league.clubs)} clubs`);
-    const matches = addRoundRobin(fixtures, {
-      season: state.season,
-      competitionId: league.id,
-      stage: 'league',
-      clubIds,
-      legs: league.roundRobinLegs,
-      firstMatchDay: league.firstMatchDay,
-      matchDayInterval: league.matchDayInterval,
-    });
-    const table = ranked(clubIds, `${seed}|${String(state.season)}`, league.id);
-    rankings[league.division] = table;
-    closures.push({
-      competitionId: league.id,
-      championClubId: table[0]!,
-      participants: clubIds.length,
-      matches,
-      closed: true,
-    });
-  }
-  for (const stateLeague of content.config.stateLeagues) {
-    const clubIds = stateLeague.participants.map(([clubId]) => clubId);
-    const matches = addRoundRobin(fixtures, {
-      season: state.season,
-      competitionId: stateLeague.id,
-      stage: 'league',
-      clubIds,
-      legs: 1,
-      firstMatchDay: stateLeague.firstMatchDay,
-      matchDayInterval: stateLeague.matchDayInterval,
-    });
-    closures.push({
-      competitionId: stateLeague.id,
-      championClubId: ranked(
-        clubIds,
-        `${seed}|${String(state.season)}`,
-        stateLeague.id,
-      )[0]!,
-      participants: clubIds.length,
-      matches,
-      closed: true,
-    });
-  }
-  const allClubs = (['serie-a', 'serie-b', 'serie-c'] as const).flatMap(
-    (division) => state.divisions[division],
-  );
-  const cup = addCup(fixtures, content.config, state.season, allClubs);
-  closures.push({
-    competitionId: content.config.nationalCup.id,
-    championClubId: cup.champion,
-    participants: allClubs.length,
-    matches: cup.matches,
-    closed: true,
-  });
-  const continental = addContinental(
-    fixtures,
-    content.config.continental,
-    state.season,
-    state.continentalDirect,
-    state.continentalPreliminary,
-  );
-  closures.push({
-    competitionId: content.config.continental.id,
-    championClubId: continental.champion,
-    participants: continental.participants,
-    matches: continental.matches,
-    closed: true,
-  });
-  const calendarFailures = validateReferenceCalendar(fixtures, content.config);
-  if (calendarFailures.length > 0)
-    throw new Error(
-      `Calendar rejected before season: ${calendarFailures.join('; ')}`,
+    const definition = definitionById.get(
+      system.ids.divisions[league.division],
     );
+    if (definition === undefined)
+      throw new Error(`Missing ${league.division} definition`);
+    const participants = state.divisions[league.division].map(canonicalClubId);
+    const competition = playCompetition(
+      definition,
+      { league: participants },
+      state.season,
+      `${seed}|${String(state.season)}|${definition.id}`,
+    );
+    rankings[league.division] = competition.outcome.stages[0]!.orderedClubIds;
+    played.push(competition);
+  }
+
+  for (const configured of content.config.stateLeagues) {
+    const definition = definitionById.get(
+      canonicalCompetitionId(configured.id),
+    );
+    if (definition === undefined)
+      throw new Error(`Missing state definition ${configured.id}`);
+    played.push(
+      playCompetition(
+        definition,
+        {
+          league: configured.participants.map(([clubId]) =>
+            canonicalClubId(clubId),
+          ),
+        },
+        state.season,
+        `${seed}|${String(state.season)}|${definition.id}`,
+      ),
+    );
+  }
+
+  const allNational = (['serie-a', 'serie-b', 'serie-c'] as const).flatMap(
+    (division) => state.divisions[division].map(canonicalClubId),
+  );
+  const cupDefinition = definitionById.get(system.ids.nationalCup)!;
+  const cup = playCompetition(
+    cupDefinition,
+    { [cupDefinition.stages[0]!.id]: allNational },
+    state.season,
+    `${seed}|${String(state.season)}|${cupDefinition.id}`,
+  );
+  played.push(cup);
+
+  const continentalDefinition = definitionById.get(system.ids.continental)!;
+  const continental = playCompetition(
+    continentalDefinition,
+    {
+      [continentalDefinition.stages[0]!.id]:
+        state.continentalPreliminary.map(canonicalClubId),
+      groups: state.continentalDirect.map(canonicalClubId),
+    },
+    state.season,
+    `${seed}|${String(state.season)}|${continentalDefinition.id}`,
+  );
+  played.push(continental);
+
+  for (const competition of played) {
+    fixtures.push(...competition.fixtures);
+    stageMap(
+      calendarParticipants,
+      competition.outcome.competitionId,
+      competition.stageParticipants,
+    );
+    const definition = definitionById.get(competition.outcome.competitionId)!;
+    const events = generateCompetitionAwards(definition, competition.outcome);
+    if (!events.some(({ type }) => type === 'CompetitionWon'))
+      throw new Error(`${definition.id} did not emit its title event`);
+  }
+  const validation = validateCompetitionCalendar({
+    fixtures,
+    competitions: system.definitions,
+    stageParticipants: calendarParticipants,
+    minimumIntervalDays: system.minimumIntervalDays,
+    reservedDates: system.reservedDates,
+  });
+  if (!validation.valid)
+    throw new Error(
+      `Calendar rejected before season: ${validation.violations
+        .map(({ code }) => code)
+        .join(', ')}`,
+    );
+
+  const generation = generateNextSeason(
+    played.map(({ outcome }) => outcome),
+    system.nextSeasonAllocations,
+  );
+  const continentalEntrants = generation.participants[system.ids.continental];
+  if (continentalEntrants === undefined)
+    throw new Error('Engine did not generate continental entrants');
+  const next: ReferenceSeasonState = Object.freeze({
+    season: state.season + 1,
+    divisions: Object.freeze(
+      Object.fromEntries(
+        (['serie-a', 'serie-b', 'serie-c'] as const).map((division) => {
+          const participants =
+            generation.participants[system.ids.divisions[division]];
+          if (participants === undefined)
+            throw new Error(`Engine did not generate ${division}`);
+          return [division, participants];
+        }),
+      ) as unknown as Record<DivisionId, readonly string[]>,
+    ),
+    continentalDirect: Object.freeze(
+      continentalEntrants.slice(0, content.config.continental.directSlots),
+    ),
+    continentalPreliminary: Object.freeze(
+      continentalEntrants.slice(content.config.continental.directSlots),
+    ),
+  });
+  const closures = played.map(({ outcome, fixtures: matches, entrants }) =>
+    Object.freeze({
+      competitionId: outcome.competitionId,
+      championClubId: outcome.championId,
+      participants: entrants,
+      matches: matches.length,
+      closed: true as const,
+    }),
+  );
   return Object.freeze({
     season: state.season,
     fixtures: Object.freeze(fixtures),
     closures: Object.freeze(closures),
     nationalRankings: Object.freeze(rankings),
-    cupChampion: cup.champion,
-    next: expectedNextState(state, rankings, cup.champion, content.config),
+    cupChampion: cup.outcome.championId,
+    next,
   });
 }

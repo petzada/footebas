@@ -2,6 +2,7 @@
   "schemaVersion": "footebas-mvp-competitions-v1",
   "seasonDays": 200,
   "minimumRestDays": 1,
+  "reservedMatchDays": [0, 1, 199],
   "sources": {
     "serie-a": "dados/elencos/brasileirao-serie-a-2026.md",
     "serie-b": "dados/elencos/brasileirao-serie-b-2026.md",

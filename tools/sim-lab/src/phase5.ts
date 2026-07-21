@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- required league/fixture cardinalities are validated before indexed access */
 import { canonicalJson } from '@footebas/domain';
 import {
+  COMPETITION_ENGINE_VERSION,
+  MVP_COMPETITION_CONFIG_VERSION,
+} from '@footebas/engine';
+import {
   loadPhaseFiveContent,
   parseCompetitionConfig,
   type CompetitionConfig,
@@ -18,6 +22,8 @@ export const PHASE_FIVE_GATE_MINIMUM_SEASONS = 1_000;
 
 export interface PhaseFiveGateReport {
   readonly schemaVersion: typeof PHASE_FIVE_GATE_VERSION;
+  readonly engineVersion: typeof COMPETITION_ENGINE_VERSION;
+  readonly competitionConfigVersion: typeof MVP_COMPETITION_CONFIG_VERSION;
   readonly seed: string;
   readonly seasons: number;
   readonly competitionsPerSeason: number;
@@ -184,6 +190,8 @@ export function runPhaseFiveGate(
   if (!invalidCalendar) failures.push('invalid calendar was accepted');
   return Object.freeze({
     schemaVersion: PHASE_FIVE_GATE_VERSION,
+    engineVersion: COMPETITION_ENGINE_VERSION,
+    competitionConfigVersion: MVP_COMPETITION_CONFIG_VERSION,
     seed,
     seasons,
     competitionsPerSeason: competitionCount,

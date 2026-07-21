@@ -1,5 +1,6 @@
 import {
   createPhaseFiveFixtureState,
+  EnginePhaseFiveSeasonGenerationAdapter,
   FakeBearerAuth,
   InMemoryPhaseFiveCompetitionAdapter,
   PhaseFiveCompetitionService,
@@ -33,6 +34,7 @@ async function setup() {
   const application = new PhaseFiveCompetitionService(
     new InMemoryPhaseFiveCompetitionAdapter([createPhaseFiveFixtureState()]),
     { now: () => new Date('2026-12-09T12:00:00.000Z') },
+    new EnginePhaseFiveSeasonGenerationAdapter(),
   );
   const api = await buildApi({
     application: {
