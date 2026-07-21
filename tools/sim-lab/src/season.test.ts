@@ -6,7 +6,13 @@ import { runSeason } from './season.js';
 describe('phase one season gate', () => {
   it('closes a canonical eight-club double round robin', () => {
     const report = runSeason();
-    expect(report).toMatchObject({ clubs: 8, players: 200, rounds: 14, matches: 56, passed: true });
+    expect(report).toMatchObject({
+      clubs: 8,
+      players: 200,
+      rounds: 14,
+      matches: 56,
+      passed: true,
+    });
     expect(report.standings).toHaveLength(8);
     expect(report.standings.every(({ played }) => played === 14)).toBe(true);
   });
@@ -24,6 +30,11 @@ describe('phase one season gate', () => {
 
   it('aggregates the gate with configurable small test counts', () => {
     const report = runPhaseOneGate(1_000, 2);
-    expect(report).toMatchObject({ matches: 1_000, seasons: 2, seasonMatches: 112, passed: true });
+    expect(report).toMatchObject({
+      matches: 1_000,
+      seasons: 2,
+      seasonMatches: 112,
+      passed: true,
+    });
   }, 30_000);
 });

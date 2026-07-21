@@ -132,12 +132,10 @@ export function squadFactory(
     throw new Error('Factory formation must contain players');
   const lineup = createLineup({
     clubId: club.id,
-    starters: players
-      .slice(0, 11)
-      .map((player, index) => ({
-        playerId: player.id,
-        position: FORMATION_POSITIONS[formation][index] ?? player.position,
-      })),
+    starters: players.slice(0, 11).map((player, index) => ({
+      playerId: player.id,
+      position: FORMATION_POSITIONS[formation][index] ?? player.position,
+    })),
     substitutes: players.slice(11).map(({ id }) => id),
     captainId: captain.id,
   });

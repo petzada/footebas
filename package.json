@@ -16,6 +16,7 @@
     "lint": "turbo run lint",
     "smoke": "pnpm --filter @footebas/sim-lab smoke",
     "test": "turbo run test",
+    "test:phase1": "pnpm --filter @footebas/sim-lab phase1-gate",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

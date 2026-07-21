@@ -117,12 +117,10 @@ function match(
       players,
       lineup: createLineup({
         clubId,
-        starters: players
-          .slice(0, 11)
-          .map((player, index) => ({
-            playerId: player.id,
-            position: slots[index]!,
-          })),
+        starters: players.slice(0, 11).map((player, index) => ({
+          playerId: player.id,
+          position: slots[index]!,
+        })),
         substitutes: players.slice(11).map(({ id }) => id),
         captainId: players[0]!.id,
       }),

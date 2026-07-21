@@ -7,7 +7,9 @@ import { runSeason } from './season.js';
 
 function numericArgument(name: string, fallback: number): number {
   const argument = process.argv.find((value) => value.startsWith(`--${name}=`));
-  return argument === undefined ? fallback : Number(argument.slice(name.length + 3));
+  return argument === undefined
+    ? fallback
+    : Number(argument.slice(name.length + 3));
 }
 
 if (process.argv.includes('--smoke')) {
@@ -18,7 +20,9 @@ if (process.argv.includes('--smoke')) {
   process.stdout.write(`${canonicalJson(report)}\n`);
   if (!report.passed) process.exitCode = 1;
 } else if (process.argv.includes('--season')) {
-  const seed = process.argv.find((value) => value.startsWith('--seed='))?.slice(7);
+  const seed = process.argv
+    .find((value) => value.startsWith('--seed='))
+    ?.slice(7);
   const report = runSeason(seed === undefined ? {} : { seed });
   process.stdout.write(`${canonicalJson(report)}\n`);
   if (!report.passed) process.exitCode = 1;
@@ -27,7 +31,10 @@ if (process.argv.includes('--smoke')) {
   process.stdout.write(`${canonicalJson(report)}\n`);
   if (!report.passed) process.exitCode = 1;
 } else if (process.argv.includes('--phase1-gate')) {
-  const report = runPhaseOneGate(numericArgument('matches', 10_000), numericArgument('seasons', 1_000));
+  const report = runPhaseOneGate(
+    numericArgument('matches', 10_000),
+    numericArgument('seasons', 1_000),
+  );
   process.stdout.write(`${canonicalJson(report)}\n`);
   if (!report.passed) process.exitCode = 1;
 } else {

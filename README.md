@@ -25,13 +25,19 @@ executar apenas o laboratório:
 pnpm smoke
 ```
 
-## Workspaces ativos na Fase 0
+O gate estatístico completo da Fase 1 executa 10.000 partidas e 1.000 temporadas inteiras:
+
+```bash
+pnpm test:phase1
+```
+
+## Núcleo ativo
 
 - `packages/domain`: IDs, `GameDate`, erros e serialização canônica.
-- `packages/engine`: PRNG puro, seedado e versionado.
+- `packages/engine`: PRNG, partida, liga e progressão puros, seedados e versionados.
 - `packages/testing`: fixtures e helpers determinísticos compartilhados.
 - `packages/config`: presets e políticas de tooling.
-- `tools/sim-lab`: CLI/harness do motor, sem dependências externas.
+- `tools/sim-lab`: CLI/harness, Monte Carlo, amostra real e playthroughs, sem dependências externas.
 
 Next.js, Fastify, Playwright, Prisma, Postgres, Redis, Supabase e BullMQ não fazem parte do baseline da Fase 0.
 
