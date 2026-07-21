@@ -77,12 +77,10 @@ describe('server-authoritative application slice', () => {
     const { app, deps, token } = setup();
     const careerId = await createAndSelect(app, token);
     const squad = await app.squad(token, careerId);
-    const starters = squad.lineupPlayerIds
-      .slice(0, 11)
-      .map((playerId) => ({
-        playerId,
-        position: squad.players.find(({ id }) => id === playerId)!.position,
-      }));
+    const starters = squad.lineupPlayerIds.slice(0, 11).map((playerId) => ({
+      playerId,
+      position: squad.players.find(({ id }) => id === playerId)!.position,
+    }));
     await app.execute(
       token,
       command('SetLineup', 'command_lineup', 2, {

@@ -38,6 +38,28 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@22.20.1)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
 
+  packages/application:
+    dependencies:
+      '@footebas/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@footebas/database':
+        specifier: workspace:*
+        version: link:../database
+      '@footebas/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@footebas/engine':
+        specifier: workspace:*
+        version: link:../engine
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(vite@8.1.5(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
+
   packages/config: {}
 
   packages/contracts:
