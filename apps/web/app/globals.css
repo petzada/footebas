@@ -1,8 +1,8 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme inline {
-  --font-sans: "Archivo Variable", sans-serif;
-  --font-display: "Rajdhani", sans-serif;
+  --font-sans: 'Archivo Variable', sans-serif;
+  --font-display: 'Rajdhani', sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -27,11 +27,63 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-:root { --radius: .65rem; --background: oklch(.14 .025 155); --foreground: oklch(.96 .015 105); --card: oklch(.18 .03 155); --card-foreground: oklch(.96 .015 105); --popover: oklch(.18 .03 155); --popover-foreground: oklch(.96 .015 105); --primary: oklch(.72 .17 145); --primary-foreground: oklch(.14 .03 155); --secondary: oklch(.25 .035 155); --secondary-foreground: oklch(.94 .015 105); --muted: oklch(.23 .025 155); --muted-foreground: oklch(.7 .025 145); --accent: oklch(.74 .18 55); --accent-foreground: oklch(.16 .025 45); --destructive: oklch(.65 .2 25); --border: oklch(.31 .035 150); --input: oklch(.27 .035 150); --ring: oklch(.72 .17 145); }
+:root {
+  --radius: 0.65rem;
+  --background: oklch(0.14 0.025 155);
+  --foreground: oklch(0.96 0.015 105);
+  --card: oklch(0.18 0.03 155);
+  --card-foreground: oklch(0.96 0.015 105);
+  --popover: oklch(0.18 0.03 155);
+  --popover-foreground: oklch(0.96 0.015 105);
+  --primary: oklch(0.72 0.17 145);
+  --primary-foreground: oklch(0.14 0.03 155);
+  --secondary: oklch(0.25 0.035 155);
+  --secondary-foreground: oklch(0.94 0.015 105);
+  --muted: oklch(0.23 0.025 155);
+  --muted-foreground: oklch(0.7 0.025 145);
+  --accent: oklch(0.74 0.18 55);
+  --accent-foreground: oklch(0.16 0.025 45);
+  --destructive: oklch(0.65 0.2 25);
+  --border: oklch(0.31 0.035 150);
+  --input: oklch(0.27 0.035 150);
+  --ring: oklch(0.72 0.17 145);
+}
 
-* { border-color: var(--border); }
-html { background: var(--background); }
-body { min-height: 100dvh; background: radial-gradient(circle at 50% -20%, oklch(.3 .08 145 / .45), transparent 42%), var(--background); color: var(--foreground); font-family: "Archivo Variable", sans-serif; }
-button, a, input { touch-action: manipulation; }
-button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+* {
+  border-color: var(--border);
+}
+html {
+  background: var(--background);
+}
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(
+      circle at 50% -20%,
+      oklch(0.3 0.08 145 / 0.45),
+      transparent 42%
+    ),
+    var(--background);
+  color: var(--foreground);
+  font-family: 'Archivo Variable', sans-serif;
+}
+button,
+a,
+input {
+  touch-action: manipulation;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -3,8 +3,18 @@
   "style": "new-york",
   "rsc": true,
   "tsx": true,
-  "tailwind": { "css": "app/globals.css", "baseColor": "neutral", "cssVariables": true },
+  "tailwind": {
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
   "iconLibrary": "phosphor",
-  "aliases": { "components": "@/components", "utils": "@/lib/utils", "ui": "@/components/ui", "lib": "@/lib", "hooks": "@/hooks" },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
   "registries": {}
 }
