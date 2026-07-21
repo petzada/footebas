@@ -126,6 +126,11 @@ export const compactHistoryCommandSchema = z.strictObject({
   type: z.literal('CompactHistory'),
   payload: z.strictObject({ retainFromSeason: z.int().positive() }),
 });
+export const advanceCareerSeasonCommandSchema = z.strictObject({
+  ...envelope,
+  type: z.literal('AdvanceCareerSeason'),
+  payload: z.strictObject({}),
+});
 
 export const phaseFourCommandSchema = z.discriminatedUnion('type', [
   renewPlayerContractCommandSchema,
@@ -142,6 +147,7 @@ export const phaseFourCommandSchema = z.discriminatedUnion('type', [
   acceptJobProposalCommandSchema,
   migrateSaveCommandSchema,
   compactHistoryCommandSchema,
+  advanceCareerSeasonCommandSchema,
 ]);
 
 export const marketSearchQuerySchema = z.strictObject({
@@ -185,6 +191,7 @@ export const phaseFourEventSchema = z.strictObject({
     'MANAGER_CHANGED_CLUB',
     'SAVE_MIGRATED',
     'HISTORY_ARCHIVED',
+    'SEASON_ADVANCED',
   ]),
   occurredAt: instantSchema,
   gameDate: gameDateSchema,
@@ -251,10 +258,63 @@ export const phaseFourCareerReadModelSchema = z.strictObject({
   archiveKeys: z.array(z.string().min(1)),
 });
 
+const historyEventReadModelSchema = z.strictObject({
+  id: entityIdSchema,
+  type: z.enum([
+    'title',
+    'promotion',
+    'relegation',
+    'top_scorer',
+    'record',
+    'idol',
+    'manager_fired',
+    'transfer',
+    'retirement',
+  ]),
+  season: z.int().positive(),
+  occurredOn: gameDateSchema,
+  clubId: entityIdSchema.optional(),
+  playerId: entityIdSchema.optional(),
+  competitionId: entityIdSchema.optional(),
+  value: z.number().optional(),
+});
+
+export const phaseFourHistoryReadModelSchema = z.strictObject({
+  version: transportVersionSchema,
+  careerId: entityIdSchema,
+  aggregateVersion: versionSchema,
+  currentSeason: z.int().positive(),
+  history: z.array(historyEventReadModelSchema),
+  archivedThroughSeason: z.int().nonnegative(),
+  archivedSeasonCount: z.int().nonnegative(),
+});
+
+const leaderboardRowSchema = z.strictObject({
+  managerId: entityIdSchema,
+  score: z.number().nonnegative(),
+  rank: z.int().positive(),
+});
+
+export const phaseFourLeaderboardReadModelSchema = z.strictObject({
+  version: transportVersionSchema,
+  careerId: entityIdSchema,
+  aggregateVersion: versionSchema,
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  global: z.array(leaderboardRowSchema),
+  underdog: z.array(leaderboardRowSchema),
+  monthly: z.array(leaderboardRowSchema),
+});
+
 export type PhaseFourCommand = z.infer<typeof phaseFourCommandSchema>;
 export type PhaseFourEvent = z.infer<typeof phaseFourEventSchema>;
 export type PhaseFourReceipt = z.infer<typeof phaseFourReceiptSchema>;
 export type MarketSearchQuery = z.infer<typeof marketSearchQuerySchema>;
 export type PhaseFourCareerReadModel = z.infer<
   typeof phaseFourCareerReadModelSchema
+>;
+export type PhaseFourHistoryReadModel = z.infer<
+  typeof phaseFourHistoryReadModelSchema
+>;
+export type PhaseFourLeaderboardReadModel = z.infer<
+  typeof phaseFourLeaderboardReadModelSchema
 >;

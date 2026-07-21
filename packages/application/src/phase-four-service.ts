@@ -4,11 +4,15 @@ import {
   type PhaseFourCareerReadModel,
   type PhaseFourCommand,
   type PhaseFourEvent,
+  type PhaseFourHistoryReadModel,
+  type PhaseFourLeaderboardReadModel,
   type PhaseFourReceipt,
 } from '@footebas/contracts';
+import { checksumSnapshot } from '@footebas/database';
 import {
   acceptJobProposal,
   appendLedgerEntry,
+  canonicalJson,
   clubCashBalance,
   completeAcceptedOffer,
   contractAlerts,
@@ -20,14 +24,17 @@ import {
   generateYouthCandidates,
   leaveClub,
   promoteYouth,
+  projectLeaderboards,
   releaseYouth,
   renewContract,
   scoutPlayer,
   searchTransferMarket,
+  shouldFireManager,
   startStadiumExpansion,
   terminateContract,
   transitionOffer,
   type Club,
+  type CanonicalValue,
   type ClubId,
   type LedgerTransaction,
   type LedgerPosting,
@@ -36,12 +43,14 @@ import {
   type Player,
   type PlayerContract,
   type PlayerId,
+  type PrestigeAchievement,
   type ScoutingReport,
   type TransferOffer,
 } from '@footebas/domain';
 import type { Clock, IdGenerator } from './ports.js';
 import type {
   ArchiveStoragePort,
+  CareerSeasonAdvancePort,
   PhaseFourState,
   PhaseFourStateRepository,
   RandomFactoryPort,
@@ -57,6 +66,7 @@ interface Dependencies {
   readonly clock: Clock;
   readonly ids: IdGenerator;
   readonly random: RandomFactoryPort;
+  readonly seasonAdvancer?: CareerSeasonAdvancePort;
 }
 
 type MutableState = {
@@ -75,19 +85,32 @@ export class PhaseFourApplicationService {
     input: unknown,
   ): Promise<PhaseFourReceipt> {
     const command = phaseFourCommandSchema.parse(input);
+    const fingerprint = checksumSnapshot(command as unknown as CanonicalValue);
     return this.dependencies.repository.withLock(command.careerId, async () => {
+      const current = await this.loadOwned(command.careerId, actorUserId);
       const previous = await this.dependencies.repository.receipt(
         command.careerId,
         command.idempotencyKey,
       );
       if (previous !== undefined) {
-        if (previous.commandId !== command.commandId)
+        if (previous.commandFingerprint !== fingerprint)
           throw new PhaseFourConflictError(
-            'idempotency key was reused by another command',
+            'idempotency key replay does not match the original command',
           );
-        return previous;
+        return previous.receipt;
       }
-      const current = await this.loadOwned(command.careerId, actorUserId);
+      const previousCommand =
+        await this.dependencies.repository.receiptByCommandId(
+          command.careerId,
+          command.commandId,
+        );
+      if (previousCommand !== undefined) {
+        if (previousCommand.commandFingerprint !== fingerprint)
+          throw new PhaseFourConflictError(
+            'command id was reused with different command data',
+          );
+        return previousCommand.receipt;
+      }
       if (current.version !== command.expectedVersion)
         throw new PhaseFourConflictError(
           `expected version ${String(command.expectedVersion)}, found ${String(current.version)}`,
@@ -105,11 +128,11 @@ export class PhaseFourApplicationService {
         eventIds,
         outcome,
       };
-      await this.dependencies.repository.save(draft, current.version);
-      await this.dependencies.repository.saveReceipt(
-        command.careerId,
+      await this.dependencies.repository.commit(
+        draft,
+        current.version,
         command.idempotencyKey,
-        receipt,
+        { commandFingerprint: fingerprint, receipt },
       );
       return receipt;
     });
@@ -195,6 +218,52 @@ export class PhaseFourApplicationService {
     };
   }
 
+  public async history(
+    actorUserId: string,
+    careerId: string,
+  ): Promise<PhaseFourHistoryReadModel> {
+    const state = await this.loadOwned(careerId, actorUserId);
+    const archive = state.seasonWorld?.snapshot.archive;
+    return {
+      version: 1,
+      careerId,
+      aggregateVersion: state.version,
+      currentSeason: state.season,
+      history: state.history.map((item) => ({ ...item })),
+      archivedThroughSeason: archive?.throughSeason ?? 0,
+      archivedSeasonCount: archive?.seasons ?? 0,
+    };
+  }
+
+  public async leaderboard(
+    actorUserId: string,
+    careerId: string,
+    month: string,
+  ): Promise<PhaseFourLeaderboardReadModel> {
+    if (!/^\d{4}-\d{2}$/.test(month))
+      throw new PhaseFourConflictError('leaderboard month must be YYYY-MM');
+    const state = await this.loadOwned(careerId, actorUserId);
+    const projected = projectLeaderboards(state.achievements, month);
+    return {
+      version: 1,
+      careerId,
+      aggregateVersion: state.version,
+      month,
+      global: projected.global.map((row) => ({ ...row })),
+      underdog: projected.underdog.map((row) => ({ ...row })),
+      monthly: projected.monthly.map((row) => ({ ...row })),
+    };
+  }
+
+  public checksum(actorUserId: string, careerId: string): Promise<string> {
+    return this.loadOwned(careerId, actorUserId).then(async () => {
+      const value = await this.dependencies.repository.checksum(careerId);
+      if (value === undefined)
+        throw new PhaseFourNotFoundError(`career ${careerId} not found`);
+      return value;
+    });
+  }
+
   private async loadOwned(
     careerId: string,
     actorUserId: string,
@@ -259,6 +328,8 @@ export class PhaseFourApplicationService {
         return this.migrate(state, command);
       case 'CompactHistory':
         return this.compact(state, command);
+      case 'AdvanceCareerSeason':
+        return this.advanceSeason(state, command);
     }
   }
 
@@ -479,6 +550,7 @@ export class PhaseFourApplicationService {
     command: Extract<PhaseFourCommand, { type: 'CounterTransferOffer' }>,
   ): 'applied' {
     const offer = this.offer(state, command.payload.offerId);
+    this.assertOfferOpen(state, offer);
     if (offer.fromClubId === undefined)
       throw new PhaseFourAuthorizationError(
         'free-agent offer cannot be countered by a club',
@@ -513,6 +585,7 @@ export class PhaseFourApplicationService {
     command: Extract<PhaseFourCommand, { type: 'DecideTransferOffer' }>,
   ): 'applied' {
     const offer = this.offer(state, command.payload.offerId);
+    this.assertOfferOpen(state, offer);
     const controlledClubId = state.manager.currentClubId;
     const controlsDecision =
       controlledClubId !== undefined &&
@@ -569,6 +642,9 @@ export class PhaseFourApplicationService {
           ? terminateContract(contract)
           : contract,
       );
+      const terminationCost = Number(offer.wage) * 12;
+      if (!Number.isSafeInteger(terminationCost))
+        throw new PhaseFourConflictError('contract value exceeds safe money');
       const contract: PlayerContract = {
         id: this.dependencies.ids.next('contract'),
         playerId: player.id,
@@ -577,12 +653,12 @@ export class PhaseFourApplicationService {
         endsOn: this.addYears(state.currentDate, 2),
         wage: offer.wage,
         status: 'active',
-        terminationCost: (offer.wage * 12) as Money,
+        terminationCost: terminationCost as Money,
         revision: 1,
       };
       state.contracts = [...state.contracts, contract];
-      if (offer.fee > 0) this.postTransfer(state, offer);
     }
+    if (offer.fee > 0) this.postTransfer(state, offer);
     this.addEvent(
       state,
       command,
@@ -617,14 +693,6 @@ export class PhaseFourApplicationService {
           clubId: offer.fromClubId,
         },
       );
-    else
-      postings.push(
-        { account: 'world:transfer_clearing', amount: offer.fee },
-        {
-          account: 'world:transfer_clearing',
-          amount: -Number(offer.fee) as Money,
-        },
-      );
     state.ledger = appendLedgerEntry(state.ledger, {
       id: this.dependencies.ids.next('ledger'),
       occurredAt: this.dependencies.clock.now().toISOString(),
@@ -638,6 +706,8 @@ export class PhaseFourApplicationService {
     command: Extract<PhaseFourCommand, { type: 'SetTicketPrice' }>,
   ): 'applied' {
     this.assertManagedClub(state, command.payload.clubId as ClubId);
+    if (!state.stadiums.some(({ clubId }) => clubId === command.payload.clubId))
+      throw new PhaseFourNotFoundError('stadium not found');
     state.stadiums = state.stadiums.map((stadium) =>
       stadium.clubId === command.payload.clubId
         ? Object.freeze({
@@ -665,6 +735,12 @@ export class PhaseFourApplicationService {
     const clubId = command.payload.clubId as ClubId;
     this.assertManagedClub(state, clubId);
     const club = this.club(state, clubId);
+    if (!state.stadiums.some((stadium) => stadium.clubId === clubId))
+      throw new PhaseFourNotFoundError('stadium not found');
+    if (command.payload.completesOn <= state.currentDate)
+      throw new PhaseFourConflictError(
+        'stadium completion must be in the future',
+      );
     if (
       clubCashBalance(state.ledger, club.id, club.balance) <
       command.payload.cost
@@ -814,6 +890,10 @@ export class PhaseFourApplicationService {
     state: MutableState,
     command: Extract<PhaseFourCommand, { type: 'LeaveClub' }>,
   ): 'applied' {
+    if (command.payload.reason === 'fired' && !shouldFireManager(state.manager))
+      throw new PhaseFourAuthorizationError(
+        'manager dismissal requires a board decision',
+      );
     state.manager = leaveClub(
       state.manager,
       state.currentDate,
@@ -858,6 +938,183 @@ export class PhaseFourApplicationService {
     return 'applied';
   }
 
+  private advanceSeason(
+    state: MutableState,
+    command: Extract<PhaseFourCommand, { type: 'AdvanceCareerSeason' }>,
+  ): 'applied' {
+    if (state.seasonWorld === undefined)
+      throw new PhaseFourConflictError(
+        'career has no canonical seasonal world to advance',
+      );
+    if (this.dependencies.seasonAdvancer === undefined)
+      throw new PhaseFourConflictError('season advancement is unavailable');
+    const previousWorld = state.seasonWorld.snapshot;
+    const identityMap = state.seasonIdentityMap;
+    if (
+      identityMap?.worldManagerId !== previousWorld.manager.id ||
+      identityMap.managerId !== state.manager.managerId
+    )
+      throw new PhaseFourConflictError(
+        'seasonal world identity mapping does not match career manager',
+      );
+    const advanced = this.dependencies.seasonAdvancer.advance(
+      state.seasonWorld,
+    );
+    const world = advanced.snapshot;
+    if (
+      world.season !== previousWorld.season + 1 ||
+      world.manager.id !== previousWorld.manager.id
+    )
+      throw new PhaseFourConflictError(
+        'season adapter violated season or manager continuity',
+      );
+    const nextClubId = identityMap.clubs[world.manager.clubId];
+    if (nextClubId === undefined)
+      throw new PhaseFourConflictError(
+        'season adapter selected an unmapped manager club',
+      );
+    if (!state.clubs.some(({ id }) => id === nextClubId))
+      throw new PhaseFourConflictError(
+        'season adapter selected a club outside the career projection',
+      );
+    const previousClubId = state.manager.currentClubId;
+    const changedClub = previousClubId !== nextClubId;
+    const nextDate = this.addYears(state.currentDate, 1);
+    const appointments = changedClub
+      ? [
+          ...state.manager.appointments.map((appointment, index) =>
+            index === state.manager.appointments.length - 1
+              ? Object.freeze({
+                  ...appointment,
+                  leftOn: state.currentDate,
+                  reason: 'fired' as const,
+                })
+              : appointment,
+          ),
+          Object.freeze({ clubId: nextClubId, joinedOn: nextDate }),
+        ]
+      : state.manager.appointments;
+    state.manager = Object.freeze({
+      ...state.manager,
+      currentClubId: nextClubId,
+      employmentStatus: 'employed',
+      boardConfidence: world.manager.confidence,
+      fanConfidence: world.manager.confidence,
+      prestige: world.manager.prestige,
+      seasons: world.manager.seasons,
+      appointments: Object.freeze(appointments),
+    });
+    state.seasonWorld = advanced;
+    state.season = world.season;
+    state.currentDate = nextDate;
+
+    const completed = world.history.at(-1);
+    if (completed === undefined)
+      throw new PhaseFourConflictError('season adapter produced no history');
+    const history = [...state.history];
+    for (const [competitionId, worldClubId] of Object.entries(
+      completed.champions,
+    )) {
+      const clubId = identityMap.clubs[worldClubId];
+      if (clubId === undefined)
+        throw new PhaseFourConflictError('season champion club is unmapped');
+      history.push({
+        id: this.dependencies.ids.next('history'),
+        type: 'title',
+        season: completed.season,
+        occurredOn: nextDate,
+        clubId,
+        competitionId: this.stableId(competitionId),
+      });
+    }
+    for (const worldClubId of completed.promoted) {
+      const clubId = identityMap.clubs[worldClubId];
+      if (clubId === undefined)
+        throw new PhaseFourConflictError('promoted club is unmapped');
+      history.push({
+        id: this.dependencies.ids.next('history'),
+        type: 'promotion',
+        season: completed.season,
+        occurredOn: nextDate,
+        clubId,
+      });
+    }
+    const topScorerId = identityMap.players[completed.topScorerId];
+    if (topScorerId === undefined)
+      throw new PhaseFourConflictError('season top scorer is unmapped');
+    history.push({
+      id: this.dependencies.ids.next('history'),
+      type: 'top_scorer',
+      season: completed.season,
+      occurredOn: nextDate,
+      playerId: topScorerId,
+      competitionId: 'all_divisions',
+    });
+    if (changedClub && previousClubId !== undefined)
+      history.push({
+        id: this.dependencies.ids.next('history'),
+        type: 'manager_fired',
+        season: completed.season,
+        occurredOn: nextDate,
+        clubId: previousClubId,
+      });
+    state.history = Object.freeze(history);
+
+    const managedClubId = identityMap.clubs[completed.managerClubId];
+    if (managedClubId === undefined)
+      throw new PhaseFourConflictError('managed season club is unmapped');
+    const managedClub = this.club(state, managedClubId);
+    const achievements: PrestigeAchievement[] = [
+      ...state.achievements,
+      {
+        id: this.dependencies.ids.next('achievement'),
+        managerId: state.manager.managerId,
+        occurredOn: nextDate,
+        type: 'season_completed' as const,
+        clubReputation: Number(managedClub.reputation),
+      },
+    ];
+    if (Object.values(completed.champions).includes(completed.managerClubId))
+      achievements.push({
+        id: this.dependencies.ids.next('achievement'),
+        managerId: state.manager.managerId,
+        occurredOn: nextDate,
+        type: 'league_title',
+        clubReputation: Number(managedClub.reputation),
+      });
+    if (completed.promoted.includes(completed.managerClubId))
+      achievements.push({
+        id: this.dependencies.ids.next('achievement'),
+        managerId: state.manager.managerId,
+        occurredOn: nextDate,
+        type: 'promotion',
+        clubReputation: Number(managedClub.reputation),
+      });
+    state.achievements = Object.freeze(achievements);
+    if (changedClub)
+      this.addEvent(
+        state,
+        command,
+        'MANAGER_FIRED',
+        payload({
+          managerId: state.manager.managerId,
+          previousClubId: previousClubId ?? null,
+          nextClubId,
+        }),
+      );
+    this.addEvent(
+      state,
+      command,
+      'SEASON_ADVANCED',
+      payload({
+        completedSeason: completed.season,
+        nextSeason: world.season,
+        managerClubId: nextClubId,
+      }),
+    );
+    return 'applied';
+  }
+
   private migrate(
     state: MutableState,
     command: Extract<PhaseFourCommand, { type: 'MigrateSave' }>,
@@ -890,10 +1147,12 @@ export class PhaseFourApplicationService {
       ({ season }) => season < command.payload.retainFromSeason,
     );
     if (archived.length === 0) return 'refused';
-    const key = `careers/${state.careerId}/history/before-${String(command.payload.retainFromSeason)}-v${String(state.version + 1)}.json`;
+    const serialized = canonicalJson(archived);
+    const checksum = checksumSnapshot(archived as unknown as CanonicalValue);
+    const key = `careers/${state.careerId}/history/before-${String(command.payload.retainFromSeason)}-v${String(state.version + 1)}-sha256-${checksum}.json`;
     await this.dependencies.archives.put(
       key,
-      new TextEncoder().encode(JSON.stringify(archived)),
+      new TextEncoder().encode(serialized),
     );
     state.history = state.history.filter(
       ({ season }) => season >= command.payload.retainFromSeason,
@@ -980,5 +1239,19 @@ export class PhaseFourApplicationService {
     const instant = new Date(`${date}T00:00:00.000Z`);
     instant.setUTCFullYear(instant.getUTCFullYear() + years);
     return instant.toISOString().slice(0, 10);
+  }
+  private assertOfferOpen(state: PhaseFourState, offer: TransferOffer): void {
+    if (offer.status !== 'pending')
+      throw new PhaseFourConflictError('offer is no longer pending');
+    if (offer.expiresOn < state.currentDate)
+      throw new PhaseFourConflictError('offer has expired');
+  }
+
+  private stableId(value: string): string {
+    const normalized = value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return /^[a-z]/.test(normalized) ? normalized : `item_${normalized}`;
   }
 }

@@ -3,6 +3,11 @@ import swaggerUi from '@fastify/swagger-ui';
 import {
   ApplicationError,
   AuthenticationError,
+  PhaseFourApplicationService,
+  PhaseFourAuthorizationError,
+  PhaseFourConflictError,
+  PhaseFourNotFoundError,
+  type AuthPort,
   type FootebasApplication,
   type JobQueuePort,
 } from '@footebas/application';
@@ -10,8 +15,15 @@ import {
   apiErrorSchema,
   commandAcceptedSchema,
   commandSchema,
+  comparePlayersQuerySchema,
   jobSseEventSchema,
   jobStatusSchema,
+  marketSearchQuerySchema,
+  phaseFourCareerReadModelSchema,
+  phaseFourCommandSchema,
+  phaseFourHistoryReadModelSchema,
+  phaseFourLeaderboardReadModelSchema,
+  phaseFourReceiptSchema,
   type ApiError,
   type JobSseEvent,
   type JobStatus,
@@ -25,6 +37,10 @@ export interface ApiDependencies {
   readonly nextRequestId?: () => string;
   readonly now?: () => Date;
   readonly bodyLimit?: number;
+  readonly phaseFour?: Readonly<{
+    application: PhaseFourApplicationService;
+    auth: AuthPort;
+  }>;
 }
 
 const bearer = (request: FastifyRequest): string => {
@@ -143,6 +159,108 @@ export async function buildApi(
       async (request) => {
         const { id } = paramsSchemaParse(request.params);
         return query(bearer(request), id);
+      },
+    );
+  }
+
+  if (deps.phaseFour !== undefined) {
+    const phaseFour = deps.phaseFour;
+    app.post(
+      '/v1/phase-four/commands',
+      { schema: { ...commonSchema, body: { type: 'object' } } },
+      async (request, reply) => {
+        const identity = await phaseFour.auth.authenticate(bearer(request));
+        const command = phaseFourCommandSchema.parse(request.body);
+        const receipt = await phaseFour.application.execute(
+          identity.userId,
+          command,
+        );
+        return reply.send(phaseFourReceiptSchema.parse(receipt));
+      },
+    );
+    app.get(
+      '/v1/phase-four/careers/:id/overview',
+      { schema: { ...commonSchema, params: paramsSchema } },
+      async (request) => {
+        const identity = await phaseFour.auth.authenticate(bearer(request));
+        const { id } = paramsSchemaParse(request.params);
+        return phaseFourCareerReadModelSchema.parse(
+          await phaseFour.application.readModel(identity.userId, id),
+        );
+      },
+    );
+    app.get(
+      '/v1/phase-four/careers/:id/market',
+      { schema: { ...commonSchema, params: paramsSchema } },
+      async (request) => {
+        const identity = await phaseFour.auth.authenticate(bearer(request));
+        const { id } = paramsSchemaParse(request.params);
+        const query = marketSearchQuerySchema.parse(request.query);
+        return phaseFour.application.market(identity.userId, id, query);
+      },
+    );
+    app.get(
+      '/v1/phase-four/careers/:id/scout/:playerId',
+      { schema: { ...commonSchema } },
+      async (request) => {
+        const identity = await phaseFour.auth.authenticate(bearer(request));
+        const { id, playerId } = request.params as {
+          id: string;
+          playerId: string;
+        };
+        return phaseFour.application.scout(identity.userId, id, playerId);
+      },
+    );
+    app.get(
+      '/v1/phase-four/careers/:id/compare',
+      { schema: { ...commonSchema, params: paramsSchema } },
+      async (request) => {
+        const identity = await phaseFour.auth.authenticate(bearer(request));
+        const { id } = paramsSchemaParse(request.params);
+        const raw = (request.query as { playerIds?: unknown }).playerIds;
+        const playerIds = Array.isArray(raw)
+          ? raw
+          : typeof raw === 'string'
+            ? raw.split(',')
+            : [];
+        const query = comparePlayersQuerySchema.parse({
+          careerId: id,
+          playerIds,
+        });
+        return phaseFour.application.compare(
+          identity.userId,
+          id,
+          query.playerIds,
+        );
+      },
+    );
+    app.get(
+      '/v1/phase-four/careers/:id/history',
+      { schema: { ...commonSchema, params: paramsSchema } },
+      async (request) => {
+        const identity = await phaseFour.auth.authenticate(bearer(request));
+        const { id } = paramsSchemaParse(request.params);
+        return phaseFourHistoryReadModelSchema.parse(
+          await phaseFour.application.history(identity.userId, id),
+        );
+      },
+    );
+    app.get(
+      '/v1/phase-four/careers/:id/leaderboard',
+      { schema: { ...commonSchema, params: paramsSchema } },
+      async (request) => {
+        const identity = await phaseFour.auth.authenticate(bearer(request));
+        const { id } = paramsSchemaParse(request.params);
+        const query = request.query as { month?: unknown };
+        if (typeof query.month !== 'string')
+          throw new PhaseFourConflictError('leaderboard month is required');
+        return phaseFourLeaderboardReadModelSchema.parse(
+          await phaseFour.application.leaderboard(
+            identity.userId,
+            id,
+            query.month,
+          ),
+        );
       },
     );
   }
@@ -291,6 +409,21 @@ function mapError(
       body: errorBody(request, error.code, error.message),
     };
   }
+  if (error instanceof PhaseFourAuthorizationError)
+    return {
+      status: 403,
+      body: errorBody(request, 'FORBIDDEN', error.message),
+    };
+  if (error instanceof PhaseFourNotFoundError)
+    return {
+      status: 404,
+      body: errorBody(request, 'NOT_FOUND', error.message),
+    };
+  if (error instanceof PhaseFourConflictError)
+    return {
+      status: 409,
+      body: errorBody(request, 'VERSION_CONFLICT', error.message),
+    };
   return {
     status: 500,
     body: errorBody(request, 'INTERNAL_ERROR', 'internal server error'),

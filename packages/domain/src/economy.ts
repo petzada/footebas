@@ -126,14 +126,16 @@ export function accountBalance(
   ledger: FinancialLedger,
   account: LedgerAccount,
 ): Money {
-  return ledger.entries.reduce(
-    (total, entry) =>
-      total +
-      entry.postings
-        .filter((item) => item.account === account)
-        .reduce((sum, item) => sum + item.amount, 0),
-    0,
-  ) as Money;
+  let total = 0;
+  for (const entry of ledger.entries) {
+    for (const posting of entry.postings) {
+      if (posting.account !== account) continue;
+      total += posting.amount;
+      if (!Number.isSafeInteger(total))
+        throw new DomainError('INVALID_VALUE', 'ledger balance overflow');
+    }
+  }
+  return total as Money;
 }
 
 export function clubCashBalance(
@@ -141,8 +143,12 @@ export function clubCashBalance(
   clubId: ClubId,
   openingBalance: Money,
 ): Money {
-  return (openingBalance +
-    accountBalance(ledger, `club:${clubId}:cash`)) as Money;
+  const balance =
+    Number(openingBalance) +
+    Number(accountBalance(ledger, `club:${clubId}:cash`));
+  if (!Number.isSafeInteger(balance))
+    throw new DomainError('INVALID_VALUE', 'club cash balance overflow');
+  return balance as Money;
 }
 
 export function createWageTransaction(
