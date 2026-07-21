@@ -9,6 +9,7 @@
     "lint": "eslint src --max-warnings=0",
     "phase1-gate": "tsx src/cli.ts --phase1-gate --matches=10000 --seasons=1000",
     "phase3-gate": "tsx src/cli.ts --phase3-gate --rounds=14",
+    "phase4-gate": "tsx src/cli.ts --phase4-gate --seasons=25",
     "playthrough": "tsx src/cli.ts --playthrough --rounds=14",
     "season": "tsx src/cli.ts --season",
     "smoke": "tsx src/cli.ts --smoke",

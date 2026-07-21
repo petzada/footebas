@@ -5,6 +5,7 @@ import { runPhaseOneGate } from './gate.js';
 import { runPlaythrough } from './playthrough.js';
 import { runSeason } from './season.js';
 import { runPhaseThreePlaythrough } from './phase3.js';
+import { runPhaseFourGate } from './phase4.js';
 
 function numericArgument(name: string, fallback: number): number {
   const argument = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -42,9 +43,19 @@ if (process.argv.includes('--smoke')) {
   const report = runPhaseThreePlaythrough(numericArgument('rounds', 14));
   process.stdout.write(`${canonicalJson(report)}\n`);
   if (!report.passed) process.exitCode = 1;
+} else if (process.argv.includes('--phase4-gate')) {
+  const seed = process.argv
+    .find((value) => value.startsWith('--seed='))
+    ?.slice(7);
+  const report = runPhaseFourGate({
+    seasons: numericArgument('seasons', 25),
+    ...(seed === undefined ? {} : { seed }),
+  });
+  process.stdout.write(`${canonicalJson(report)}\n`);
+  if (!report.passed) process.exitCode = 1;
 } else {
   process.stderr.write(
-    'Usage: sim-lab --smoke | --calibrate [--matches=10000] | --season [--seed=x] | --playthrough [--rounds=14] | --phase1-gate [--matches=10000] [--seasons=1000] | --phase3-gate [--rounds=14]\n',
+    'Usage: sim-lab --smoke | --calibrate [--matches=10000] | --season [--seed=x] | --playthrough [--rounds=14] | --phase1-gate [--matches=10000] [--seasons=1000] | --phase3-gate [--rounds=14] | --phase4-gate [--seasons=25] [--seed=x]\n',
   );
   process.exitCode = 1;
 }

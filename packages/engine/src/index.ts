@@ -31,3 +31,38 @@ export type {
 } from './presentation.js';
 export { prepareMatch } from './preparation.js';
 export type { ApproximateStrength, MatchPreparation } from './preparation.js';
+export {
+  advanceCareerSeason,
+  CAREER_ARCHIVE_VERSION,
+  CAREER_RULES_VERSION,
+  CAREER_SAVE_VERSION,
+  CAREER_WORLD_VERSION,
+  createCareerWorld,
+  createCareerWorldSave,
+  DEFAULT_CAREER_WORLD_CONFIG,
+  ledgerConservationErrors,
+  migrateCareerWorldSave,
+} from './career-world.js';
+export type {
+  CareerArchive,
+  CareerClub,
+  CareerContentClub,
+  CareerContentPlayer,
+  CareerContract,
+  CareerDivision,
+  CareerLeaderboardEntry,
+  CareerManager,
+  CareerNews,
+  CareerPlayer,
+  CareerPosition,
+  CareerSeasonHistory,
+  CareerWorld,
+  CareerWorldConfig,
+  CareerWorldContent,
+  CareerWorldSave,
+  LedgerEntry,
+  LedgerPosting,
+  LedgerType,
+  LegacyCareerWorldSave,
+  PlayerIdentitySource,
+} from './career-world.js';
