@@ -3,27 +3,6 @@
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp"
-    },
-    "upstash": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@upstash/mcp-server@latest",
-        "--email",
-        "${UPSTASH_EMAIL:-}",
-        "--api-key",
-        "${UPSTASH_API_KEY:-}"
-      ]
-    },
-    "upstash-redis": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/redis-mcp"],
-      "env": {
-        "UPSTASH_REDIS_REST_URL": "${UPSTASH_REDIS_REST_URL:-}",
-        "UPSTASH_REDIS_REST_TOKEN": "${UPSTASH_REDIS_REST_TOKEN:-}"
-      }
     }
   }
 }
