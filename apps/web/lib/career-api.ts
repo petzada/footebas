@@ -3,14 +3,20 @@ import {
   type Phase4View,
   type TransferKind,
 } from '@/lib/phase4-model';
+import { replayFromFeed } from '@/lib/match-replay-adapter';
+import type { MatchReplayInput } from '@/lib/match-replay-model';
 
 export type Screen =
   | 'home'
+  | 'inbox'
+  | 'calendar'
   | 'squad'
   | 'tactics'
   | 'table'
   | 'market'
   | 'club'
+  | 'finance'
+  | 'history'
   | 'competitions'
   | 'world';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
@@ -92,6 +98,7 @@ export interface MatchResultView {
   headline: string;
   events: readonly MatchUpdate[];
   actions: readonly MatchActionView[];
+  replay?: MatchReplayInput;
 }
 
 export interface CareerView {
@@ -114,6 +121,8 @@ export interface MatchUpdate {
   message: string;
   score: string;
   kind: 'kickoff' | 'chance' | 'goal' | 'card' | 'save' | 'full-time';
+  /** Team that owns the action; `save` belongs to the attacking side. */
+  side?: 'home' | 'away';
   decisionPoint: boolean;
   done: boolean;
 }
@@ -522,6 +531,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Samuel Lino acelera pela esquerda e cruza com perigo',
     score: '0 × 0',
     kind: 'chance',
+    side: 'home',
     decisionPoint: false,
     done: false,
   },
@@ -532,6 +542,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Rossi fecha o ângulo e salva o Flamengo',
     score: '0 × 0',
     kind: 'save',
+    side: 'away',
     decisionPoint: false,
     done: false,
   },
@@ -542,6 +553,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'GOL! Paquetá completa a jogada de Arrascaeta',
     score: '1 × 0',
     kind: 'goal',
+    side: 'home',
     decisionPoint: true,
     done: false,
   },
@@ -552,6 +564,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Palmeiras sobe a pressão pelo corredor central',
     score: '1 × 0',
     kind: 'chance',
+    side: 'away',
     decisionPoint: true,
     done: false,
   },
@@ -562,6 +575,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Léo Ortiz recebe amarelo ao parar o contra-ataque',
     score: '1 × 0',
     kind: 'card',
+    side: 'home',
     decisionPoint: true,
     done: false,
   },
@@ -572,6 +586,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Luiz Araújo acerta a trave em chute cruzado',
     score: '1 × 0',
     kind: 'chance',
+    side: 'home',
     decisionPoint: false,
     done: false,
   },
@@ -1208,11 +1223,13 @@ export class InMemoryCareerApi implements CareerApiPort {
 
   #commitResult() {
     const current = this.#require();
+    const events = timeline.map((event) => structuredClone(event));
     const result: MatchResultView = {
       score: '1 × 0',
       headline: 'Vitória com cara de time grande',
-      events: timeline.map((event) => structuredClone(event)),
+      events,
       actions: structuredClone(this.#matchActions),
+      replay: replayFromFeed(current, events, `match-${current.round + 1}`),
     };
     this.#career = {
       ...current,

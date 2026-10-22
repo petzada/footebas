@@ -46,8 +46,10 @@ const defaultCompetitionPort = createFakeCompetitionProductPort();
 
 export function CompetitionScreens({
   port = defaultCompetitionPort,
+  initialTab = 'pyramid',
 }: {
   port?: CompetitionProductPort;
+  initialTab?: 'pyramid' | 'calendar' | 'next';
 }) {
   const [model, setModel] = useState<CompetitionProductView>();
   const [error, setError] = useState('');
@@ -93,7 +95,7 @@ export function CompetitionScreens({
           em uma visão rápida.
         </p>
       </header>
-      <Tabs defaultValue="pyramid">
+      <Tabs defaultValue={initialTab}>
         <TabsList className="grid w-full grid-cols-3 sm:w-fit">
           <TabsTrigger value="pyramid">Pirâmide</TabsTrigger>
           <TabsTrigger value="calendar">Calendário</TabsTrigger>

@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-sans: 'Archivo Variable', sans-serif;
   --font-display: 'Rajdhani', sans-serif;
@@ -29,6 +31,28 @@
 
 :root {
   --radius: 0.65rem;
+  --background: oklch(0.97 0.012 105);
+  --foreground: oklch(0.2 0.03 155);
+  --card: oklch(0.995 0.005 105);
+  --card-foreground: oklch(0.2 0.03 155);
+  --popover: oklch(0.995 0.005 105);
+  --popover-foreground: oklch(0.2 0.03 155);
+  --primary: oklch(0.5 0.14 148);
+  --primary-foreground: oklch(0.98 0.01 105);
+  --secondary: oklch(0.92 0.025 150);
+  --secondary-foreground: oklch(0.24 0.035 155);
+  --muted: oklch(0.93 0.015 120);
+  --muted-foreground: oklch(0.45 0.03 150);
+  --accent: oklch(0.6 0.17 50);
+  --accent-foreground: oklch(0.99 0.01 105);
+  --destructive: oklch(0.55 0.21 25);
+  --border: oklch(0.86 0.02 140);
+  --input: oklch(0.88 0.02 140);
+  --ring: oklch(0.5 0.14 148);
+  --glow: oklch(0.85 0.08 145 / 0.45);
+}
+
+.dark {
   --background: oklch(0.14 0.025 155);
   --foreground: oklch(0.96 0.015 105);
   --card: oklch(0.18 0.03 155);
@@ -47,6 +71,7 @@
   --border: oklch(0.31 0.035 150);
   --input: oklch(0.27 0.035 150);
   --ring: oklch(0.72 0.17 145);
+  --glow: oklch(0.3 0.08 145 / 0.45);
 }
 
 * {
@@ -58,11 +83,7 @@ html {
 body {
   min-height: 100dvh;
   background:
-    radial-gradient(
-      circle at 50% -20%,
-      oklch(0.3 0.08 145 / 0.45),
-      transparent 42%
-    ),
+    radial-gradient(circle at 50% -20%, var(--glow), transparent 42%),
     var(--background);
   color: var(--foreground);
   font-family: 'Archivo Variable', sans-serif;

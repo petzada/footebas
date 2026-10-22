@@ -1,17 +1,20 @@
 # Estado de implementação
 
-Última atualização: 2026-07-21
+Última atualização: 2026-10-22
 
-| Fase                           | Estado       | Evidência                                       |
-| ------------------------------ | ------------ | ----------------------------------------------- |
-| 0 — Baseline reproduzível      | concluída    | `pnpm check` verde; build e smoke               |
-| 1 — Laboratório determinístico | concluída    | `pnpm test:phase1`: 10k partidas + 1k épocas    |
-| 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes  |
-| 3 — Elenco e matchday          | concluída    | matchday reproduzível e acessível; gates verdes |
-| 4 — Mundo vivo                 | concluída    | economia/carreira 25 épocas; API e gates verdes |
-| 5 — Pirâmide e calendário      | concluída    | engine canônico; gate de 2.000 épocas verde     |
-| 6 — Experiência e campo 2D     | em progresso | shell mobile, acessibilidade e timeline 2D      |
-| 7–9                            | pendente     | execução estritamente sequencial pelos gates    |
+| Fase                           | Estado    | Evidência                                        |
+| ------------------------------ | --------- | ------------------------------------------------ |
+| 0 — Baseline reproduzível      | concluída | `pnpm check` verde; build e smoke                |
+| 1 — Laboratório determinístico | concluída | `pnpm test:phase1`: 10k partidas + 1k épocas     |
+| 2 — Primeira carreira          | concluída | vertical HTTP/worker/web e `pnpm check` verdes   |
+| 3 — Elenco e matchday          | concluída | matchday reproduzível e acessível; gates verdes  |
+| 4 — Mundo vivo                 | concluída | economia/carreira 25 épocas; API e gates verdes  |
+| 5 — Pirâmide e calendário      | concluída | engine canônico; gate de 2.000 épocas verde      |
+| 6 — Experiência e campo 2D     | concluída | shell, PWA, replay 2D; testes e build web verdes |
+| 7–9                            | pendente  | execução estritamente sequencial pelos gates     |
+
+Hospedagem de produção: Cloudflare nativo (ADR 0005), Supabase para Postgres/Auth/Storage, domínio
+`footebas.com.br`.
 
 ## Decisões operacionais
 
@@ -84,3 +87,20 @@
 - Gate canônico: 2.000 épocas, 2.648.000 partidas, dez competições/época, zero falhas em 37,44 s.
 - Transições observadas: 16.000 promoções, 16.000 rebaixamentos e 20.000 classificações continentais.
 - `pnpm check`: formatter, typecheck, lint, 145 testes, builds (incluindo Next) e smoke verdes.
+
+## Gate da Fase 6
+
+- Shell mobile-first com barra inferior (4 atalhos + menu com todas as áreas) e enhancement desktop de três painéis.
+- Treze destinos alcançáveis: visão geral, caixa de entrada, calendário, elenco, táticas, mercado, classificação,
+  competições, clube, finanças, história e mundo, com `aria-current`, link de pular para o conteúdo e título por área.
+- Tokens de tema claro e escuro, escolha lembrada e aplicada antes da pintura; tipografia esportiva e ícones Phosphor.
+- PWA instalável: manifest com ícone, service worker que guarda só o shell estático e nunca API/comandos.
+- Estados offline e de reconexão anunciados sem bloquear a tela; outbox com reenvio idempotente após queda.
+- Anti-duplicação por comando: toque repetido no mesmo comando não reenvia; pular resultado nunca fica bloqueado.
+- Campo 2D render-only sobre a timeline oficial (mesmo formato de `postMatchReadModelSchema`), com momento,
+  xG-lite, notas, estatísticas derivadas da timeline, alternativa textual e respeito a movimento reduzido.
+- Resultado mostra veredito coerente com o placar (vitória, empate ou derrota) em vez de texto fixo.
+- Evidência: `vitest related` web (22 + 16 testes), `phase-six-platform` (3), contracts (13), api (13); lint e
+  typecheck de web/application/api; `next build` verde.
+- Pendente para o checklist externo: E2E Playwright em browsers reais, LCP em aparelho e matriz de celulares.
+- O web ainda usa o port local `InMemoryCareerApi`; o adapter HTTP para a API real é o próximo passo antes da Fase 7.

@@ -1,24 +1,17 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   ArrowsClockwise,
-  ChartBar,
   CheckCircle,
   ClipboardText,
-  Buildings,
-  CalendarDots,
-  GlobeHemisphereWest,
-  House,
   Lightning,
-  ListChecks,
   Pause,
   Play,
   ShieldWarning,
   SoccerBall,
   Sparkle,
-  Storefront,
   Strategy,
   Trophy,
   UserSwitch,
@@ -74,6 +67,9 @@ import {
   WorldScreen,
 } from '@/components/phase4-screens';
 import { CompetitionScreens } from '@/components/competition-screens';
+import { Phase6Shell, PwaRuntime } from '@/components/phase6-shell';
+import { MatchReplayViewer } from '@/components/match-replay-viewer';
+import { parseScore } from '@/lib/match-replay-adapter';
 
 type Stage = 'login' | 'coach' | 'club' | 'game' | 'match' | 'result';
 
@@ -90,19 +86,36 @@ export function CareerGame({
   const [matchUpdate, setMatchUpdate] = useState<MatchUpdate | null>(null);
   const [matchFeed, setMatchFeed] = useState<MatchUpdate[]>([]);
   const [error, setError] = useState('');
+  const [commandState, setCommandState] = useState<
+    'idle' | 'pending' | 'duplicate' | 'success'
+  >('idle');
+  // Blocks repeated taps of the same command while it is in flight; different
+  // commands (e.g. skipping during the narrated feed) are never blocked.
+  const inFlight = useRef(new Set<string>());
 
-  const attempt = async <T,>(action: () => Promise<T>) => {
+  const attempt = async <T,>(key: string, action: () => Promise<T>) => {
+    if (inFlight.current.has(key)) {
+      setCommandState('duplicate');
+      return undefined;
+    }
+    inFlight.current.add(key);
+    setCommandState('pending');
     try {
       setError('');
-      return await action();
+      const result = await action();
+      setCommandState('success');
+      return result;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Tente novamente.');
+      setCommandState('idle');
       return undefined;
+    } finally {
+      inFlight.current.delete(key);
     }
   };
 
   const beginNarratedMatch = () =>
-    attempt(async () => {
+    attempt('narrate', async () => {
       const first = await api.beginMatch();
       setMatchUpdate(first);
       setMatchFeed([first]);
@@ -110,7 +123,7 @@ export function CareerGame({
     });
 
   const nextEvent = async () => {
-    const next = await attempt(() => api.nextMatchEvent());
+    const next = await attempt('next', () => api.nextMatchEvent());
     if (!next) return;
     setMatchUpdate(next);
     setMatchFeed((current) =>
@@ -121,50 +134,53 @@ export function CareerGame({
   };
 
   const finishMatch = () =>
-    attempt(async () => {
+    attempt('finish', async () => {
       setCareer(await api.finishMatch());
       setStage('result');
     });
 
   const instantResult = () =>
-    attempt(async () => {
+    attempt('instant', async () => {
       setCareer(await api.instantResult());
       setStage('result');
     });
 
   if (!['game', 'match', 'result'].includes(stage)) {
     return (
-      <Onboarding
-        stage={stage}
-        email={email}
-        coach={coach}
-        error={error}
-        setEmail={setEmail}
-        setCoach={setCoach}
-        onLogin={() =>
-          attempt(async () => {
-            await api.login(email);
-            const saved = await api.getCareer();
-            if (saved) {
-              setCareer(saved);
+      <>
+        <PwaRuntime />
+        <Onboarding
+          stage={stage}
+          email={email}
+          coach={coach}
+          error={error}
+          setEmail={setEmail}
+          setCoach={setCoach}
+          onLogin={() =>
+            attempt('login', async () => {
+              await api.login(email);
+              const saved = await api.getCareer();
+              if (saved) {
+                setCareer(saved);
+                setStage('game');
+              } else setStage('coach');
+            })
+          }
+          onCoach={() =>
+            attempt('coach', async () => {
+              await api.createCareer({ coach });
+              setStage('club');
+            })
+          }
+          onClub={(club) =>
+            attempt('club', async () => {
+              await api.selectClub(club);
+              setCareer(await api.getCareer());
               setStage('game');
-            } else setStage('coach');
-          })
-        }
-        onCoach={() =>
-          attempt(async () => {
-            await api.createCareer({ coach });
-            setStage('club');
-          })
-        }
-        onClub={(club) =>
-          attempt(async () => {
-            await api.selectClub(club);
-            setCareer(await api.getCareer());
-            setStage('game');
-          })
-        }
-      />
+            })
+          }
+        />
+      </>
     );
   }
 
@@ -172,10 +188,14 @@ export function CareerGame({
 
   const shared = { career, error };
   return (
-    <div className="mx-auto min-h-dvh max-w-[92rem] pb-24 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:pb-0">
-      <Sidebar screen={screen} setScreen={setScreen} career={career} />
-      <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-        <Topbar career={career} />
+    <>
+      <PwaRuntime />
+      <Phase6Shell
+        screen={screen}
+        setScreen={setScreen}
+        career={career}
+        commandState={commandState}
+      >
         {error && <InlineError message={error} />}
         {stage === 'match' && matchUpdate ? (
           <Matchday
@@ -208,17 +228,21 @@ export function CareerGame({
           <Squad
             career={career}
             onMove={(id, role) =>
-              attempt(async () => setCareer(await api.setPlayerRole(id, role)))
+              attempt(`role:${id}`, async () =>
+                setCareer(await api.setPlayerRole(id, role)),
+              )
             }
             onAuto={(strategy) =>
-              attempt(async () => setCareer(await api.autoPick(strategy)))
+              attempt('auto-pick', async () =>
+                setCareer(await api.autoPick(strategy)),
+              )
             }
           />
         ) : screen === 'tactics' ? (
           <Tactics
             career={career}
             onSave={(formation, tactics) =>
-              attempt(async () => {
+              attempt('tactics', async () => {
                 setCareer(await api.setTactics({ formation, tactics }));
                 setScreen('home');
               })
@@ -239,20 +263,52 @@ export function CareerGame({
             api={api}
             onCareerChange={setCareer}
             reportError={setError}
+            key={screen}
+            initialTab="board"
           />
+        ) : screen === 'finance' ? (
+          <ClubScreen
+            career={career}
+            api={api}
+            onCareerChange={setCareer}
+            reportError={setError}
+            key={screen}
+            initialTab="finance"
+          />
+        ) : screen === 'calendar' ? (
+          <CompetitionScreens key={screen} initialTab="calendar" />
         ) : screen === 'competitions' ? (
-          <CompetitionScreens />
+          <CompetitionScreens key={screen} initialTab="pyramid" />
+        ) : screen === 'inbox' ? (
+          <WorldScreen
+            career={career}
+            api={api}
+            onCareerChange={setCareer}
+            reportError={setError}
+            key={screen}
+            initialTab="news"
+          />
+        ) : screen === 'history' ? (
+          <WorldScreen
+            career={career}
+            api={api}
+            onCareerChange={setCareer}
+            reportError={setError}
+            key={screen}
+            initialTab="history"
+          />
         ) : (
           <WorldScreen
             career={career}
             api={api}
             onCareerChange={setCareer}
             reportError={setError}
+            key={screen}
+            initialTab="ranking"
           />
         )}
-      </main>
-      {stage === 'game' && <BottomNav screen={screen} setScreen={setScreen} />}
-    </div>
+      </Phase6Shell>
+    </>
   );
 }
 
@@ -411,112 +467,6 @@ function Onboarding(props: {
         </Card>
       </div>
     </main>
-  );
-}
-
-const navItems = [
-  ['home', 'Início', House],
-  ['squad', 'Elenco', ListChecks],
-  ['tactics', 'Táticas', Strategy],
-  ['table', 'Tabela', ChartBar],
-  ['market', 'Mercado', Storefront],
-  ['club', 'Clube', Buildings],
-  ['competitions', 'Competições', CalendarDots],
-  ['world', 'Mundo', GlobeHemisphereWest],
-] as const;
-
-const mobileNavItems = [
-  ['home', 'Início', House],
-  ['squad', 'Elenco', ListChecks],
-  ['market', 'Mercado', Storefront],
-  ['club', 'Clube', Buildings],
-  ['competitions', 'Comp.', CalendarDots],
-  ['world', 'Mundo', GlobeHemisphereWest],
-] as const;
-
-function Topbar({ career }: { career: CareerView }) {
-  return (
-    <header className="mb-5 flex items-end justify-between gap-3">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[.18em] text-muted-foreground">
-          Rodada {career.round} · Série A
-        </p>
-        <h1 className="font-display text-3xl font-bold uppercase sm:text-4xl">
-          Olá, {career.coach}
-        </h1>
-      </div>
-      <Badge variant="outline">{career.club}</Badge>
-    </header>
-  );
-}
-
-function Sidebar({
-  screen,
-  setScreen,
-  career,
-}: {
-  screen: Screen;
-  setScreen(value: Screen): void;
-  career: CareerView;
-}) {
-  return (
-    <aside className="hidden min-h-dvh border-r bg-card/60 p-5 lg:flex lg:flex-col">
-      <Brand />
-      <nav aria-label="Principal" className="mt-10 flex flex-col gap-2">
-        {navItems.map(([id, label, Icon]) => (
-          <Button
-            key={id}
-            variant={screen === id ? 'secondary' : 'ghost'}
-            className="min-h-11 justify-start"
-            onClick={() => setScreen(id)}
-          >
-            <Icon data-icon="inline-start" />
-            {label}
-          </Button>
-        ))}
-      </nav>
-      <div className="mt-auto">
-        <p className="text-xs text-muted-foreground">Próximo jogo</p>
-        <p className="mt-1 font-display text-lg font-bold uppercase">
-          vs. {career.opponent.club}
-        </p>
-      </div>
-    </aside>
-  );
-}
-
-function BottomNav({
-  screen,
-  setScreen,
-}: {
-  screen: Screen;
-  setScreen(value: Screen): void;
-}) {
-  return (
-    <nav
-      aria-label="Navegação inferior"
-      className="fixed inset-x-0 bottom-0 grid grid-cols-6 border-t bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden"
-    >
-      {mobileNavItems.map(([id, label, Icon]) => (
-        <button
-          key={id}
-          aria-current={screen === id ? 'page' : undefined}
-          className={cn(
-            'flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[.68rem] font-bold uppercase tracking-wide',
-            screen === id
-              ? 'bg-secondary text-primary'
-              : 'text-muted-foreground',
-          )}
-          onClick={() => setScreen(id)}
-        >
-          <Icon
-            className="size-5"
-            weight={screen === id ? 'fill' : 'regular'}
-          />
-          {label}
-        </button>
-      ))}
-    </nav>
   );
 }
 
@@ -1504,27 +1454,43 @@ function Result({
   onContinue(): void;
 }) {
   const result = career.lastResult;
+  if (!result)
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Button className="min-h-12 w-full" onClick={onContinue}>
+          Preparar próxima rodada
+          <ArrowRight data-icon="inline-end" />
+        </Button>
+      </div>
+    );
+  const score = parseScore(result.score);
+  const outcome =
+    score.home > score.away
+      ? { verdict: `${career.club} venceu`, summary: '+3 pontos' }
+      : score.home === score.away
+        ? { verdict: 'Empate', summary: '+1 ponto' }
+        : { verdict: `${career.club} perdeu`, summary: 'sem pontos' };
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto flex max-w-4xl flex-col gap-4">
       <Card>
         <CardHeader className="items-center text-center">
           <Trophy className="size-10 text-accent" weight="fill" />
           <Badge>Fim de jogo</Badge>
           <CardTitle className="font-display text-6xl uppercase">
-            {result?.score ?? '1 × 0'}
+            {result.score}
           </CardTitle>
-          <CardDescription>{career.club} venceu a rodada</CardDescription>
+          <CardDescription>{outcome.verdict}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-center">
           <div>
             <h2 className="font-display text-2xl font-bold uppercase">
-              {result?.headline ?? 'Vitória confirmada'}
+              {result.headline}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              +3 pontos · moral em alta · próxima rodada liberada
+              {outcome.summary} · próxima rodada liberada
             </p>
           </div>
-          {result && result.actions.length > 0 && (
+          {result.actions.length > 0 && (
             <div className="rounded-md bg-muted p-3 text-left">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 Decisões registradas
@@ -1546,6 +1512,7 @@ function Result({
           </Button>
         </CardFooter>
       </Card>
+      {result.replay && <MatchReplayViewer match={result.replay} />}
     </div>
   );
 }

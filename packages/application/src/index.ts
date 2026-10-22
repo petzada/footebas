@@ -6,3 +6,4 @@ export * from './phase-four-service.js';
 export * from './phase-five.js';
 export * from './phase-five-engine-adapter.js';
 export * from './phase-five-fixture.js';
+export * from './phase-six-platform.js';

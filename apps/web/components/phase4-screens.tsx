@@ -47,6 +47,8 @@ interface Phase4ScreenProps {
   api: CareerApiPort;
   onCareerChange(value: CareerView): void;
   reportError(value: string): void;
+  /** Tab opened first when the shell routes straight to a sub-area. */
+  initialTab?: string;
 }
 
 const money = (value: number) =>
@@ -581,7 +583,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
         description="Caixa, patrimônio, base e confiança se encontram aqui — cada ação deixa uma origem rastreável."
       />
       <LiveNotice>{notice}</LiveNotice>
-      <Tabs defaultValue="finance">
+      <Tabs defaultValue={props.initialTab ?? 'finance'}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="finance">Finanças</TabsTrigger>
           <TabsTrigger value="stadium">Estádio</TabsTrigger>
@@ -947,7 +949,7 @@ export function WorldScreen(props: Phase4ScreenProps) {
         title="Mundo"
         description="Notícias, conquistas, recordes e rankings mostram o universo avançando sem esconder o estado técnico do save."
       />
-      <Tabs defaultValue="news">
+      <Tabs defaultValue={props.initialTab ?? 'news'}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="news">Notícias</TabsTrigger>
           <TabsTrigger value="history">História</TabsTrigger>

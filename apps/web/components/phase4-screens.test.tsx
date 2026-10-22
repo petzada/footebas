@@ -40,7 +40,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
     await onboard();
     navigate(/^mercado$/i);
     expect(
-      await screen.findByRole('heading', { name: /^mercado$/i }),
+      await screen.findByRole('heading', { level: 2, name: /^mercado$/i }),
     ).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/^nome$/i), {
       target: { value: 'Scarpa' },
@@ -104,7 +104,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('oferece feedback inválido acessível e preserva o ledger', async () => {
     await onboard();
-    navigate(/^clube$/i);
+    navigate(/^finanças$/i);
     expect(await screen.findByText(/ledger imutável/i)).toBeTruthy();
     expect(screen.getByText('Bilheteria · Flamengo × Bahia')).toBeTruthy();
     expect(screen.getByText('Folha salarial · Rodada 7')).toBeTruthy();
@@ -181,7 +181,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
   it('expõe notícias, rankings segmentados e estado de migração por teclado', async () => {
     await onboard();
     navigate(/^mundo$/i);
-    expect(await screen.findByRole('tablist')).toBeTruthy();
+    expect((await screen.findAllByRole('tablist')).length).toBeGreaterThan(0);
     await selectTab(/^ranking$/i);
     expect(screen.getByText(/referência nacional/i)).toBeTruthy();
     expect(screen.getByRole('tab', { name: /ascensão/i })).toBeTruthy();

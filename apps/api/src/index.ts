@@ -151,10 +151,22 @@ export async function buildApi(
     },
     async (request, reply) => {
       const command = commandSchema.parse(request.body);
+      const header = request.headers['idempotency-key'];
+      if (
+        header !== undefined &&
+        (Array.isArray(header) || header !== command.idempotencyKey)
+      )
+        throw new ApplicationError(
+          'VALIDATION_ERROR',
+          'idempotency-key header must match the versioned command body',
+        );
       const result = commandAcceptedSchema.parse(
         await deps.application.execute(bearer(request), command),
       );
-      return reply.code(202).send(result);
+      return reply
+        .header('idempotency-key', command.idempotencyKey)
+        .code(202)
+        .send(result);
     },
   );
 
