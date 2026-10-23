@@ -21,10 +21,19 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import type { CareerView, Screen } from '@/lib/career-api';
 import { countryName, personalityLabel } from '@/lib/coach-profile';
+import { ZoneBand, ZoneLegend } from '@/components/competition-tables';
 import type {
   CompetitionProductPort,
   CompetitionProductView,
+  TableGroupView,
+  TableRowView,
+  TableZoneKind,
 } from '@/lib/competition-product';
+import {
+  orderedCompetitions,
+  shortClubName,
+  zoneOf,
+} from '@/lib/competition-tables';
 import type { InboxPort } from '@/lib/inbox-product';
 import { cn } from '@/lib/utils';
 
@@ -85,7 +94,11 @@ export function CentralScreen({
         <ClubCard career={career} />
       </div>
       <div className="order-3 lg:order-2">
-        <StandingsSummary career={career} onOpen={() => navigate('table')} />
+        <StandingsSummary
+          career={career}
+          port={calendar}
+          onOpen={() => navigate('table')}
+        />
       </div>
       <div className="order-4">
         <Upcoming
@@ -508,25 +521,8 @@ function SideCard({
   );
 }
 
-/**
- * Short club name for the narrow table: "Atlético Mineiro" → "Atlético M.",
- * "Red Bull Bragantino" → "RB Bragantino". Names that fit stay whole.
- */
-export function shortClubName(name: string, max = 13): string {
-  if (name.length <= max) return name;
-  const words = name.split(/\s+/).filter(Boolean);
-  if (words.length < 2) return `${name.slice(0, max - 1)}.`;
-  const [first, ...rest] = words as [string, ...string[]];
-  const candidate =
-    words.length >= 3
-      ? `${words
-          .slice(0, -1)
-          .map((word) => word[0]!.toUpperCase())
-          .join('')} ${words.at(-1)}`
-      : `${first} ${rest.map((word) => `${word[0]!.toUpperCase()}.`).join(' ')}`;
-  if (candidate.length <= max) return candidate;
-  return `${candidate.slice(0, max - 1).trimEnd()}.`;
-}
+// Shared with the Classificação (groups); kept exported from here.
+export { shortClubName };
 
 /** Rows around the user's club (five), or the top five without a position. */
 export function standingsWindow<T extends { position: number; club: string }>(
@@ -548,15 +544,67 @@ const cell = 'py-1.5 pl-1.5 text-right whitespace-nowrap tabular-nums';
 const head = 'pb-1 pl-1.5 text-right font-bold whitespace-nowrap';
 const wide = 'hidden min-[414px]:table-cell';
 
+/**
+ * Zone bands of the Central window (D7): the tables read model names the
+ * group the club plays in; its zones colour the five rows. Absent (older
+ * server, demo without the club) the table stays as it is.
+ */
+function useFocusZones(
+  port: CompetitionProductPort | undefined,
+  club: string,
+): TableGroupView | undefined {
+  const [group, setGroup] = useState<TableGroupView | undefined>();
+  useEffect(() => {
+    if (!port?.tables) return;
+    let active = true;
+    port
+      .tables()
+      .then((view) => {
+        if (!active) return;
+        const tables = orderedCompetitions(view);
+        const found = tables
+          .flatMap((table) =>
+            table.stages
+              .filter(({ kind }) => kind === 'league')
+              .flatMap(({ groups }) => groups),
+          )
+          .find((candidate) =>
+            candidate.rows.some((row) => row.club.name === club),
+          );
+        setGroup(found);
+      })
+      .catch(() => active && setGroup(undefined));
+    return () => {
+      active = false;
+    };
+  }, [port, club]);
+  return group;
+}
+
 function StandingsSummary({
   career,
+  port,
   onOpen,
 }: {
   career: CareerView;
+  port: CompetitionProductPort | undefined;
   onOpen(): void;
 }) {
   const shown = standingsWindow(career.standings, career.club);
   const hasRecord = shown.some((row) => row.won !== undefined);
+  const zones = useFocusZones(port, career.club);
+  const zoneFor = (club: string, position: number) => {
+    if (!zones) return undefined;
+    // The career's own position decides the band; a row flagged by the
+    // server (`zone`) only fills in when no band covers that position.
+    return (
+      zoneOf(zones, { position } as TableRowView) ??
+      zones.rows.find((item) => item.club.name === club)?.zone
+    );
+  };
+  const shownZones = shown
+    .map((row) => zoneFor(row.club, row.position))
+    .filter((zone): zone is TableZoneKind => zone !== undefined);
   return (
     <SideCard
       id="central-tabela"
@@ -618,7 +666,10 @@ function StandingsSummary({
                   className={cn('border-t-2', isMine && 'bg-bulb/50')}
                   {...(isMine ? { 'aria-current': 'true' as const } : {})}
                 >
-                  <td className="py-1.5 pr-1.5 pl-1">{row.position}</td>
+                  <td className="relative py-1.5 pr-1.5 pl-2.5">
+                    <ZoneBand zone={zoneFor(row.club, row.position)} />
+                    {row.position}
+                  </td>
                   <td className="w-full max-w-0 py-1.5">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <ClubEmblem name={row.club} size={16} decorative />
@@ -655,6 +706,9 @@ function StandingsSummary({
             })}
           </tbody>
         </table>
+      )}
+      {zones && shownZones.length > 0 && (
+        <ZoneLegend group={zones} only={shownZones} />
       )}
     </SideCard>
   );

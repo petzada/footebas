@@ -54,6 +54,14 @@ complementa `docs/08-mvp-fonte-de-verdade.md`; em conflito sobre telas, vale est
   sócio-torcedor, receitas e despesas. **Finanças só aqui**: a aba antiga da tela Estádio foi removida (revisão
   mobile D5).
 - **Temporada:** só leitura, gráficos e tabelas (artilharia, notas, posição por rodada, campeões).
+- **Caixa de entrada:** tela própria (revisão mobile D6): decisões e mensagens (pendentes primeiro, lixeira só no
+  que já foi decidido) e, abaixo, as notícias da carreira; abrir a tela marca as mensagens como lidas e apaga o
+  contador do menu. A Central continua com o resumo (4 envelopes + "Ver todas").
+- **Mundo / Histórico:** prestígio e memória da carreira (temporadas, campeões, recordes, ídolos); sem Notícias,
+  Ranking ou Save repetidos (D6).
+- **Classificação:** cada competição no seu formato (revisão mobile D7): pontos corridos e estaduais com faixas de
+  zona, Copa do Brasil como confrontos por fase (ida, volta, agregado, desempate), Libertadores com pré, grupos e
+  mata-mata; fases não sorteadas "a definir"; campeão com a data. Seletores de competição e fase em abas roláveis.
 - **Ranking:** tela própria.
 - **Partida:** mantém feed narrado, pausas táticas e campo 2D do replay.
 

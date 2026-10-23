@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CompetitionScreens } from '@/components/competition-screens';
 import { createFakeCompetitionProductPort } from '@/lib/competition-product';
 
@@ -14,6 +14,21 @@ describe('competition and calendar screens', () => {
     expect(screen.getByRole('heading', { name: 'Série C' })).toBeTruthy();
     expect(screen.getByText('Pré-Libertadores')).toBeTruthy();
     expect(screen.getByText('Turno único · São Paulo')).toBeTruthy();
+  });
+
+  it('"Ver tabela" leva à Classificação da competição do card (D7)', async () => {
+    const onOpenTable = vi.fn();
+    render(
+      <CompetitionScreens
+        port={createFakeCompetitionProductPort()}
+        onOpenTable={onOpenTable}
+      />,
+    );
+    await screen.findByRole('heading', { name: 'Competições' });
+    fireEvent.click(
+      screen.getByRole('button', { name: /ver tabela: copa do brasil/i }),
+    );
+    expect(onOpenTable).toHaveBeenCalledWith('copa_brasil');
   });
 
   it('exposes calendar validation and next-season transitions through keyboard tabs', async () => {

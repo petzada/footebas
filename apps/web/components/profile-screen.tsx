@@ -1,7 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle, SealCheck, SignOut } from '@phosphor-icons/react';
+import {
+  CaretDown,
+  CheckCircle,
+  SealCheck,
+  SignOut,
+} from '@phosphor-icons/react';
 import {
   LICENSE_BENEFITS,
   LicenseCheckout,
@@ -19,6 +24,7 @@ import {
   type ProfileView,
 } from '@/lib/account-product';
 import type { CareerList } from '@/lib/career-api';
+import type { Phase4View } from '@/lib/phase4-model';
 import { useSound } from '@/lib/retro/use-sound';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +47,7 @@ export function ProfileScreen({
   player,
   loadCareers,
   onSignOut,
+  saveArchive,
   pollMs = 4000,
   now = () => new Date(),
 }: {
@@ -48,6 +55,8 @@ export function ProfileScreen({
   player: PlayerIdentity;
   loadCareers?: () => Promise<CareerList>;
   onSignOut?: (() => void) | undefined;
+  /** Save version, migration and checksum of the open career (D6). */
+  saveArchive?: SaveArchive | undefined;
   /** Order polling interval while a PIX is pending. */
   pollMs?: number;
   now?: () => Date;
@@ -237,8 +246,51 @@ export function ProfileScreen({
         ) : (
           <LicensePitch onStart={() => setCheckingOut(true)} />
         )}
+        {saveArchive && <SaveDetails archive={saveArchive} />}
       </div>
     </div>
+  );
+}
+
+type SaveArchive = Phase4View['archive'];
+
+/**
+ * Technical state of the open save (was the Save tab of Mundo, D6): closed
+ * by default, the client only displays what the server reports.
+ */
+function SaveDetails({ archive }: { archive: SaveArchive }) {
+  const rows: [string, string][] = [
+    ['Versão do save', archive.saveVersion],
+    ['Migração', archive.migrationStatus],
+    ['Arquivo', archive.archiveStatus],
+    ['Última compactação', archive.lastCompaction],
+    ['Checksum', archive.checksum],
+  ];
+  return (
+    <details className="panel group p-3" data-testid="perfil-save-detalhes">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-pixel text-[.55rem]">
+        Detalhes técnicos do save
+        <CaretDown
+          aria-hidden="true"
+          className="size-4 transition-transform group-open:rotate-180"
+        />
+      </summary>
+      <dl className="mt-2 grid gap-2 text-sm">
+        {rows.map(([label, value]) => (
+          <div
+            key={label}
+            className="flex flex-wrap justify-between gap-x-3 border-t-2 border-ink/20 pt-2"
+          >
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="font-pixel text-[.5rem] break-all">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-muted-foreground">
+        O cliente exibe este estado, mas não escreve no save. Migrações são
+        feitas pelo servidor.
+      </p>
+    </details>
   );
 }
 

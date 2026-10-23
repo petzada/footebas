@@ -97,10 +97,30 @@ function licensingDemo(account: AccountPort, api: CareerApiPort): AccountPort {
 }
 
 /**
+ * Offline demo: the inbox fake keeps its own messages, but the badge and the
+ * Notícias come from `career.world.news`; reading or deleting through the
+ * inbox port must reach the in-memory career too, like the server does.
+ */
+function inboxDemo(inbox: InboxPort, api: CareerApiPort): InboxPort {
+  if (!(api instanceof InMemoryCareerApi)) return inbox;
+  return {
+    ...inbox,
+    async markRead(messageIds) {
+      api.markNewsRead(messageIds);
+      return inbox.markRead(messageIds);
+    },
+    async remove(messageId) {
+      api.removeNews(messageId);
+      return inbox.remove(messageId);
+    },
+  };
+}
+
+/**
  * Over HTTP every port talks to the authoritative server; the in-memory
  * runtime (offline demo, tests) gets deterministic fakes. One set per
- * runtime: the Central and the Notícias/Histórico/Ranking/Save screens read
- * the same inbox, season and ranking (and share the ranking cache).
+ * runtime: the Central and the Caixa de entrada/Histórico/Ranking screens
+ * read the same inbox, season and ranking (and share the ranking cache).
  */
 export function productPortsFor(api: CareerApiPort): ProductPorts {
   const known = portsByApi.get(api);
@@ -115,7 +135,7 @@ export function productPortsFor(api: CareerApiPort): ProductPorts {
         }
       : {
           season: createFakeSeasonPort(),
-          inbox: createFakeInboxPort(),
+          inbox: inboxDemo(createFakeInboxPort(), api),
           ranking: createFakeRankingPort(),
           account: licensingDemo(createFakeAccountPort(), api),
         };

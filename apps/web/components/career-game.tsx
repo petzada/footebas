@@ -54,8 +54,9 @@ import type { AuthPort, AuthUser } from '@/lib/auth';
 import { SessionExpiredError } from '@/lib/http-career-api';
 import { Brand } from '@/components/brand';
 import { AuthPending, SignInScreen } from '@/components/sign-in-screen';
-import { cn } from '@/lib/utils';
 import { ClubScreen, WorldScreen } from '@/components/phase4-screens';
+import { CompetitionTables } from '@/components/competition-tables';
+import { InboxScreen } from '@/components/inbox-screen';
 import { SquadScreen } from '@/components/squad-screen';
 import { TACTIC_LABEL } from '@/lib/management-model';
 import { MarketScreen } from '@/components/market-screen';
@@ -202,6 +203,8 @@ function CareerFlow({
   const [products] = useState(() => productPortsFor(api));
   const [stage, setStage] = useState<Stage>('login');
   const [screen, setScreen] = useState<Screen>('central');
+  // Competition the Classificação opens on (from a "Ver tabela" button).
+  const [tableFocus, setTableFocus] = useState<string | undefined>();
   const [limitNotice, setLimitNotice] = useState('');
   // Career-slot paywall (free save taken, or a career locked by a refund).
   const [paywall, setPaywall] = useState<CareerPaywallReason | null>(null);
@@ -671,7 +674,11 @@ function CareerFlow({
             initialTab={screen === 'tactics' ? 'tactics' : 'board'}
           />
         ) : screen === 'table' ? (
-          <Standings career={career} />
+          <CompetitionTables
+            career={career}
+            port={competitionPort ?? demoCompetitionPort}
+            initialCompetitionId={tableFocus}
+          />
         ) : screen === 'market' ? (
           <MarketScreen
             career={career}
@@ -689,6 +696,7 @@ function CareerFlow({
             player={player}
             loadCareers={listCareers}
             onSignOut={onSignOut}
+            saveArchive={career.world.archive}
           />
         ) : screen === 'office' || screen === 'finance' ? (
           <OfficeScreen
@@ -718,16 +726,20 @@ function CareerFlow({
           <CompetitionScreens
             key={screen}
             initialTab="pyramid"
+            onOpenTable={(competitionId) => {
+              setTableFocus(competitionId);
+              changeScreen('table');
+            }}
             {...(competitionPort ? { port: competitionPort } : {})}
           />
         ) : screen === 'inbox' ? (
-          <WorldScreen
+          <InboxScreen
             career={career}
             api={api}
+            port={products.inbox}
+            navigate={changeScreen}
             onCareerChange={setCareer}
             reportError={setError}
-            key={screen}
-            initialTab="news"
           />
         ) : (
           // history
@@ -737,7 +749,6 @@ function CareerFlow({
             onCareerChange={setCareer}
             reportError={setError}
             key={screen}
-            initialTab="history"
           />
         )}
       </Phase6Shell>
@@ -1533,117 +1544,5 @@ function Result({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-/**
- * Classificação: teletext table with the record when the read model has
- * it (V/E/D from 414px, SG always), the coach's club highlighted. Cup and
- * group formats live in the competition screens; this is the league.
- */
-function Standings({ career }: { career: CareerView }) {
-  const rows = career.standings
-    .slice()
-    .sort((a, b) => a.position - b.position || b.points - a.points);
-  const hasRecord = rows.some((row) => row.won !== undefined);
-  const cell = 'py-2 pl-1.5 text-right whitespace-nowrap tabular-nums';
-  const head = 'pb-1.5 pl-1.5 text-right font-bold whitespace-nowrap';
-  const wide = 'hidden min-[414px]:table-cell';
-  return (
-    <section aria-labelledby="classificacao-titulo" className="panel p-4">
-      <h2 id="classificacao-titulo" className="font-pixel text-[.65rem]">
-        Classificação
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {career.division ?? 'Liga'} · rodada {career.round}
-      </p>
-      {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          A tabela aparece depois da primeira rodada.
-        </p>
-      ) : (
-        <table className="teletext mt-3 w-full text-[.5rem] sm:text-[.6rem]">
-          <caption className="sr-only">
-            Classificação completa
-            {career.division ? ` · ${career.division}` : ''}
-          </caption>
-          <thead>
-            <tr className="bg-board text-left text-bulb">
-              <th scope="col" className="pb-1.5 pl-1 font-bold">
-                #
-              </th>
-              <th scope="col" className="w-full max-w-0 pb-1.5 font-bold">
-                Clube
-              </th>
-              <th scope="col" className={head}>
-                J
-              </th>
-              {hasRecord && (
-                <>
-                  <th scope="col" className={cn(head, wide)}>
-                    V
-                  </th>
-                  <th scope="col" className={cn(head, wide)}>
-                    E
-                  </th>
-                  <th scope="col" className={cn(head, wide)}>
-                    D
-                  </th>
-                  <th scope="col" className={head}>
-                    SG
-                  </th>
-                </>
-              )}
-              <th scope="col" className={cn(head, 'pr-1')}>
-                Pts
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => {
-              const isMine = row.club === career.club;
-              const diff = row.goalDifference ?? 0;
-              return (
-                <tr
-                  key={row.club}
-                  className={cn('border-t-2', isMine && 'bg-bulb/50')}
-                  {...(isMine ? { 'aria-current': 'true' as const } : {})}
-                >
-                  <td className="py-2 pr-1.5 pl-1">
-                    {row.position || index + 1}
-                  </td>
-                  <td className="w-full max-w-0 py-2">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <ClubEmblem name={row.club} size={18} decorative />
-                      <span
-                        className={cn(
-                          'truncate',
-                          isMine && 'font-bold text-primary',
-                        )}
-                        title={row.club}
-                      >
-                        {row.club}
-                      </span>
-                    </span>
-                  </td>
-                  <td className={cell}>{row.played}</td>
-                  {hasRecord && (
-                    <>
-                      <td className={cn(cell, wide)}>{row.won ?? 0}</td>
-                      <td className={cn(cell, wide)}>{row.drawn ?? 0}</td>
-                      <td className={cn(cell, wide)}>{row.lost ?? 0}</td>
-                      <td className={cell}>
-                        {diff > 0 ? `+${String(diff)}` : diff}
-                      </td>
-                    </>
-                  )}
-                  <td className={cn(cell, 'pr-1 font-bold')}>{row.points}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-    </section>
   );
 }

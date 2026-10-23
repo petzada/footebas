@@ -6,8 +6,6 @@ import {
   Binoculars,
   Buildings,
   CheckCircle,
-  ShieldCheck,
-  Trash,
   Trophy,
 } from '@phosphor-icons/react';
 import { ScreenSkeleton } from '@/components/retro/skeleton';
@@ -33,9 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RankingScreen } from '@/components/ranking-screen';
 import type { CareerApiPort, CareerView } from '@/lib/career-api';
-import { formatGameDate } from '@/lib/inbox-product';
 import type { MarketPlayerView, TransferKind } from '@/lib/phase4-model';
 import { productPortsFor, type ProductPorts } from '@/lib/runtime-api';
 import { type SeasonPort, worldHistoryFromSeason } from '@/lib/season-product';
@@ -886,13 +882,13 @@ export function ClubScreen(props: Phase4ScreenProps) {
 }
 
 /** Ports the Mundo screen reads besides the career (shared with the Central). */
-export type WorldScreenPorts = Pick<ProductPorts, 'season' | 'ranking'>;
+export type WorldScreenPorts = Pick<ProductPorts, 'season'>;
 
 /**
- * Mundo (Caixa de entrada → "Ver todas", Histórico): every tab reads the
- * same persisted data the rest of the game uses. Notícias lists the inbox
- * the Central shows (plus career milestones), Histórico the season read
- * model, Ranking the live server boards and Save the stored careers.
+ * Mundo / Histórico (docs/design revisão mobile, D6): the career's memory.
+ * Prestige of the coach and the season read model (temporadas, campeões,
+ * recordes, ídolos). The inbox is its own screen, the Ranking keeps its
+ * own screen and the saved careers live in Perfil: nothing is repeated here.
  */
 export function WorldScreen(
   props: Phase4ScreenProps & { ports?: WorldScreenPorts },
@@ -904,136 +900,31 @@ export function WorldScreen(
       <SectionHeading
         eyebrow="Memória da carreira"
         title="Mundo"
-        description="Notícias, conquistas, recordes e rankings mostram o universo avançando sem esconder o estado técnico do save."
+        description="Prestígio, temporadas, campeões, recordes e ídolos: o universo avançando com a sua carreira."
       />
-      <Tabs defaultValue={props.initialTab ?? 'news'}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="news">Notícias</TabsTrigger>
-          <TabsTrigger value="history">História</TabsTrigger>
-          <TabsTrigger value="ranking">Ranking</TabsTrigger>
-          <TabsTrigger value="save">Save</TabsTrigger>
-        </TabsList>
-        <TabsContent value="news" className="mt-4">
-          <NewsList
-            news={world.news}
-            onDelete={async (id) => {
-              try {
-                await productPortsFor(props.api).inbox.remove(id);
-                const next = await props.api.getCareer();
-                if (next) props.onCareerChange(next);
-              } catch (caught) {
-                props.reportError(
-                  caught instanceof Error
-                    ? caught.message
-                    : 'Não foi possível excluir a mensagem.',
-                );
-              }
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="history" className="mt-4">
-          <HistoryTab base={world.history} port={ports.season} />
-        </TabsContent>
-        <TabsContent value="ranking" className="mt-4 flex flex-col gap-4">
-          <Card className="scoreboard">
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <Badge>Prestígio</Badge>
-                  <CardTitle className="font-display text-base uppercase">
-                    {world.prestige.points.toLocaleString('pt-BR')}
-                  </CardTitle>
-                  <CardDescription>{world.prestige.level}</CardDescription>
-                </div>
-                <Trophy className="size-10 text-accent" weight="fill" />
+      <div className="grid gap-4">
+        <Card className="scoreboard">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Badge>Prestígio</Badge>
+                <CardTitle className="font-display text-base uppercase">
+                  {world.prestige.points.toLocaleString('pt-BR')}
+                </CardTitle>
+                <CardDescription>{world.prestige.level}</CardDescription>
               </div>
-            </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-2 text-center">
-              <Metric label="Títulos" value={String(world.prestige.titles)} />
-              <Metric
-                label="Acessos"
-                value={String(world.prestige.promotions)}
-              />
-              <Metric
-                label="Temporadas"
-                value={String(world.prestige.seasons)}
-              />
-            </CardContent>
-          </Card>
-          {/* Same live boards as the Ranking screen (GET /v1/rankings). */}
-          <RankingScreen port={ports.ranking} />
-        </TabsContent>
-        <TabsContent value="save" className="mt-4">
-          <SaveTab career={props.career} api={props.api} />
-        </TabsContent>
-      </Tabs>
+              <Trophy className="size-10 text-accent" weight="fill" />
+            </div>
+          </CardHeader>
+          <CardContent className="grid grid-cols-3 gap-2 text-center">
+            <Metric label="Títulos" value={String(world.prestige.titles)} />
+            <Metric label="Acessos" value={String(world.prestige.promotions)} />
+            <Metric label="Temporadas" value={String(world.prestige.seasons)} />
+          </CardContent>
+        </Card>
+        <HistoryTab base={world.history} port={ports.season} />
+      </div>
     </div>
-  );
-}
-
-function NewsList({
-  news,
-  onDelete,
-}: {
-  news: CareerView['world']['news'];
-  onDelete?: (id: string) => Promise<void>;
-}) {
-  const [removing, setRemoving] = useState<string | null>(null);
-  if (news.length === 0)
-    return (
-      <p className="panel p-4 text-sm text-muted-foreground">
-        Nenhuma mensagem ainda. Relatórios de jogo, recados da diretoria e
-        propostas chegam aqui assim que a rodada andar.
-      </p>
-    );
-  return (
-    <ul aria-label="Todas as mensagens" className="grid gap-3 lg:grid-cols-3">
-      {news.map((item) => (
-        <li key={item.id}>
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="w-fit">
-                  {item.tag}
-                </Badge>
-                {item.date && (
-                  <span className="font-pixel text-[.45rem] text-muted-foreground">
-                    {formatGameDate(item.date)}
-                  </span>
-                )}
-                {item.pending && (
-                  <Badge className="w-fit">Decisão pendente</Badge>
-                )}
-                {item.deletable && onDelete && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="ml-auto size-8"
-                    aria-label={`Excluir: ${item.headline}`}
-                    disabled={removing !== null}
-                    onClick={() => {
-                      setRemoving(item.id);
-                      void onDelete(item.id).finally(() => setRemoving(null));
-                    }}
-                  >
-                    <Trash aria-hidden="true" />
-                  </Button>
-                )}
-              </div>
-              <CardTitle className="font-display text-sm uppercase">
-                {item.headline}
-              </CardTitle>
-              <CardDescription>{item.detail}</CardDescription>
-              {item.pending && (
-                <p className="text-xs text-muted-foreground">
-                  Responda pela caixa de entrada da Central.
-                </p>
-              )}
-            </CardHeader>
-          </Card>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -1136,118 +1027,6 @@ function HistoryTab({
           ))}
         </HistoryCard>
       </div>
-    </div>
-  );
-}
-
-function SaveTab({ career, api }: { career: CareerView; api: CareerApiPort }) {
-  const world = career.world;
-  const careers = useLoad(() => api.listCareers(), api);
-  return (
-    <div className="grid max-w-2xl gap-4">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between gap-3">
-            <div>
-              <CardTitle className="font-display text-base uppercase">
-                Integridade do save
-              </CardTitle>
-              <CardDescription>
-                Status visível de migração e arquivamento.
-              </CardDescription>
-            </div>
-            <ShieldCheck className="text-primary" weight="fill" />
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Row label="Versão" value={world.archive.saveVersion} />
-          <Row label="Migração" value={world.archive.migrationStatus} />
-          <Row label="Arquivo" value={world.archive.archiveStatus} />
-          <Row
-            label="Última compactação"
-            value={world.archive.lastCompaction}
-          />
-          <Row label="Checksum" value={world.archive.checksum} />
-          <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-            O cliente exibe este estado, mas não escreve no snapshot canônico.
-            Migrações explícitas são executadas pelo backend.
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-sm uppercase">
-            O que este save guarda
-          </CardTitle>
-          <CardDescription>
-            Tudo abaixo está gravado no servidor e volta igual quando você
-            reabre a carreira.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <Row label="Mensagens e notícias" value={String(world.news.length)} />
-          <Row
-            label="Decisões pendentes"
-            value={String(world.news.filter((item) => item.pending).length)}
-          />
-          <Row
-            label="Lançamentos no caixa"
-            value={String(world.finances.ledger.length)}
-          />
-          <Row label="Contratos" value={String(world.contracts.length)} />
-          <Row
-            label="Temporadas concluídas"
-            value={String(world.prestige.seasons)}
-          />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-sm uppercase">
-            Carreiras salvas
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {careers.status === 'loading' ? (
-            <p className="text-sm text-muted-foreground" role="status">
-              Conferindo os saves…
-            </p>
-          ) : careers.status === 'error' ? (
-            <p className="text-sm" role="alert">
-              {careers.message}
-            </p>
-          ) : careers.value.careers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma carreira salva.
-            </p>
-          ) : (
-            <ul aria-label="Carreiras salvas" className="flex flex-col gap-3">
-              {careers.value.careers.map((saved) => (
-                <li
-                  key={saved.id}
-                  className="flex flex-col justify-between gap-1 border-b pb-3 text-sm last:border-0 last:pb-0 sm:flex-row"
-                >
-                  <strong className="flex flex-wrap items-center gap-2">
-                    {saved.name ?? saved.coach}
-                    {saved.id === career.careerId && <Badge>Em uso</Badge>}
-                  </strong>
-                  <span className="text-muted-foreground sm:text-right">
-                    {[
-                      saved.clubName ?? 'Sem clube',
-                      saved.season ? `temporada ${String(saved.season)}` : '',
-                      saved.currentDate
-                        ? formatGameDate(saved.currentDate)
-                        : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
