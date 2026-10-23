@@ -157,6 +157,7 @@ function compose(env: Env) {
   const application = new FootebasApplication({
     auth,
     clock,
+    entitlements: new PostgresEntitlements(sql),
     ids,
     jobs,
     storage: new InMemoryStorage(),

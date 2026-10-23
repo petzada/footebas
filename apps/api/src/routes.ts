@@ -3,6 +3,7 @@
 import {
   ApplicationError,
   AuthenticationError,
+  CareerLimitReachedError,
   PhaseFourAuthorizationError,
   PhaseFourConflictError,
   PhaseFourNotFoundError,
@@ -204,6 +205,23 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
   const app = deps.application;
   const routes: ApiRoute[] = [
     healthRoute(deps),
+    {
+      method: 'GET',
+      path: '/v1/public/stats',
+      schema: {
+        summary: 'Coaches, clubs and athletes counters for the home screen',
+      },
+      async handler() {
+        // docs/09 decision 9: counters come from the database, cached ~5 min.
+        return {
+          status: 200,
+          headers: {
+            'cache-control': 'public, max-age=300, s-maxage=300',
+          },
+          body: await app.publicStats(),
+        };
+      },
+    },
     {
       method: 'POST',
       path: '/v1/commands',
@@ -681,6 +699,8 @@ export function mapError(
         'payment provider unavailable',
       ),
     };
+  if (error instanceof CareerLimitReachedError)
+    return { status: 403, body: error.toApiError(requestId) };
   if (error instanceof AuthenticationError)
     return {
       status: 401,
