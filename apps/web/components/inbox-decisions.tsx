@@ -10,6 +10,7 @@ import {
   Megaphone,
   Newspaper,
   Scroll,
+  Trash,
   UsersThree,
   Warning,
 } from '@phosphor-icons/react';
@@ -20,6 +21,7 @@ import type { Screen } from '@/lib/career-api';
 import {
   closedReason,
   formatGameDate,
+  isDeletable,
   isPending,
   KIND_LABEL,
   OFFER_DECISION_LABEL,
@@ -196,6 +198,11 @@ export function InboxDecisions({
                   port.resolve(message.id, option.id),
                 )
               }
+              onRemove={() =>
+                run(message.id, 'Mensagem excluída.', () =>
+                  port.remove(message.id),
+                )
+              }
               onDecideOffer={(decision) =>
                 run(
                   message.id,
@@ -236,6 +243,7 @@ function Envelope({
   navigate,
   onChoose,
   onDecideOffer,
+  onRemove,
 }: {
   message: InboxMessage;
   currentDate: string;
@@ -245,6 +253,8 @@ function Envelope({
   navigate(value: Screen): void;
   onChoose(option: { id: string; label: string }): void;
   onDecideOffer(decision: 'accept' | 'reject'): void;
+  /** `DeleteInboxMessage`: only once nothing waits for the coach. */
+  onRemove(): void;
 }) {
   const Icon = ICON[message.kind];
   const closed = closedReason(message, currentDate);
@@ -284,6 +294,18 @@ function Envelope({
           </h3>
           <p className="text-sm text-muted-foreground">{message.body}</p>
         </div>
+        {isDeletable(message, currentDate) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            aria-label={`Excluir: ${message.subject}`}
+            disabled={disabled}
+            onClick={onRemove}
+          >
+            <Trash aria-hidden="true" />
+          </Button>
+        )}
       </div>
 
       {confirmation ? (

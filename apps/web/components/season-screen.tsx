@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ChartLineUp, Info, Medal } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { ClubEmblem } from '@/components/club-emblem';
 import { PixelStar, PixelTrophy } from '@/components/retro/sprites';
 import { Badge } from '@/components/ui/badge';
@@ -61,11 +62,7 @@ export function SeasonScreen({
   }, [port]);
 
   if (state.status === 'loading')
-    return (
-      <p className="panel p-3 text-sm" role="status">
-        Somando os números da temporada…
-      </p>
-    );
+    return <ScreenSkeleton label="Somando os números da temporada…" />;
   if (state.status === 'error')
     return (
       <p className="panel p-3 text-sm" role="alert">

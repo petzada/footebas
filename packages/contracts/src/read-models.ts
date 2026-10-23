@@ -111,6 +111,8 @@ export const coachMessageSchema = z.strictObject({
   decision: inboxDecisionSchema.optional(),
   /** Decision of a generated message (see `ResolveInboxDecision`). */
   choice: inboxChoiceSchema.optional(),
+  /** Seen by the coach (`MarkInboxRead`); absent from older servers. */
+  read: z.boolean().optional(),
 });
 export const homeReadModelSchema = z.strictObject({
   ...readBase,

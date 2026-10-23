@@ -264,6 +264,8 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
             'CounterSponsorshipOffer',
             'ConfigureFanMembership',
             'ResolveInboxDecision',
+            'MarkInboxRead',
+            'DeleteInboxMessage',
           ].map((type) => ({
             type: 'object',
             required: [
@@ -339,6 +341,7 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
     office: (token, id) => app.careerOffice(token, id),
     'next-match': (token, id) => app.nextMatch(token, id),
     standings: (token, id) => app.standings(token, id),
+    tables: (token, id) => app.tables(token, id),
     'post-match': (token, id) => app.postMatch(token, id),
     world: async (token, id) =>
       careerWorldReadModelSchema.parse(await app.careerWorld(token, id)),

@@ -3,15 +3,14 @@
 import { Children, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  Bank,
   Binoculars,
   Buildings,
-  ChartLineUp,
   CheckCircle,
-  CurrencyCircleDollar,
   ShieldCheck,
+  Trash,
   Trophy,
 } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -84,16 +83,16 @@ function SectionHeading({
   description: string;
 }) {
   return (
-    <header className="mb-4">
-      <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">
+    // Sits on the grass, not on a panel: chalk tones keep AA contrast
+    // (primary green and the muted ink would be below 2:1 here).
+    <header className="mb-4 text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
+      <p className="text-xs font-bold uppercase tracking-[.18em] text-chalk/90">
         {eyebrow}
       </p>
       <h2 className="font-display text-xs font-bold uppercase sm:text-sm">
         {title}
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-        {description}
-      </p>
+      <p className="mt-1 max-w-2xl text-sm">{description}</p>
     </header>
   );
 }
@@ -593,77 +592,13 @@ export function ClubScreen(props: Phase4ScreenProps) {
         description="Caixa, patrimônio, base e confiança se encontram aqui — cada ação deixa uma origem rastreável."
       />
       <LiveNotice>{notice}</LiveNotice>
-      <Tabs defaultValue={props.initialTab ?? 'finance'}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="finance">Finanças</TabsTrigger>
+      {/* Finanças lives in the Escritório only (D5). */}
+      <Tabs defaultValue={props.initialTab ?? 'stadium'}>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="stadium">Estádio</TabsTrigger>
           <TabsTrigger value="youth">Base</TabsTrigger>
           <TabsTrigger value="board">Diretoria</TabsTrigger>
         </TabsList>
-        <TabsContent value="finance" className="mt-4 flex flex-col gap-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Summary
-              icon={CurrencyCircleDollar}
-              label="Caixa"
-              value={money(props.career.world.finances.cash)}
-              note={`Reserva mínima: ${money(props.career.world.finances.transferGate)}`}
-            />
-            <Summary
-              icon={Bank}
-              label="Folha por rodada"
-              value={money(props.career.world.finances.wageBill)}
-              note={`Teto: ${money(props.career.world.finances.wageBudget)}`}
-            />
-            <Summary
-              icon={ChartLineUp}
-              label="Patrocínio"
-              value={props.career.world.finances.sponsor}
-              note="Receita contratual identificada"
-            />
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-sm uppercase">
-                Ledger imutável
-              </CardTitle>
-              <CardDescription>
-                Histórico somente leitura. Cada valor nasce de uma fonte
-                nomeada.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Origem</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right">Saldo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {props.career.world.finances.ledger.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{entry.date}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="mr-2">
-                          {entry.category}
-                        </Badge>
-                        {entry.sourceLabel}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {money(entry.amount)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {money(entry.balance)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
         <TabsContent value="stadium" className="mt-4 grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
@@ -784,7 +719,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
           </Card>
         </TabsContent>
         <TabsContent value="youth" className="mt-4">
-          <div className="mb-3 rounded-md border bg-muted p-3 text-sm">
+          <div className="mb-3 rounded-md border bg-muted p-3 text-sm text-ink">
             <strong>Identidade do conteúdo:</strong> todos os atletas abaixo são{' '}
             <Badge variant="outline">gerados pelo universo</Badge>. Força e
             dimensões ocultas aparecem apenas como estimativas textuais.
@@ -827,7 +762,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
                     {youth.readiness}
                   </p>
                 </CardContent>
-                <CardFooter className="grid grid-cols-3 gap-2">
+                <CardFooter className="grid gap-2 min-[400px]:grid-cols-3">
                   <Button
                     size="sm"
                     variant="outline"
@@ -979,7 +914,22 @@ export function WorldScreen(
           <TabsTrigger value="save">Save</TabsTrigger>
         </TabsList>
         <TabsContent value="news" className="mt-4">
-          <NewsList news={world.news} />
+          <NewsList
+            news={world.news}
+            onDelete={async (id) => {
+              try {
+                await productPortsFor(props.api).inbox.remove(id);
+                const next = await props.api.getCareer();
+                if (next) props.onCareerChange(next);
+              } catch (caught) {
+                props.reportError(
+                  caught instanceof Error
+                    ? caught.message
+                    : 'Não foi possível excluir a mensagem.',
+                );
+              }
+            }}
+          />
         </TabsContent>
         <TabsContent value="history" className="mt-4">
           <HistoryTab base={world.history} port={ports.season} />
@@ -1021,7 +971,14 @@ export function WorldScreen(
   );
 }
 
-function NewsList({ news }: { news: CareerView['world']['news'] }) {
+function NewsList({
+  news,
+  onDelete,
+}: {
+  news: CareerView['world']['news'];
+  onDelete?: (id: string) => Promise<void>;
+}) {
+  const [removing, setRemoving] = useState<string | null>(null);
   if (news.length === 0)
     return (
       <p className="panel p-4 text-sm text-muted-foreground">
@@ -1046,6 +1003,21 @@ function NewsList({ news }: { news: CareerView['world']['news'] }) {
                 )}
                 {item.pending && (
                   <Badge className="w-fit">Decisão pendente</Badge>
+                )}
+                {item.deletable && onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto size-8"
+                    aria-label={`Excluir: ${item.headline}`}
+                    disabled={removing !== null}
+                    onClick={() => {
+                      setRemoving(item.id);
+                      void onDelete(item.id).finally(() => setRemoving(null));
+                    }}
+                  >
+                    <Trash aria-hidden="true" />
+                  </Button>
                 )}
               </div>
               <CardTitle className="font-display text-sm uppercase">
@@ -1111,9 +1083,7 @@ function HistoryTab({
   return (
     <div className="grid gap-4">
       {season.status === 'loading' && (
-        <p className="panel p-3 text-sm" role="status">
-          Abrindo o arquivo das temporadas…
-        </p>
+        <ScreenSkeleton label="Abrindo o arquivo das temporadas…" />
       )}
       {season.status === 'error' && (
         <p className="panel p-3 text-sm" role="alert">
@@ -1290,33 +1260,6 @@ function Metric({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-1 font-display text-xs font-bold uppercase">{value}</p>
     </div>
-  );
-}
-
-function Summary({
-  icon: Icon,
-  label,
-  value,
-  note,
-}: {
-  icon: typeof Bank;
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <Badge variant="outline">{label}</Badge>
-          <Icon />
-        </div>
-        <CardTitle className="font-display text-base uppercase">
-          {value}
-        </CardTitle>
-        <CardDescription>{note}</CardDescription>
-      </CardHeader>
-    </Card>
   );
 }
 

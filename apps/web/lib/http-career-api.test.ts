@@ -28,6 +28,7 @@ import {
   type AccessTokenProvider,
 } from '@/lib/http-career-api';
 import { httpInboxPort, httpSeasonPort } from '@/lib/http-products';
+import { unreadCount } from '@/lib/inbox-product';
 import { worldHistoryFromSeason } from '@/lib/season-product';
 
 const open: { close(): Promise<unknown> }[] = [];
@@ -473,6 +474,31 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     expect(history.seasons[0]!.finish).toMatch(/\dV \dE \dD/);
   });
 
+  it('marca a caixa como lida e exclui mensagens no servidor', async () => {
+    const { client } = await start();
+    const played = await client.instantResult();
+    expect(unreadCount(played.world.news)).toBeGreaterThan(0);
+    const port = httpInboxPort(client);
+    const read = await port.markRead(played.world.news.map(({ id }) => id));
+    expect(read.messages.every((message) => message.read === true)).toBe(true);
+    const career = (await client.getCareer())!;
+    expect(unreadCount(career.world.news)).toBe(0);
+    // Nothing unread: no command is sent, the version stays.
+    await port.markRead(career.world.news.map(({ id }) => id));
+    const report = career.world.news.find(({ tag }) => tag === 'Relatório')!;
+    expect(report.deletable).toBe(true);
+    const after = await port.remove(report.id);
+    expect(after.messages.map(({ id }) => id)).not.toContain(report.id);
+    const pending = career.world.news.find(({ pending }) => pending);
+    // No trash icon on a waiting decision, and the server refuses it anyway.
+    for (const item of career.world.news.filter(({ pending }) => pending))
+      expect(item.deletable).toBeUndefined();
+    if (pending) await expect(port.remove(pending.id)).rejects.toThrow();
+    expect(
+      (await client.getCareer())!.world.news.map(({ id }) => id),
+    ).not.toContain(report.id);
+  });
+
   it('carrega pirâmide, calendário e transição para as telas de competição', async () => {
     const { client } = await start();
     const view = await httpCompetitionPort(client).load();
@@ -486,6 +512,32 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     );
     expect(view.calendar.entries.length).toBeGreaterThan(38);
     expect(view.nextSeason.status).toBe('pending');
+  });
+
+  it('a classificação da Central segue o estadual em andamento e as tabelas vêm por competição', async () => {
+    const { client, career } = await start();
+    expect(career.division).toBe('Carioca');
+    const played = await client.instantResult();
+    expect(played.division).toBe('Carioca');
+    expect(
+      played.standings.find(({ club }) => club === 'Flamengo')?.played,
+    ).toBe(1);
+    const tables = await httpCompetitionPort(client).tables!();
+    expect(tables.focusCompetitionId).toBe('carioca');
+    expect(
+      tables.competitions.map(({ competitionId }) => competitionId),
+    ).toEqual(
+      expect.arrayContaining([
+        'carioca',
+        'copa_do_brasil',
+        'copa_libertadores',
+      ]),
+    );
+    const cup = tables.competitions.find(
+      ({ competitionId }) => competitionId === 'copa_do_brasil',
+    )!;
+    expect(cup.stages.every(({ kind }) => kind === 'knockout')).toBe(true);
+    expect(cup.champion).toBeUndefined();
   });
 });
 

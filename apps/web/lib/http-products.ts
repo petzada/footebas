@@ -9,7 +9,12 @@ import {
   type ProfileView,
   type RefundView,
 } from '@/lib/account-product';
-import type { InboxMessage, InboxPort, InboxView } from '@/lib/inbox-product';
+import {
+  unreadIds,
+  type InboxMessage,
+  type InboxPort,
+  type InboxView,
+} from '@/lib/inbox-product';
 import type {
   MyRankingEntry,
   RankingPort,
@@ -71,6 +76,18 @@ export function httpInboxPort(
       if (kind === 'sponsor_offer')
         await port.decideSponsorship(offerId, decision);
       else await port.decideMarketOffer(offerId, decision);
+      return load();
+    },
+    async markRead(messageIds) {
+      // Only what is still unread: each command is a new save version.
+      const unread = new Set(unreadIds((await load()).messages));
+      const ids = messageIds.filter((id) => unread.has(id)).slice(0, 50);
+      if (ids.length > 0)
+        await api.command('MarkInboxRead', { messageIds: ids });
+      return load();
+    },
+    async remove(messageId) {
+      await api.command('DeleteInboxMessage', { messageId });
       return load();
     },
   };

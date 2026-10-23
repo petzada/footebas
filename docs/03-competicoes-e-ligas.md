@@ -25,6 +25,16 @@ a **continental** dá o teto aspiracional já no MVP. ~60 clubes.
 > turno único e apenas os estados grandes, para manter o **calendário controlado** — a identidade cultural pesa
 > mais que o custo, agora que a marca brasileira foi priorizada.
 
+> **Calendário dos estaduais (2026-10-23):** as rodadas se espalham pelo começo do ano e cada estadual termina no
+> dia 44 (14/02), antes do Brasileirão (dia 48) e longe da Pré-Libertadores (dias 42 e 46, com pelo menos um dia de
+> descanso). Os dias contam desde 1º de janeiro e ficam em `packages/content/config/competitions-2026.json`
+> (`firstMatchDay`, `matchDayInterval`): Paulistão (12 clubes, 11 rodadas) nos dias 4, 8, …, 44; estaduais de 5 ou 6
+> clubes (5 rodadas) nos dias 8, 17, 26, 35, 44; de 4 clubes (3 rodadas) nos dias 14, 29, 44. Antes, todos começavam
+> no dia 2 a cada 3 dias e os menores terminavam em 9 a 15/01, com campeões decididos antes do primeiro jogo de quem
+> não disputa estadual. Mudar esses dias exige atualizar esta nota e o teste
+> `packages/application/src/state-league-calendar.test.ts`; carreiras já criadas mantêm o calendário gravado da
+> temporada em curso e usam o novo a partir da temporada seguinte.
+
 > **IP nos nomes:** a base oficial do MVP usa **nomes reais** de competições, clubes e jogadores (fonte
 > `dados/elencos/`), por decisão de produto. Revisão jurídica/comercial permanece gate de lançamento público.
 

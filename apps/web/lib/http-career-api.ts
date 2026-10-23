@@ -17,10 +17,12 @@ import type {
   StandingView,
   TacticsView,
 } from '@/lib/career-api';
-import type {
-  CompetitionProductPort,
-  CompetitionProductView,
-  CompetitionView,
+import {
+  mainGroupOf,
+  type CompetitionProductPort,
+  type CompetitionProductView,
+  type CompetitionTablesView,
+  type CompetitionView,
 } from '@/lib/competition-product';
 import {
   formatGameDate,
@@ -448,7 +450,11 @@ function worldNews(
     headline: message.subject,
     detail: message.body,
     date: message.occurredOn,
-    ...(isPending(message, home.currentDate) ? { pending: true } : {}),
+    ...(isPending(message, home.currentDate)
+      ? { pending: true }
+      : { deletable: true }),
+    // Older servers do not send `read`: everything counts as unread there.
+    ...(message.read === true ? {} : { unread: true }),
   }));
   const milestones = history.slice(0, 12).map((event) => ({
     id: event.id,
@@ -997,14 +1003,20 @@ export class HttpCareerApi implements CareerApiPort {
 
   async #view(): Promise<CareerView> {
     const id = this.#career();
-    const [home, squad, next, standings, post, world] = await Promise.all([
-      this.#request<HomeModel>('GET', `/v1/careers/${id}/home`),
-      this.#request<SquadModel>('GET', `/v1/careers/${id}/squad`),
-      this.#optional<NextMatchModel>(`/v1/careers/${id}/next-match`),
-      this.#optional<StandingsModel>(`/v1/careers/${id}/standings`),
-      this.#optional<PostMatchModel>(`/v1/careers/${id}/post-match`),
-      this.#request<WorldModel>('GET', `/v1/careers/${id}/world`),
-    ]);
+    const [home, squad, next, division, tables, post, world] =
+      await Promise.all([
+        this.#request<HomeModel>('GET', `/v1/careers/${id}/home`),
+        this.#request<SquadModel>('GET', `/v1/careers/${id}/squad`),
+        this.#optional<NextMatchModel>(`/v1/careers/${id}/next-match`),
+        this.#optional<StandingsModel>(`/v1/careers/${id}/standings`),
+        this.#optional<CompetitionTablesView>(`/v1/careers/${id}/tables`),
+        this.#optional<PostMatchModel>(`/v1/careers/${id}/post-match`),
+        this.#request<WorldModel>('GET', `/v1/careers/${id}/world`),
+      ]);
+    // The Central and Classificação follow the competition the club is
+    // playing (its estadual while it runs, then the division); the old
+    // division-only read stayed at zero during the estadual.
+    const standings = focusStandings(tables) ?? division;
     this.#version = home.aggregateVersion;
     this.#squad = squad;
     this.#roles = this.#rolesFrom(squad);
@@ -2271,11 +2283,37 @@ interface PyramidCompetition {
   prestige: number;
 }
 
+/** Table the Central summarises, from `GET /tables` (`focusCompetitionId`). */
+function focusStandings(
+  tables: CompetitionTablesView | undefined,
+): StandingsModel | undefined {
+  const focus = tables?.competitions.find(
+    ({ competitionId }) => competitionId === tables.focusCompetitionId,
+  );
+  const group = focus === undefined ? undefined : mainGroupOf(focus);
+  if (focus === undefined || group === undefined || group.rows.length === 0)
+    return undefined;
+  return {
+    competition: focus.name,
+    rows: group.rows.map((row) => ({
+      position: row.position,
+      club: { id: row.club.id, name: row.club.name, shortName: row.club.name },
+      played: row.played,
+      won: row.won,
+      drawn: row.drawn,
+      lost: row.lost,
+      goalDifference: row.goalDifference,
+      points: row.points,
+    })),
+  };
+}
+
 /** Competition screens over the same authoritative career. */
 export function httpCompetitionPort(
   api: HttpCareerApi,
 ): CompetitionProductPort {
   return {
+    tables: () => api.read<CompetitionTablesView>('tables'),
     async load() {
       const [pyramid, calendar, transition] = await Promise.all([
         api.read<{

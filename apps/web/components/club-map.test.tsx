@@ -54,12 +54,25 @@ beforeEach(() => {
 });
 
 describe('Mapa do clube', () => {
-  it('só a ilustração navega: não há mais lista abaixo do mapa', async () => {
+  it('lista os mesmos destinos abaixo da ilustração (docs/09 decisão 2)', async () => {
+    const { navigate } = await renderMap();
+    const list = screen.getByRole('navigation', {
+      name: 'Áreas do clube em lista',
+    });
+    const buttons = within(list).getAllByRole('button');
+    expect(buttons.map((node) => node.textContent)).toEqual(
+      CLUB_AREAS.flatMap((area) =>
+        area.links.map(([, label]) => `${area.name} · ${label}`),
+      ),
+    );
+    fireEvent.click(
+      within(list).getByRole('button', { name: /^sede · finanças$/i }),
+    );
+    expect(navigate).toHaveBeenLastCalledWith('finance');
+  });
+
+  it('cada prédio da ilustração é um botão focável com descrição', async () => {
     const { map } = await renderMap();
-    expect(
-      screen.queryByRole('navigation', { name: 'Áreas do clube em lista' }),
-    ).toBeNull();
-    expect(screen.queryByText(/ou escolha na lista/i)).toBeNull();
     // Every building is a real, focusable button with a short description.
     const buildings = within(map).getAllByRole('button');
     expect(buildings.map((node) => node.getAttribute('data-area'))).toEqual(
