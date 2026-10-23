@@ -16,16 +16,44 @@ export async function signIn(page: Page, email: string): Promise<void> {
   ).toBeVisible();
 }
 
-/** Nova carreira → nome do treinador → clube, até a Central. */
+/**
+ * Nova Carreira em cinco etapas (modo → universo → clube → treinador → nome),
+ * até a Central.
+ */
 export async function createCareer(
   page: Page,
   { coach, club }: { coach: string; club: string },
 ): Promise<void> {
+  const next = () => page.getByRole('button', { name: /^continuar$/i }).click();
   await page.getByRole('button', { name: /nova carreira/i }).click();
-  await page.getByLabel('Nome do treinador').fill(coach);
-  await page.getByRole('button', { name: /conhecer os clubes/i }).click();
-  await expect(page.getByText(/escolha seu desafio/i)).toBeVisible();
-  await page.getByRole('button', { name: new RegExp(club, 'i') }).click();
+  await expect(
+    page.getByRole('heading', { name: /como você quer jogar/i }),
+  ).toBeVisible();
+  await next();
+  await expect(
+    page.getByRole('heading', { name: /onde vai ser a sua carreira/i }),
+  ).toBeVisible();
+  await next();
+  await expect(
+    page.getByRole('heading', { name: /escolha seu clube/i }),
+  ).toBeVisible();
+  await page
+    .getByRole('radio', { name: new RegExp(club, 'i') })
+    .first()
+    .check();
+  await next();
+  await expect(
+    page.getByRole('heading', { name: /quem é o treinador/i }),
+  ).toBeVisible();
+  await page.getByLabel(/nome do treinador/i).fill(coach);
+  await page
+    .getByRole('radio', { name: /^estrategista/i })
+    .check({ force: true });
+  await next();
+  await expect(
+    page.getByRole('heading', { name: /dê um nome à carreira/i }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /começar carreira/i }).click();
   await expect(playButton(page)).toBeVisible();
 }
 
