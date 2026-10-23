@@ -1,0 +1,80 @@
+name: backup
+
+# Dump semanal off-site do schema `footebas` (docs/backup-restore.md).
+# Só roda o dump se o secret SUPABASE_DB_URL existir (string do Session pooler
+# do Supabase, IPv4). Com BACKUP_PASSPHRASE, o arquivo é cifrado (gpg AES256)
+# antes de virar artefato.
+on:
+  schedule:
+    # Segunda-feira, 06:17 UTC (03:17 em Brasília).
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAS_DB_URL: ${{ secrets.SUPABASE_DB_URL != '' }}
+      HAS_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE != '' }}
+    steps:
+      - name: Secret ausente
+        if: env.HAS_DB_URL != 'true'
+        run: echo "::notice::SUPABASE_DB_URL não configurado; backup pulado."
+
+      - name: Repositório público exige cifra
+        if: env.HAS_DB_URL == 'true' && env.HAS_PASSPHRASE != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          private="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .private)"
+          if [ "$private" != "true" ]; then
+            echo "::error::Repositório público: configure BACKUP_PASSPHRASE para cifrar o dump."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        if: env.HAS_DB_URL == 'true'
+
+      - name: Cliente Postgres 17
+        if: env.HAS_DB_URL == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Dump
+        if: env.HAS_DB_URL == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/backup-db.sh backups
+
+      - name: Cifrar
+        if: env.HAS_DB_URL == 'true' && env.HAS_PASSPHRASE == 'true'
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          for file in backups/*.dump; do
+            gpg --batch --yes --quiet --pinentry-mode loopback --passphrase-fd 3 \
+              --symmetric --cipher-algo AES256 --output "${file}.gpg" "$file" 3<<<"$BACKUP_PASSPHRASE"
+            (cd backups && sha256sum "$(basename "$file").gpg" > "$(basename "$file").gpg.sha256")
+            rm -f "$file" "${file}.sha256"
+          done
+
+      - name: Guardar artefato (30 dias)
+        if: env.HAS_DB_URL == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: footebas-db-${{ github.run_number }}
+          path: backups/
+          retention-days: 30
+          if-no-files-found: error
