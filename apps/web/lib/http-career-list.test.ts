@@ -58,7 +58,12 @@ describe('HttpCareerApi · contadores públicos', () => {
 describe('HttpCareerApi · carreiras do usuário', () => {
   const list = {
     version: 1,
-    limits: { plan: 'licensed', maxCareers: 5, anyClub: true, activeCareers: 2 },
+    limits: {
+      plan: 'licensed',
+      maxCareers: 5,
+      anyClub: true,
+      activeCareers: 2,
+    },
     careers: [
       {
         careerId: 'career_a',
