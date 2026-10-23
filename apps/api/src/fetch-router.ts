@@ -44,10 +44,18 @@ interface CompiledRoute {
   readonly route: ReturnType<typeof apiRoutes>[number];
 }
 
-function compile(routes: ReturnType<typeof apiRoutes>): CompiledRoute[] {
-  return routes.map((route) => {
+// Handlers close over per-request dependencies, but a path always compiles to
+// the same pattern: keep those for the isolate's lifetime.
+const patterns = new Map<
+  string,
+  { readonly pattern: RegExp; readonly names: readonly string[] }
+>();
+
+function patternOf(path: string) {
+  let compiled = patterns.get(path);
+  if (compiled === undefined) {
     const names: string[] = [];
-    const source = route.path
+    const source = path
       .split('/')
       .map((segment) => {
         if (!segment.startsWith(':'))
@@ -56,14 +64,25 @@ function compile(routes: ReturnType<typeof apiRoutes>): CompiledRoute[] {
         return '([^/]+)';
       })
       .join('/');
-    return {
-      method: route.method,
-      pattern: new RegExp(`^${source}/?$`),
-      names,
-      route,
-    };
-  });
+    compiled = { pattern: new RegExp(`^${source}/?$`), names };
+    patterns.set(path, compiled);
+  }
+  return compiled;
 }
+
+function compile(routes: ReturnType<typeof apiRoutes>): CompiledRoute[] {
+  return routes.map((route) => ({
+    method: route.method,
+    ...patternOf(route.path),
+    route,
+  }));
+}
+
+/**
+ * How long browsers may reuse a preflight (Chromium caps it at 7200 s);
+ * without it every cross-origin call from the game pays an extra OPTIONS.
+ */
+const PREFLIGHT_MAX_AGE_SECONDS = 7200;
 
 export function createFetchHandler(
   deps: ApiDependencies,
@@ -100,6 +119,10 @@ export function createFetchHandler(
       );
       if (request.method === 'OPTIONS') {
         state.route = 'preflight';
+        headers.set(
+          'access-control-max-age',
+          String(PREFLIGHT_MAX_AGE_SECONDS),
+        );
         return new Response(null, { status: 204, headers });
       }
     }
