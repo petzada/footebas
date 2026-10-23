@@ -247,7 +247,8 @@ sim-ball-run` em passos de 12, `steps()` como o resto do tema); sem Phaser/Three
    layout intactos. Para 5 escopos (Geral, Ascensão, Mensal, Títulos, Melhor temporada) no celular, recomendo a
    `TabsList` com rolagem horizontal (`flex overflow-x-auto snap-x`, sem `grid-cols-5`), aba ativa rolada para o
    centro ao selecionar e um degradê de "continua" na borda; alternativa: `<select>` nativo (pixel) abaixo de
-   `sm` e abas a partir dele. Evitar duas linhas de abas e rótulos abaixo de `.5rem`.
+   `sm` e abas a partir dele. Evitar duas linhas de abas e rótulos abaixo de `.5rem`. **Aprovada (abas roláveis),
+   pendente:** vai junto com a implementação do ranking (ADR 0017).
 
 ## Decisões para o responsável
 
@@ -258,12 +259,18 @@ verdade", "sem becos sem saída"); ADR 0014 prevê Zustand/TanStack para estado,
 `history.pushState` por tela (`screen` e `stage` como entrada de histórico, `popstate` volta para a Central e, na
 partida, só pausa); (b) só interceptar na partida com `beforeunload`; (c) manter como está e documentar.
 Recomendação: (a), com a partida tratada como estado em que "voltar" pausa em vez de sair.
+**Decidido: (a), histórico por tela.** Implementado em `lib/game-history.ts` (`useGameHistory`): cada tela e etapa
+entra no histórico (`pushState`); `popstate` restaura a anterior; na partida, Voltar pausa e a entrada é reposta;
+a primeira tela substitui a entrada de abertura (Voltar sai do site, sem laço) e o estágio de login/carregando
+nunca ganha entrada; partida e resultado encerrados voltam para a Central. Teste em `phase6-shell.test.tsx`.
 
 **D2 — Rótulos da barra inferior em 6,4 px (≤ 375 px).** Problema: "Central/Elenco/Mercado/Escritório/Menu" em
 `.4rem` são ilegíveis em 320–375 (a maioria dos aparelhos‑alvo). Regra: `docs/07` §3 (bottom‑nav, alvos generosos)
 e ADR 0012 (tipografia pixel para rótulos). Opções: (a) abreviar os rótulos ("Escrit.", "Merc.") e subir para
 `.5rem`; (b) mostrar só ícones com `aria-label` abaixo de 376 px e rótulos a partir daí; (c) trocar a fonte dos
 rótulos da barra por sans 11 px (quebra a regra visual). Recomendação: (a), mantendo a fonte pixel.
+**Decidido: (b), só ícones abaixo de 376 px.** `phase6-shell.tsx`: rótulo `hidden min-[376px]:inline`, `aria-label`
+em cada botão, `min-w-11 min-h-14`; de 376 px para cima ícone + rótulo em `.45rem`. Teste atualizado.
 
 **D3 — Ordem dos cards da Central no celular.** Problema: em 320–375 "Jogar partida" (a ação primária do jogo) fica
 abaixo da dobra; o card do clube ocupa a primeira tela. Regra: `docs/09` mapa de telas ("card do clube… próximo
@@ -271,17 +278,25 @@ jogo e avançar/jogar ao centro") e `docs/07` §3 ("rodada em poucos toques"). O
 antes do card do clube (desktop inalterado); (b) card do clube compacto no celular (emblema + nome + 4 números numa
 linha) para a dobra incluir o botão; (c) botão "Jogar" fixo na barra inferior enquanto a Central está aberta.
 Recomendação: (b), que preserva a ordem decidida e põe o botão na primeira tela.
+**Decidido: (a), Próximo jogo primeiro no celular.** `central-screen.tsx`: ordem por `order-*` (celular: Próximo
+jogo, card do clube, Tabela, Compromissos, e-mails/notícias; `lg`: card do clube em cima e três painéis como
+antes). `docs/09` atualizado. Teste em `central-screen.test.tsx`.
 
 **D4 — Mapa sem a "alternativa em lista".** Problema: `docs/09` decisão 2 pede ilustração "com alternativa em
 lista"; hoje só os prédios são acessíveis (teclado e leitor de tela funcionam, mas não há lista visível para quem
 não entende a ilustração ou tem dedos grandes: "Estacionamento" tem 41 px de altura). Opções: (a) lista de
 `<button>` abaixo da ilustração (6 linhas, mesmo rótulo dos prédios); (b) manter só a ilustração e registrar o
 desvio na decisão 2. Recomendação: (a); é pequena e cumpre a decisão.
+**Decidido: (a), lista abaixo da ilustração.** `club-map.tsx`: `nav` "Áreas do clube em lista" com um botão por
+destino (prédio · tela), 44 px. Teste em `club-map.test.tsx`.
 
 **D5 — "Finanças" em dois lugares.** Problema: Menu → Finanças abre o Escritório (aba Finanças, ADR 0011) e a tela
 Estádio tem uma aba "Finanças" própria (`phase4-screens`, legada). Regra: `docs/09` ("Escritório: finanças,
 contratos…"). Opções: (a) remover a aba Finanças de Estádio e apontar para o Escritório; (b) renomear a aba do
 Estádio ("Caixa do estádio"); (c) manter. Recomendação: (a).
+**Decidido: (a), aba removida.** `phase4-screens.tsx`: a tela Estádio abre em Estádio/Base/Diretoria; o ledger
+continua no read model (o Escritório mostra finanças por categoria). Nada mais apontava para a aba (`Screen`
+`finance` já abria o Escritório; o Mapa "Sede · Finanças" idem). Teste atualizado.
 
 **D6 — "Caixa de entrada", "Histórico" e "Ranking" apontam para a tela "Mundo".** Problema: o item do menu "Caixa
 de entrada" (badge com o número de notícias) abre "Mundo › Notícias"; as decisões por e‑mail só existem na Central;
@@ -290,11 +305,14 @@ mapa de telas (Central com e‑mails e notícias; Ranking com tela própria) e `
 antipadrão). Opções: (a) "Caixa de entrada" abre uma tela com as decisões pendentes + notícias (o mesmo
 `InboxDecisions` da Central sem limite) e "Mundo" perde as abas Ranking e Save (Save vai para Perfil); (b) renomear
 o item para "Notícias" e manter o resto; (c) manter. Recomendação: (a).
+**Aprovada (a), pendente:** fica para depois do agente que mexe na caixa de entrada.
 
 **D7 — Classificação completa mais pobre que o resumo.** Problema: a tela Classificação mostra J e Pts; o resumo da
 Central mostra J, SG, Pts (e V/E/D em ≥ 414 px). Regra: `docs/07` §2 ("números legíveis — tabela são
 protagonistas"). Opções: (a) reutilizar a tabela teletexto do resumo na tela completa, com V/E/D/GP/GC/SG e rolagem
 horizontal controlada; (b) manter. Recomendação: (a).
+**Aprovada, pendente:** o visual da liga já entrou (c163b1c); os formatos por competição dependem dos dados do
+outro agente (ver "Escopo ampliado", item 5).
 
 ## Recomendações (não alteram fluxo; não executadas por envolverem padrão global ou direção visual)
 

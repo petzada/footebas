@@ -37,15 +37,22 @@ complementa `docs/08-mvp-fonte-de-verdade.md`; em conflito sobre telas, vale est
   personalidade) → nome da carreira.
 - **Carregar Carreira:** lista das carreiras do usuário (limite do plano).
 - **Central:** card estilo FIFA do clube/treinador, próximo jogo e avançar/jogar ao centro, tabela e calendário nas
-  laterais; abaixo, e-mails com decisões e notícias.
-- **Mapa (ilustração clicável).**
+  laterais; abaixo, e-mails com decisões e notícias. Decisão (2026-10-23, revisão mobile D3): no celular o card do
+  **próximo jogo vem primeiro** (com "Jogar partida" na primeira tela) e o card do clube logo abaixo; no desktop a
+  ordem acima continua.
+- **Mapa (ilustração clicável)** com a lista dos mesmos destinos logo abaixo (decisão 2; revisão mobile D4).
+- **Navegação no celular** (revisão mobile, 2026-10-23): cada tela entra no histórico do navegador e o Voltar
+  (navegador ou físico do Android) volta uma tela; na partida ao vivo, Voltar pausa em vez de sair; a primeira tela
+  não prende o usuário (D1). A barra inferior mostra **só ícones abaixo de 376 px** (nome acessível e alvo ≥ 44 px) e
+  ícone + rótulo a partir daí (D2).
 - **Elenco:** campo interativo com arrastar (e alternativa por toque/teclado), tabela, táticas e presets,
   escalações salvas, estatísticas. Sem batedores; camisa real da pesquisa. Decisão (2026-10-23): as escalações
   salvas (até 3 por carreira, nomeáveis) ficam no navegador (`localStorage`, chave por carreira) até o servidor
   expor o recurso; só guardam ids, formação e tática, e são revalidadas contra o elenco ao aplicar.
 - **Mercado:** caixa, janelas, status, compra/venda/empréstimo nacional e dos estrangeiros do catálogo.
 - **Escritório:** propostas (atletas, empregos, patrocínios), finanças, contratos, carreira do treinador,
-  sócio-torcedor, receitas e despesas.
+  sócio-torcedor, receitas e despesas. **Finanças só aqui**: a aba antiga da tela Estádio foi removida (revisão
+  mobile D5).
 - **Temporada:** só leitura, gráficos e tabelas (artilharia, notas, posição por rodada, campeões).
 - **Ranking:** tela própria.
 - **Partida:** mantém feed narrado, pausas táticas e campo 2D do replay.
