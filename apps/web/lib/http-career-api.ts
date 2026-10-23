@@ -1,7 +1,10 @@
 import type {
   AutoPickStrategy,
   CareerApiPort,
+  CareerList,
+  CareerSummary,
   CareerView,
+  PublicStats,
   Formation,
   MatchActionView,
   MatchResultView,
@@ -74,6 +77,29 @@ export interface HttpCareerApiOptions {
   readonly startDate?: string;
   readonly jobPollMs?: number;
   readonly storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+  /** Clock for the public stats cache (ms since epoch). */
+  readonly now?: () => number;
+}
+
+/** Public counters are cached on the client for five minutes. */
+export const PUBLIC_STATS_TTL_MS = 5 * 60 * 1000;
+
+interface CareerListModel {
+  careers: {
+    careerId: string;
+    aggregateVersion: number;
+    managerName?: string;
+    clubId?: string;
+    clubName?: string;
+    season?: number;
+    currentDate?: string;
+    /** Assumed: career name, once the server stores it. */
+    name?: string;
+    /** Assumed: last change timestamp (ISO). */
+    updatedAt?: string;
+  }[];
+  /** Assumed: careers allowed by the player's plan. */
+  careerLimit?: number;
 }
 
 // --- transport shapes (subset of @footebas/contracts read models) ---
@@ -388,6 +414,8 @@ export class HttpCareerApi implements CareerApiPort {
   #scouted = new Set<string>();
   #match: LiveMatch | undefined;
   #sequence = 0;
+  #listed = new Map<string, CareerListModel['careers'][number]>();
+  #stats: { at: number; value: PublicStats | null } | undefined;
 
   public constructor(options: HttpCareerApiOptions) {
     this.#options = options;
@@ -588,6 +616,9 @@ export class HttpCareerApi implements CareerApiPort {
   async createCareer({ coach }: { coach: string }) {
     if (!coach.trim()) throw new Error('Informe o nome do treinador.');
     this.#version = 0;
+    // One key per creation: players may keep several careers (plan limit is
+    // enforced by the server with CAREER_LIMIT_REACHED).
+    const idempotencyKey = this.#key('CreateCareer');
     const accepted = await this.#request<{
       careerId: string;
       aggregateVersion: number;
@@ -596,8 +627,8 @@ export class HttpCareerApi implements CareerApiPort {
       '/v1/commands',
       {
         version: 1,
-        commandId: 'command_create_primary_career',
-        idempotencyKey: 'primary-career',
+        commandId: `command_${slug(idempotencyKey)}`,
+        idempotencyKey,
         expectedVersion: 0,
         type: 'CreateCareer',
         payload: {
@@ -605,7 +636,7 @@ export class HttpCareerApi implements CareerApiPort {
           startDate: this.#options.startDate ?? '2026-01-01',
         },
       },
-      { 'idempotency-key': 'primary-career' },
+      { 'idempotency-key': idempotencyKey },
     );
     this.#careerId = accepted.careerId;
     this.#version = accepted.aggregateVersion;
@@ -618,15 +649,100 @@ export class HttpCareerApi implements CareerApiPort {
     });
   }
 
+  /**
+   * Public counters (coaches, clubs, athletes). The route may not exist yet:
+   * any failure resolves to `null` so the screen simply hides them.
+   */
+  async getPublicStats(): Promise<PublicStats | null> {
+    const now = (this.#options.now ?? Date.now)();
+    if (this.#stats && now - this.#stats.at < PUBLIC_STATS_TTL_MS)
+      return this.#stats.value;
+    let value: PublicStats | null = null;
+    try {
+      const response = await this.#fetch(
+        `${this.#options.baseUrl}/v1/public/stats`,
+        { method: 'GET' },
+      );
+      if (response.ok) {
+        const body = (await response.json()) as Partial<PublicStats>;
+        const valid = (['coaches', 'clubs', 'athletes'] as const).every(
+          (key) => Number.isFinite(body[key]) && Number(body[key]) >= 0,
+        );
+        if (valid)
+          value = {
+            coaches: Number(body.coaches),
+            clubs: Number(body.clubs),
+            athletes: Number(body.athletes),
+          };
+      }
+    } catch {
+      value = null;
+    }
+    this.#stats = { at: now, value };
+    return value;
+  }
+
+  async listCareers(): Promise<CareerList> {
+    const list = await this.#request<CareerListModel>('GET', '/v1/careers');
+    this.#listed = new Map(list.careers.map((item) => [item.careerId, item]));
+    return {
+      careers: list.careers.map((item): CareerSummary => ({
+        id: item.careerId,
+        coach: item.managerName ?? 'Treinador',
+        ...(item.name ? { name: item.name } : {}),
+        ...(item.clubName ? { clubName: item.clubName } : {}),
+        ...(item.season === undefined ? {} : { season: item.season }),
+        ...(item.currentDate ? { currentDate: item.currentDate } : {}),
+        ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
+      })),
+      ...(list.careerLimit === undefined ? {} : { limit: list.careerLimit }),
+    };
+  }
+
+  async openCareer(careerId: string): Promise<CareerView | null> {
+    if (!this.#listed.has(careerId)) await this.listCareers();
+    const listed = this.#listed.get(careerId);
+    if (!listed) throw new Error('Carreira não encontrada.');
+    this.#careerId = careerId;
+    this.#version = listed.aggregateVersion;
+    this.#squad = undefined;
+    this.#roles = new Map();
+    this.#match = undefined;
+    if (listed.clubId === undefined) return null;
+    return this.#view();
+  }
+
+  /** Sends `DeleteCareer` in the same versioned envelope as every command. */
+  async deleteCareer(careerId: string): Promise<void> {
+    if (!this.#listed.has(careerId)) await this.listCareers();
+    const listed = this.#listed.get(careerId);
+    if (!listed) throw new Error('Carreira não encontrada.');
+    const idempotencyKey = this.#key('DeleteCareer');
+    await this.#request(
+      'POST',
+      '/v1/commands',
+      {
+        version: 1,
+        commandId: `command_${slug(idempotencyKey)}`,
+        idempotencyKey,
+        expectedVersion: listed.aggregateVersion,
+        type: 'DeleteCareer',
+        payload: { careerId },
+      },
+      { 'idempotency-key': idempotencyKey },
+    );
+    this.#listed.delete(careerId);
+    if (this.#careerId === careerId) {
+      this.#careerId = undefined;
+      this.#version = 0;
+      this.#squad = undefined;
+      this.#match = undefined;
+    }
+  }
+
   async getCareer(): Promise<CareerView | null> {
     if (!this.#careerId) {
-      const list = await this.#request<{
-        careers: {
-          careerId: string;
-          aggregateVersion: number;
-          clubId?: string;
-        }[];
-      }>('GET', '/v1/careers');
+      const list = await this.#request<CareerListModel>('GET', '/v1/careers');
       const career = list.careers.find(({ clubId }) => clubId !== undefined);
       if (!career) return null;
       this.#careerId = career.careerId;
@@ -652,6 +768,16 @@ export class HttpCareerApi implements CareerApiPort {
     return {
       coach: home.managerName,
       club: home.club?.name ?? squad.club.name,
+      ...(standings?.competition ? { division: standings.competition } : {}),
+      ...(next
+        ? {
+            fixture: {
+              competition: next.competition,
+              date: next.date,
+              venue: next.preparation.venue,
+            },
+          }
+        : {}),
       round: next?.round ?? 0,
       formation: squad.lineup?.formation ?? squad.tactic?.formation ?? '4-4-2',
       tactics: fromServerTactic(squad.tactic),

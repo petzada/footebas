@@ -8,6 +8,8 @@ export interface AuthUser {
   readonly id: string;
   readonly email?: string;
   readonly name?: string;
+  /** Profile picture from the identity provider (Google), when present. */
+  readonly avatarUrl?: string;
 }
 
 /** Identity seam of the web app: Supabase in production, a fake in tests. */
@@ -86,12 +88,18 @@ function toUser(user: User | undefined | null): AuthUser | null {
   const metadata = user.user_metadata as {
     full_name?: unknown;
     name?: unknown;
+    avatar_url?: unknown;
+    picture?: unknown;
   };
   const name = metadata.full_name ?? metadata.name;
+  const avatar = metadata.avatar_url ?? metadata.picture;
   return {
     id: user.id,
     ...(user.email ? { email: user.email } : {}),
     ...(typeof name === 'string' && name ? { name } : {}),
+    ...(typeof avatar === 'string' && avatar.startsWith('https://')
+      ? { avatarUrl: avatar }
+      : {}),
   };
 }
 
