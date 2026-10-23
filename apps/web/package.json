@@ -8,11 +8,15 @@
     "build": "next build",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "5.3.0",
     "@fontsource/rajdhani": "5.3.0",
+    "@opennextjs/cloudflare": "1.20.2",
     "@phosphor-icons/react": "2.1.10",
     "@radix-ui/react-label": "2.1.12",
     "@radix-ui/react-progress": "1.1.13",
@@ -23,7 +27,7 @@
     "@radix-ui/react-toggle-group": "1.1.11",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "next": "16.2.10",
+    "next": "16.2.12",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "tailwind-merge": "3.3.1"
@@ -36,13 +40,14 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "eslint": "9.31.0",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.2.12",
     "jsdom": "26.1.0",
     "tailwindcss": "4.3.3",
     "typescript": "5.8.3",
     "vitest": "3.2.4",
     "@footebas/api": "workspace:*",
     "@footebas/application": "workspace:*",
-    "@footebas/database": "workspace:*"
+    "@footebas/database": "workspace:*",
+    "wrangler": "4.152.0"
   }
 }
