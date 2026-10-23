@@ -37,24 +37,26 @@ export async function createCareer(
   await expect(
     page.getByRole('heading', { name: /escolha seu clube/i }),
   ).toBeVisible();
-  await page
-    .getByRole('radio', { name: new RegExp(club, 'i') })
-    .first()
-    .check({ force: true });
+  await chooseCard(page, new RegExp(club, 'i'));
   await next();
   await expect(
     page.getByRole('heading', { name: /quem é o treinador/i }),
   ).toBeVisible();
   await page.getByLabel(/nome do treinador/i).fill(coach);
-  await page
-    .getByRole('radio', { name: /^estrategista/i })
-    .check({ force: true });
+  await chooseCard(page, /^estrategista/i);
   await next();
   await expect(
     page.getByRole('heading', { name: /dê um nome à carreira/i }),
   ).toBeVisible();
   await page.getByRole('button', { name: /começar carreira/i }).click();
   await expect(playButton(page)).toBeVisible();
+}
+
+/** Cartões de escolha escondem o radio (sr-only): clica no rótulo visível. */
+async function chooseCard(page: Page, name: RegExp): Promise<void> {
+  const radio = page.getByRole('radio', { name }).first();
+  await page.locator('label').filter({ has: radio }).first().click();
+  await expect(radio).toBeChecked();
 }
 
 export function playButton(page: Page) {

@@ -26,11 +26,10 @@ que não depende destes itens; cada item diz o que destrava.
 
 ## Qualidade, jurídico e lançamento
 
-7a. **Modelo 3D do estádio** (`football-field`, `football-court`): confirmar a origem e a licença de uso comercial (e
-    se exige crédito ao autor) antes do lançamento.
-
-7. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
-8. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
+7. **Modelo 3D do estádio** (`football-field`, `football-court`): confirmar a origem e a licença de uso comercial (e
+   se exige crédito ao autor) antes do lançamento.
+8. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
+9. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
    tributação da licença.
-9. Beta fechada com 3–5 pessoas e aceite qualitativo do loop.
-10. Aceite humano final.
+10. Beta fechada com 3–5 pessoas e aceite qualitativo do loop.
+11. Aceite humano final.
