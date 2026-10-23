@@ -1,6 +1,6 @@
 # ADR 0017 — Ranking em tempo real, por títulos e por melhor temporada
 
-- Status: aceito (implementação pendente)
+- Status: aceito (implementado no branch `feat/ranking-tempo-real`)
 - Data: 2026-10-23
 - Substitui os itens 1 (momento da conquista), 7 (snapshots) e 8 (leitura) do ADR 0013; os demais seguem valendo.
 
@@ -25,13 +25,13 @@ estadual não aparece. O responsável pediu (2026-10-23):
 2. **Rankings (escopos).** Pontos de cada conquista seguem a tabela do ADR 0013 (`ranking-v1`); a versão das regras
    passa a `ranking-v2` por causa do momento da conquista.
 
-   | Escopo           | Mede                                                          | Desempate                               |
-   | ---------------- | ------------------------------------------------------------- | --------------------------------------- |
-   | Geral            | soma dos pontos da carreira (era "global")                    | quem chegou ao total primeiro, id       |
-   | Títulos          | número de títulos (liga, copa, estadual, continental)         | pontos; quem chegou primeiro; id        |
-   | Melhor temporada | maior soma de pontos numa única temporada da carreira         | temporada mais antiga; id               |
-   | Ascensão         | regra do ADR 0013 (clubes de reputação até 65, até 3×)        | igual ao ADR 0013                       |
-   | Mensal           | pontos validados no mês civil (UTC), regra do ADR 0013        | igual ao ADR 0013                       |
+   | Escopo           | Mede                                                   | Desempate                         |
+   | ---------------- | ------------------------------------------------------ | --------------------------------- |
+   | Geral            | soma dos pontos da carreira (era "global")             | quem chegou ao total primeiro, id |
+   | Títulos          | número de títulos (liga, copa, estadual, continental)  | pontos; quem chegou primeiro; id  |
+   | Melhor temporada | maior soma de pontos numa única temporada da carreira  | temporada mais antiga; id         |
+   | Ascensão         | regra do ADR 0013 (clubes de reputação até 65, até 3×) | igual ao ADR 0013                 |
+   | Mensal           | pontos validados no mês civil (UTC), regra do ADR 0013 | igual ao ADR 0013                 |
 
 3. **Uma carreira por usuário** (mantido, decisão do responsável): em cada escopo conta a melhor carreira do usuário;
    carreiras não se somam, para que mais saves (licença) não virem vantagem.
@@ -43,6 +43,26 @@ estadual não aparece. O responsável pediu (2026-10-23):
    cron agregando a tabela inteira). A leitura pública ordena por índice e passa pelo Workers Cache por no máximo 30
    segundos; a posição do usuário (`/v1/rankings/me`) é calculada na hora. O cron de 15 minutos deixa de gerar
    snapshots (segue para a reconciliação de pagamentos) e só fecha o mês anterior no dia 1, para o histórico mensal.
+
+## Notas de implementação
+
+- **Domínio** (`packages/domain/src/ranking.ts`): regras puras dos cinco escopos, uma ordem única para todos
+  (títulos desc., pontos desc., temporada asc., instante em que chegou ao total asc., id do usuário) e a
+  classificação completa com as contas zeradas (`rankingStandings`, em ordem de cadastro).
+- **Momento do título**: a aplicação compara, a cada data jogada em `playThrough`, as competições que ganharam
+  `outcome` e valida o título do clube gerido naquele momento, com a data da última rodada; o motor não mudou.
+  O fechamento repete os títulos da temporada e a chave única descarta os repetidos.
+- **Banco** (`20261028000100_ranking_realtime.sql`): `ranking_players` (uma linha por conta, gatilho em
+  `auth.users` e backfill) e `ranking_entries` (melhor total do usuário por escopo e período, só com pontos;
+  índice de expressão para a ordem). A cada conquista a API reconstrói, na mesma transação e com as regras do
+  domínio, as linhas do usuário (escopos de sempre e o mês da conquista). Contas com conquistas anteriores a esta
+  mudança ficam marcadas (`needs_refresh`) e o cron as reconstrói em lotes de 100.
+- **Leitura**: `GET /v1/rankings` lê por índice e completa a página com as contas zeradas que têm carreira;
+  `total` é o número de participantes (todas as contas). O Worker guarda a resposta em `caches.default` por até
+  30 s, com chave por URL e `Origin` (a resposta leva o CORS da origem e o Cache API ignora `Vary`); só funciona no
+  domínio próprio (`api.footebas.com.br`).
+- **Desempate de Melhor temporada**: "temporada mais antiga" foi lido como o número da temporada da carreira
+  (temporada 1 antes da 3); persistindo o empate, quem chegou primeiro e depois o id.
 
 ## Consequências
 
