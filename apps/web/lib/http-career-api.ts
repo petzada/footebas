@@ -1171,11 +1171,15 @@ export class HttpCareerApi implements CareerApiPort {
           post.timeline.flatMap((event) =>
             event.side !== side
               ? []
-              : 'playerId' in event
-                ? [event.playerId]
-                : event.type === 'substitution'
-                  ? [event.playerInId, event.playerOutId]
-                  : [],
+              : event.type === 'substitution'
+                ? [event.playerInId, event.playerOutId]
+                : event.type === 'chance' || event.type === 'goal'
+                  ? [event.playerId, event.assistId].filter(
+                      (id): id is string => id !== undefined,
+                    )
+                  : 'playerId' in event
+                    ? [event.playerId]
+                    : [],
           ),
         ),
         ...(post.participants ?? [])
@@ -1221,6 +1225,17 @@ export class HttpCareerApi implements CareerApiPort {
       injury: 'card',
       full_time: 'full-time',
     };
+    // A saved shot keeps the specific narration but is a `save` beat for the
+    // live screen (the shooter's side owns it).
+    const kindOf = (line: (typeof lines)[number]): MatchUpdate['kind'] => {
+      const event =
+        line.eventIndex === undefined
+          ? undefined
+          : post.timeline[line.eventIndex];
+      return event?.type === 'chance' && event.outcome === 'saved'
+        ? 'save'
+        : (kinds[line.kind] ?? 'save');
+    };
     return lines.map((line, index) => {
       const next = lines[index + 1];
       return {
@@ -1234,7 +1249,7 @@ export class HttpCareerApi implements CareerApiPort {
         minute: line.minute,
         message: line.text,
         score: `${String(line.score.home)} × ${String(line.score.away)}`,
-        kind: kinds[line.kind] ?? 'save',
+        kind: kindOf(line),
         ...(line.side === undefined ? {} : { side: line.side }),
         decisionPoint: line.kind === 'half_time',
         done: line.kind === 'full_time',

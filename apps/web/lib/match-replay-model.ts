@@ -1,4 +1,9 @@
+import type { NarrationEvent } from '@footebas/engine/narration';
+
 export type ReplaySide = 'home' | 'away';
+/** How a chance was built and how it ended (match-v4, ADR 0015). */
+export type ReplayPlay = NonNullable<NarrationEvent['play']>;
+export type ReplayOutcome = NonNullable<NarrationEvent['outcome']>;
 
 export interface ReplayPlayer {
   readonly id: string;
@@ -30,12 +35,24 @@ export interface ReplayStatistics {
 /** `note` carries the narration line when the source already wrote one. */
 export type ReplayEvent = Readonly<{ note?: string }> &
   (
-    | Readonly<{ type: 'chance'; minute: number; side: ReplaySide; xg: number }>
+    | Readonly<{
+        type: 'chance';
+        minute: number;
+        side: ReplaySide;
+        xg: number;
+        /** Shooter, assistant, play and outcome: absent before match-v4. */
+        playerId?: string;
+        assistId?: string;
+        play?: ReplayPlay;
+        outcome?: ReplayOutcome;
+      }>
     | Readonly<{
         type: 'goal';
         minute: number;
         side: ReplaySide;
         playerId: string;
+        assistId?: string;
+        play?: ReplayPlay;
       }>
     | Readonly<{
         type: 'card';
@@ -148,12 +165,62 @@ function eventPlayerId(event: ReplayEvent | undefined): string | undefined {
   return undefined;
 }
 
+function knownName(
+  input: MatchReplayInput,
+  id: string | undefined,
+): string | undefined {
+  return id === undefined
+    ? undefined
+    : [...input.home.players, ...input.away.players].find(
+        (player) => player.id === id,
+      )?.name;
+}
+
 function playerName(input: MatchReplayInput, id: string): string {
-  return (
-    [...input.home.players, ...input.away.players].find(
-      (player) => player.id === id,
-    )?.name ?? 'Jogador'
-  );
+  return knownName(input, id) ?? 'Jogador';
+}
+
+/** How the play reached the finish ("Pedro finaliza após cruzamento"). */
+const PLAY_LABELS: Readonly<Record<ReplayPlay, string>> = {
+  build_up: 'após troca de passes',
+  counter: 'em contra-ataque',
+  individual: 'em jogada individual',
+  cross: 'após cruzamento',
+  long_shot: 'de fora da área',
+  defensive_error: 'após erro da defesa',
+};
+const OUTCOME_LABELS: Readonly<Record<ReplayOutcome, string>> = {
+  goal: 'gol',
+  saved: 'defesa do goleiro',
+  off_target: 'para fora',
+  blocked: 'travado pela defesa',
+  woodwork: 'na trave',
+};
+
+function describeChance(
+  input: MatchReplayInput,
+  event: Extract<ReplayEvent, { type: 'chance' }>,
+  prefix: string,
+): string {
+  // Only athletes of the match are named; unknown shooters fall back to xG.
+  const shooter = knownName(input, event.playerId);
+  if (shooter === undefined)
+    return `${prefix} cria uma chance de ${event.xg.toFixed(2)} xG.`;
+  const play = event.play === undefined ? '' : ` ${PLAY_LABELS[event.play]}`;
+  const outcome =
+    event.outcome === undefined ? '' : `… ${OUTCOME_LABELS[event.outcome]}`;
+  return `${prefix}: ${shooter} finaliza${play}${outcome}.`;
+}
+
+function describeGoal(
+  input: MatchReplayInput,
+  event: Extract<ReplayEvent, { type: 'goal' }>,
+  prefix: string,
+): string {
+  const play = event.play === undefined ? '' : ` ${PLAY_LABELS[event.play]}`;
+  const assistant = knownName(input, event.assistId);
+  const assist = assistant === undefined ? '' : `, passe de ${assistant}`;
+  return `${prefix} marca com ${playerName(input, event.playerId)}${play}${assist}.`;
 }
 
 export function describeReplayEvent(
@@ -165,9 +232,9 @@ export function describeReplayEvent(
   const prefix = `${event.minute}' · ${team.abbreviation}`;
   switch (event.type) {
     case 'chance':
-      return `${prefix} cria uma chance de ${event.xg.toFixed(2)} xG.`;
+      return describeChance(input, event, prefix);
     case 'goal':
-      return `${prefix} marca com ${playerName(input, event.playerId)}.`;
+      return describeGoal(input, event, prefix);
     case 'card':
       return `${prefix}: cartão ${event.card === 'red' ? 'vermelho' : 'amarelo'} para ${playerName(input, event.playerId)}.`;
     case 'injury':

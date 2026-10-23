@@ -242,18 +242,57 @@ export const standingsReadModelSchema = z.strictObject({
   competition: nonEmptyTextSchema,
   rows: z.array(standingRowSchema).min(2).max(100),
 });
+/** How a chance was built (match-v4, ADR 0015). */
+export const matchPlaySchema = z.enum([
+  'build_up',
+  'counter',
+  'individual',
+  'cross',
+  'long_shot',
+  'defensive_error',
+]);
+export const chanceOutcomeSchema = z.enum([
+  'goal',
+  'saved',
+  'off_target',
+  'blocked',
+  'woodwork',
+]);
+/**
+ * Playback speeds of the match feed (decision 18: 0.5× is user selectable).
+ * The server sends the full list; the list without 0.5× (before it reached
+ * the contract) stays valid so older payloads and clients keep parsing.
+ */
+export const playbackSpeedsSchema = z.union([
+  z.tuple([
+    z.literal(0.5),
+    z.literal(1),
+    z.literal(2),
+    z.literal(4),
+    z.literal(8),
+  ]),
+  z.tuple([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]),
+]);
 const timelineEventSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('chance'),
     minute: z.int().min(0).max(130),
     side: z.enum(['home', 'away']),
     xg: z.number().min(0).max(1),
+    // Shooter, assistant, play and outcome exist since match-v4; results
+    // recorded by older engine versions have none of them.
+    playerId: entityIdSchema.optional(),
+    assistId: entityIdSchema.optional(),
+    play: matchPlaySchema.optional(),
+    outcome: chanceOutcomeSchema.optional(),
   }),
   z.strictObject({
     type: z.literal('goal'),
     minute: z.int().min(0).max(130),
     side: z.enum(['home', 'away']),
     playerId: entityIdSchema,
+    assistId: entityIdSchema.optional(),
+    play: matchPlaySchema.optional(),
   }),
   z.strictObject({
     type: z.literal('card'),
@@ -310,7 +349,7 @@ export const postMatchReadModelSchema = z.strictObject({
       z.literal('fast'),
       z.literal('feed'),
     ]),
-    speeds: z.tuple([z.literal(1), z.literal(2), z.literal(4), z.literal(8)]),
+    speeds: playbackSpeedsSchema,
     canSkip: z.literal(true),
   }),
 });

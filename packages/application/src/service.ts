@@ -2290,12 +2290,16 @@ function postMatchModel(
   const { fixture: f, result } = played;
   const timeline: Record<string, unknown>[] = [];
   for (const event of result.timeline) {
+    // Shooter, assistant, play and outcome (match-v4) feed the narration;
+    // results recorded by older engines simply lack them.
     if (event.type === 'goal')
       timeline.push({
         type: 'goal',
         minute: event.minute,
         side: event.side,
         playerId: event.scorerId,
+        ...(event.assistId ? { assistId: event.assistId } : {}),
+        ...(event.play ? { play: event.play } : {}),
       });
     else if (event.type === 'chance')
       timeline.push({
@@ -2303,6 +2307,10 @@ function postMatchModel(
         minute: event.minute,
         side: event.side,
         xg: event.xg,
+        ...(event.playerId ? { playerId: event.playerId } : {}),
+        ...(event.assistId ? { assistId: event.assistId } : {}),
+        ...(event.play ? { play: event.play } : {}),
+        ...(event.outcome ? { outcome: event.outcome } : {}),
       });
     else if (event.type === 'card')
       timeline.push({

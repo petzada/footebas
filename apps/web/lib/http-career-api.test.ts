@@ -311,6 +311,34 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     for (const event of shown) expect(finalMessages).toContain(event.message);
   });
 
+  it('narra cada finalização com o autor, a jogada e o desfecho do motor', async () => {
+    const { client } = await start();
+    const updates = [await client.beginMatch()];
+    while (!updates.at(-1)!.done) updates.push(await client.nextMatchEvent());
+    const replay = updates.at(-1)!.replay ?? updates[0]!.replay!;
+    const names = new Map(
+      [...replay.home.players, ...replay.away.players].map(
+        ({ id, name }) => [id, name] as const,
+      ),
+    );
+    const chances = replay.timeline.flatMap((event) =>
+      event.type === 'chance' ? [event] : [],
+    );
+    expect(chances.length).toBeGreaterThan(0);
+    for (const chance of chances) {
+      expect(names.has(chance.playerId ?? '')).toBe(true);
+      expect(chance.play).toBeDefined();
+      expect(chance.outcome).toBeDefined();
+    }
+    // Every unsaved shot is a `chance` line naming its shooter (saved shots
+    // are `save` beats with the same specific narration).
+    const unsaved = chances.filter(({ outcome }) => outcome !== 'saved');
+    const lines = updates.filter(({ kind }) => kind === 'chance');
+    expect(lines).toHaveLength(unsaved.length);
+    for (const [index, line] of lines.entries())
+      expect(line.message).toContain(names.get(unsaved[index]!.playerId!));
+  });
+
   it('dá resultado instantâneo e aplica comandos do mundo na mesma versão', async () => {
     const { client } = await start();
     const played = await client.instantResult();

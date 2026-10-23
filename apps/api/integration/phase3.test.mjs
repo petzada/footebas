@@ -307,7 +307,7 @@ describe('Phase 3 Fastify/application/worker integration', () => {
     );
     expect(postMatch.playback).toEqual({
       modes: ['instant', 'fast', 'feed'],
-      speeds: [1, 2, 4, 8],
+      speeds: [0.5, 1, 2, 4, 8],
       canSkip: true,
     });
     const expandedAfter = squadReadModelSchema.parse(

@@ -133,9 +133,22 @@ describe('server-authoritative application slice', () => {
       ).jobId,
     ).toBeDefined();
     expect((await app.runNextJob())?.state).toBe('succeeded');
-    expect((await app.postMatch(token, careerId)).fixtureId).toBe(
-      next.fixtureId,
+    const post = await app.postMatch(token, careerId);
+    expect(post.fixtureId).toBe(next.fixtureId);
+    // match-v4 chances reach the read model with shooter, play and outcome,
+    // always athletes of the match (ADR 0015), so the feed narrates them.
+    const chances = post.timeline.flatMap((event) =>
+      event.type === 'chance' ? [event] : [],
     );
+    const participants = new Set(post.participants?.map(({ id }) => id));
+    expect(chances.length).toBeGreaterThan(0);
+    for (const chance of chances) {
+      expect(chance.playerId && participants.has(chance.playerId)).toBe(true);
+      expect(chance.play).toBeDefined();
+      expect(chance.outcome).toBeDefined();
+      if (chance.assistId !== undefined)
+        expect(participants.has(chance.assistId)).toBe(true);
+    }
     const table = await app.standings(token, careerId);
     expect(table.competition).toBe('Brasileirão Série A');
     expect(table.rows).toHaveLength(20);
@@ -256,7 +269,7 @@ describe('server-authoritative application slice', () => {
     );
     expect(post.playback).toEqual({
       modes: ['instant', 'fast', 'feed'],
-      speeds: [1, 2, 4, 8],
+      speeds: [0.5, 1, 2, 4, 8],
       canSkip: true,
     });
     const after = await app.squad(token, careerId);
