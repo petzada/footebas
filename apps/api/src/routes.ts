@@ -232,12 +232,16 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
         body: {
           oneOf: [
             'CreateCareer',
+            'DeleteCareer',
             'SelectClub',
             'SetLineup',
             'AutoPickLineup',
             'SetTactics',
             'AdvanceDate',
             'SimulateMatch',
+            'DecideSponsorshipOffer',
+            'CounterSponsorshipOffer',
+            'ConfigureFanMembership',
           ].map((type) => ({
             type: 'object',
             required: [
@@ -308,6 +312,7 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
   > = {
     home: (token, id) => app.home(token, id),
     squad: (token, id) => app.squad(token, id),
+    office: (token, id) => app.careerOffice(token, id),
     'next-match': (token, id) => app.nextMatch(token, id),
     standings: (token, id) => app.standings(token, id),
     'post-match': (token, id) => app.postMatch(token, id),
