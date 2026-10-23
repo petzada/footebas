@@ -13,11 +13,14 @@ import { InMemoryCareerApi } from '@/lib/career-api';
 async function onboard(api = new InMemoryCareerApi()) {
   render(<CareerGame api={api} />);
   fireEvent.click(screen.getByRole('button', { name: /entrar no vestiário/i }));
+  fireEvent.click(
+    await screen.findByRole('button', { name: /nova carreira/i }),
+  );
   await screen.findByLabelText(/nome do treinador/i);
   fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
   await screen.findByText(/escolha seu desafio/i);
   fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
-  await screen.findByRole('button', { name: /narrar partida/i });
+  await screen.findByRole('button', { name: /jogar partida/i });
   return api;
 }
 
@@ -26,7 +29,7 @@ afterEach(() => vi.useRealTimers());
 describe('elenco e matchday mobile-first', () => {
   it('chega à rodada em poucos toques, pula o feed e prepara a próxima', async () => {
     await onboard();
-    fireEvent.click(screen.getByRole('button', { name: /narrar partida/i }));
+    fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
     fireEvent.click(
       await screen.findByRole('button', { name: /pular resultado/i }),
     );
@@ -34,7 +37,7 @@ describe('elenco e matchday mobile-first', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /preparar próxima rodada/i }),
     );
-    expect(await screen.findByText(/rodada 2/i)).toBeTruthy();
+    expect((await screen.findAllByText(/rodada 2/i)).length).toBeGreaterThan(0);
   });
 
   it('oferece controles sem drag e seleção operável por teclado', async () => {
@@ -65,7 +68,7 @@ describe('elenco e matchday mobile-first', () => {
     await onboard();
     expect(screen.getByText(/raio-x do rival/i)).toBeTruthy();
     expect(screen.getByText('≈ 82')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /narrar partida/i }));
+    fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
     expect(await screen.findByLabelText(/velocidade 4 vezes/i)).toBeTruthy();
     expect(
       screen.getByRole('list', { name: /feed da partida/i }).textContent,

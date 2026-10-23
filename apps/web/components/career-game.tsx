@@ -1,15 +1,20 @@
 'use client';
 
-import React, { useEffect, useEffectEvent, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import {
+  ArrowLeft,
   ArrowRight,
   ArrowsClockwise,
   CheckCircle,
-  ClipboardText,
-  Lightning,
+  ChartLineUp,
   Pause,
   Play,
-  ShieldWarning,
   SignOut,
   SoccerBall,
   Sparkle,
@@ -60,6 +65,7 @@ import {
   type SquadRole,
   type TacticsView,
   InMemoryCareerApi,
+  isCareerLimitError,
 } from '@/lib/career-api';
 import type { AuthPort, AuthUser } from '@/lib/auth';
 import { SessionExpiredError } from '@/lib/http-career-api';
@@ -74,6 +80,15 @@ import {
 import { CompetitionScreens } from '@/components/competition-screens';
 import { Phase6Shell, PwaRuntime } from '@/components/phase6-shell';
 import { MatchReplayViewer } from '@/components/match-replay-viewer';
+import { ClubEmblem } from '@/components/club-emblem';
+import { CentralScreen } from '@/components/central-screen';
+import { ClubMapScreen } from '@/components/club-map';
+import {
+  LoadCareerScreen,
+  StartScreen,
+  type PlayerIdentity,
+} from '@/components/start-screens';
+import { createFakeCompetitionProductPort } from '@/lib/competition-product';
 import { parseScore } from '@/lib/match-replay-adapter';
 import {
   competitionPortFor,
@@ -81,7 +96,11 @@ import {
   type CareerRuntime,
 } from '@/lib/runtime-api';
 
-type Stage = 'login' | 'coach' | 'club' | 'game' | 'match' | 'result';
+type Stage =
+  'login' | 'start' | 'load' | 'coach' | 'club' | 'game' | 'match' | 'result';
+
+/** Offline demo calendar, same source the competition screens use. */
+const demoCompetitionPort = createFakeCompetitionProductPort();
 
 const SESSION_EXPIRED = 'Sua sessão expirou. Entre novamente.';
 
@@ -172,7 +191,8 @@ function CareerFlow({
 }) {
   const [competitionPort] = useState(() => competitionPortFor(api));
   const [stage, setStage] = useState<Stage>('login');
-  const [screen, setScreen] = useState<Screen>('home');
+  const [screen, setScreen] = useState<Screen>('central');
+  const [limitNotice, setLimitNotice] = useState('');
   const [career, setCareer] = useState<CareerView | null>(null);
   const [email, setEmail] = useState('torcedor@footebas.com');
   const [coach, setCoach] = useState('Márcio');
@@ -248,12 +268,51 @@ function CareerFlow({
       await api.login(
         session ? (session.email ?? 'jogador@footebas.app') : email,
       );
-      const saved = await api.getCareer();
-      if (saved) {
-        setCareer(saved);
-        setStage('game');
-      } else setStage('coach');
+      setStage('start');
     });
+
+  const goStart = () => {
+    setError('');
+    setLimitNotice('');
+    setStage('start');
+  };
+
+  const openCareer = (careerId: string) =>
+    attempt(`open:${careerId}`, async () => {
+      const opened = await api.openCareer(careerId);
+      setLimitNotice('');
+      if (!opened) {
+        setStage('club');
+        return;
+      }
+      setCareer(opened);
+      setScreen('central');
+      setStage('game');
+    });
+
+  const loadStats = useCallback(() => api.getPublicStats(), [api]);
+  const listCareers = useCallback(() => api.listCareers(), [api]);
+  const removeCareer = useCallback(
+    async (careerId: string) => {
+      try {
+        await api.deleteCareer(careerId);
+      } catch (caught) {
+        if (caught instanceof SessionExpiredError && onSessionExpired)
+          onSessionExpired();
+        throw caught;
+      }
+    },
+    [api, onSessionExpired],
+  );
+
+  const player: PlayerIdentity = {
+    name:
+      session?.name ??
+      (session?.email ?? email).split('@')[0] ??
+      career?.coach ??
+      'Treinador',
+    ...(session?.avatarUrl ? { avatarUrl: session.avatarUrl } : {}),
+  };
 
   const resumeSession = useEffectEvent(() => void login());
   const userId = session?.id;
@@ -269,6 +328,48 @@ function CareerFlow({
     };
   }, [userId]);
 
+  if (stage === 'start')
+    return (
+      <>
+        <PwaRuntime />
+        <StartScreen
+          player={player}
+          loadStats={loadStats}
+          error={error}
+          onNewCareer={() => {
+            setError('');
+            setStage('coach');
+          }}
+          onLoadCareer={() => {
+            setError('');
+            setStage('load');
+          }}
+          onSignOut={onSignOut}
+        />
+      </>
+    );
+
+  if (stage === 'load')
+    return (
+      <>
+        <PwaRuntime />
+        <LoadCareerScreen
+          load={listCareers}
+          remove={removeCareer}
+          notice={limitNotice}
+          error={error}
+          onOpen={(summary) => void openCareer(summary.id)}
+          onNewCareer={() => {
+            setError('');
+            setLimitNotice('');
+            setStage('coach');
+          }}
+          onBack={goStart}
+          onSignOut={onSignOut}
+        />
+      </>
+    );
+
   if (!['game', 'match', 'result'].includes(stage)) {
     return (
       <>
@@ -283,9 +384,18 @@ function CareerFlow({
           setCoach={setCoach}
           onLogin={() => void login()}
           {...(onSignOut ? { onSignOut } : {})}
+          onBack={goStart}
           onCoach={() =>
             attempt('coach', async () => {
-              await api.createCareer({ coach });
+              try {
+                await api.createCareer({ coach });
+              } catch (caught) {
+                // The plan refused another career: show it next to the list.
+                if (!isCareerLimitError(caught)) throw caught;
+                setLimitNotice(caught.message);
+                setStage('load');
+                return;
+              }
               setStage('club');
             })
           }
@@ -293,6 +403,7 @@ function CareerFlow({
             attempt('club', async () => {
               await api.selectClub(club);
               setCareer(await api.getCareer());
+              setScreen('central');
               setStage('game');
             })
           }
@@ -313,6 +424,7 @@ function CareerFlow({
         career={career}
         commandState={commandState}
         {...(onSignOut ? { onSignOut } : {})}
+        onHome={goStart}
       >
         {error && <InlineError message={error} />}
         {stage === 'match' && matchUpdate ? (
@@ -332,15 +444,23 @@ function CareerFlow({
             career={career}
             onContinue={() => {
               setStage('game');
-              setScreen('home');
+              setScreen('central');
             }}
           />
-        ) : screen === 'home' ? (
-          <MatchPreparation
+        ) : screen === 'central' ? (
+          <CentralScreen
             career={career}
+            calendar={competitionPort ?? demoCompetitionPort}
             onNarrate={beginNarratedMatch}
             onInstant={instantResult}
-            setScreen={setScreen}
+            navigate={setScreen}
+          />
+        ) : screen === 'map' ? (
+          <ClubMapScreen
+            career={career}
+            navigate={setScreen}
+            onNarrate={beginNarratedMatch}
+            onInstant={instantResult}
           />
         ) : screen === 'squad' ? (
           <Squad
@@ -362,7 +482,7 @@ function CareerFlow({
             onSave={(formation, tactics) =>
               attempt('tactics', async () => {
                 setCareer(await api.setTactics({ formation, tactics }));
-                setScreen('home');
+                setScreen('central');
               })
             }
           />
@@ -375,14 +495,16 @@ function CareerFlow({
             onCareerChange={setCareer}
             reportError={setError}
           />
-        ) : screen === 'club' ? (
+        ) : screen === 'season' ? (
+          <SeasonScreen career={career} navigate={setScreen} />
+        ) : screen === 'office' || screen === 'stadium' ? (
           <ClubScreen
             career={career}
             api={api}
             onCareerChange={setCareer}
             reportError={setError}
             key={screen}
-            initialTab="board"
+            initialTab={screen === 'office' ? 'board' : 'stadium'}
           />
         ) : screen === 'finance' ? (
           <ClubScreen
@@ -424,6 +546,7 @@ function CareerFlow({
             initialTab="history"
           />
         ) : (
+          // ranking
           <WorldScreen
             career={career}
             api={api}
@@ -465,6 +588,7 @@ function Onboarding(props: {
   onLogin(): void;
   onCoach(): void;
   onClub(value: string): void;
+  onBack(): void;
   onSignOut?: () => void;
 }) {
   return (
@@ -538,6 +662,14 @@ function Onboarding(props: {
           ) : props.stage === 'coach' ? (
             <>
               <CardHeader>
+                <Button
+                  variant="ghost"
+                  className="-ml-3 min-h-11 w-fit"
+                  onClick={props.onBack}
+                >
+                  <ArrowLeft data-icon="inline-start" />
+                  Voltar ao início
+                </Button>
                 <Badge variant="secondary" className="w-fit">
                   1 de 2
                 </Badge>
@@ -589,12 +721,15 @@ function Onboarding(props: {
                   <Button
                     key={club}
                     variant="outline"
-                    className="h-auto min-h-14 justify-between py-3"
+                    className="h-auto min-h-16 justify-between gap-3 py-3"
                     onClick={() => props.onClub(club)}
                   >
-                    <span className="text-left">
-                      <strong className="block">{club}</strong>
-                      <small className="text-muted-foreground">{note}</small>
+                    <span className="flex items-center gap-3 text-left">
+                      <ClubEmblem name={club} size={40} decorative />
+                      <span>
+                        <strong className="block">{club}</strong>
+                        <small className="text-muted-foreground">{note}</small>
+                      </span>
                     </span>
                     <ArrowRight />
                   </Button>
@@ -620,182 +755,6 @@ function Onboarding(props: {
         )}
       </div>
     </main>
-  );
-}
-
-function MatchPreparation({
-  career,
-  onNarrate,
-  onInstant,
-  setScreen,
-}: {
-  career: CareerView;
-  onNarrate(): void;
-  onInstant(): void;
-  setScreen(value: Screen): void;
-}) {
-  const unavailable = career.players.filter(
-    (player) => player.injuryRounds > 0 || player.suspended,
-  );
-  const starters = career.players.filter((player) => player.role === 'starter');
-  const average = Math.round(
-    starters.reduce((sum, player) => sum + player.strength, 0) /
-      Math.max(1, starters.length),
-  );
-  return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,.65fr)]">
-      <Card className="overflow-hidden">
-        <CardHeader className="match-banner">
-          <div className="flex items-center justify-between">
-            <Badge>Próxima rodada</Badge>
-            <span className="font-display text-sm font-bold uppercase text-muted-foreground">
-              Hoje · 20:30
-            </span>
-          </div>
-          <CardTitle className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 font-display text-3xl uppercase sm:text-5xl">
-            <span>{career.club}</span>
-            <span className="text-accent">×</span>
-            <span className="text-right">{career.opponent.club}</span>
-          </CardTitle>
-          <CardDescription>Maracanã · mando do {career.club}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 pt-6">
-          <div className="grid grid-cols-3 gap-2 rounded-md bg-muted p-3 text-center">
-            <Stat label="Nossa força" value={String(average)} />
-            <Stat
-              label="Adversário"
-              value={`≈ ${career.opponent.approximateStrength}`}
-            />
-            <Stat label="Formação" value={career.formation} />
-          </div>
-          <section
-            aria-labelledby="scout-title"
-            className="grid gap-3 sm:grid-cols-[auto_1fr]"
-          >
-            <div>
-              <h2
-                id="scout-title"
-                className="font-display text-xl font-bold uppercase"
-              >
-                Raio-X do rival
-              </h2>
-              <div
-                className="mt-2 flex gap-1"
-                aria-label={`Forma recente: ${career.opponent.form.join(', ')}`}
-              >
-                {career.opponent.form.map((result, index) => (
-                  <Badge
-                    key={`${result}-${index}`}
-                    variant={result === 'V' ? 'default' : 'secondary'}
-                  >
-                    {result}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-md border bg-background/35 p-3">
-              <p className="text-sm">{career.opponent.report}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Desfalques: {career.opponent.absences.join(', ') || 'nenhum'}
-              </p>
-            </div>
-          </section>
-        </CardContent>
-        <CardFooter className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <Button className="min-h-12" onClick={onNarrate}>
-            <Play weight="fill" data-icon="inline-start" />
-            Narrar partida
-          </Button>
-          <Button variant="secondary" className="min-h-12" onClick={onInstant}>
-            <Lightning weight="fill" data-icon="inline-start" />
-            Resultado instantâneo
-          </Button>
-          <Button
-            variant="outline"
-            className="min-h-12"
-            onClick={() => setScreen('tactics')}
-            aria-label="Revisar escalação e tática"
-          >
-            <ClipboardText data-icon="inline-start" />
-            Revisar
-          </Button>
-        </CardFooter>
-      </Card>
-      <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-xl uppercase">
-              Pronto para jogar?
-            </CardTitle>
-            <CardDescription>Resumo da decisão da rodada.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <StatusLine
-              good={starters.length === 11}
-              label={`${starters.length}/11 titulares`}
-            />
-            <StatusLine
-              good={unavailable.every((player) => player.role !== 'starter')}
-              label={`${unavailable.length} indisponível(is)`}
-            />
-            <StatusLine
-              good
-              label={`${tacticsLabel.mentality[career.tactics.mentality]} · ${tacticsLabel.press[career.tactics.press]}`}
-            />
-          </CardContent>
-        </Card>
-        {unavailable.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-xl uppercase">
-                Departamento médico
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              {unavailable.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span>{player.name}</span>
-                  <Badge variant="outline">
-                    {player.injuryRounds
-                      ? `${player.injuryRounds} rod.`
-                      : 'Suspenso'}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatusLine({ good, label }: { good: boolean; label: string }) {
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      {good ? (
-        <CheckCircle className="text-primary" weight="fill" />
-      ) : (
-        <ShieldWarning className="text-accent" weight="fill" />
-      )}
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-[.65rem] font-bold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 font-display text-lg font-bold uppercase sm:text-xl">
-        {value}
-      </p>
-    </div>
   );
 }
 
@@ -1677,7 +1636,9 @@ function Standings({ career }: { career: CareerView }) {
         <CardTitle className="font-display text-2xl uppercase">
           Classificação
         </CardTitle>
-        <CardDescription>Série A · rodada {career.round}</CardDescription>
+        <CardDescription>
+          {career.division ?? 'Liga'} · rodada {career.round}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
@@ -1703,7 +1664,10 @@ function Standings({ career }: { career: CareerView }) {
                       row.club === career.club && 'font-bold text-primary',
                     )}
                   >
-                    {row.club}
+                    <span className="flex items-center gap-2">
+                      <ClubEmblem name={row.club} size={24} decorative />
+                      {row.club}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">{row.played}</TableCell>
                   <TableCell className="text-right font-display text-lg font-bold">
@@ -1715,5 +1679,55 @@ function Standings({ career }: { career: CareerView }) {
         </Table>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Temporada: read-only season screen. Charts (scorers, ratings, position by
+ * round, champions) come with its own redesign; the table works today.
+ */
+function SeasonScreen({
+  career,
+  navigate,
+}: {
+  career: CareerView;
+  navigate(value: Screen): void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <section
+        aria-labelledby="temporada-em-construcao"
+        className="arcade-panel flex flex-col gap-3 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex items-start gap-3">
+          <ChartLineUp
+            className="size-8 shrink-0 text-accent"
+            weight="duotone"
+            aria-hidden="true"
+          />
+          <div>
+            <h2
+              id="temporada-em-construcao"
+              className="font-display text-2xl font-bold uppercase"
+            >
+              Em construção
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Artilharia, notas, posição por rodada e campeões chegam nesta
+              tela. Enquanto isso, a classificação e as competições seguem aqui.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          className="min-h-11"
+          onClick={() => navigate('competitions')}
+        >
+          Ver competições
+          <ArrowRight data-icon="inline-end" />
+        </Button>
+      </section>
+      <Standings career={career} />
+    </div>
   );
 }

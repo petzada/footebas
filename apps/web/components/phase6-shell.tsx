@@ -4,24 +4,27 @@ import { useEffect, useState, type ReactNode } from 'react';
 import {
   Bank,
   Bell,
-  Buildings,
+  Briefcase,
   CalendarDots,
-  ChartBar,
+  ChartLineUp,
   ClockCounterClockwise,
   DotsThree,
-  GlobeHemisphereWest,
   House,
-  ListChecks,
+  ListNumbers,
+  MapTrifold,
   Moon,
+  Ranking,
   SignOut,
   SoccerBall,
   Storefront,
   Strategy,
   Sun,
   Trophy,
+  UsersThree,
   WifiHigh,
   WifiSlash,
 } from '@phosphor-icons/react';
+import { ClubEmblem } from '@/components/club-emblem';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -30,24 +33,37 @@ import { cn } from '@/lib/utils';
 
 type CommandState = 'idle' | 'pending' | 'duplicate' | 'success';
 
-const destinations = [
-  ['home', 'Visão geral', House],
+type Destination = readonly [Screen, string, typeof House];
+
+/** The seven main areas of docs/09-telas-e-escopo.md, in order. */
+export const mainDestinations = [
+  ['central', 'Central', House],
+  ['map', 'Mapa', MapTrifold],
+  ['squad', 'Elenco', UsersThree],
+  ['market', 'Mercado', Storefront],
+  ['office', 'Escritório', Briefcase],
+  ['season', 'Temporada', ChartLineUp],
+  ['ranking', 'Ranking', Ranking],
+] as const satisfies ReadonlyArray<Destination>;
+
+/** Current screens that keep working until their own redesign. */
+export const moreDestinations = [
   ['inbox', 'Caixa de entrada', Bell],
   ['calendar', 'Calendário', CalendarDots],
-  ['squad', 'Elenco', ListChecks],
   ['tactics', 'Táticas', Strategy],
-  ['market', 'Mercado', Storefront],
-  ['table', 'Classificação', ChartBar],
+  ['table', 'Classificação', ListNumbers],
   ['competitions', 'Competições', Trophy],
-  ['club', 'Clube', Buildings],
+  ['stadium', 'Estádio', SoccerBall],
   ['finance', 'Finanças', Bank],
-  ['history', 'História', ClockCounterClockwise],
-  ['world', 'Mundo', GlobeHemisphereWest],
-] as const satisfies ReadonlyArray<readonly [Screen, string, typeof House]>;
+  ['history', 'Histórico', ClockCounterClockwise],
+] as const satisfies ReadonlyArray<Destination>;
 
-const primaryMobile = destinations.filter(([id]) =>
-  ['home', 'squad', 'tactics', 'market'].includes(id),
-);
+const destinations: readonly Destination[] = [
+  ...mainDestinations,
+  ...moreDestinations,
+];
+
+const primaryMobile = mainDestinations.slice(0, 4);
 
 const labels = Object.fromEntries(
   destinations.map(([id, label]) => [id, label]),
@@ -59,6 +75,7 @@ export function Phase6Shell({
   career,
   commandState,
   onSignOut,
+  onHome,
   children,
 }: {
   screen: Screen;
@@ -67,9 +84,14 @@ export function Phase6Shell({
   commandState: CommandState;
   /** Shown only when there is a real account session to end. */
   onSignOut?: () => void;
+  /** Leaves the career for the Início screen (new or saved careers). */
+  onHome?: () => void;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Central and Mapa already show the next match and the advance button.
+  const showRail = screen !== 'central' && screen !== 'map';
 
   const navigate = (destination: Screen) => {
     setScreen(destination);
@@ -78,7 +100,12 @@ export function Phase6Shell({
   };
 
   return (
-    <div className="mx-auto min-h-dvh max-w-[110rem] pb-24 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:pb-0 xl:grid-cols-[16rem_minmax(0,1fr)_19rem]">
+    <div
+      className={cn(
+        'mx-auto min-h-dvh max-w-[110rem] pb-24 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:pb-0',
+        showRail && 'xl:grid-cols-[16rem_minmax(0,1fr)_19rem]',
+      )}
+    >
       <DesktopSidebar career={career} screen={screen} navigate={navigate} />
       <main
         id="conteudo-principal"
@@ -86,15 +113,29 @@ export function Phase6Shell({
         className="min-w-0 px-4 py-4 sm:px-6 lg:px-8 lg:py-6"
       >
         <header className="mb-5 flex min-h-14 items-center justify-between gap-3 border-b pb-4">
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold uppercase tracking-[.18em] text-primary">
-              {career.club} · Rodada {career.round}
-            </p>
-            <h1 className="font-display text-3xl font-bold uppercase leading-none sm:text-4xl">
-              {labels[screen]}
-            </h1>
+          <div className="flex min-w-0 items-center gap-3">
+            <ClubEmblem name={career.club} size={44} decorative />
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold uppercase tracking-[.18em] text-primary">
+                {career.club} · Rodada {career.round}
+              </p>
+              <h1 className="font-display text-3xl font-bold uppercase leading-none sm:text-4xl">
+                {labels[screen]}
+              </h1>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {onHome && (
+              <Button
+                variant="outline"
+                aria-label="Voltar ao início"
+                title="Voltar ao início"
+                onClick={onHome}
+              >
+                <SoccerBall data-icon="inline-start" />
+                <span className="hidden sm:inline">Início</span>
+              </Button>
+            )}
             <ThemeButton />
             {onSignOut && (
               <Button variant="outline" onClick={onSignOut}>
@@ -107,7 +148,7 @@ export function Phase6Shell({
         <CommandAnnouncer state={commandState} />
         {children}
       </main>
-      <DesktopRail career={career} navigate={navigate} />
+      {showRail && <DesktopRail career={career} navigate={navigate} />}
       <MobileNavigation
         screen={screen}
         open={menuOpen}
@@ -191,11 +232,11 @@ function DesktopSidebar({
         aria-label="Navegação principal desktop"
         className="mt-7 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
       >
-        {destinations.map(([id, label, Icon]) => (
+        {mainDestinations.map(([id, label, Icon]) => (
           <Button
             key={id}
             variant={screen === id ? 'secondary' : 'ghost'}
-            className="min-h-10 justify-start"
+            className="min-h-10 justify-start font-semibold"
             aria-current={screen === id ? 'page' : undefined}
             onClick={() => navigate(id)}
           >
@@ -206,6 +247,33 @@ function DesktopSidebar({
             {label}
           </Button>
         ))}
+        <p
+          id="mais-areas-desktop"
+          className="mt-4 px-3 text-[.65rem] font-bold uppercase tracking-[.18em] text-muted-foreground"
+        >
+          Mais áreas
+        </p>
+        <ul
+          aria-labelledby="mais-areas-desktop"
+          className="flex flex-col gap-1"
+        >
+          {moreDestinations.map(([id, label, Icon]) => (
+            <li key={id}>
+              <Button
+                variant={screen === id ? 'secondary' : 'ghost'}
+                className="min-h-9 w-full justify-start text-muted-foreground"
+                aria-current={screen === id ? 'page' : undefined}
+                onClick={() => navigate(id)}
+              >
+                <Icon
+                  data-icon="inline-start"
+                  weight={screen === id ? 'fill' : 'regular'}
+                />
+                {label}
+              </Button>
+            </li>
+          ))}
+        </ul>
       </nav>
       <Separator className="my-4" />
       <p className="text-xs text-muted-foreground">Treinador</p>
@@ -314,7 +382,7 @@ function MobileNavigation({
           </div>
           <nav
             aria-label="Mais áreas"
-            className="grid grid-cols-2 gap-1 sm:grid-cols-3"
+            className="grid max-h-[60dvh] grid-cols-2 gap-1 overflow-y-auto sm:grid-cols-3"
           >
             {destinations.map(([id, label, Icon]) => (
               <Button

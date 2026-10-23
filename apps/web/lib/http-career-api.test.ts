@@ -111,6 +111,18 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     expect(career.world.market.length).toBeGreaterThan(0);
   });
 
+  it('lista e reabre a carreira pela listagem do servidor', async () => {
+    const { client } = await start();
+    const { careers } = await client.listCareers();
+    expect(careers).toEqual([
+      expect.objectContaining({ coach: 'Marcio', clubName: 'Flamengo' }),
+    ]);
+    const reopened = await client.openCareer(careers[0]!.id);
+    expect(reopened?.club).toBe('Flamengo');
+    expect(reopened?.division).toBeTruthy();
+    expect(reopened?.fixture?.competition).toBeTruthy();
+  });
+
   it('joga a partida com pausa técnica sem reescrever o que já passou', async () => {
     const { client, career } = await start();
     const shown = [await client.beginMatch()];

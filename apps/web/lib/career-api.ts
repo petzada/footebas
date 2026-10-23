@@ -6,19 +6,23 @@ import {
 import { replayFromFeed } from '@/lib/match-replay-adapter';
 import type { MatchReplayInput } from '@/lib/match-replay-model';
 
+/** Shell destinations; the first seven are the main areas of docs/09. */
 export type Screen =
-  | 'home'
+  | 'central'
+  | 'map'
+  | 'squad'
+  | 'market'
+  | 'office'
+  | 'season'
+  | 'ranking'
   | 'inbox'
   | 'calendar'
-  | 'squad'
   | 'tactics'
   | 'table'
-  | 'market'
-  | 'club'
-  | 'finance'
-  | 'history'
   | 'competitions'
-  | 'world';
+  | 'stadium'
+  | 'finance'
+  | 'history';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
 export type SquadRole = 'starter' | 'bench' | 'reserve';
 export type AutoPickStrategy = 'best' | 'rest' | 'develop';
@@ -101,9 +105,20 @@ export interface MatchResultView {
   replay?: MatchReplayInput;
 }
 
+export interface FixtureView {
+  competition: string;
+  /** ISO game date, when the server exposes it. */
+  date?: string;
+  venue: 'home' | 'away';
+}
+
 export interface CareerView {
   coach: string;
   club: string;
+  /** League the club plays in (standings read model). */
+  division?: string;
+  /** Next fixture metadata (next-match read model). */
+  fixture?: FixtureView;
   round: number;
   formation: Formation;
   tactics: TacticsView;
@@ -127,11 +142,63 @@ export interface MatchUpdate {
   done: boolean;
 }
 
+/** Public counters for the Início screen (GET /v1/public/stats). */
+export interface PublicStats {
+  coaches: number;
+  clubs: number;
+  athletes: number;
+}
+
+/** One saved career of the signed-in player. */
+export interface CareerSummary {
+  id: string;
+  /** Career name chosen by the player, once the server stores it. */
+  name?: string;
+  coach: string;
+  clubName?: string;
+  season?: number;
+  currentDate?: string;
+  round?: number;
+  /** ISO timestamp of the last change, once the server exposes it. */
+  updatedAt?: string;
+}
+
+export interface CareerList {
+  careers: readonly CareerSummary[];
+  /** Careers allowed by the plan (free: 1, license: 5), when known. */
+  limit?: number;
+}
+
+export const FREE_CAREER_LIMIT = 1;
+export const LICENSE_CAREER_LIMIT = 5;
+
+/** Mirrors the server refusal `CAREER_LIMIT_REACHED`. */
+export class CareerLimitReachedError extends Error {
+  public readonly code = 'CAREER_LIMIT_REACHED';
+  public constructor(message: string) {
+    super(message);
+    this.name = 'CareerLimitReachedError';
+  }
+}
+
+export function isCareerLimitError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    (error as { code?: unknown }).code === 'CAREER_LIMIT_REACHED'
+  );
+}
+
 export interface CareerApiPort {
   login(email: string): Promise<void>;
   createCareer(input: { coach: string }): Promise<void>;
   selectClub(club: string): Promise<void>;
   getCareer(): Promise<CareerView | null>;
+  /** Public counters; `null` hides them (endpoint missing or failing). */
+  getPublicStats(): Promise<PublicStats | null>;
+  listCareers(): Promise<CareerList>;
+  /** Activates a career; `null` when it still needs a club. */
+  openCareer(careerId: string): Promise<CareerView | null>;
+  deleteCareer(careerId: string): Promise<void>;
   setPlayerRole(playerId: string, role: SquadRole): Promise<CareerView>;
   autoPick(strategy: AutoPickStrategy): Promise<CareerView>;
   setTactics(input: {
@@ -602,12 +669,43 @@ const timeline: readonly MatchUpdate[] = [
   },
 ];
 
+interface StoredCareer {
+  readonly id: string;
+  view: CareerView;
+  updatedAt: string;
+}
+
+const LOCAL_CLUBS = ['Flamengo', 'Fluminense', 'Atlético Mineiro'] as const;
+
 export class InMemoryCareerApi implements CareerApiPort {
   #authenticated = false;
-  #career: CareerView | null = null;
+  readonly #careers = new Map<string, StoredCareer>();
+  #activeId: string | undefined;
+  #sequence = 0;
+  readonly #limit: number;
+  readonly #now: () => Date;
   #eventIndex = -1;
   #matchPlayers: PlayerView[] = [];
   #matchActions: MatchActionView[] = [];
+
+  public constructor(options: { careerLimit?: number; now?: () => Date } = {}) {
+    this.#limit = options.careerLimit ?? FREE_CAREER_LIMIT;
+    this.#now = options.now ?? (() => new Date());
+  }
+
+  /** The active career; writes also stamp its last update. */
+  get #career(): CareerView | null {
+    return this.#activeId
+      ? (this.#careers.get(this.#activeId)?.view ?? null)
+      : null;
+  }
+
+  set #career(view: CareerView) {
+    const stored = this.#activeId && this.#careers.get(this.#activeId);
+    if (!stored) throw new Error('Carreira não encontrada.');
+    stored.view = view;
+    stored.updatedAt = this.#now().toISOString();
+  }
 
   async login(email: string) {
     if (!email.includes('@')) throw new Error('Informe um e-mail válido.');
@@ -617,22 +715,38 @@ export class InMemoryCareerApi implements CareerApiPort {
   async createCareer({ coach }: { coach: string }) {
     if (!this.#authenticated) throw new Error('Sessão necessária.');
     if (!coach.trim()) throw new Error('Informe o nome do treinador.');
-    this.#career = {
-      coach: coach.trim(),
-      club: '',
-      round: 1,
-      formation: '4-3-3',
-      tactics: { ...defaultTactics },
-      players: createRoster(),
-      standings: initialTable,
-      opponent: opponents[0],
-      world: createPhase4View(coach.trim(), ''),
-    };
+    if (this.#careers.size >= this.#limit)
+      throw new CareerLimitReachedError(
+        this.#limit === FREE_CAREER_LIMIT
+          ? 'O plano grátis permite 1 carreira. Exclua a atual ou ative a licença para ter até 5.'
+          : `Você chegou ao limite de ${this.#limit} carreiras. Exclua uma para começar outra.`,
+      );
+    this.#sequence += 1;
+    const id = `career-${this.#sequence}`;
+    this.#careers.set(id, {
+      id,
+      updatedAt: this.#now().toISOString(),
+      view: {
+        coach: coach.trim(),
+        club: '',
+        division: 'Série A',
+        fixture: { competition: 'Série A', venue: 'home' },
+        round: 1,
+        formation: '4-3-3',
+        tactics: { ...defaultTactics },
+        players: createRoster(),
+        standings: initialTable,
+        opponent: opponents[0],
+        world: createPhase4View(coach.trim(), ''),
+      },
+    });
+    this.#activeId = id;
+    this.#eventIndex = -1;
   }
 
   async selectClub(club: string) {
     this.#require();
-    if (!['Flamengo', 'Fluminense', 'Atlético Mineiro'].includes(club))
+    if (!(LOCAL_CLUBS as readonly string[]).includes(club))
       throw new Error('Clube indisponível.');
     this.#career = {
       ...this.#career!,
@@ -643,6 +757,54 @@ export class InMemoryCareerApi implements CareerApiPort {
 
   async getCareer() {
     return this.#career ? structuredClone(this.#career) : null;
+  }
+
+  async getPublicStats(): Promise<PublicStats> {
+    const clubs = new Set<string>([
+      ...LOCAL_CLUBS,
+      ...initialTable.map(({ club }) => club),
+      ...opponents.map(({ club }) => club),
+    ]);
+    const coaches = new Set(
+      [...this.#careers.values()].map(({ view }) => view.coach),
+    );
+    return {
+      coaches: Math.max(1, coaches.size),
+      clubs: clubs.size,
+      athletes: rosterSeeds.length,
+    };
+  }
+
+  async listCareers(): Promise<CareerList> {
+    const careers = [...this.#careers.values()]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(({ id, view, updatedAt }): CareerSummary => ({
+        id,
+        coach: view.coach,
+        ...(view.club ? { clubName: view.club } : {}),
+        season: 2026,
+        round: view.round,
+        updatedAt,
+      }));
+    return { careers, limit: this.#limit };
+  }
+
+  async openCareer(careerId: string) {
+    if (!this.#careers.has(careerId))
+      throw new Error('Carreira não encontrada.');
+    this.#activeId = careerId;
+    this.#eventIndex = -1;
+    const view = this.#career!;
+    return view.club ? structuredClone(view) : null;
+  }
+
+  async deleteCareer(careerId: string) {
+    if (!this.#careers.delete(careerId))
+      throw new Error('Carreira não encontrada.');
+    if (this.#activeId === careerId) {
+      this.#activeId = undefined;
+      this.#eventIndex = -1;
+    }
   }
 
   async setPlayerRole(playerId: string, role: SquadRole) {

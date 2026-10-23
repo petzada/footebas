@@ -14,11 +14,14 @@ import { InMemoryCareerApi } from '@/lib/career-api';
 async function onboard(api = new InMemoryCareerApi()) {
   render(<CareerGame api={api} />);
   fireEvent.click(screen.getByRole('button', { name: /entrar no vestiário/i }));
+  fireEvent.click(
+    await screen.findByRole('button', { name: /nova carreira/i }),
+  );
   await screen.findByLabelText(/nome do treinador/i);
   fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
   await screen.findByText(/escolha seu desafio/i);
   fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
-  await screen.findByRole('button', { name: /narrar partida/i });
+  await screen.findByRole('button', { name: /jogar partida/i });
   return api;
 }
 
@@ -122,7 +125,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('marca jovens como gerados e permite desenvolver e promover', async () => {
     const api = await onboard();
-    navigate(/^clube$/i);
+    navigate(/^escritório$/i);
     await screen.findByRole('tab', { name: /^base$/i });
     await selectTab(/^base$/i);
     expect(
@@ -154,7 +157,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
   it('troca de clube preserva treinador, prestígio e histórico', async () => {
     const api = await onboard();
     const before = await api.getCareer();
-    navigate(/^clube$/i);
+    navigate(/^escritório$/i);
     await screen.findByRole('tab', { name: /diretoria/i });
     await selectTab(/diretoria/i);
     fireEvent.click(
@@ -180,7 +183,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('expõe notícias, rankings segmentados e estado de migração por teclado', async () => {
     await onboard();
-    navigate(/^mundo$/i);
+    navigate(/^ranking$/i);
     expect((await screen.findAllByRole('tablist')).length).toBeGreaterThan(0);
     await selectTab(/^ranking$/i);
     expect(screen.getByText(/referência nacional/i)).toBeTruthy();

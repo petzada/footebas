@@ -7,11 +7,14 @@ import { InMemoryCareerApi } from '@/lib/career-api';
 async function onboard(api = new InMemoryCareerApi()) {
   render(<CareerGame api={api} />);
   fireEvent.click(screen.getByRole('button', { name: /entrar no vestiário/i }));
+  fireEvent.click(
+    await screen.findByRole('button', { name: /nova carreira/i }),
+  );
   await screen.findByLabelText(/nome do treinador/i);
   fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
   await screen.findByText(/escolha seu desafio/i);
   fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
-  await screen.findByRole('button', { name: /narrar partida/i });
+  await screen.findByRole('button', { name: /jogar partida/i });
   return api;
 }
 
@@ -28,18 +31,21 @@ describe('Fase 6 · shell mobile-first', () => {
       name: /navegação principal desktop/i,
     });
     for (const area of [
+      'Mapa',
+      'Elenco',
+      'Mercado',
+      'Escritório',
+      'Temporada',
+      'Ranking',
       'Caixa de entrada',
       'Calendário',
-      'Elenco',
       'Táticas',
-      'Mercado',
       'Classificação',
       'Competições',
-      'Clube',
+      'Estádio',
       'Finanças',
-      'História',
-      'Mundo',
-      'Visão geral',
+      'Histórico',
+      'Central',
     ]) {
       const button = within(nav).getByRole('button', { name: area });
       fireEvent.click(button);
@@ -48,6 +54,36 @@ describe('Fase 6 · shell mobile-first', () => {
       ).toBeTruthy();
       expect(button.getAttribute('aria-current')).toBe('page');
     }
+  });
+
+  it('organiza a barra inferior com as áreas principais de docs/09', async () => {
+    await onboard();
+    const bottom = screen.getByRole('navigation', {
+      name: /navegação principal mobile/i,
+    });
+    expect(
+      within(bottom)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Central', 'Mapa', 'Elenco', 'Mercado', 'Menu']);
+    fireEvent.click(within(bottom).getByRole('button', { name: 'Mapa' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Mapa' }),
+    ).toBeTruthy();
+  });
+
+  it('volta ao Início sem perder a carreira', async () => {
+    await onboard();
+    fireEvent.click(screen.getByRole('button', { name: /voltar ao início/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /carregar carreira/i }),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /abrir carreira de márcio/i }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Central' }),
+    ).toBeTruthy();
   });
 
   it('abre o menu completo pela barra inferior sem depender de gesto', async () => {
@@ -90,16 +126,14 @@ describe('Fase 6 · shell mobile-first', () => {
       window.dispatchEvent(new Event('online'));
     });
     expect(screen.getByRole('status').textContent).toMatch(/conexão voltou/i);
-    expect(
-      screen.getByRole('button', { name: /narrar partida/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: /jogar partida/i })).toBeTruthy();
   });
 
   it('não duplica o comando quando o mesmo botão é tocado duas vezes', async () => {
     const api = new InMemoryCareerApi();
     const begin = vi.spyOn(api, 'beginMatch');
     await onboard(api);
-    const narrate = screen.getByRole('button', { name: /narrar partida/i });
+    const narrate = screen.getByRole('button', { name: /jogar partida/i });
     fireEvent.click(narrate);
     fireEvent.click(narrate);
     await screen.findByRole('button', { name: /pular resultado/i });
