@@ -107,3 +107,19 @@ export type {
   LegacyCareerWorldSave,
   PlayerIdentitySource,
 } from './career-world.js';
+export {
+  CAREER_SEASON_VERSION,
+  careerSeasonSystem,
+  closeCareerSeason,
+  createCareerSeason,
+  fixturesOn,
+  isSeasonComplete,
+  liveStandings,
+  nextMatchDate,
+  pendingFixtures,
+  recordSeasonResults,
+  type CareerSeasonInput,
+  type CareerSeasonState,
+  type SeasonClosure,
+  type SeasonCompetition,
+} from './career-season.js';
