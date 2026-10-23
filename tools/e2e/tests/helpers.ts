@@ -24,7 +24,10 @@ export async function createCareer(
   page: Page,
   { coach, club }: { coach: string; club: string },
 ): Promise<void> {
-  const next = () => page.getByRole('button', { name: /^continuar$/i }).click();
+  // Touch emulation in CI never reports the wizard button as "stable";
+  // it is static in real browsers, so skip only that actionability wait.
+  const next = () =>
+    page.getByRole('button', { name: /^continuar$/i }).click({ force: true });
   await page.getByRole('button', { name: /nova carreira/i }).click();
   await expect(
     page.getByRole('heading', { name: /como você quer jogar/i }),

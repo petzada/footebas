@@ -4,6 +4,8 @@
 import {
   FakeBearerAuth,
   FootebasApplication,
+  FREE_ENTITLEMENTS,
+  LICENSED_ENTITLEMENTS,
   InMemoryArchiveStorage,
   InMemoryJobQueue,
   InMemoryStorage,
@@ -47,6 +49,15 @@ const application = new FootebasApplication({
   storage: new InMemoryStorage(),
   telemetry: new NoopTelemetry(),
   unitOfWork,
+  // Local play and E2E pick any club; DEV_PLAN=free shows the free plan.
+  entitlements: {
+    forUser: () =>
+      Promise.resolve(
+        process.env.DEV_PLAN === 'free'
+          ? FREE_ENTITLEMENTS
+          : LICENSED_ENTITLEMENTS,
+      ),
+  },
 });
 const phaseFour = new PhaseFourApplicationService({
   repository: new UnifiedPhaseFourRepository(unitOfWork),
