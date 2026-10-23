@@ -149,6 +149,8 @@ describe('rotas de ranking', () => {
       // No rise points: zero, after Bruno, who signed up earlier.
       ['rise', 2, 2],
       ['monthly', 1, 2],
+      // Provisional alias for web clients cached before ADR 0017.
+      ['global', 1, 2],
     ]);
     const bruno = await handle(
       new Request(`${BASE}/v1/rankings/me`, {

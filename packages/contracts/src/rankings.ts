@@ -79,7 +79,11 @@ export const myRankingReadModelSchema = z.strictObject({
   entries: z
     .array(
       z.strictObject({
-        scope: rankingScopeSchema,
+        /**
+         * The five scopes, then `global`: a copy of `general` kept for web
+         * clients cached before ADR 0017. Provisional: drop it next cycle.
+         */
+        scope: rankingQueryScopeSchema,
         period: z.union([z.literal('all'), rankingPeriodSchema]),
         /** Participants of the scope ("you are No. N of `total`"). */
         total: z.int().min(0),
@@ -91,7 +95,7 @@ export const myRankingReadModelSchema = z.strictObject({
         avatar: coachAvatarSchema.optional(),
       }),
     )
-    .length(5),
+    .length(6),
 });
 
 export type RankingScopeName = z.infer<typeof rankingScopeSchema>;

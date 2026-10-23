@@ -278,25 +278,32 @@ export class RankingService {
       period: rankingPeriodOf(scope, now),
     }));
     const positions = await this.deps.store.positionsOf(userId, targets);
+    const entries = targets.map(({ scope, period }) => {
+      const row = positions.find(
+        (item) => item.scope === scope && item.period === period,
+      );
+      return {
+        scope,
+        period,
+        total: row?.total ?? 0,
+        ...(row?.position === undefined ? {} : { position: row.position }),
+        ...measure(scope, row ?? { points: 0, titles: 0, season: 0 }),
+        ...(row?.displayName === undefined
+          ? {}
+          : { displayName: row.displayName }),
+        ...rowAvatar(row?.avatar),
+      };
+    });
+    const general = entries.find(({ scope }) => scope === 'general');
     return myRankingReadModelSchema.parse({
       version: 1,
       rulesVersion: RANKING_RULES_VERSION,
-      entries: targets.map(({ scope, period }) => {
-        const row = positions.find(
-          (item) => item.scope === scope && item.period === period,
-        );
-        return {
-          scope,
-          period,
-          total: row?.total ?? 0,
-          ...(row?.position === undefined ? {} : { position: row.position }),
-          ...measure(scope, row ?? { points: 0, titles: 0, season: 0 }),
-          ...(row?.displayName === undefined
-            ? {}
-            : { displayName: row.displayName }),
-          ...rowAvatar(row?.avatar),
-        };
-      }),
+      // PROVISIONAL (ADR 0017): `global` repeats `general` for web clients
+      // cached before the rename; remove it in the next cycle.
+      entries: [
+        ...entries,
+        ...(general === undefined ? [] : [{ ...general, scope: 'global' }]),
+      ],
     });
   }
 }

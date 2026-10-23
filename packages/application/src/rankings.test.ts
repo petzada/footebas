@@ -266,6 +266,16 @@ describe('ranking service (live, ADR 0017)', () => {
         displayName: 'Ana',
         avatar: 'avatar-05',
       },
+      // Provisional alias of general for web clients cached before ADR 0017.
+      {
+        scope: 'global',
+        period: 'all',
+        total: 4,
+        position: 2,
+        points: 70,
+        displayName: 'Ana',
+        avatar: 'avatar-05',
+      },
     ]);
     // An account without career still has a position (with zero).
     const caio = await service.mine(token('user_caio'));
