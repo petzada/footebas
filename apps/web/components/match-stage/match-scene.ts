@@ -89,7 +89,7 @@ export function createMatchScene(
   controller: StageController,
   theme: StageTheme,
   scale: number,
-) {
+): PhaserModule['Scene'] {
   const unit = theme.artUnit * scale;
   const toX = (x: number) => (theme.pitchOffset.x + x) * unit;
   const toY = (y: number) => (theme.pitchOffset.y + y) * unit;
