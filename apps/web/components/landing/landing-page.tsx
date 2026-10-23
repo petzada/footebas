@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Brand } from '@/components/brand';
 import {
   PixelArrow,
-  PixelBall,
   PixelCard,
   PixelCoin,
   PixelHeart,
@@ -342,7 +341,7 @@ function LiveMatch() {
               {line.minute}&apos;
             </span>
             {line.tone === 'card' && <PixelCard size={12} />}
-            {line.tone === 'goal' && <PixelBall size={12} />}
+            {line.tone === 'goal' && <PixelStar size={12} />}
             <span className="truncate">{line.text}</span>
           </li>
         ))}
@@ -386,11 +385,11 @@ const BENEFITS: ReadonlyArray<{
 }> = [
   {
     title: 'Partida ao vivo',
-    text: 'Placar grande, narração e campo animado em pixel art. Pause para mexer na tática ou pule direto para o resultado.',
+    text: 'Placar grande, narração e campo animado. Pause para mexer na tática ou pule direto para o resultado.',
     icon: <PixelWhistle size={28} />,
   },
   {
-    title: 'Pirâmide brasileira',
+    title: 'Campeonato Brasileiro',
     text: 'Séries A, B e C com acesso e rebaixamento, Copa do Brasil, estaduais e Libertadores com os gigantes do continente.',
     icon: <PixelTrophy size={28} />,
   },
@@ -420,12 +419,12 @@ const STEPS = [
   {
     n: '01',
     title: 'Entre',
-    text: 'Google ou link mágico no e-mail. Sem senha para decorar.',
+    text: 'Entre com Google ou e-mail. Sem cadastro longo para começar a jogar.',
   },
   {
     n: '02',
     title: 'Crie seu treinador',
-    text: 'Nome, bandeira, avatar pixel e a personalidade que vai guiar o clube.',
+    text: 'Nome, bandeira, avatar e a personalidade que vai guiar o clube.',
   },
   {
     n: '03',
@@ -435,7 +434,7 @@ const STEPS = [
   {
     n: '04',
     title: 'Avance rodadas',
-    text: 'Escale, jogue, negocie e suba de série. Salvo na nuvem, continue em qualquer aparelho.',
+    text: 'Escale, jogue, negocie e conquiste campeonatos. Salvo na nuvem, continue em qualquer aparelho.',
   },
 ] as const;
 
@@ -469,12 +468,6 @@ export function LandingPage() {
       <section className="mx-auto grid max-w-6xl gap-8 px-4 pb-12 pt-8 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:pt-14">
         <div className="relative min-w-0">
           <span
-            className="lp-float absolute -left-2 -top-6 hidden sm:block"
-            style={{ '--delay': '0.3s' } as React.CSSProperties}
-          >
-            <PixelBall size={28} />
-          </span>
-          <span
             className="lp-float absolute right-2 -top-8 hidden sm:block"
             style={{ '--delay': '0.9s' } as React.CSSProperties}
           >
@@ -505,8 +498,8 @@ export function LandingPage() {
             Sua carreira, sua história
           </p>
           <p className="mt-4 max-w-prose text-base leading-relaxed text-chalk sm:text-lg">
-            Pegue um clube brasileiro de verdade, monte o elenco, negocie no
-            mercado e suba de série. Rodada em poucos toques, no navegador, com
+            Escolha seu clube brasileiro favorito, monte o elenco, negocie no
+            mercado e conquiste campeonatos. Rodadas rápidas, no navegador, com
             a cara dos managers que você jogava na lan house.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -527,7 +520,7 @@ export function LandingPage() {
               Ver a licença
             </a>
           </div>
-          <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 font-pixel text-[.5rem] leading-relaxed text-chalk/85">
+          <ul className="mx-auto mt-6 grid w-fit grid-cols-2 gap-x-8 gap-y-2 text-center font-pixel text-[.5rem] leading-relaxed text-chalk/85">
             <li>Sem instalar</li>
             <li>Sem assinatura</li>
             <li>Sem anúncios</li>
@@ -711,10 +704,13 @@ export function LandingPage() {
               />
             ))}
           </div>
+          <p className="mb-5 text-center font-pixel text-[.55rem] leading-relaxed text-chalk drop-shadow-[0_2px_0_rgb(21_32_26)] sm:text-[.65rem]">
+            Comece grátis. Você pode apoiar o jogo com a licença e recebe
+            benefícios por isso.
+          </p>
           <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
             <div className="panel flex flex-col gap-4 p-5 sm:p-6">
               <div className="flex items-center gap-3">
-                <PixelBall size={26} />
                 <h2
                   id="licenca-titulo"
                   className="font-pixel text-[.7rem] leading-relaxed sm:text-sm"
@@ -729,13 +725,10 @@ export function LandingPage() {
                 R$ 0
               </p>
               <ul className="flex flex-col gap-2 text-sm leading-relaxed text-ink/90">
-                <li>✔ Loop completo: elenco, mercado, escritório, temporada</li>
-                <li>
-                  ✔ {FREE_ENTITLEMENTS.maxCareers} carreira ativa, com nome
-                </li>
+                <li>✔ Jogo completo: elenco, mercado, escritório, temporada</li>
+                <li>✔ {FREE_ENTITLEMENTS.maxCareers} carreira ativa</li>
                 <li>✔ Começa na Série C e sobe no braço</li>
                 <li>✔ Partida ao vivo e ranking global</li>
-                <li>✔ Salvo na nuvem</li>
               </ul>
               <a
                 href={GAME_URL}
@@ -761,10 +754,6 @@ export function LandingPage() {
               <p className="led text-3xl sm:text-4xl">
                 {formatCents(LICENSE_PRICE_CENTS)}
               </p>
-              <p className="text-sm leading-relaxed text-chalk/85">
-                Uma licença única libera a edição completa. Nada muda dentro de
-                campo: a vantagem é só de liberdade, nunca esportiva.
-              </p>
               <ul className="flex flex-col gap-2 text-sm leading-relaxed text-chalk">
                 <li className="flex gap-2">
                   <PixelStar size={14} className="mt-1" />
@@ -789,13 +778,14 @@ export function LandingPage() {
                 className="play-button mt-auto inline-flex min-h-14 items-center justify-center gap-3 px-5 text-[.65rem]"
               >
                 <PixelCoin size={18} />
-                Entrar e pagar com PIX
+                Quero meus benefícios
               </a>
-              <p className="text-xs text-chalk/70">
-                O valor e o QR Code aparecem no seu perfil, dentro do jogo.
-              </p>
             </div>
           </div>
+          <p className="mt-4 text-center text-xs text-chalk/80">
+            7 dias para testar o jogo ou seu dinheiro de volta. Qualquer dúvida,
+            fale com o nosso suporte.
+          </p>
         </div>
       </section>
 
@@ -826,22 +816,35 @@ export function LandingPage() {
         </div>
       </section>
 
-      <footer className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-        <div className="panel-wood flex flex-wrap items-center justify-between gap-3 px-4 py-3 font-pixel text-[.5rem] text-chalk">
-          <span>Footebas · feito no Brasil</span>
-          <nav aria-label="Documentos legais" className="flex gap-4">
+      <footer className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">
+        <div className="panel-wood flex flex-col items-center gap-5 px-4 py-8 text-center font-pixel text-[.5rem] text-chalk sm:py-10">
+          <span className="text-[.65rem] sm:text-sm">Footebas</span>
+          <nav
+            aria-label="Documentos legais"
+            className="flex flex-wrap justify-center gap-x-8 gap-y-3"
+          >
             <a className="underline underline-offset-4" href="/termos">
               Termos de uso
             </a>
             <a className="underline underline-offset-4" href="/privacidade">
               Privacidade
             </a>
+            <a className="underline underline-offset-4" href={GAME_URL}>
+              Entrar no jogo
+            </a>
           </nav>
+          <span className="text-chalk/80">Feito no Brasil</span>
         </div>
-        <p className="mt-3 text-center text-xs text-chalk/70">
-          Escudos e nomes dos clubes pertencem aos seus donos e aparecem apenas
-          para identificar as equipes do jogo.
-        </p>
+        <div className="mx-auto mt-5 flex max-w-2xl flex-col gap-2 text-center text-xs leading-relaxed text-chalk/70">
+          <p>
+            Escudos e nomes dos clubes pertencem aos seus donos e aparecem
+            apenas para identificar as equipes do jogo.
+          </p>
+          <p>
+            Jogo Footebas operado por Marct Soluções Digitais · CNPJ
+            63.940.273/0001-36
+          </p>
+        </div>
       </footer>
     </div>
   );
