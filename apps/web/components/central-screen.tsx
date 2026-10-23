@@ -13,10 +13,12 @@ import {
   ShieldWarning,
 } from '@phosphor-icons/react';
 import { ClubEmblem } from '@/components/club-emblem';
+import { CoachAvatar } from '@/components/coach-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import type { CareerView, Screen } from '@/lib/career-api';
+import { countryName, flagEmoji, personalityLabel } from '@/lib/coach-profile';
 import type {
   CompetitionProductPort,
   CompetitionProductView,
@@ -59,7 +61,7 @@ export function CentralScreen({
   navigate(value: Screen): void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="grid gap-4">
       <ClubCard career={career} />
       <div className="grid gap-4 lg:grid-cols-[minmax(15rem,.8fr)_minmax(0,1.4fr)_minmax(15rem,.8fr)]">
         <div className="lg:order-2">
@@ -95,7 +97,7 @@ function ClubCard({ career }: { career: CareerView }) {
   return (
     <section
       aria-labelledby="central-clube"
-      className="fut-card grid gap-5 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center"
+      className="fut-card grid gap-5 p-5 sm:p-6 lg:grid-cols-2 lg:items-center"
     >
       <div className="flex min-w-0 items-center gap-4">
         <ClubEmblem name={career.club} size={84} />
@@ -103,7 +105,8 @@ function ClubCard({ career }: { career: CareerView }) {
           <ClubTitle career={career} />
         </div>
       </div>
-      <dl className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4 xl:min-w-[26rem]">
+      <CoachBadge career={career} />
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4 lg:col-span-2">
         <CardStat
           label="Posição"
           value={row ? `${row.position}º` : '—'}
@@ -123,20 +126,56 @@ function ClubCard({ career }: { career: CareerView }) {
 function ClubTitle({ career }: { career: CareerView }) {
   return (
     <>
-      <p className="fut-muted text-xs font-bold uppercase tracking-[.2em]">
+      <p className="fut-muted truncate text-xs font-bold uppercase tracking-[.2em]">
+        {career.careerName ? `${career.careerName} · ` : ''}
         {career.division ?? 'Temporada'} · Rodada {career.round}
       </p>
       <h2
         id="central-clube"
-        className="truncate font-display text-4xl font-bold uppercase leading-none sm:text-5xl"
+        className="truncate text-4xl font-extrabold leading-none sm:text-5xl"
       >
         {career.club}
       </h2>
       <p className="fut-muted mt-1 truncate text-sm">
-        Treinador <strong className="text-white">{career.coach}</strong> ·{' '}
-        {career.world.board.objective}
+        Objetivo: {career.world.board.objective}
       </p>
     </>
+  );
+}
+
+/** Coach identity: avatar, name, nationality and personality. */
+function CoachBadge({ career }: { career: CareerView }) {
+  const profile = career.coachProfile;
+  return (
+    <div
+      aria-label="Treinador"
+      role="group"
+      className="flex min-w-0 items-center gap-3 rounded-2xl bg-popover/70 p-2.5"
+    >
+      {profile && <CoachAvatar avatar={profile.avatar} size={52} />}
+      <div className="min-w-0 text-sm">
+        <p className="fut-muted text-[.65rem] font-bold uppercase tracking-wider">
+          Treinador
+        </p>
+        <p className="truncate text-base font-extrabold">
+          {profile && (
+            <span aria-hidden="true">{flagEmoji(profile.nationality)} </span>
+          )}
+          {career.coach}
+          {profile && (
+            <span className="sr-only">
+              , {countryName(profile.nationality)}
+            </span>
+          )}
+        </p>
+        {profile && (
+          <p className="truncate text-sm">
+            Personalidade:{' '}
+            <strong>{personalityLabel(profile.personality)}</strong>
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -154,7 +193,7 @@ function CardStat({
       <dt className="fut-muted text-[.65rem] font-bold uppercase tracking-wider">
         {label}
       </dt>
-      <dd className="font-display text-3xl font-bold leading-none tabular-nums">
+      <dd className="text-3xl font-extrabold leading-none tabular-nums">
         {value}
         {hint && (
           <span className="fut-muted ml-1 text-sm font-semibold">{hint}</span>
@@ -171,13 +210,13 @@ function CardMeter({ label, value }: { label: string; value: number }) {
         {label}
       </dt>
       <dd>
-        <span className="font-display text-3xl font-bold leading-none tabular-nums">
+        <span className="text-3xl font-extrabold leading-none tabular-nums">
           {value}%
         </span>
         <Progress
           value={value}
           aria-label={`Confiança da ${label.toLowerCase()}: ${value}%`}
-          className="mt-1 h-1.5 bg-white/15"
+          className="mt-1 h-1.5"
         />
       </dd>
     </div>
@@ -212,7 +251,7 @@ function NextMatch({
     return (
       <section
         aria-labelledby="proximo-jogo-central"
-        className="arcade-panel flex h-full flex-col justify-center rounded-xl border p-6 text-center"
+        className="glass flex h-full flex-col justify-center rounded-2xl p-6 text-center"
       >
         <h2
           id="proximo-jogo-central"
@@ -229,7 +268,7 @@ function NextMatch({
   return (
     <section
       aria-labelledby="proximo-jogo-central"
-      className="arcade-panel match-banner overflow-hidden rounded-xl border"
+      className="glass overflow-hidden rounded-2xl"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
         <Badge>Próximo jogo</Badge>
@@ -247,8 +286,8 @@ function NextMatch({
         className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-5 py-5"
       >
         <TeamSide name={home} />
-        <span className="font-display text-4xl font-bold text-accent sm:text-5xl">
-          ×
+        <span className="scoreboard-digits text-4xl font-bold text-accent sm:text-5xl">
+          VS
         </span>
         <TeamSide name={visitor} />
       </div>
@@ -262,7 +301,7 @@ function NextMatch({
           Jogar partida
         </button>
         <Button
-          variant="secondary"
+          variant="outline"
           className="h-auto min-h-12 whitespace-normal"
           onClick={onInstant}
         >
@@ -279,7 +318,7 @@ function NextMatch({
           Revisar
         </Button>
       </div>
-      <div className="grid grid-cols-3 gap-2 border-y bg-background/40 px-5 py-3 text-center">
+      <div className="grid grid-cols-3 gap-2 border-y border-glass-line bg-popover/50 px-5 py-3 text-center">
         <MiniStat label="Nossa força" value={String(average)} />
         <MiniStat
           label="Adversário"
@@ -390,7 +429,7 @@ function SideCard({
   return (
     <section
       aria-labelledby={id}
-      className="flex h-full flex-col rounded-xl border bg-card/70 p-4"
+      className="surface flex h-full flex-col rounded-2xl p-4"
     >
       <h2 id={id} className="font-display text-xl font-bold uppercase">
         {title}
@@ -608,7 +647,7 @@ function Inbox({
   return (
     <section
       aria-labelledby="central-caixa"
-      className="rounded-xl border bg-card/70 p-4"
+      className="surface rounded-2xl p-4"
     >
       <div className="flex items-center justify-between gap-2">
         <h2
@@ -631,7 +670,7 @@ function Inbox({
           {decisions.map((item) => (
             <li
               key={item.id}
-              className="grid gap-2 rounded-md border bg-background/40 p-3 sm:grid-cols-[1fr_auto] sm:items-center"
+              className="grid gap-2 rounded-xl bg-popover/70 p-3 sm:grid-cols-[1fr_auto] sm:items-center"
             >
               <div className="text-sm">
                 <Badge variant="outline" className="mr-2">
@@ -660,7 +699,7 @@ function News({ career, onOpen }: { career: CareerView; onOpen(): void }) {
   return (
     <section
       aria-labelledby="central-noticias"
-      className="flex flex-col rounded-xl border bg-card/70 p-4"
+      className="surface flex flex-col rounded-2xl p-4"
     >
       <h2
         id="central-noticias"

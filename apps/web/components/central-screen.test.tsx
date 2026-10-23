@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
+import { completeNewCareer } from '@/components/testing/complete-new-career';
 import { CentralScreen } from '@/components/central-screen';
 import { InMemoryCareerApi, type CareerView } from '@/lib/career-api';
 import {
@@ -67,7 +68,11 @@ describe('Central', () => {
     const club = screen.getByRole('region', { name: 'Flamengo' });
     expect(within(club).getByRole('img', { name: /emblema do flamengo/i }));
     expect(club.textContent).toMatch(/série a/i);
-    expect(club.textContent).toMatch(/treinador ana/i);
+    expect(club.textContent).toMatch(/carreira de ana/i);
+    const coach = within(club).getByRole('group', { name: 'Treinador' });
+    expect(coach.textContent).toMatch(/ana/i);
+    expect(coach.textContent).toMatch(/personalidade: estrategista/i);
+    expect(coach.querySelector('[data-avatar="avatar-01"]')).not.toBeNull();
     expect(within(club).getByText('Posição')).toBeTruthy();
     expect(within(club).getByText('Caixa')).toBeTruthy();
     expect(
@@ -149,10 +154,7 @@ describe('Central', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: /nova carreira/i }),
     );
-    fireEvent.click(
-      await screen.findByRole('button', { name: /conhecer os clubes/i }),
-    );
-    fireEvent.click(await screen.findByRole('button', { name: /flamengo/i }));
+    await completeNewCareer();
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Central' }),
     ).toBeTruthy();
