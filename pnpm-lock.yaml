@@ -320,6 +320,9 @@ importers:
 
   tools/sim-lab:
     dependencies:
+      '@footebas/content':
+        specifier: workspace:*
+        version: link:../../packages/content
       '@footebas/domain':
         specifier: workspace:*
         version: link:../../packages/domain

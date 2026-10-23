@@ -18,6 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@footebas/content": "workspace:*",
     "@footebas/domain": "workspace:*",
     "@footebas/engine": "workspace:*",
     "@footebas/testing": "workspace:*"
