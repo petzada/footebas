@@ -43,6 +43,11 @@ import {
   type JobStatus,
 } from '@footebas/contracts';
 import { ZodError } from 'zod';
+import {
+  billingRoutes,
+  type BillingRouteDependencies,
+} from './billing/routes.js';
+import { WooviApiError } from './billing/woovi-client.js';
 
 export interface ApiDependencies {
   readonly application: FootebasApplication;
@@ -58,6 +63,8 @@ export interface ApiDependencies {
     application: PhaseFiveCompetitionService;
     auth: AuthPort;
   }>;
+  /** Licença única via Woovi/PIX and `GET /v1/me` (Fase 8). */
+  readonly billing?: BillingRouteDependencies;
   /** Development-only sign-in that issues fake bearer tokens. Never in production. */
   readonly devAuth?: FakeBearerAuth;
   /** Browser origins allowed to call the API (CORS). */
@@ -146,6 +153,8 @@ export interface ApiRequest {
   readonly query: Readonly<Record<string, string | undefined>>;
   readonly headers: Readonly<Record<string, string | undefined>>;
   readonly body: unknown;
+  /** Body exactly as received (webhook signatures are computed over it). */
+  readonly rawBody?: string;
 }
 
 export interface ApiReply {
@@ -541,6 +550,8 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
       });
   }
 
+  if (deps.billing !== undefined) routes.push(...billingRoutes(deps.billing));
+
   routes.push(
     {
       method: 'GET',
@@ -659,6 +670,15 @@ export function mapError(
         requestId,
         'VALIDATION_ERROR',
         'request validation failed',
+      ),
+    };
+  if (error instanceof WooviApiError)
+    return {
+      status: 502,
+      body: errorBody(
+        requestId,
+        'INTERNAL_ERROR',
+        'payment provider unavailable',
       ),
     };
   if (error instanceof AuthenticationError)
