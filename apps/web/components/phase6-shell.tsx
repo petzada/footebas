@@ -259,7 +259,7 @@ function DesktopSidebar({
       </a>
       <nav
         aria-label="Navegação principal desktop"
-        className="mt-7 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
+        className="scrollbar-px mt-7 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1"
       >
         {menuGroups.map((group) => (
           <section

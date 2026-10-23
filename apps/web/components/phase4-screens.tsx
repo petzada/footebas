@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Trophy,
 } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -1111,9 +1112,7 @@ function HistoryTab({
   return (
     <div className="grid gap-4">
       {season.status === 'loading' && (
-        <p className="panel p-3 text-sm" role="status">
-          Abrindo o arquivo das temporadas…
-        </p>
+        <ScreenSkeleton label="Abrindo o arquivo das temporadas…" />
       )}
       {season.status === 'error' && (
         <p className="panel p-3 text-sm" role="alert">

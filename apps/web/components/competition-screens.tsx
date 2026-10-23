@@ -9,6 +9,7 @@ import {
   Medal,
   Trophy,
 } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -67,12 +68,7 @@ export function CompetitionScreens({
   }, [port]);
 
   if (error) return <p role="alert">{error}</p>;
-  if (!model)
-    return (
-      <p role="status" aria-live="polite" className="text-sm text-chalk">
-        Carregando calendário…
-      </p>
-    );
+  if (!model) return <ScreenSkeleton label="Carregando calendário…" />;
 
   return (
     <section aria-labelledby="competition-title">

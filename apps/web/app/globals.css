@@ -491,6 +491,55 @@ textarea,
   animation: px-shake 240ms steps(4, end) 2;
 }
 
+/* Loading placeholders: unlit bars that blink in steps (see ScreenSkeleton). */
+.skeleton-bar {
+  animation: skeleton-blink 1.1s steps(2, end) infinite;
+}
+@keyframes skeleton-blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+/* Instant result: the ball crosses the pitch in pixel steps. */
+.sim-ball {
+  animation: sim-ball-run 1.4s steps(12, end) infinite alternate;
+}
+@keyframes sim-ball-run {
+  from {
+    left: 0.5rem;
+    transform: translateY(-50%);
+  }
+  50% {
+    transform: translateY(-140%);
+  }
+  to {
+    left: calc(100% - 1.25rem);
+    transform: translateY(-50%);
+  }
+}
+
+/* Pixel scrollbar for the desktop sidebar: chalk track, grass thumb with a
+   stepped border; Firefox gets the thin two-color version. */
+.scrollbar-px {
+  scrollbar-width: thin;
+  scrollbar-color: var(--grass-deep) var(--wood-deep);
+}
+.scrollbar-px::-webkit-scrollbar {
+  width: 10px;
+}
+.scrollbar-px::-webkit-scrollbar-track {
+  background: var(--wood-deep);
+  box-shadow: inset 2px 0 0 0 var(--ink);
+}
+.scrollbar-px::-webkit-scrollbar-thumb {
+  background: var(--grass);
+  border: 2px solid var(--ink);
+  border-radius: 0;
+}
+.scrollbar-px::-webkit-scrollbar-thumb:hover {
+  background: var(--grass-light);
+}
+
 /* Clickable buildings on the club map. */
 .map-building {
   cursor: pointer;

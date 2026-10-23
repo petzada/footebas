@@ -349,6 +349,57 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(begin).toHaveBeenCalledTimes(1);
   });
 
+  it('mostra o campo simulando só enquanto o resultado instantâneo não chega', async () => {
+    const api = new InMemoryCareerApi();
+    const original = api.instantResult.bind(api);
+    let release: () => void = () => {};
+    vi.spyOn(api, 'instantResult').mockImplementation(async () => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return original();
+    });
+    await onboard(api);
+    fireEvent.click(
+      screen.getByRole('button', { name: /resultado instantâneo/i }),
+    );
+    expect(await screen.findByTestId('match-simulation')).toBeTruthy();
+    expect(screen.queryByTestId('match-stage')).toBeNull();
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByTestId('final-scoreboard')).toBeTruthy();
+    expect(screen.queryByTestId('match-simulation')).toBeNull();
+  });
+
+  it('descarta o erro do comando ao fechar o aviso ou trocar de tela', async () => {
+    const api = new InMemoryCareerApi();
+    vi.spyOn(api, 'instantResult').mockRejectedValue(
+      new Error('Operação recusada pelo clube.'),
+    );
+    await onboard(api);
+    fireEvent.click(
+      screen.getByRole('button', { name: /resultado instantâneo/i }),
+    );
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/operação recusada/i);
+    fireEvent.click(
+      within(alert).getByRole('button', { name: /fechar aviso/i }),
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /resultado instantâneo/i }),
+    );
+    await screen.findByRole('alert');
+    const bar = screen.getByRole('navigation', {
+      name: /navegação principal mobile/i,
+    });
+    fireEvent.click(within(bar).getByRole('button', { name: /^elenco$/i }));
+    await screen.findByRole('heading', { level: 1, name: 'Elenco' });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('entrega resultado instantâneo com placar, resumo e veredito coerente, sem campo 2D', async () => {
     await onboard();
     fireEvent.click(

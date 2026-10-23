@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowsLeftRight, Check, X } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { ContractsScreen } from '@/components/phase4-screens';
 import { PixelCoin, PixelTrophy } from '@/components/retro/sprites';
@@ -105,12 +106,7 @@ export function OfficeScreen({
     }
   };
 
-  if (!office)
-    return (
-      <p className="panel p-3 text-sm" role="status">
-        Abrindo o escritório…
-      </p>
-    );
+  if (!office) return <ScreenSkeleton label="Abrindo o escritório…" />;
 
   const pending = office.proposals.sponsorship.filter(
     (offer) => offer.status === 'pending',

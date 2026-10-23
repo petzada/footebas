@@ -14,6 +14,7 @@ import {
   Tag,
   X,
 } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { PixelAvatar } from '@/components/retro/pixel-avatar';
 import { PixelCoin, PixelFlag } from '@/components/retro/sprites';
 import { useTicker } from '@/components/retro/ticker';
@@ -149,12 +150,7 @@ export function MarketScreen({
     void load(query);
   };
 
-  if (!market)
-    return (
-      <p className="panel p-3 text-sm" role="status">
-        Abrindo o mercado…
-      </p>
-    );
+  if (!market) return <ScreenSkeleton label="Abrindo o mercado…" />;
 
   const windowOpen = market.window.status === 'open';
   const closedMessage =
