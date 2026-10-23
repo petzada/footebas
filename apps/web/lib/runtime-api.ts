@@ -2,6 +2,20 @@ import { InMemoryCareerApi, type CareerApiPort } from '@/lib/career-api';
 import { SupabaseAuth, type AuthPort } from '@/lib/auth';
 import type { CompetitionProductPort } from '@/lib/competition-product';
 import { HttpCareerApi, httpCompetitionPort } from '@/lib/http-career-api';
+import {
+  httpAccountPort,
+  httpInboxPort,
+  httpRankingPort,
+  httpSeasonPort,
+} from '@/lib/http-products';
+import { createFakeAccountPort, type AccountPort } from '@/lib/account-product';
+import { createFakeInboxPort, type InboxPort } from '@/lib/inbox-product';
+import {
+  cachedRankingPort,
+  createFakeRankingPort,
+  type RankingPort,
+} from '@/lib/ranking-product';
+import { createFakeSeasonPort, type SeasonPort } from '@/lib/season-product';
 
 export interface CareerRuntime {
   readonly api: CareerApiPort;
@@ -54,4 +68,32 @@ export function competitionPortFor(
   api: CareerApiPort,
 ): CompetitionProductPort | undefined {
   return api instanceof HttpCareerApi ? httpCompetitionPort(api) : undefined;
+}
+
+/** Season, inbox, ranking and account ports over the same runtime. */
+export interface ProductPorts {
+  readonly season: SeasonPort;
+  readonly inbox: InboxPort;
+  readonly ranking: RankingPort;
+  readonly account: AccountPort;
+}
+
+/**
+ * Over HTTP every port talks to the authoritative server; the in-memory
+ * runtime (offline demo, tests) gets deterministic fakes.
+ */
+export function productPortsFor(api: CareerApiPort): ProductPorts {
+  if (api instanceof HttpCareerApi)
+    return {
+      season: httpSeasonPort(api),
+      inbox: httpInboxPort(api),
+      ranking: cachedRankingPort(httpRankingPort(api)),
+      account: httpAccountPort(api),
+    };
+  return {
+    season: createFakeSeasonPort(),
+    inbox: createFakeInboxPort(),
+    ranking: createFakeRankingPort(),
+    account: createFakeAccountPort(),
+  };
 }

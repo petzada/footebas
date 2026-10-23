@@ -10,7 +10,6 @@ import React, {
 import {
   ArrowRight,
   ArrowsClockwise,
-  ChartLineUp,
   Pause,
   Play,
   SignOut,
@@ -84,8 +83,12 @@ import { parseScore } from '@/lib/match-replay-adapter';
 import {
   competitionPortFor,
   createCareerRuntime,
+  productPortsFor,
   type CareerRuntime,
 } from '@/lib/runtime-api';
+import { SeasonScreen } from '@/components/season-screen';
+import { RankingScreen } from '@/components/ranking-screen';
+import { ProfileScreen } from '@/components/profile-screen';
 
 type Stage =
   'login' | 'start' | 'load' | 'new' | 'club' | 'game' | 'match' | 'result';
@@ -188,6 +191,7 @@ function CareerFlow({
   onSessionExpired?: () => void;
 }) {
   const [competitionPort] = useState(() => competitionPortFor(api));
+  const [products] = useState(() => productPortsFor(api));
   const [stage, setStage] = useState<Stage>('login');
   const [screen, setScreen] = useState<Screen>('central');
   const [limitNotice, setLimitNotice] = useState('');
@@ -336,6 +340,13 @@ function CareerFlow({
     const list = await api.listCareers();
     setAnyClub(list.anyClub ?? true);
     return list;
+  }, [api]);
+  // After an inbox decision the board/finances may have moved.
+  const refreshCareer = useCallback(() => {
+    void api
+      .getCareer()
+      .then((view) => view && setCareer(view))
+      .catch(() => undefined);
   }, [api]);
   const removeCareer = useCallback(
     async (careerId: string) => {
@@ -488,6 +499,8 @@ function CareerFlow({
           />
         ) : screen === 'central' ? (
           <CentralScreen
+            inbox={products.inbox}
+            onInboxResolved={refreshCareer}
             career={career}
             calendar={competitionPort ?? demoCompetitionPort}
             onNarrate={beginNarratedMatch}
@@ -520,7 +533,16 @@ function CareerFlow({
             reportError={setError}
           />
         ) : screen === 'season' ? (
-          <SeasonScreen career={career} navigate={setScreen} />
+          <SeasonScreen port={products.season} clubName={career.club} />
+        ) : screen === 'ranking' ? (
+          <RankingScreen port={products.ranking} />
+        ) : screen === 'profile' ? (
+          <ProfileScreen
+            account={products.account}
+            player={player}
+            loadCareers={listCareers}
+            onSignOut={onSignOut}
+          />
         ) : screen === 'office' || screen === 'finance' ? (
           <OfficeScreen
             key={screen}
@@ -560,7 +582,8 @@ function CareerFlow({
             key={screen}
             initialTab="news"
           />
-        ) : screen === 'history' ? (
+        ) : (
+          // history
           <WorldScreen
             career={career}
             api={api}
@@ -568,16 +591,6 @@ function CareerFlow({
             reportError={setError}
             key={screen}
             initialTab="history"
-          />
-        ) : (
-          // ranking
-          <WorldScreen
-            career={career}
-            api={api}
-            onCareerChange={setCareer}
-            reportError={setError}
-            key={screen}
-            initialTab="ranking"
           />
         )}
       </Phase6Shell>
@@ -1140,55 +1153,5 @@ function Standings({ career }: { career: CareerView }) {
         </Table>
       </CardContent>
     </Card>
-  );
-}
-
-/**
- * Temporada: read-only season screen. Charts (scorers, ratings, position by
- * round, champions) come with its own redesign; the table works today.
- */
-function SeasonScreen({
-  career,
-  navigate,
-}: {
-  career: CareerView;
-  navigate(value: Screen): void;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <section
-        aria-labelledby="temporada-em-construcao"
-        className="panel flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div className="flex items-start gap-3">
-          <ChartLineUp
-            className="size-8 shrink-0 text-accent"
-            weight="duotone"
-            aria-hidden="true"
-          />
-          <div>
-            <h2
-              id="temporada-em-construcao"
-              className="font-display text-base font-bold uppercase"
-            >
-              Em construção
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Artilharia, notas, posição por rodada e campeões chegam nesta
-              tela. Enquanto isso, a classificação e as competições seguem aqui.
-            </p>
-          </div>
-        </div>
-        <Button
-          variant="outline"
-          className="min-h-11"
-          onClick={() => navigate('competitions')}
-        >
-          Ver competições
-          <ArrowRight data-icon="inline-end" />
-        </Button>
-      </section>
-      <Standings career={career} />
-    </div>
   );
 }

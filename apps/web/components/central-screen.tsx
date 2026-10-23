@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react';
 import { ClubEmblem } from '@/components/club-emblem';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { InboxDecisions } from '@/components/inbox-decisions';
 import { PixelBall, PixelWhistle } from '@/components/retro/sprites';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import type {
   CompetitionProductPort,
   CompetitionProductView,
 } from '@/lib/competition-product';
+import type { InboxPort } from '@/lib/inbox-product';
 import { cn } from '@/lib/utils';
 
 type CalendarEntry = CompetitionProductView['calendar']['entries'][number];
@@ -49,6 +51,8 @@ export function formatFixtureDate(date: string): string {
 export function CentralScreen({
   career,
   calendar,
+  inbox,
+  onInboxResolved,
   onNarrate,
   onInstant,
   navigate,
@@ -56,6 +60,9 @@ export function CentralScreen({
   career: CareerView;
   /** Season calendar (competition read model); hidden when absent. */
   calendar?: CompetitionProductPort | undefined;
+  /** E-mails with decisions; without it the legacy summary is shown. */
+  inbox?: InboxPort | undefined;
+  onInboxResolved?: (() => void) | undefined;
   onNarrate(): void;
   onInstant(): void;
   navigate(value: Screen): void;
@@ -84,7 +91,15 @@ export function CentralScreen({
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <Inbox career={career} navigate={navigate} />
+        {inbox ? (
+          <InboxDecisions
+            port={inbox}
+            navigate={navigate}
+            {...(onInboxResolved ? { onResolved: onInboxResolved } : {})}
+          />
+        ) : (
+          <Inbox career={career} navigate={navigate} />
+        )}
         <News career={career} onOpen={() => navigate('inbox')} />
       </div>
     </div>

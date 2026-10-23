@@ -33,5 +33,10 @@ que não depende destes itens; cada item diz o que destrava.
 9. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
 10. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
     tributação da licença.
+    - **Preencher os marcadores `[preencher]`** das páginas públicas `/termos` e `/privacidade`
+      (`apps/web/components/legal-page.tsx`, constante `LEGAL_PLACEHOLDER`): razão social, CNPJ, endereço, e-mail
+      de contato, encarregado de dados (DPO) e data da última atualização. Depois da revisão jurídica, remover o
+      selo "versão preliminar — sujeita a revisão jurídica" (`LEGAL_DRAFT_NOTICE`) e confirmar os prazos de
+      retenção declarados (registros técnicos 90 dias, fiscais 5 anos) com quem opera a infraestrutura.
 11. Beta fechada com 3–5 pessoas e aceite qualitativo do loop.
 12. Aceite humano final.

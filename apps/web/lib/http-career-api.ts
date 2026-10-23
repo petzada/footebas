@@ -2130,6 +2130,25 @@ export class HttpCareerApi implements CareerApiPort {
     });
     return this.getOffice();
   }
+
+  // --- generic access for product ports (season, ranking, inbox, account) --
+  /** Authenticated JSON call to any API path (used by the product ports). */
+  public async call<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    return this.#request<T>(method, path, body);
+  }
+
+  /** Sends a career command (`/v1/commands`) with `careerId` filled in. */
+  public async command(
+    type: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    if (!this.#careerId) await this.getCareer();
+    await this.#command(type, { careerId: this.#career(), ...payload });
+  }
 }
 
 interface PyramidCompetition {

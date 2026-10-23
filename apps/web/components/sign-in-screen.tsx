@@ -8,6 +8,7 @@ import {
   GoogleLogo,
 } from '@phosphor-icons/react';
 import { Brand } from '@/components/brand';
+import { LegalLinks } from '@/components/legal-page';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -38,6 +39,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
           </p>
         </div>
         {children}
+        <LegalLinks className="mt-6 text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]" />
       </div>
     </main>
   );
