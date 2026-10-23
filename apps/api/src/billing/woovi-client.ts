@@ -50,10 +50,15 @@ export interface RefundChargeInput {
 /** Port used by the billing service; the HTTP adapter and test fakes implement it. */
 export interface WooviClient {
   createCharge(input: CreateChargeInput): Promise<WooviCharge>;
-  getCharge(correlationID: string): Promise<WooviCharge | undefined>;
+  /** `providerId`: the provider's own charge id when it differs (AbacatePay). */
+  getCharge(
+    correlationID: string,
+    providerId?: string,
+  ): Promise<WooviCharge | undefined>;
   refundCharge(
     chargeCorrelationID: string,
     input: RefundChargeInput,
+    providerId?: string,
   ): Promise<WooviRefund>;
 }
 

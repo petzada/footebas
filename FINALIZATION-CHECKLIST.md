@@ -21,8 +21,14 @@ que não depende destes itens; cada item diz o que destrava.
 
 ## Pagamento
 
-6. **Woovi sandbox e produção.** Fornecer `WOOVI_APP_ID` e o segredo de webhook (via `wrangler secret put`, nunca no
-   repositório) e cadastrar a URL do webhook no painel Woovi; realizar o primeiro pagamento e reembolso PIX reais.
+6. **AbacatePay (PIX da licença, ADR 0016).**
+   - Gravar os segredos sem colar no chat:
+     `pnpm --filter @footebas/api exec wrangler secret put ABACATEPAY_API_KEY` e
+     `pnpm --filter @footebas/api exec wrangler secret put ABACATEPAY_WEBHOOK_SECRET` (uma frase longa e aleatória).
+   - A chave precisa das permissões `TRANSPARENT:CREATE`, `TRANSPARENT:READ` e `REFUND:CREATE`.
+   - No painel da AbacatePay, criar o webhook com endpoint `https://api.footebas.com.br/v1/billing/webhook`, o mesmo
+     secret do passo anterior e os eventos `transparent.completed` e `transparent.refunded`.
+   - Testar em modo dev (pagamento simulado e reembolso) e, com a conta de produção aprovada (CNPJ), trocar a chave.
 
 ## Qualidade, jurídico e lançamento
 

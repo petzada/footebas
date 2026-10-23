@@ -24,6 +24,7 @@ import {
 } from '@footebas/database';
 import postgres from 'postgres';
 import { PostgresBillingRepository } from './billing/billing-repository-postgres.js';
+import { AbacatePayClient } from './billing/abacatepay-client.js';
 import { BillingService, DEFAULT_BILLING_CONFIG } from './billing/service.js';
 import {
   parsePublicKeyPems,
@@ -77,6 +78,12 @@ export interface Env {
   readonly SMOKE_TOKEN?: string;
   /** Workers version metadata binding, reported by GET /health. */
   readonly CF_VERSION_METADATA?: { readonly id: string; readonly tag?: string };
+  /** PIX provider (var): `abacatepay` (default, ADR 0016) or `woovi`. */
+  readonly PAYMENT_PROVIDER?: string;
+  /** Secret: AbacatePay API key (`wrangler secret put ABACATEPAY_API_KEY`). */
+  readonly ABACATEPAY_API_KEY?: string;
+  /** Secret: value set as `secret` on the AbacatePay webhook. */
+  readonly ABACATEPAY_WEBHOOK_SECRET?: string;
   /** Woovi base URL (var): sandbox or https://api.woovi.com. */
   readonly WOOVI_API_URL?: string;
   /** Secret: Woovi AppID (`wrangler secret put WOOVI_APP_ID`). */
@@ -113,20 +120,28 @@ function billing(env: Env, sql: postgres.Sql, auth: AuthPort) {
   const apiUrl = env.WOOVI_API_URL ?? WOOVI_SANDBOX_URL;
   const appId = env.WOOVI_APP_ID?.trim() ?? '';
   const pinned = parsePublicKeyPems(env.WOOVI_WEBHOOK_PUBLIC_KEYS ?? '');
+  const abacate = (env.PAYMENT_PROVIDER ?? 'abacatepay') === 'abacatepay';
+  const abacateKey = env.ABACATEPAY_API_KEY?.trim() ?? '';
+  const provider = abacate
+    ? abacateKey === ''
+      ? new UnconfiguredWooviClient()
+      : new AbacatePayClient({ apiKey: abacateKey })
+    : appId === ''
+      ? new UnconfiguredWooviClient()
+      : new WooviHttpClient({ apiUrl, appId });
+  const webhookSecret = abacate
+    ? env.ABACATEPAY_WEBHOOK_SECRET
+    : env.WOOVI_WEBHOOK_SECRET;
   const service = new BillingService({
     repository: new PostgresBillingRepository(sql),
-    woovi:
-      appId === ''
-        ? new UnconfiguredWooviClient()
-        : new WooviHttpClient({ apiUrl, appId }),
+    woovi: provider,
+    webhookProvider: abacate ? 'abacatepay' : 'woovi',
     entitlements: new PostgresEntitlements(sql),
     webhookKeys:
       pinned.length > 0
         ? new StaticPublicKeys(pinned)
         : new RemotePublicKeys({ apiUrl }),
-    ...(env.WOOVI_WEBHOOK_SECRET === undefined
-      ? {}
-      : { webhookSecret: env.WOOVI_WEBHOOK_SECRET }),
+    ...(webhookSecret === undefined ? {} : { webhookSecret }),
     config: {
       priceCents: positiveInteger(
         env.LICENSE_PRICE_CENTS,

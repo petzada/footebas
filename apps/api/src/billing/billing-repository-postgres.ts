@@ -28,6 +28,7 @@ interface OrderRow {
   br_code: string | null;
   qr_code_image: string | null;
   payment_link_url: string | null;
+  provider_charge_id: string | null;
   expires_at: Instant;
   paid_at: Instant;
   pix_end_to_end_id: string | null;
@@ -58,6 +59,7 @@ const ORDER_COLUMNS = [
   'br_code',
   'qr_code_image',
   'payment_link_url',
+  'provider_charge_id',
   'expires_at',
   'paid_at',
   'pix_end_to_end_id',
@@ -99,6 +101,7 @@ function toOrder(row: OrderRow): Order {
       brCode: row.br_code ?? undefined,
       qrCodeImage: row.qr_code_image ?? undefined,
       paymentLinkUrl: row.payment_link_url ?? undefined,
+      providerChargeId: row.provider_charge_id ?? undefined,
       expiresAt: iso(row.expires_at),
       paidAt: iso(row.paid_at),
       pixEndToEndId: row.pix_end_to_end_id ?? undefined,
@@ -193,6 +196,7 @@ export class PostgresBillingRepository implements BillingRepository {
         br_code = ${charge.brCode ?? null},
         qr_code_image = ${charge.qrCodeImage ?? null},
         payment_link_url = ${charge.paymentLinkUrl ?? null},
+        provider_charge_id = ${charge.providerChargeId ?? null},
         expires_at = ${charge.expiresAt ?? null},
         updated_at = ${now.toISOString()}
       where id = ${orderId}
