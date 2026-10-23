@@ -17,3 +17,10 @@ Thumbs.db
 tools/e2e/dist
 tools/e2e/test-results
 tools/e2e/playwright-report
+
+# Raw art from the owner, kept local: crest/flag sheets already cut into
+# apps/web/public/{crests,flags}; football-court is the unused 2 MB model
+# (ADR 0012 picked football-field); the zips duplicate the folders.
+/public/
+/football-court/
+/*.zip
