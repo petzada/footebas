@@ -9,3 +9,7 @@ coverage/
 .DS_Store
 Thumbs.db
 
+.wrangler/
+.wrangler-dry/
+.dev.vars
+.open-next/
