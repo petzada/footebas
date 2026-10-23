@@ -1,8 +1,10 @@
 import {
   aggregateRanking,
   canonicalJson,
+  RANKING_ALL_TIME,
+  rankingStandings,
   type CanonicalValue,
-  type RankingRow,
+  type RankingPlayer,
   type RankingScope,
 } from '@footebas/domain';
 import {
@@ -22,9 +24,10 @@ import {
   type CommandReceipt,
   type CommandRepository,
   type GameSaveRepository,
+  type RankingBoard,
+  type RankingEnrollment,
   type RankingPeriod,
-  type RankingSnapshot,
-  type RankingSnapshotRow,
+  type RankingPosition,
   type RankingStorePort,
   type TransactionContext,
   type UnitOfWork,
@@ -36,6 +39,8 @@ interface State {
   saves: Map<string, GameSave>;
   commands: Map<string, CommandReceipt>;
   achievements: Map<string, ValidatedAchievement>;
+  /** Ranking accounts by user (ADR 0017). */
+  players: Map<string, RankingPlayer>;
 }
 
 /** Uniqueness of a validated achievement (career, type, season, competition). */
@@ -192,14 +197,40 @@ class MemoryCommandRepository implements CommandRepository {
   }
 }
 
+/** Links an account to a career only while it has none. */
+function enrollPlayer(
+  state: State,
+  career: RankingEnrollment,
+  joinedAt: string,
+): void {
+  const current = state.players.get(career.userId);
+  if (current?.careerId !== undefined) return;
+  state.players.set(career.userId, {
+    userId: career.userId,
+    joinedAt: current?.joinedAt ?? joinedAt,
+    careerId: career.careerId,
+    displayName: career.displayName,
+    ...(career.avatar === undefined ? {} : { avatar: career.avatar }),
+  });
+}
+
 class MemoryAchievementLedger implements AchievementLedgerPort {
-  constructor(private readonly state: State) {}
+  constructor(
+    private readonly state: State,
+    private readonly clock: Clock,
+  ) {}
   record(entries: readonly ValidatedAchievement[]): Promise<void> {
     for (const entry of entries) {
       const key = achievementKey(entry);
       if (!this.state.achievements.has(key))
         this.state.achievements.set(key, clone(entry));
+      // Totals are derived from the ledger on read; the account must exist.
+      enrollPlayer(this.state, entry, this.clock.now().toISOString());
     }
+    return Promise.resolve();
+  }
+  enroll(career: RankingEnrollment): Promise<void> {
+    enrollPlayer(this.state, career, this.clock.now().toISOString());
     return Promise.resolve();
   }
   listByCareer(careerId: string): Promise<readonly ValidatedAchievement[]> {
@@ -221,6 +252,7 @@ export class InMemoryUnitOfWork implements UnitOfWork {
     saves: new Map(),
     commands: new Map(),
     achievements: new Map(),
+    players: new Map(),
   };
   private readonly tails = new Map<string, Promise<void>>();
   constructor(private readonly clock: Clock) {}
@@ -231,7 +263,7 @@ export class InMemoryUnitOfWork implements UnitOfWork {
     return {
       saves: new MemorySaveRepository(state, this.clock),
       commands: new MemoryCommandRepository(state),
-      achievements: new MemoryAchievementLedger(state),
+      achievements: new MemoryAchievementLedger(state, this.clock),
     };
   }
   /**
@@ -278,6 +310,15 @@ export class InMemoryUnitOfWork implements UnitOfWork {
   achievements(): readonly ValidatedAchievement[] {
     return [...this.state.achievements.values()].map(clone);
   }
+  /** Committed ranking accounts (for the in-memory ranking store). */
+  rankingPlayers(): readonly RankingPlayer[] {
+    return [...this.state.players.values()].map(clone);
+  }
+  /** Sign-up of an account (the `auth.users` trigger of the migration). */
+  signUp(userId: string, joinedAt = this.clock.now().toISOString()): void {
+    if (!this.state.players.has(userId))
+      this.state.players.set(userId, { userId, joinedAt });
+  }
   async withCareerLock<T>(
     careerId: string,
     work: (tx: TransactionContext) => Promise<T>,
@@ -298,6 +339,7 @@ export class InMemoryUnitOfWork implements UnitOfWork {
       achievements: new Map(
         [...this.state.achievements].map(([k, v]) => [k, clone(v)]),
       ),
+      players: new Map([...this.state.players].map(([k, v]) => [k, clone(v)])),
     };
     try {
       const result = await work(this.context(draft));
@@ -328,52 +370,87 @@ export class InMemoryUnitOfWork implements UnitOfWork {
   }
 }
 
-/** Ranking snapshots over the in-memory ledger (tests, local server). */
+/** What the in-memory ranking reads (an `InMemoryUnitOfWork`). */
+export interface InMemoryRankingSource {
+  achievements(): readonly ValidatedAchievement[];
+  rankingPlayers(): readonly RankingPlayer[];
+}
+
+/**
+ * Live leaderboards over the in-memory ledger (tests, local server): the
+ * same domain rules the Postgres adapter stores per user (ADR 0017).
+ */
 export class InMemoryRankingStore implements RankingStorePort {
-  private readonly snapshots = new Map<string, RankingSnapshot>();
-  constructor(private readonly ledger: () => readonly ValidatedAchievement[]) {}
-  aggregate(scope: RankingScope, period?: string): Promise<RankingRow[]> {
-    return Promise.resolve(aggregateRanking(this.ledger(), scope, period));
-  }
-  replaceSnapshot(
-    scope: RankingScope,
-    period: RankingPeriod,
-    rows: readonly RankingRow[],
-    generatedAt: string,
-  ): Promise<void> {
-    this.snapshots.set(`${scope}|${period}`, {
+  /** Closed months: period -> rows written. */
+  private readonly closed = new Map<string, number>();
+  constructor(private readonly source: InMemoryRankingSource) {}
+  private standings(scope: RankingScope, period: RankingPeriod) {
+    const rows = aggregateRanking(
+      this.source.achievements(),
       scope,
-      period,
-      generatedAt,
-      total: rows.length,
-      rows: rows.map(clone),
-    });
-    return Promise.resolve();
+      scope === 'monthly' ? period : undefined,
+    );
+    return {
+      rows,
+      standings: rankingStandings(rows, this.source.rankingPlayers()),
+    };
   }
-  snapshot(
+  board(
     scope: RankingScope,
     period: RankingPeriod,
     limit: number,
-  ): Promise<RankingSnapshot | undefined> {
-    const stored = this.snapshots.get(`${scope}|${period}`);
-    return Promise.resolve(
-      stored === undefined
-        ? undefined
-        : { ...stored, rows: stored.rows.slice(0, limit).map(clone) },
-    );
+  ): Promise<RankingBoard> {
+    const { standings } = this.standings(scope, period);
+    return Promise.resolve({
+      scope,
+      period,
+      total: standings.length,
+      rows: standings
+        .flatMap((row) =>
+          row.careerId === undefined || row.displayName === undefined
+            ? []
+            : [
+                {
+                  ...row,
+                  careerId: row.careerId,
+                  displayName: row.displayName,
+                },
+              ],
+        )
+        .slice(0, limit),
+    });
   }
   positionsOf(
     userId: string,
-    snapshots: readonly { scope: RankingScope; period: RankingPeriod }[],
-  ): Promise<readonly RankingSnapshotRow[]> {
+    targets: readonly { scope: RankingScope; period: RankingPeriod }[],
+  ): Promise<readonly RankingPosition[]> {
     return Promise.resolve(
-      snapshots.flatMap(({ scope, period }) => {
-        const stored = this.snapshots.get(`${scope}|${period}`);
-        const row = stored?.rows.find((item) => item.userId === userId);
-        return stored === undefined || row === undefined
-          ? []
-          : [{ ...row, scope, period, generatedAt: stored.generatedAt }];
+      targets.map(({ scope, period }) => {
+        const { standings } = this.standings(scope, period);
+        const row = standings.find((item) => item.userId === userId);
+        if (row === undefined)
+          return {
+            scope,
+            period,
+            total: standings.length,
+            userId,
+            points: 0,
+            titles: 0,
+            season: 0,
+          };
+        return { ...row, scope, period, total: standings.length };
       }),
     );
+  }
+  closeMonth(period: string): Promise<number | undefined> {
+    if (period === RANKING_ALL_TIME || this.closed.has(period))
+      return Promise.resolve(undefined);
+    const rows = this.standings('monthly', period).rows.length;
+    this.closed.set(period, rows);
+    return Promise.resolve(rows);
+  }
+  refreshPending(): Promise<number> {
+    // Totals are derived from the ledger on every read: nothing to rebuild.
+    return Promise.resolve(0);
   }
 }
