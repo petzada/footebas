@@ -70,20 +70,26 @@ describe('Fase 6 · shell mobile-first', () => {
     ]);
     for (const button of buttons) {
       expect(button.className).toMatch(/min-h-14/);
+      expect(button.className).toMatch(/min-w-11/);
       expect(button.className).toMatch(/whitespace-nowrap/);
-      expect(button.className).toMatch(/text-\[\.4rem\]/);
+      expect(button.className).toMatch(/text-\[\.45rem\]/);
+      // D2: below 376px only the icon shows; the label is the name.
+      expect(button.getAttribute('aria-label')).toBe(button.textContent);
+      expect(button.querySelector('span')?.className).toMatch(
+        /hidden min-\[376px\]:inline/,
+      );
     }
     expect(bottom.className).toMatch(
       /grid-cols-\[repeat\(5,minmax\(min-content,1fr\)\)\]/,
     );
-    // Press Start 2P is 1em per glyph: at 320px (bar inset 12px, padding
-    // 6px, four 4px gaps) the labels at .4rem plus 2px padding a side fit.
-    const glyph = 0.4 * 16;
+    // Press Start 2P is 1em per glyph: at 376px (bar inset 12px, padding
+    // 6px, four 4px gaps) the labels at .45rem plus 2px padding a side fit.
+    const glyph = 0.45 * 16;
     const needed = buttons.reduce(
       (sum, button) => sum + (button.textContent ?? '').length * glyph + 4,
       0,
     );
-    expect(needed).toBeLessThanOrEqual(320 - 2 * 12 - 2 * 6 - 4 * 4);
+    expect(needed).toBeLessThanOrEqual(376 - 2 * 12 - 2 * 6 - 4 * 4);
     fireEvent.click(within(bottom).getByRole('button', { name: 'Elenco' }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Elenco' }),
@@ -347,6 +353,41 @@ describe('Fase 6 · shell mobile-first', () => {
     fireEvent.click(narrate);
     await screen.findByRole('button', { name: /pular para o resultado/i });
     expect(begin).toHaveBeenCalledTimes(1);
+  });
+
+  it('Voltar do navegador volta uma tela e, na partida, só pausa (D1)', async () => {
+    await onboard();
+    const bar = () =>
+      screen.getByRole('navigation', { name: /navegação principal mobile/i });
+    fireEvent.click(within(bar()).getByRole('button', { name: 'Elenco' }));
+    await screen.findByRole('heading', { level: 1, name: 'Elenco' });
+    fireEvent.click(within(bar()).getByRole('button', { name: 'Mercado' }));
+    await screen.findByRole('heading', { level: 1, name: 'Mercado' });
+    await act(async () => {
+      window.history.back();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Elenco' }),
+    ).toBeTruthy();
+    await act(async () => {
+      window.history.back();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Central' }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
+    await screen.findByRole('button', { name: /pular para o resultado/i });
+    await act(async () => {
+      window.history.back();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(
+      await screen.findByRole('button', { name: /retomar partida/i }),
+    ).toBeTruthy();
+    expect(screen.getByTestId('live-match')).toBeTruthy();
   });
 
   it('mostra o campo simulando só enquanto o resultado instantâneo não chega', async () => {

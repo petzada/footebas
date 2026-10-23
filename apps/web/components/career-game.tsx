@@ -20,6 +20,7 @@ import {
   X,
 } from '@phosphor-icons/react';
 import { MatchSimulation } from '@/components/retro/match-simulation';
+import { useGameHistory } from '@/lib/game-history';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -461,6 +462,23 @@ function CareerFlow({
       globalThis.scrollTo?.({ top: 0 });
   }, [stage]);
 
+  // Browser/Android Back walks the screens (D1); in a match it pauses.
+  const [pauseSignal, setPauseSignal] = useState(0);
+  useGameHistory({
+    location: { stage, screen },
+    onBackInMatch: () => setPauseSignal((value) => value + 1),
+    restore: (target) => {
+      setError('');
+      // A finished match cannot be re-entered; a career screen needs a career.
+      const next =
+        target.stage === 'match' || target.stage === 'result'
+          ? 'game'
+          : target.stage;
+      setStage((['game'].includes(next) && !career ? 'start' : next) as Stage);
+      setScreen(target.screen);
+    },
+  });
+
   const resumeSession = useEffectEvent(() => void login());
   const userId = session?.id;
   useEffect(() => {
@@ -597,6 +615,7 @@ function CareerFlow({
             api={api}
             update={matchUpdate}
             feed={matchFeed}
+            pauseSignal={pauseSignal}
             onNext={nextEvent}
             onSkip={finishMatch}
             onFinished={finishMatch}
@@ -956,6 +975,8 @@ function Matchday(props: {
   api: CareerApiPort;
   update: MatchUpdate;
   feed: readonly MatchUpdate[];
+  /** Increments when the browser Back is pressed: pauses instead of leaving. */
+  pauseSignal?: number;
   error: string;
   onNext(): Promise<void>;
   onSkip(): void;
@@ -987,6 +1008,14 @@ function Matchday(props: {
   );
   const halfTimeStop = update.decisionPoint && dismissedPauseId !== update.id;
   const paused = manualPaused || halfTimeStop || update.done;
+  // Derived during render (no setState in effects): a new Back press
+  // pauses the match; the coach may resume afterwards.
+  const { pauseSignal = 0 } = props;
+  const [seenPause, setSeenPause] = useState(pauseSignal);
+  if (seenPause !== pauseSignal) {
+    setSeenPause(pauseSignal);
+    setManualPaused(true);
+  }
   // Pausing (by hand, at half time or at the end) cuts sounds in flight.
   useEffect(() => {
     if (paused) stopSounds();
