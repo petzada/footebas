@@ -304,6 +304,7 @@ export class InMemoryUnitOfWork implements UnitOfWork {
       delete: (id, userId) => repositories().saves.delete(id, userId),
       listAchievements: (careerId) =>
         repositories().achievements.listByCareer(careerId),
+      enrollRanking: (career) => repositories().achievements.enroll(career),
     };
   }
   /** Committed validated achievements (for the in-memory ranking store). */
@@ -313,6 +314,18 @@ export class InMemoryUnitOfWork implements UnitOfWork {
   /** Committed ranking accounts (for the in-memory ranking store). */
   rankingPlayers(): readonly RankingPlayer[] {
     return [...this.state.players.values()].map(clone);
+  }
+  /**
+   * Account without its career linked, like the ones the migration
+   * backfilled from `auth.users` for careers created before ADR 0017 (tests).
+   */
+  unlinkRankingCareer(userId: string): void {
+    const player = this.state.players.get(userId);
+    if (player !== undefined)
+      this.state.players.set(userId, {
+        userId,
+        joinedAt: player.joinedAt,
+      });
   }
   /** Sign-up of an account (the `auth.users` trigger of the migration). */
   signUp(userId: string, joinedAt = this.clock.now().toISOString()): void {

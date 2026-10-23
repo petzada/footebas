@@ -181,6 +181,13 @@ export interface CareerSaveStore {
   ): Promise<GameSave>;
   delete(id: string, userId: string): Promise<void>;
   listAchievements(careerId: string): Promise<readonly ValidatedAchievement[]>;
+  /**
+   * Same rule as `AchievementLedgerPort.enroll` (ADR 0017): links the
+   * account to this career only while it has none. The career object calls
+   * it once per life, on the first action, so careers created before the
+   * ranking accounts get their coach name listed.
+   */
+  enrollRanking(career: RankingEnrollment): Promise<void>;
 }
 
 /** Hints for `executeIdempotent`; adapters may ignore them. */
