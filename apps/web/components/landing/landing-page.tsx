@@ -484,7 +484,7 @@ export function LandingPage() {
             </span>
           </p>
           <h1
-            className="lp-title mt-5 font-pixel text-4xl leading-none text-chalk drop-shadow-[0_4px_0_rgb(21_32_26)] sm:text-6xl lg:text-7xl"
+            className="lp-title mt-5 font-pixel text-4xl leading-none text-chalk drop-shadow-[0_4px_0_rgb(21_32_26)] sm:text-6xl lg:text-[3.25rem] xl:text-6xl"
             aria-label={title}
           >
             {[...title].map((letter, i) => (
