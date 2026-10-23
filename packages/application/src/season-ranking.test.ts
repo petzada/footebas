@@ -11,6 +11,7 @@ import {
   RankingService,
   SequentialIdGenerator,
   type CareerSnapshot,
+  careerSaveRepository,
 } from './index.js';
 
 const command = (
@@ -74,8 +75,9 @@ describe('temporada e ranking sobre a mesma carreira', () => {
       );
       const leagueId = (await app.standings(token, careerId)).competitionId;
       const snapshotOf = async () =>
-        (await unitOfWork.repositories().saves.peek(careerId))!
-          .snapshot as unknown as CareerSnapshot;
+        (await careerSaveRepository(unitOfWork.repositories().saves).peek(
+          careerId,
+        ))!.snapshot as unknown as CareerSnapshot;
 
       let checkedMidSeason = false;
       let sawRollback = false;

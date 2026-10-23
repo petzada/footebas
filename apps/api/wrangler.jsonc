@@ -56,6 +56,17 @@
       "simple": { "limit": 120, "period": 60 },
     },
   ],
+  // Career Durable Objects (ADR 0014): one SQLite-backed object per career
+  // keeps the hydrated aggregate in memory, serializes its commands, stores
+  // idempotency receipts and writes each change to Postgres (game_saves).
+  // Without this binding the Worker falls back to Postgres directly.
+  "durable_objects": {
+    "bindings": [{ "name": "CAREERS", "class_name": "CareerDurableObject" }],
+  },
+  // Durable Object migrations are append-only: never edit or reorder a tag.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CareerDurableObject"] },
+  ],
   // Ranking snapshots (ADR 0013): the `scheduled` handler of src/worker.ts
   // aggregates validated achievements into footebas.ranking_snapshots.
   "triggers": { "crons": ["*/15 * * * *"] },

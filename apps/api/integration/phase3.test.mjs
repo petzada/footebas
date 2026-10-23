@@ -5,6 +5,7 @@ import {
   InMemoryStorage,
   NoopTelemetry,
   SequentialIdGenerator,
+  careerSaveRepository,
 } from '@footebas/application';
 import {
   jobSseEventSchema,
@@ -396,11 +397,13 @@ describe('Phase 3 Fastify/application/worker integration', () => {
     await fixture.dependencies.unitOfWork.withCareerLock(
       careerId,
       async (tx) => {
-        const save = await tx.saves.load(careerId, 'user_phase3_owner');
+        // Saves are stored lean (ADR 0014); edit them through the codec.
+        const saves = careerSaveRepository(tx.saves);
+        const save = await saves.load(careerId, 'user_phase3_owner');
         const snapshot = structuredClone(save.snapshot);
         snapshot.players.find(({ id }) => id === unavailableId).injuryRounds =
           2;
-        await tx.saves.update(careerId, 'user_phase3_owner', save.version, {
+        await saves.update(careerId, 'user_phase3_owner', save.version, {
           snapshot,
           seed: save.seed,
           versions: save.versions,
@@ -413,13 +416,15 @@ describe('Phase 3 Fastify/application/worker integration', () => {
     await fixture.dependencies.unitOfWork.withCareerLock(
       careerId,
       async (tx) => {
-        const save = await tx.saves.load(careerId, 'user_phase3_owner');
+        // Saves are stored lean (ADR 0014); edit them through the codec.
+        const saves = careerSaveRepository(tx.saves);
+        const save = await saves.load(careerId, 'user_phase3_owner');
         const snapshot = structuredClone(save.snapshot);
         snapshot.players.find(({ id }) => id === unavailableId).injuryRounds =
           0;
         snapshot.players.find(({ id }) => id === suspendedId).suspensionRounds =
           1;
-        await tx.saves.update(careerId, 'user_phase3_owner', save.version, {
+        await saves.update(careerId, 'user_phase3_owner', save.version, {
           snapshot,
           seed: save.seed,
           versions: save.versions,

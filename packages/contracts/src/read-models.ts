@@ -323,3 +323,47 @@ export type SquadReadModel = z.infer<typeof squadReadModelSchema>;
 export type NextMatchReadModel = z.infer<typeof nextMatchReadModelSchema>;
 export type StandingsReadModel = z.infer<typeof standingsReadModelSchema>;
 export type PostMatchReadModel = z.infer<typeof postMatchReadModelSchema>;
+
+/** Squad summary of the Central (ADR 0014): what the list rows show. */
+const bundleSquadSchema = z.strictObject({
+  club: clubSummarySchema,
+  players: z
+    .array(
+      z.strictObject({
+        id: entityIdSchema,
+        name: nonEmptyTextSchema,
+        age: z.int().min(15).max(60),
+        position: positionSchema,
+        shirtNumber: z.int().min(0).max(99).optional(),
+        strength: z.number().min(1).max(100),
+        condition: percentageSchema,
+        morale: percentageSchema,
+        squadStatus: z.enum([
+          'starter',
+          'rotation',
+          'backup',
+          'listed',
+          'youth',
+        ]),
+        availability: z.enum(['available', 'injured', 'suspended']),
+      }),
+    )
+    .max(100),
+  lineupPlayerIds: z.array(entityIdSchema).max(100),
+  formation: formationSchema.optional(),
+});
+/**
+ * The whole Central in one read (`GET /v1/careers/:id/bundle`, ADR 0014):
+ * home, squad summary, next match, league table and inbox at one aggregate
+ * version, served with `ETag` by that version.
+ */
+export const careerBundleReadModelSchema = z.strictObject({
+  ...readBase,
+  contentVersion: nonEmptyTextSchema,
+  home: homeReadModelSchema,
+  squad: bundleSquadSchema.optional(),
+  nextMatch: nextMatchReadModelSchema.optional(),
+  standings: standingsReadModelSchema.optional(),
+  inbox: z.array(coachMessageSchema).max(20),
+});
+export type CareerBundleReadModel = z.infer<typeof careerBundleReadModelSchema>;

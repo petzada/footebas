@@ -8,6 +8,7 @@ import {
   careerWorldReadModelSchema,
   careerOfficeReadModelSchema,
   careerSeasonReadModelSchema,
+  careerBundleReadModelSchema,
   commandSchema,
   homeReadModelSchema,
   matchInstructionSchema,
@@ -16,6 +17,7 @@ import {
   squadReadModelSchema,
   standingsReadModelSchema,
   type ApiError,
+  type CareerBundleReadModel,
   type CoachMessage,
   type CoachProfile,
   type Command,
@@ -37,7 +39,6 @@ import {
   SaveConflictError,
   SaveNotFoundError,
   SaveOwnershipError,
-  verifyChecksum,
   type GameSave,
   type TransactionContext,
   type UnitOfWork,
@@ -129,6 +130,11 @@ import {
 } from './career-content.js';
 import { defaultTactic } from './tactics.js';
 import {
+  CAREER_SAVE_SCHEMA,
+  SaveCodecError,
+  careerUnitOfWork,
+} from './career-save-codec.js';
+import {
   LEAGUE_TIERS,
   closeSeasonStats,
   ensureStats,
@@ -163,7 +169,6 @@ import {
   type TelemetryPort,
 } from './ports.js';
 
-export const CAREER_SAVE_SCHEMA = 'game-save-v2' as const;
 const RULES_VERSION = CAREER_SEASON_VERSION;
 /** Full match detail kept for the managed club; older scores live in the season. */
 const KEPT_MANAGED_MATCHES = 10;
@@ -324,10 +329,13 @@ async function careerIdFor(userId: string, key: string): Promise<string> {
 export class FootebasApplication {
   private readonly content: CareerContentPort;
   private readonly entitlements: EntitlementsPort;
+  /** Saves with the full career state (lean storage behind it, ADR 0014). */
+  private readonly unitOfWork: UnitOfWork;
 
   public constructor(private readonly deps: ApplicationDependencies) {
     this.content = deps.content ?? catalogCareerContent;
     this.entitlements = deps.entitlements ?? new InMemoryEntitlements();
+    this.unitOfWork = careerUnitOfWork(deps.unitOfWork, this.content);
   }
 
   public async execute(
@@ -380,7 +388,7 @@ export class FootebasApplication {
         'new careers require expectedVersion 0',
       );
     const careerId = await careerIdFor(userId, command.idempotencyKey);
-    const response = await this.deps.unitOfWork.executeIdempotent(
+    const response = await this.unitOfWork.executeIdempotent(
       careerId,
       command.idempotencyKey,
       async (tx) => {
@@ -449,7 +457,7 @@ export class FootebasApplication {
     command: Extract<Command, { type: 'DeleteCareer' }>,
   ): Promise<CommandAccepted> {
     const careerId = command.payload.careerId;
-    const response = await this.deps.unitOfWork.executeIdempotent(
+    const response = await this.unitOfWork.executeIdempotent(
       careerId,
       command.idempotencyKey,
       async (tx) => {
@@ -473,7 +481,7 @@ export class FootebasApplication {
   ): Promise<CommandAccepted> {
     const careerId = command.payload.careerId;
     let jobToEnqueue: SimulationJob | undefined;
-    const response = await this.deps.unitOfWork.executeIdempotent(
+    const response = await this.unitOfWork.executeIdempotent(
       careerId,
       command.idempotencyKey,
       async (tx) => {
@@ -758,7 +766,7 @@ export class FootebasApplication {
       prior?.state === 'failed' ? prior.attempt + 1 : (prior?.attempt ?? 1);
     await this.setJobStatus(job, 'running', attempt);
     try {
-      await this.deps.unitOfWork.withCareerLock(job.careerId, async (tx) => {
+      await this.unitOfWork.withCareerLock(job.careerId, async (tx) => {
         const save = await this.load(tx, job.careerId, job.userId);
         const snapshot = withProfile(
           structuredClone(save.snapshot) as unknown as Snapshot,
@@ -1104,177 +1112,269 @@ export class FootebasApplication {
   }
 
   public async home(bearer: string, careerId: string): Promise<HomeReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
-      const next = managedFixture(s);
-      return homeReadModelSchema.parse({
-        ...base(save, now),
-        managerName: s.managerName,
-        careerName: s.careerName,
-        coach: s.coach,
-        inbox: coachInbox(s),
-        ...(s.selectedClubId === undefined
-          ? {}
-          : { chemistry: managedChemistry(s, s.selectedClubId) }),
-        club: clubSummary(s, s.selectedClubId),
-        currentDate: s.currentDate,
-        season: s.season,
-        ...(club ? { balance: club.balance } : {}),
-        nextFixtureId: next?.id,
-        pendingActions: s.pendingJobId
-          ? ['simulation_pending']
-          : next
-            ? ['prepare_match']
-            : s.selectedClubId
-              ? ['finish_season']
-              : ['select_club'],
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.homeModel(save, s, now),
+    );
   }
   public async squad(
     bearer: string,
     careerId: string,
   ): Promise<SquadReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
-      if (!club) throw new ApplicationError('NOT_FOUND', 'club not selected');
-      return squadReadModelSchema.parse({
-        ...base(save, now),
-        club: clubSummary(s, club.id),
-        players: s.players
-          .filter(({ clubId }) => clubId === club.id)
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            age: p.age,
-            position: p.position,
-            secondaryPositions: p.secondaryPositions,
-            ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
-            ...(p.shirtNumber === undefined
-              ? {}
-              : { shirtNumber: p.shirtNumber }),
-            strength: p.strength,
-            traits: p.traits,
-            condition: p.condition,
-            morale: p.morale,
-            matchSharpness: p.matchSharpness,
-            squadStatus: p.squadStatus,
-            injuryRounds: p.injuryRounds,
-            suspensionRounds: p.suspensionRounds,
-            availability:
-              p.injuryRounds > 0
-                ? 'injured'
-                : p.suspensionRounds > 0
-                  ? 'suspended'
-                  : 'available',
-            ...(p.lastMatchRating === undefined
-              ? {}
-              : { lastMatchRating: p.lastMatchRating }),
-            careerStats: {
-              appearances: p.careerStats.appearances,
-              goals: p.careerStats.goals,
-              assists: p.careerStats.assists,
-              yellowCards: p.careerStats.yellowCards,
-              redCards: p.careerStats.redCards,
-              ...(p.careerStats.ratedAppearances
-                ? {
-                    averageRating: Number(
-                      (
-                        (p.careerStats.ratingTotal ?? 0) /
-                        p.careerStats.ratedAppearances
-                      ).toFixed(2),
-                    ),
-                  }
-                : {}),
-            },
-            hiddenEstimates: hiddenEstimates(p),
-          })),
-        lineupPlayerIds: s.lineup
-          ? [
-              ...s.lineup.starters.map(({ playerId }) => playerId),
-              ...s.lineup.substitutes,
-              ...(s.lineup.reserves ?? []),
-            ]
-          : [],
-        ...(s.tactic ? { tactic: s.tactic } : {}),
-        lineup:
-          s.lineup && s.tactic
-            ? {
-                formation: s.tactic.formation,
-                starters: s.lineup.starters.map(({ playerId }) => playerId),
-                bench: s.lineup.substitutes,
-                reserves: s.lineup.reserves ?? [],
-              }
-            : undefined,
-        chemistry: managedChemistry(s, club.id),
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.squadModel(save, s, now),
+    );
   }
   public async nextMatch(
     bearer: string,
     careerId: string,
   ): Promise<NextMatchReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const f = managedFixture(s);
-      if (!f) throw new ApplicationError('NOT_FOUND', 'next fixture not found');
-      const content = this.loadContent(s.contentVersion);
-      return nextMatchReadModelSchema.parse({
-        ...base(save, now),
-        fixtureId: f.id,
-        competition: competitionName(content.competitions, s, f.competitionId),
-        round: f.round,
-        date: f.date,
-        homeClub: clubSummary(s, f.homeClubId),
-        awayClub: clubSummary(s, f.awayClubId),
-        status: s.pendingJobId
-          ? 'running'
-          : s.lineup && s.tactic
-            ? 'ready'
-            : 'scheduled',
-        preparation: matchPreparation(s, f),
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.nextMatchModel(save, s, now),
+    );
   }
   public async standings(
     bearer: string,
     careerId: string,
   ): Promise<StandingsReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const content = this.loadContent(s.contentVersion);
-      const division = (
-        Object.keys(s.competition.divisions) as MvpDivisionId[]
-      ).find((key) =>
-        s.competition.divisions[key].some(
-          (clubId) => clubId === s.selectedClubId,
-        ),
-      );
-      if (division === undefined)
-        throw new ApplicationError('NOT_FOUND', 'club not selected');
-      const competitionId = careerSeasonSystem(
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.standingsModel(save, s, now),
+    );
+  }
+  private homeModel(save: GameSave, s: Snapshot, now: string): HomeReadModel {
+    const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+    const next = managedFixture(s);
+    return homeReadModelSchema.parse({
+      ...base(save, now),
+      managerName: s.managerName,
+      careerName: s.careerName,
+      coach: s.coach,
+      inbox: coachInbox(s),
+      ...(s.selectedClubId === undefined
+        ? {}
+        : { chemistry: managedChemistry(s, s.selectedClubId) }),
+      club: clubSummary(s, s.selectedClubId),
+      currentDate: s.currentDate,
+      season: s.season,
+      ...(club ? { balance: club.balance } : {}),
+      nextFixtureId: next?.id,
+      pendingActions: s.pendingJobId
+        ? ['simulation_pending']
+        : next
+          ? ['prepare_match']
+          : s.selectedClubId
+            ? ['finish_season']
+            : ['select_club'],
+    });
+  }
+  private squadModel(save: GameSave, s: Snapshot, now: string): SquadReadModel {
+    const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+    if (!club) throw new ApplicationError('NOT_FOUND', 'club not selected');
+    return squadReadModelSchema.parse({
+      ...base(save, now),
+      club: clubSummary(s, club.id),
+      players: s.players
+        .filter(({ clubId }) => clubId === club.id)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          age: p.age,
+          position: p.position,
+          secondaryPositions: p.secondaryPositions,
+          ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
+          ...(p.shirtNumber === undefined
+            ? {}
+            : { shirtNumber: p.shirtNumber }),
+          strength: p.strength,
+          traits: p.traits,
+          condition: p.condition,
+          morale: p.morale,
+          matchSharpness: p.matchSharpness,
+          squadStatus: p.squadStatus,
+          injuryRounds: p.injuryRounds,
+          suspensionRounds: p.suspensionRounds,
+          availability:
+            p.injuryRounds > 0
+              ? 'injured'
+              : p.suspensionRounds > 0
+                ? 'suspended'
+                : 'available',
+          ...(p.lastMatchRating === undefined
+            ? {}
+            : { lastMatchRating: p.lastMatchRating }),
+          careerStats: {
+            appearances: p.careerStats.appearances,
+            goals: p.careerStats.goals,
+            assists: p.careerStats.assists,
+            yellowCards: p.careerStats.yellowCards,
+            redCards: p.careerStats.redCards,
+            ...(p.careerStats.ratedAppearances
+              ? {
+                  averageRating: Number(
+                    (
+                      (p.careerStats.ratingTotal ?? 0) /
+                      p.careerStats.ratedAppearances
+                    ).toFixed(2),
+                  ),
+                }
+              : {}),
+          },
+          hiddenEstimates: hiddenEstimates(p),
+        })),
+      lineupPlayerIds: s.lineup
+        ? [
+            ...s.lineup.starters.map(({ playerId }) => playerId),
+            ...s.lineup.substitutes,
+            ...(s.lineup.reserves ?? []),
+          ]
+        : [],
+      ...(s.tactic ? { tactic: s.tactic } : {}),
+      lineup:
+        s.lineup && s.tactic
+          ? {
+              formation: s.tactic.formation,
+              starters: s.lineup.starters.map(({ playerId }) => playerId),
+              bench: s.lineup.substitutes,
+              reserves: s.lineup.reserves ?? [],
+            }
+          : undefined,
+      chemistry: managedChemistry(s, club.id),
+    });
+  }
+  private nextMatchModel(
+    save: GameSave,
+    s: Snapshot,
+    now: string,
+  ): NextMatchReadModel {
+    const f = managedFixture(s);
+    if (!f) throw new ApplicationError('NOT_FOUND', 'next fixture not found');
+    const content = this.loadContent(s.contentVersion);
+    return nextMatchReadModelSchema.parse({
+      ...base(save, now),
+      fixtureId: f.id,
+      competition: competitionName(content.competitions, s, f.competitionId),
+      round: f.round,
+      date: f.date,
+      homeClub: clubSummary(s, f.homeClubId),
+      awayClub: clubSummary(s, f.awayClubId),
+      status: s.pendingJobId
+        ? 'running'
+        : s.lineup && s.tactic
+          ? 'ready'
+          : 'scheduled',
+      preparation: matchPreparation(s, f),
+    });
+  }
+  private standingsModel(
+    save: GameSave,
+    s: Snapshot,
+    now: string,
+  ): StandingsReadModel {
+    const content = this.loadContent(s.contentVersion);
+    const division = (
+      Object.keys(s.competition.divisions) as MvpDivisionId[]
+    ).find((key) =>
+      s.competition.divisions[key].some(
+        (clubId) => clubId === s.selectedClubId,
+      ),
+    );
+    if (division === undefined)
+      throw new ApplicationError('NOT_FOUND', 'club not selected');
+    const competitionId = careerSeasonSystem(
+      content.competitions,
+      s.competition,
+    ).ids.divisions[division];
+    return standingsReadModelSchema.parse({
+      ...base(save, now),
+      competitionId,
+      competition: competitionName(content.competitions, s, competitionId),
+      rows: liveStandings(
         content.competitions,
         s.competition,
-      ).ids.divisions[division];
-      return standingsReadModelSchema.parse({
-        ...base(save, now),
         competitionId,
-        competition: competitionName(content.competitions, s, competitionId),
-        rows: liveStandings(
-          content.competitions,
-          s.competition,
-          competitionId,
-        ).map((row, index) => ({
-          position: index + 1,
-          club: clubSummary(s, row.clubId),
-          played: row.played,
-          won: row.wins,
-          drawn: row.draws,
-          lost: row.losses,
-          goalsFor: row.goalsFor,
-          goalsAgainst: row.goalsAgainst,
-          goalDifference: row.goalDifference,
-          points: row.points,
-        })),
-      });
+      ).map((row, index) => ({
+        position: index + 1,
+        club: clubSummary(s, row.clubId),
+        played: row.played,
+        won: row.wins,
+        drawn: row.draws,
+        lost: row.losses,
+        goalsFor: row.goalsFor,
+        goalsAgainst: row.goalsAgainst,
+        goalDifference: row.goalDifference,
+        points: row.points,
+      })),
+    });
+  }
+  /**
+   * The Central in one read (ADR 0014): home, squad summary, next match,
+   * league table and inbox at one aggregate version. When `knownVersion`
+   * is the current version nothing is projected (HTTP 304 by `ETag`).
+   */
+  public async careerBundle(
+    bearer: string,
+    careerId: string,
+    knownVersion?: number,
+  ): Promise<{ aggregateVersion: number; bundle?: CareerBundleReadModel }> {
+    return this.query(bearer, careerId, (save, s, now) => {
+      if (knownVersion === save.version)
+        return { aggregateVersion: save.version };
+      const home = this.homeModel(save, s, now);
+      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+      const inLeague =
+        club !== undefined &&
+        Object.values(s.competition.divisions).some((ids) =>
+          ids.some((id) => id === club.id),
+        );
+      const lineupIds = s.lineup
+        ? [
+            ...s.lineup.starters.map(({ playerId }) => playerId),
+            ...s.lineup.substitutes,
+            ...(s.lineup.reserves ?? []),
+          ]
+        : [];
+      return {
+        aggregateVersion: save.version,
+        bundle: careerBundleReadModelSchema.parse({
+          ...base(save, now),
+          contentVersion: s.contentVersion,
+          home,
+          ...(club
+            ? {
+                squad: {
+                  club: clubSummary(s, club.id),
+                  players: s.players
+                    .filter(({ clubId }) => clubId === club.id)
+                    .map((p) => ({
+                      id: p.id,
+                      name: p.name,
+                      age: p.age,
+                      position: p.position,
+                      ...(p.shirtNumber === undefined
+                        ? {}
+                        : { shirtNumber: p.shirtNumber }),
+                      strength: p.strength,
+                      condition: p.condition,
+                      morale: p.morale,
+                      squadStatus: p.squadStatus,
+                      availability:
+                        p.injuryRounds > 0
+                          ? 'injured'
+                          : p.suspensionRounds > 0
+                            ? 'suspended'
+                            : 'available',
+                    })),
+                  lineupPlayerIds: lineupIds,
+                  ...(s.tactic ? { formation: s.tactic.formation } : {}),
+                },
+              }
+            : {}),
+          ...(managedFixture(s)
+            ? { nextMatch: this.nextMatchModel(save, s, now) }
+            : {}),
+          ...(inLeague ? { standings: this.standingsModel(save, s, now) } : {}),
+          inbox: home.inbox,
+        }),
+      };
     });
   }
   public async postMatch(
@@ -1289,7 +1389,7 @@ export class FootebasApplication {
   }
   public async careers(bearer: string): Promise<CareerListReadModel> {
     const user = await this.identity(bearer);
-    const saves = await this.deps.unitOfWork.withCareerLock(
+    const saves = await this.unitOfWork.withCareerLock(
       `user:${user.userId}`,
       (tx) => tx.saves.listByUser(user.userId),
     );
@@ -1326,9 +1426,8 @@ export class FootebasApplication {
   /** Public counters for the Início screen; no authentication. */
   public async publicStats(): Promise<PublicStats> {
     const content = this.content.load();
-    const coaches = await this.deps.unitOfWork.withCareerLock(
-      'public:stats',
-      (tx) => tx.saves.countActiveUsers(),
+    const coaches = await this.unitOfWork.withCareerLock('public:stats', (tx) =>
+      tx.saves.countActiveUsers(),
     );
     return publicStatsSchema.parse({
       version: 1,
@@ -1628,7 +1727,7 @@ export class FootebasApplication {
 
   public async checksum(bearer: string, careerId: string): Promise<string> {
     const user = await this.identity(bearer);
-    const save = await this.deps.unitOfWork.withCareerLock(careerId, (tx) =>
+    const save = await this.unitOfWork.withCareerLock(careerId, (tx) =>
       this.load(tx, careerId, user.userId),
     );
     return save.checksum;
@@ -1641,7 +1740,7 @@ export class FootebasApplication {
   ): Promise<T> {
     const user = await this.identity(bearer);
     try {
-      return await this.deps.unitOfWork.withCareerLock(careerId, async (tx) => {
+      return await this.unitOfWork.withCareerLock(careerId, async (tx) => {
         const save = await this.load(tx, careerId, user.userId);
         return project(
           save,
@@ -1659,8 +1758,8 @@ export class FootebasApplication {
     userId: string,
   ): Promise<GameSave> {
     const save = await tx.saves.load(id, userId);
+    // The checksum of what was stored is verified while hydrating it.
     if (!save) throw new SaveNotFoundError(`save ${id} not found`);
-    if (!verifyChecksum(save)) throw new Error('save checksum mismatch');
     if (save.versions.schema !== CAREER_SAVE_SCHEMA)
       throw new ApplicationError(
         'VERSION_CONFLICT',
@@ -1683,6 +1782,8 @@ export class FootebasApplication {
   }
   private translate(error: unknown): Error {
     if (error instanceof ApplicationError) return error;
+    if (error instanceof SaveCodecError)
+      return new ApplicationError('VERSION_CONFLICT', error.message);
     if (error instanceof OfficeRuleError || error instanceof InboxRuleError)
       return new ApplicationError(error.code, error.message);
     if (error instanceof DomainError)

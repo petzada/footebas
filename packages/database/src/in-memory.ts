@@ -18,6 +18,7 @@ import {
   SaveNotFoundError,
   SaveOwnershipError,
   type AchievementLedgerPort,
+  type CareerSaveStore,
   type CommandReceipt,
   type CommandRepository,
   type GameSaveRepository,
@@ -231,6 +232,46 @@ export class InMemoryUnitOfWork implements UnitOfWork {
       saves: new MemorySaveRepository(state, this.clock),
       commands: new MemoryCommandRepository(state),
       achievements: new MemoryAchievementLedger(state),
+    };
+  }
+  /**
+   * Career save store over the committed state (the career Durable Object's
+   * durable copy in tests and the local server).
+   */
+  careerSaveStore(): CareerSaveStore {
+    const repositories = () => this.repositories();
+    const commit = async (
+      save: GameSave,
+      expectedVersion: number,
+      achievements: readonly ValidatedAchievement[],
+    ) => {
+      assertRequiredMetadata(save.seed, save.versions);
+      const current = this.state.saves.get(save.id);
+      if (current === undefined || current.archivedAt !== undefined)
+        throw new SaveNotFoundError(`save ${save.id} not found`);
+      if (current.userId !== save.userId)
+        throw new SaveOwnershipError(`save ${save.id} does not belong to user`);
+      if (
+        current.version === save.version &&
+        current.checksum === save.checksum
+      )
+        return;
+      if (current.version !== expectedVersion)
+        throw new SaveConflictError(
+          `expected version ${String(expectedVersion)}, found ${String(current.version)}`,
+        );
+      this.state.saves.set(save.id, clone(save));
+      await repositories().achievements.record(achievements);
+    };
+    return {
+      peek: (id) => repositories().saves.peek(id),
+      versionOf: async (id) => (await repositories().saves.peek(id))?.version,
+      commit,
+      archive: (id, userId, expectedVersion) =>
+        repositories().saves.archive(id, userId, expectedVersion),
+      delete: (id, userId) => repositories().saves.delete(id, userId),
+      listAchievements: (careerId) =>
+        repositories().achievements.listByCareer(careerId),
     };
   }
   /** Committed validated achievements (for the in-memory ranking store). */

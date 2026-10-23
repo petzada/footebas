@@ -1,6 +1,8 @@
 // Cloudflare Workers entry: HTTP API (fetch), simulation consumer (queue) and
 // the ranking snapshot job (scheduled, Cron Trigger).
 // Persistence is Supabase Postgres through Hyperdrive; auth is Supabase JWT.
+// Career commands, reads and jobs run in the career Durable Object when the
+// `CAREERS` binding exists (ADR 0014); without it they use Postgres directly.
 import {
   FootebasApplication,
   InMemoryArchiveStorage,
@@ -12,10 +14,8 @@ import {
   RankingService,
   UnifiedPhaseFourRepository,
   type AuthPort,
-  type JobQueuePort,
   type SimulationJob,
 } from '@footebas/application';
-import type { JobStatus } from '@footebas/contracts';
 import {
   PostgresEntitlements,
   PostgresRankingStore,
@@ -36,6 +36,11 @@ import {
   WOOVI_SANDBOX_URL,
   WooviHttpClient,
 } from './billing/woovi-client.js';
+import {
+  careerForwarder,
+  runJobInCareerObject,
+  type CareerObjectNamespace,
+} from './career-durable-object.js';
 import { createFetchHandler } from './fetch-router.js';
 import {
   consoleLogSink,
@@ -50,6 +55,7 @@ import {
   type RateLimitBinding,
 } from './rate-limit.js';
 import { identifyRequest } from './request-identity.js';
+import { QueueJobStore } from './queue-job-store.js';
 import { errorBody } from './routes.js';
 import { withSmokeAuth } from './smoke-auth.js';
 import { SupabaseJwtAuth } from './supabase-auth.js';
@@ -100,7 +106,11 @@ export interface Env {
   readonly RATE_LIMIT_COMMANDS?: RateLimitBinding;
   readonly RATE_LIMIT_READS?: RateLimitBinding;
   readonly RATE_LIMIT_PUBLIC?: RateLimitBinding;
+  /** Career Durable Objects (`CareerDurableObject`, ADR 0014). */
+  readonly CAREERS?: CareerObjectNamespace;
 }
+
+export { CareerDurableObject } from './career-durable-object.js';
 
 /** Mirrors `max_retries` of the simulation consumer in wrangler.jsonc. */
 const QUEUE_MAX_RETRIES = 5;
@@ -154,39 +164,6 @@ function billing(env: Env, sql: postgres.Sql, auth: AuthPort) {
     },
   });
   return { service, auth };
-}
-
-/** Job status lives in Postgres; Cloudflare Queues carries the job itself. */
-class QueueJobStore implements JobQueuePort {
-  public constructor(
-    private readonly sql: postgres.Sql,
-    private readonly queue?: Env['SIMULATION_QUEUE'],
-  ) {}
-
-  public async enqueue(job: SimulationJob): Promise<void> {
-    await this.sql`
-      insert into footebas.simulation_jobs (id, career_id, user_id, job)
-      values (${job.id}, ${job.careerId}, ${job.userId}, ${this.sql.json(job as never)})
-      on conflict (id) do update set job = excluded.job, user_id = excluded.user_id`;
-    await this.queue?.send(job);
-  }
-
-  public take(): Promise<SimulationJob | undefined> {
-    return Promise.resolve(undefined);
-  }
-
-  public async status(jobId: string): Promise<JobStatus | undefined> {
-    const rows = await this.sql<{ status: JobStatus | null }[]>`
-      select status from footebas.simulation_jobs where id = ${jobId}`;
-    return rows[0]?.status ?? undefined;
-  }
-
-  public async update(status: JobStatus): Promise<void> {
-    await this.sql`
-      insert into footebas.simulation_jobs (id, career_id, status, updated_at)
-      values (${status.jobId}, ${status.careerId}, ${this.sql.json(status)}, now())
-      on conflict (id) do update set status = excluded.status, updated_at = now()`;
-  }
 }
 
 function compose(env: Env) {
@@ -259,6 +236,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
       },
       {
         rateLimit: rateLimitGuard(limiter, identity),
+        ...(env.CAREERS === undefined
+          ? {}
+          : { forward: careerForwarder(env.CAREERS) }),
         onComplete: (completion) => {
           consoleLogSink(requestLogEntry(completion, identity, version));
         },
@@ -343,9 +323,12 @@ export default {
         let result: JobOutcome;
         let failure: unknown;
         try {
-          const status = await application.runJob(message.body, {
-            requeueOnFailure: false,
-          });
+          const status =
+            env.CAREERS === undefined
+              ? await application.runJob(message.body, {
+                  requeueOnFailure: false,
+                })
+              : await runJobInCareerObject(env.CAREERS, message.body);
           if (status.state === 'failed') {
             message.retry({ delaySeconds: 5 });
             result =

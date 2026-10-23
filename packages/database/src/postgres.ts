@@ -13,11 +13,13 @@ import {
   SaveConflictError,
   SaveNotFoundError,
   SaveOwnershipError,
+  type CareerSaveStore,
   type CommandReceipt,
   type CommandRepository,
   type GameSaveRepository,
   type TransactionContext,
   type UnitOfWork,
+  type ValidatedAchievement,
 } from './ports.js';
 import { PostgresAchievementLedger } from './rankings-postgres.js';
 
@@ -273,5 +275,89 @@ export class PostgresUnitOfWork implements UnitOfWork {
       });
       return response;
     });
+  }
+}
+
+/**
+ * Postgres copy written by the career Durable Object: one conditional
+ * `update` per command (a transaction only when achievements come along).
+ */
+export class PostgresCareerSaveStore implements CareerSaveStore {
+  public constructor(
+    private readonly sql: postgres.Sql,
+    private readonly clock: Clock,
+  ) {}
+
+  public peek(id: string): Promise<GameSave | undefined> {
+    return new PostgresSaveRepository(this.sql, this.clock).peek(id);
+  }
+
+  public async versionOf(id: string): Promise<number | undefined> {
+    const rows = await this.sql<{ version: number }[]>`
+      select version from footebas.game_saves
+      where id = ${id} and archived_at is null`;
+    return rows[0]?.version;
+  }
+
+  public async commit(
+    save: GameSave,
+    expectedVersion: number,
+    achievements: readonly ValidatedAchievement[],
+  ): Promise<void> {
+    assertRequiredMetadata(save.seed, save.versions);
+    const write = async (sql: Sql) => {
+      const rows = await sql<{ id: string }[]>`
+        update footebas.game_saves set
+          snapshot = ${sql.json(save.snapshot)},
+          checksum = ${save.checksum},
+          seed = ${save.seed},
+          versions = ${sql.json(save.versions as never)},
+          version = ${save.version},
+          updated_at = ${save.updatedAt}
+        where id = ${save.id} and user_id = ${save.userId}
+          and version = ${expectedVersion} and archived_at is null
+        returning id`;
+      if (rows.length === 0) {
+        const current = await new PostgresSaveRepository(sql, this.clock).peek(
+          save.id,
+        );
+        if (
+          current?.version === save.version &&
+          current.checksum === save.checksum
+        )
+          return;
+        throw current === undefined
+          ? new SaveNotFoundError(`save ${save.id} not found`)
+          : new SaveConflictError(
+              `expected version ${String(expectedVersion)}, found ${String(current.version)}`,
+            );
+      }
+      if (achievements.length > 0)
+        await new PostgresAchievementLedger(sql).record(achievements);
+    };
+    if (achievements.length === 0) await write(this.sql);
+    else await this.sql.begin((tx) => write(tx));
+  }
+
+  public archive(
+    id: string,
+    userId: string,
+    expectedVersion: number,
+  ): Promise<GameSave> {
+    return new PostgresSaveRepository(this.sql, this.clock).archive(
+      id,
+      userId,
+      expectedVersion,
+    );
+  }
+
+  public delete(id: string, userId: string): Promise<void> {
+    return new PostgresSaveRepository(this.sql, this.clock).delete(id, userId);
+  }
+
+  public listAchievements(
+    careerId: string,
+  ): Promise<readonly ValidatedAchievement[]> {
+    return new PostgresAchievementLedger(this.sql).listByCareer(careerId);
   }
 }
