@@ -30,5 +30,4 @@
       },
     ],
   },
-  "routes": [{ "pattern": "api.footebas.com.br", "custom_domain": true }],
 }
