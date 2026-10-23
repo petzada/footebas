@@ -81,7 +81,9 @@ describe('elenco e matchday mobile-first', () => {
   it('mostra preparação, controles de velocidade, feed e skip em um toque', async () => {
     await onboard();
     expect(screen.getByText(/raio-x do rival/i)).toBeTruthy();
-    expect(screen.getByText('≈ 82')).toBeTruthy();
+    // Opponent strength is shown as a plain number (no "≈").
+    expect(document.body.textContent).toMatch(/82/);
+    expect(document.body.textContent).not.toMatch(/≈ 82/);
     fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
     expect(await screen.findByLabelText(/velocidade 4 vezes/i)).toBeTruthy();
     expect(
