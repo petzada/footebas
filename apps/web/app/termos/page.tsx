@@ -1,4 +1,4 @@
-import { LEGAL_PLACEHOLDER, LegalPage } from '@/components/legal-page';
+import { ContactEmail, LEGAL_INFO, LegalPage } from '@/components/legal-page';
 
 export const metadata = {
   title: 'Termos de uso — Footebas',
@@ -23,9 +23,10 @@ export default function TermosPage() {
           gerados pelo próprio Footebas.
         </p>
         <p>
-          O serviço é oferecido por {LEGAL_PLACEHOLDER.company}, inscrita no
-          CNPJ {LEGAL_PLACEHOLDER.cnpj}, com sede em {LEGAL_PLACEHOLDER.address}{' '}
-          (&quot;Footebas&quot;, &quot;nós&quot;).
+          O serviço é oferecido por {LEGAL_INFO.company}, inscrita no CNPJ{' '}
+          {LEGAL_INFO.cnpj}, e desenvolvido e operado por {LEGAL_INFO.operator}{' '}
+          (&quot;Footebas&quot;, &quot;nós&quot;), no site {LEGAL_INFO.site} e
+          seus subdomínios.
         </p>
       </section>
 
@@ -84,7 +85,7 @@ export default function TermosPage() {
         </p>
         <p>
           Após os 7 dias o reembolso só é feito em caso de falha do serviço
-          imputável a nós. Fale com {LEGAL_PLACEHOLDER.email}.
+          imputável a nós. Fale com <ContactEmail />.
         </p>
       </section>
 
@@ -132,9 +133,8 @@ export default function TermosPage() {
       <section aria-labelledby="t-contato">
         <h2 id="t-contato">8. Contato e foro</h2>
         <p>
-          Dúvidas e pedidos: {LEGAL_PLACEHOLDER.email}. Estes termos seguem a
-          legislação brasileira; para questões de consumo vale o foro do seu
-          domicílio.
+          Dúvidas e pedidos: <ContactEmail />. Estes termos seguem a legislação
+          brasileira; para questões de consumo vale o foro do seu domicílio.
         </p>
       </section>
     </LegalPage>

@@ -2,18 +2,30 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Brand } from '@/components/brand';
 
-export const LEGAL_DRAFT_NOTICE =
-  'Versão preliminar — sujeita a revisão jurídica';
-
-/** Placeholders the responsible person fills before launch (checklist). */
-export const LEGAL_PLACEHOLDER = {
-  company: '[preencher: razão social]',
-  cnpj: '[preencher: CNPJ]',
-  address: '[preencher: endereço]',
-  email: '[preencher: e-mail de contato]',
-  dpo: '[preencher: encarregado de dados (DPO)]',
-  updatedOn: '[preencher: data da última atualização]',
+/**
+ * Who offers the Footebas (the same company the landing names) and how to
+ * reach them. Google's OAuth branding review reads these pages.
+ */
+export const LEGAL_INFO = {
+  company: 'Marct Soluções Digitais',
+  cnpj: '63.940.273/0001-36',
+  operator: 'Marcio Petigrosso',
+  email: 'marciopetigrosso@gmail.com',
+  site: 'footebas.com.br',
+  updatedOn: '23 de outubro de 2026',
 } as const;
+
+/** The contact e-mail as a link. */
+export function ContactEmail() {
+  return (
+    <a
+      className="underline underline-offset-4"
+      href={`mailto:${LEGAL_INFO.email}`}
+    >
+      {LEGAL_INFO.email}
+    </a>
+  );
+}
 
 /** Small text link with a 44px tall tap area (WCAG 2.5.5). */
 const legalLink =
@@ -41,18 +53,12 @@ export function LegalPage({
         </Link>
       </div>
       <article className="panel mt-6 p-5 sm:p-8">
-        <p
-          role="note"
-          className="inline-block border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.5rem] uppercase text-bulb-foreground"
-        >
-          {LEGAL_DRAFT_NOTICE}
-        </p>
-        <h1 className="mt-4 font-pixel text-base leading-relaxed sm:text-xl">
+        <h1 className="font-pixel text-base leading-relaxed sm:text-xl">
           {title}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">{intro}</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Última atualização: {LEGAL_PLACEHOLDER.updatedOn}
+          Última atualização: {LEGAL_INFO.updatedOn}
         </p>
         <div className="legal mt-6 flex flex-col gap-6 text-sm leading-relaxed [&_h2]:font-pixel [&_h2]:text-[.65rem] [&_h2]:leading-relaxed [&_li]:mt-1 [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5">
           {children}
@@ -67,8 +73,8 @@ export function LegalPage({
             </a>
           </nav>
           <p className="mt-2">
-            {LEGAL_PLACEHOLDER.company} · {LEGAL_PLACEHOLDER.cnpj} ·{' '}
-            {LEGAL_PLACEHOLDER.email}
+            {LEGAL_INFO.company} · CNPJ {LEGAL_INFO.cnpj} · Desenvolvido e
+            operado por {LEGAL_INFO.operator} · <ContactEmail />
           </p>
         </footer>
       </article>

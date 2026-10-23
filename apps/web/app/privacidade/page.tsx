@@ -1,4 +1,4 @@
-import { LEGAL_PLACEHOLDER, LegalPage } from '@/components/legal-page';
+import { ContactEmail, LEGAL_INFO, LegalPage } from '@/components/legal-page';
 
 export const metadata = {
   title: 'Política de privacidade — Footebas',
@@ -15,10 +15,11 @@ export default function PrivacidadePage() {
       <section aria-labelledby="p-controlador">
         <h2 id="p-controlador">1. Quem é responsável</h2>
         <p>
-          Controlador: {LEGAL_PLACEHOLDER.company}, CNPJ{' '}
-          {LEGAL_PLACEHOLDER.cnpj}, {LEGAL_PLACEHOLDER.address}. Encarregado de
-          dados (DPO): {LEGAL_PLACEHOLDER.dpo}. Contato:{' '}
-          {LEGAL_PLACEHOLDER.email}.
+          Controlador: {LEGAL_INFO.company}, CNPJ {LEGAL_INFO.cnpj}, responsável
+          pelo Footebas ({LEGAL_INFO.site}). O jogo é desenvolvido e operado por{' '}
+          {LEGAL_INFO.operator}, que também é o encarregado pelo tratamento de
+          dados pessoais (DPO). Contato para qualquer assunto de privacidade:{' '}
+          <ContactEmail />.
         </p>
       </section>
 
@@ -51,8 +52,43 @@ export default function PrivacidadePage() {
         <p>Não coletamos localização precisa, contatos nem dados sensíveis.</p>
       </section>
 
+      <section aria-labelledby="p-google">
+        <h2 id="p-google">3. Login com Google</h2>
+        <p>
+          Se você entra com o Google, recebemos apenas o que o Google informa
+          para identificar a conta: nome, endereço de e-mail e foto de perfil
+          (escopos básicos <em>openid</em>, <em>email</em> e <em>profile</em>).
+          Não pedimos acesso a Gmail, Drive, contatos, agenda ou qualquer outro
+          dado da sua conta Google.
+        </p>
+        <ul>
+          <li>
+            Usamos esses dados somente para criar e manter o seu login, mostrar
+            o seu nome e a sua foto na tela inicial do jogo e falar com você
+            sobre a sua conta ou compra.
+          </li>
+          <li>
+            Eles ficam guardados no Supabase, nosso provedor de autenticação,
+            enquanto a conta existir, e são apagados quando você pede a exclusão
+            da conta.
+          </li>
+          <li>
+            Não vendemos, não alugamos e não compartilhamos dados do Google com
+            terceiros, não os usamos para publicidade nem para treinar modelos
+            de inteligência artificial, e eles nunca aparecem no ranking
+            público.
+          </li>
+        </ul>
+        <p>
+          O uso de informações recebidas das APIs do Google segue a Política de
+          dados do usuário dos serviços de API do Google, incluindo os
+          requisitos de uso limitado. Você pode revogar o acesso do Footebas a
+          qualquer momento em myaccount.google.com/permissions.
+        </p>
+      </section>
+
       <section aria-labelledby="p-finalidade">
-        <h2 id="p-finalidade">3. Para quê e com que base legal</h2>
+        <h2 id="p-finalidade">4. Para quê e com que base legal</h2>
         <ul>
           <li>
             Manter sua conta e salvar suas carreiras —{' '}
@@ -81,7 +117,7 @@ export default function PrivacidadePage() {
       </section>
 
       <section aria-labelledby="p-compartilhamento">
-        <h2 id="p-compartilhamento">4. Com quem compartilhamos</h2>
+        <h2 id="p-compartilhamento">5. Com quem compartilhamos</h2>
         <p>
           <strong>Não vendemos nem alugamos dados pessoais.</strong>{' '}
           Compartilhamos só com operadores necessários ao serviço: Supabase
@@ -93,7 +129,7 @@ export default function PrivacidadePage() {
       </section>
 
       <section aria-labelledby="p-retencao">
-        <h2 id="p-retencao">5. Por quanto tempo guardamos</h2>
+        <h2 id="p-retencao">6. Por quanto tempo guardamos</h2>
         <ul>
           <li>Conta e carreiras: enquanto a conta existir.</li>
           <li>
@@ -109,20 +145,20 @@ export default function PrivacidadePage() {
       </section>
 
       <section aria-labelledby="p-direitos">
-        <h2 id="p-direitos">6. Seus direitos</h2>
+        <h2 id="p-direitos">7. Seus direitos</h2>
         <p>
           Você pode pedir confirmação do tratamento, acesso, correção,
           anonimização, portabilidade, informação sobre compartilhamentos,
           revogação de consentimento e exclusão dos seus dados. Carreiras podem
           ser excluídas dentro do jogo; para excluir a conta inteira, escreva
-          para {LEGAL_PLACEHOLDER.email}. Respondemos em até 15 dias. Se não
-          ficar satisfeito, você pode reclamar à Autoridade Nacional de Proteção
-          de Dados (ANPD).
+          para <ContactEmail />. Respondemos em até 15 dias. Se não ficar
+          satisfeito, você pode reclamar à Autoridade Nacional de Proteção de
+          Dados (ANPD).
         </p>
       </section>
 
       <section aria-labelledby="p-cookies">
-        <h2 id="p-cookies">7. Cookies e armazenamento local</h2>
+        <h2 id="p-cookies">8. Cookies e armazenamento local</h2>
         <p>
           Usamos apenas armazenamento essencial: a sessão de login (mantida pelo
           Supabase no navegador), preferências do jogo como som e escalações
@@ -133,7 +169,7 @@ export default function PrivacidadePage() {
       </section>
 
       <section aria-labelledby="p-seguranca">
-        <h2 id="p-seguranca">8. Segurança</h2>
+        <h2 id="p-seguranca">9. Segurança</h2>
         <p>
           Dados trafegam criptografados (HTTPS), o acesso ao banco é restrito
           aos nossos serviços e as notificações de pagamento são verificadas por
@@ -143,7 +179,7 @@ export default function PrivacidadePage() {
       </section>
 
       <section aria-labelledby="p-mudancas">
-        <h2 id="p-mudancas">9. Mudanças nesta política</h2>
+        <h2 id="p-mudancas">10. Mudanças nesta política</h2>
         <p>
           Atualizações são publicadas nesta página com a data revisada; mudanças
           relevantes são avisadas no jogo ou por e-mail.
