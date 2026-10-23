@@ -1,5 +1,12 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
 import { Phase6Shell } from '@/components/phase6-shell';
@@ -102,16 +109,23 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(
       screen.queryByRole('navigation', { name: /navegação principal mobile/i }),
     ).toBeNull();
-    act(() => {
-      Object.defineProperty(window, 'scrollY', {
-        value: 80,
-        configurable: true,
+    // The scroll listener attaches in an effect after the match opens: keep
+    // scrolling further down until it answers (a single event fired before
+    // the listener exists is lost on a slow runner).
+    let y = 0;
+    await waitFor(() => {
+      act(() => {
+        y += 80;
+        Object.defineProperty(window, 'scrollY', {
+          value: y,
+          configurable: true,
+        });
+        window.dispatchEvent(new Event('scroll'));
       });
-      window.dispatchEvent(new Event('scroll'));
+      expect(
+        screen.getByRole('navigation', { name: /navegação principal mobile/i }),
+      ).toBeTruthy();
     });
-    expect(
-      screen.getByRole('navigation', { name: /navegação principal mobile/i }),
-    ).toBeTruthy();
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
   });
 
