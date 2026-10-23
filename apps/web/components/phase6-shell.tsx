@@ -243,10 +243,7 @@ function DesktopSidebar({
             aria-current={screen === id ? 'page' : undefined}
             onClick={() => navigate(id)}
           >
-            <Icon
-              data-icon="inline-start"
-              weight={screen === id ? 'fill' : 'regular'}
-            />
+            <Icon data-icon="inline-start" weight="fill" />
             {label}
           </Button>
         ))}
@@ -268,10 +265,7 @@ function DesktopSidebar({
                 aria-current={screen === id ? 'page' : undefined}
                 onClick={() => navigate(id)}
               >
-                <Icon
-                  data-icon="inline-start"
-                  weight={screen === id ? 'fill' : 'regular'}
-                />
+                <Icon data-icon="inline-start" weight="fill" />
                 {label}
               </Button>
             </li>
@@ -406,14 +400,14 @@ function MobileNavigation({
             key={id}
             aria-current={screen === id ? 'page' : undefined}
             className={cn(
-              'flex min-h-14 flex-col items-center justify-center gap-1 px-1 font-pixel text-[.45rem]',
+              'flex min-h-14 flex-col items-center justify-center gap-1 px-1 font-pixel text-[.5rem]',
               screen === id ? 'bg-board text-bulb' : 'text-chalk',
             )}
             onClick={() => navigate(id)}
           >
             <Icon
-              className="size-5"
-              weight={screen === id ? 'fill' : 'regular'}
+              className="size-6 drop-shadow-[0_2px_0_rgb(0_0_0/0.45)]"
+              weight="fill"
             />
             {label}
           </button>
@@ -426,7 +420,10 @@ function MobileNavigation({
           )}
           onClick={() => setOpen(!open)}
         >
-          <DotsThree className="size-5" weight="bold" />
+          <DotsThree
+            className="size-6 drop-shadow-[0_2px_0_rgb(0_0_0/0.45)]"
+            weight="fill"
+          />
           Menu
         </button>
       </nav>
