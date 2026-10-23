@@ -8,7 +8,7 @@ name: deploy-web
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'mvp/fase-6-9']
     paths:
       - 'apps/web/**'
       - 'packages/**'
