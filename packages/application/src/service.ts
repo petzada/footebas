@@ -16,6 +16,7 @@ import {
   postMatchReadModelSchema,
   squadReadModelSchema,
   standingsReadModelSchema,
+  competitionTablesReadModelSchema,
   type ApiError,
   type CareerBundleReadModel,
   type CoachMessage,
@@ -92,6 +93,7 @@ import {
 import {
   projectCalendar,
   projectPyramid,
+  projectTables,
   projectTransition,
   type SeasonSummary,
 } from './career-competitions.js';
@@ -155,9 +157,12 @@ import {
 } from './career-stats.js';
 import {
   InboxRuleError,
+  deleteInboxMessage,
   generatedMessages,
+  markInboxRead,
   resolveInboxDecision,
   runInboxDay,
+  withInboxMarks,
   type CareerInboxState,
 } from './career-inbox.js';
 import { seasonAchievements, type SeasonAchievement } from './rankings.js';
@@ -622,6 +627,24 @@ export class FootebasApplication {
               save.seed,
             );
             break;
+          case 'MarkInboxRead':
+          case 'DeleteInboxMessage': {
+            // A queued simulation expects this exact version.
+            if (snapshot.pendingJobId)
+              throw new ApplicationError(
+                'VERSION_CONFLICT',
+                'a simulation is already pending',
+              );
+            const visible = withInboxMarks(
+              snapshot,
+              allCoachMessages(snapshot),
+            );
+            if (command.type === 'MarkInboxRead')
+              markInboxRead(snapshot, visible, command.payload.messageIds);
+            else
+              deleteInboxMessage(snapshot, visible, command.payload.messageId);
+            break;
+          }
           case 'ResolveInboxDecision':
             resolveInboxDecision(
               snapshot,
@@ -1797,6 +1820,12 @@ export class FootebasApplication {
   public calendar(bearer: string, careerId: string) {
     return this.competitionView(bearer, careerId, projectCalendar);
   }
+  /** Tables and brackets of every competition of the season. */
+  public tables(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, (input) =>
+      competitionTablesReadModelSchema.parse(projectTables(input)),
+    );
+  }
   public seasonTransition(bearer: string, careerId: string) {
     return this.competitionView(bearer, careerId, projectTransition);
   }
@@ -2579,18 +2608,20 @@ function managedOutcome(
  * 0011) and the generated board, athlete, press and notice messages.
  */
 function coachInbox(snapshot: Snapshot): CoachMessage[] {
+  return withInboxMarks(snapshot, allCoachMessages(snapshot)).slice(0, 20);
+}
+/** Every projected inbox message, removed ones included, newest first. */
+function allCoachMessages(snapshot: Snapshot): CoachMessage[] {
   return [
     ...transferOfferMessages(snapshot),
     ...sponsorOfferMessages(snapshot),
     ...generatedMessages(snapshot),
     ...matchReports(snapshot),
-  ]
-    .sort(
-      (left, right) =>
-        right.occurredOn.localeCompare(left.occurredOn) ||
-        left.id.localeCompare(right.id),
-    )
-    .slice(0, 20);
+  ].sort(
+    (left, right) =>
+      right.occurredOn.localeCompare(left.occurredOn) ||
+      left.id.localeCompare(right.id),
+  );
 }
 function managedChemistry(snapshot: Snapshot, clubId: string) {
   return chemistryView(

@@ -173,6 +173,10 @@ export interface Phase4View {
     date?: string;
     /** Inbox message still waiting for a decision (answered in the Central). */
     pending?: boolean;
+    /** Inbox message the coach has not seen yet (badge of the inbox). */
+    unread?: boolean;
+    /** Inbox message the coach may remove (`DeleteInboxMessage`). */
+    deletable?: boolean;
   }[];
   history: {
     seasons: readonly {
@@ -480,18 +484,21 @@ export function createPhase4View(coach: string, club: string): Phase4View {
     news: [
       {
         id: 'n-1',
+        unread: true,
         tag: 'Mercado',
         headline: 'Gustavo Scarpa entra no radar do Flamengo',
         detail: 'O relatório destaca criação por dentro e bola parada.',
       },
       {
         id: 'n-2',
+        unread: true,
         tag: 'Diretoria',
         headline: 'Confiança cresce após sequência invicta',
         detail: `${coach} recebe respaldo antes da rodada decisiva.`,
       },
       {
         id: 'n-3',
+        unread: true,
         tag: 'Base',
         headline: 'Davi Lessa chama atenção nos treinos',
         detail:

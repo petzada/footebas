@@ -1269,6 +1269,7 @@ export class InMemoryCareerApi implements CareerApiPort {
       news: [
         {
           id: `n-${Date.now()}`,
+          unread: true,
           tag: 'Mercado',
           headline: `${player.name} foi colocado para ${label}`,
           detail:
@@ -1435,6 +1436,7 @@ export class InMemoryCareerApi implements CareerApiPort {
       news: [
         {
           id: `n-${Date.now()}`,
+          unread: true,
           tag: 'Base',
           headline: `${youth.name} foi promovido`,
           detail: 'O jovem gerado passa a treinar com o elenco principal.',
@@ -1518,6 +1520,7 @@ export class InMemoryCareerApi implements CareerApiPort {
         news: [
           {
             id: `n-${Date.now()}`,
+            unread: true,
             tag: 'Carreira',
             headline: `${current.coach} assume o ${proposal.club}`,
             detail: `A carreira continua na ${proposal.division}; prestígio e histórico foram preservados.`,

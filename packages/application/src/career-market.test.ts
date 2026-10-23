@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- indexes stay inside the arrays they read */
 import {
   MAX_SQUAD_SIZE,
   createClub,
@@ -7,6 +8,7 @@ import {
   money,
   percentage,
   strength,
+  transitionOffer,
   type Club,
   type ClubId,
   type Player,
@@ -159,6 +161,85 @@ describe('IA de mercado (docs/adr/0008)', () => {
     expect(
       context.world.offers.filter(({ status }) => status === 'pending'),
     ).toHaveLength(0);
+  });
+});
+
+/** A coach who turns down every proposal the day it arrives. */
+function rejectingWindow(seed: string): {
+  context: WorldContext;
+  maxOpen: number;
+} {
+  const context = catalogContext();
+  let maxOpen = 0;
+  for (const date of PRE_SEASON_DAYS) {
+    runMarketDay(context, date, seed);
+    const open = context.world.offers.filter(
+      ({ status, fromClubId }) =>
+        status === 'pending' && fromClubId === MANAGED,
+    );
+    maxOpen = Math.max(maxOpen, open.length);
+    context.world.offers = context.world.offers.map((offer) =>
+      offer.status === 'pending' && offer.fromClubId === MANAGED
+        ? transitionOffer(offer, 'rejected')
+        : offer,
+    );
+  }
+  return { context, maxOpen };
+}
+
+describe('propostas da IA pelo elenco gerido: variedade com viés para os melhores', () => {
+  const seeds = ['seed-a', 'seed-b', 'seed-c', 'seed-d', 'seed-e', 'seed-f'];
+  let cached: ReturnType<typeof rejectingWindow>[] | undefined;
+  const windows = () => (cached ??= seeds.map(rejectingWindow));
+  const offersOf = () =>
+    windows().map(({ context }) =>
+      context.world.offers.filter(({ fromClubId }) => fromClubId === MANAGED),
+    );
+
+  it('nunca deixa mais de duas propostas esperando ao mesmo tempo', () => {
+    for (const { maxOpen } of windows()) expect(maxOpen).toBeLessThanOrEqual(2);
+  });
+
+  it('não repete o mesmo atleta logo depois da recusa nem o mesmo comprador', () => {
+    for (const offers of offersOf()) {
+      const byPlayer = new Map<string, string[]>();
+      for (const offer of offers)
+        byPlayer.set(offer.playerId, [
+          ...(byPlayer.get(offer.playerId) ?? []),
+          offer.createdOn,
+        ]);
+      for (const dates of byPlayer.values())
+        for (let index = 1; index < dates.length; index++)
+          expect(
+            Date.parse(dates[index]!) - Date.parse(dates[index - 1]!),
+          ).toBeGreaterThanOrEqual(45 * 86_400_000);
+      const pairs = offers.map(
+        ({ playerId, toClubId }) => `${playerId}|${toClubId}`,
+      );
+      expect(new Set(pairs).size).toBe(pairs.length);
+    }
+  });
+
+  it('chegam poucas por janela, para vários atletas, e mais para os destaques', () => {
+    const squad = catalogContext()
+      .players.filter(({ clubId }) => clubId === MANAGED)
+      .sort((left, right) => Number(right.strength) - Number(left.strength));
+    const third = Math.floor(squad.length / 3);
+    const top = new Set(squad.slice(0, third).map(({ id }) => id));
+    const bottom = new Set(squad.slice(-third).map(({ id }) => id));
+    const received = offersOf();
+    const all = received.flat();
+    for (const offers of received) {
+      expect(offers.length).toBeGreaterThan(0);
+      expect(offers.length).toBeLessThanOrEqual(8);
+    }
+    // Variety: across careers far more than the three strongest are wanted.
+    expect(new Set(all.map(({ playerId }) => playerId)).size).toBeGreaterThan(
+      squad.length / 3,
+    );
+    const count = (ids: Set<string>) =>
+      all.filter(({ playerId }) => ids.has(playerId)).length;
+    expect(count(top)).toBeGreaterThan(2 * count(bottom));
   });
 });
 

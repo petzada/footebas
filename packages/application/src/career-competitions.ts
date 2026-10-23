@@ -1,11 +1,13 @@
 import type {
   CompetitionCalendarReadModel,
   CompetitionPyramidReadModel,
+  CompetitionTablesReadModel,
   NextSeasonTransitionReadModel,
 } from '@footebas/contracts';
 import type { CompetitionDefinition } from '@footebas/domain';
 import {
   careerSeasonSystem,
+  liveCompetition,
   type CareerSeasonState,
   type MvpCompetitionConfig,
 } from '@footebas/engine';
@@ -199,6 +201,216 @@ export function projectPyramid(
     cups: system.definitions
       .filter(({ id }) => !divisionIds.includes(id))
       .map((definition) => competitionModel(input, definition)),
+  };
+}
+
+type TableZone =
+  CompetitionTablesReadModel['competitions'][number]['stages'][number]['groups'][number]['zones'][number];
+
+/** Colour bands of a table, from the season rules (approximate for the cup winner). */
+function zonesOf(
+  config: MvpCompetitionConfig,
+  definition: CompetitionDefinition,
+  stageType: 'league' | 'groups',
+  divisionKey: 'serie-a' | 'serie-b' | 'serie-c' | undefined,
+  size: number,
+): TableZone[] {
+  if (stageType === 'groups')
+    return [
+      {
+        kind: 'advance',
+        label: 'Classificados ao mata-mata',
+        from: 1,
+        to: Math.min(size, config.continental.qualifiersPerGroup),
+      },
+    ];
+  if (definition.tier === 'state')
+    return [{ kind: 'title', label: 'Campeão estadual', from: 1, to: 1 }];
+  const league = config.nationalLeagues.find(
+    ({ division }) => division === divisionKey,
+  );
+  if (league === undefined) return [];
+  const zones: TableZone[] = [];
+  if (divisionKey === 'serie-a') {
+    // The cup winner takes one direct place; the rest go by the table.
+    const direct = Math.max(0, config.continental.directSlots - 1);
+    const preliminary = config.continental.preliminarySlots;
+    if (direct > 0)
+      zones.push({
+        kind: 'continental',
+        label: 'Libertadores (fase de grupos)',
+        from: 1,
+        to: direct,
+      });
+    if (preliminary > 0)
+      zones.push({
+        kind: 'continental_qualifying',
+        label: 'Pré-Libertadores',
+        from: direct + 1,
+        to: direct + preliminary,
+      });
+  } else if (league.promoted > 0)
+    zones.push({
+      kind: 'promotion',
+      label: 'Acesso',
+      from: 1,
+      to: league.promoted,
+    });
+  if (league.relegated > 0)
+    zones.push({
+      kind: 'relegation',
+      label: 'Rebaixamento',
+      from: league.clubs - league.relegated + 1,
+      to: league.clubs,
+    });
+  return zones.filter(({ from, to }) => from <= to && to <= size);
+}
+
+const groupName = (groupId: string, index: number) =>
+  /^group_\d+$/.test(groupId)
+    ? `Grupo ${String.fromCharCode(65 + index)}`
+    : 'Classificação';
+
+/**
+ * Tables and brackets of every competition (`GET /v1/careers/:id/tables`):
+ * league and group tables with zones, knockout ties with aggregate, the
+ * current phase, and the champion only once the competition is decided.
+ */
+export function projectTables(
+  input: ProjectionInput,
+): CompetitionTablesReadModel {
+  const system = careerSeasonSystem(input.config, input.competition);
+  const divisionOf = new Map<string, 'serie-a' | 'serie-b' | 'serie-c'>(
+    (['serie-a', 'serie-b', 'serie-c'] as const).map((division) => [
+      system.ids.divisions[division],
+      division,
+    ]),
+  );
+  const club = (id: string) => ({ id, name: input.clubNames.get(id) ?? id });
+  const managed = input.managedClubId;
+  const competitions = system.definitions.map((definition) => {
+    // Every definition of the season has its progress entry.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const progress = input.competition.competitions.find(
+      ({ competitionId }) => competitionId === definition.id,
+    )!;
+    const live = liveCompetition(
+      input.config,
+      input.competition,
+      definition.id,
+    );
+    const fixtures = input.competition.fixtures.filter(
+      ({ competitionId }) => competitionId === definition.id,
+    );
+    const takesPart =
+      managed !== undefined &&
+      (fixtures.some(
+        ({ homeClubId, awayClubId }) =>
+          homeClubId === managed || awayClubId === managed,
+      ) ||
+        Object.values(progress.seededByStage).some((ids) =>
+          ids.some((id) => id === managed),
+        ));
+    const stages = live.stages.map((stage) => ({
+      id: stage.stageId,
+      name: stage.name,
+      kind: stage.type,
+      status: stage.status,
+      groups: stage.groups.map(({ groupId, standings }, index) => {
+        const zones = zonesOf(
+          input.config,
+          definition,
+          stage.type === 'groups' ? 'groups' : 'league',
+          divisionOf.get(definition.id),
+          standings.length,
+        );
+        return {
+          id: groupId,
+          name: groupName(groupId, index),
+          rows: standings.map((row, position) => {
+            const zone = zones.find(
+              ({ from, to }) => position + 1 >= from && position + 1 <= to,
+            );
+            return {
+              position: position + 1,
+              club: club(row.clubId),
+              played: row.played,
+              won: row.wins,
+              drawn: row.draws,
+              lost: row.losses,
+              goalsFor: row.goalsFor,
+              goalsAgainst: row.goalsAgainst,
+              goalDifference: row.goalDifference,
+              points: row.points,
+              ...(zone === undefined ? {} : { zone: zone.kind }),
+            };
+          }),
+          zones,
+        };
+      }),
+      ties: stage.ties.map((tie) => ({
+        id: tie.tieId,
+        home: club(tie.homeClubId),
+        away: club(tie.awayClubId),
+        legs: tie.legs.map(({ fixture, result }) => ({
+          fixtureId: fixture.id,
+          leg: fixture.leg ?? 1,
+          date: fixture.date,
+          homeClubId: fixture.homeClubId,
+          awayClubId: fixture.awayClubId,
+          ...(result === undefined
+            ? {}
+            : { homeGoals: result.homeGoals, awayGoals: result.awayGoals }),
+        })),
+        ...(tie.aggregate === undefined ? {} : { aggregate: tie.aggregate }),
+        ...(tie.winnerClubId === undefined
+          ? {}
+          : { winnerClubId: tie.winnerClubId, decidedBy: tie.decidedBy }),
+        status:
+          tie.winnerClubId !== undefined
+            ? ('complete' as const)
+            : tie.aggregate !== undefined
+              ? ('active' as const)
+              : ('scheduled' as const),
+      })),
+      byes: stage.byeClubIds.map(club),
+    }));
+    return {
+      competitionId: definition.id,
+      name: definition.name,
+      category: definition.tier,
+      status:
+        progress.outcome !== undefined
+          ? ('complete' as const)
+          : fixtures.some(({ id }) => input.competition.results[id])
+            ? ('active' as const)
+            : ('scheduled' as const),
+      managed: takesPart,
+      currentStageId: live.currentStageId,
+      ...(live.championId === undefined || live.decidedOn === undefined
+        ? {}
+        : {
+            champion: {
+              club: club(live.championId),
+              decidedOn: live.decidedOn,
+            },
+          }),
+      stages,
+    };
+  });
+  const focus =
+    competitions.find(
+      ({ category, managed: mine, status }) =>
+        category === 'state' && mine && status !== 'complete',
+    ) ??
+    competitions.find(
+      ({ category, managed: mine }) => category === 'national_league' && mine,
+    );
+  return {
+    ...base(input),
+    season: input.competition.year,
+    ...(focus === undefined ? {} : { focusCompetitionId: focus.competitionId }),
+    competitions,
   };
 }
 

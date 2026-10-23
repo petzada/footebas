@@ -28,6 +28,8 @@ export const MAX_CONFIDENCE_EFFECT = 5;
 export const MAX_MORALE_EFFECT = 10;
 const KEPT_MESSAGES = 40;
 const KEPT_KEYS = 400;
+/** Read and deleted ids kept (well above the 20 messages the home shows). */
+const KEPT_MARKS = 200;
 const NOTICE_DAYS = 30;
 const DAYS: Readonly<Record<string, number>> = {
   board: 14,
@@ -40,6 +42,23 @@ const RENEWAL_RAISE = 1.1;
 const CONTRACT_NOTICE_FROM = '-10-01';
 const RENEWAL_REQUEST_FROM = '-07-01';
 const MAX_CONTRACT_NOTICES = 3;
+/*
+ * Minutes requests (2026-10-23): one open at a time, at most one a month,
+ * 60 days between requests of the same athlete, none while he is listed and
+ * none for the rest of the season after "deny" or "list". Approved as
+ * provisional values until a sim-lab calibration over a few seasons.
+ */
+/** Days before the same athlete asks for minutes again (any answer). */
+export const MINUTES_COOLDOWN_DAYS = 60;
+/** Answers after which the athlete does not ask again in the season. */
+const MINUTES_CLOSING_OPTIONS: ReadonlySet<string> = new Set([
+  'deny',
+  'list_player',
+]);
+const minutesAskedKey = (playerId: string, date: string) =>
+  `player_minutes_asked|${playerId}|${date}`;
+const minutesClosedKey = (playerId: string, year: string) =>
+  `player_minutes_closed|${playerId}|${year}`;
 
 export interface InboxEffect {
   board?: number;
@@ -81,6 +100,10 @@ export interface CareerInboxState {
   messages: InboxMessageState[];
   /** Generation keys already used, so each trigger fires once. */
   keys: string[];
+  /** Inbox ids (any source) the coach has seen, newest last. */
+  read?: string[];
+  /** Ids of offers and match reports the coach removed, newest last. */
+  deleted?: string[];
 }
 
 export class InboxRuleError extends Error {
@@ -579,8 +602,48 @@ function boardMessages(context: Context, input: InboxDayInput): void {
   });
 }
 
-/** A benched top player asks for minutes, at most once a month. */
+/**
+ * Whether this athlete may ask for minutes today: not after the coach said
+ * no or listed him this season, not within the cooldown of his last request
+ * (answered or ignored), and not while he is on the transfer list.
+ */
+function mayAskForMinutes(context: Context, playerId: string): boolean {
+  const year = context.date.slice(0, 4);
+  if (context.inbox.keys.includes(minutesClosedKey(playerId, year)))
+    return false;
+  const since = addDays(context.date, -MINUTES_COOLDOWN_DAYS);
+  const prefix = minutesAskedKey(playerId, '');
+  if (
+    context.inbox.keys.some(
+      (key) => key.startsWith(prefix) && key.slice(prefix.length) > since,
+    ) ||
+    context.inbox.messages.some(
+      (message) =>
+        message.topic === 'player_minutes' &&
+        message.playerId === playerId &&
+        message.occurredOn > since,
+    )
+  )
+    return false;
+  return !(context.snapshot.world.market?.listings ?? []).some(
+    (listing) => listing.playerId === playerId,
+  );
+}
+
+/**
+ * A benched top player asks for minutes: at most once a month, one request
+ * open at a time, each athlete respecting his cooldown and the answer given.
+ */
 function minutesRequest(context: Context, played: PlayedManagedMatch): void {
+  if (
+    context.inbox.messages.some(
+      (message) =>
+        message.topic === 'player_minutes' &&
+        message.status === 'pending' &&
+        message.expiresOn >= context.date,
+    )
+  )
+    return;
   const side = played.fixture.homeClubId === context.clubId ? 'home' : 'away';
   const started = new Set(
     (played.result.playerPerformances ?? [])
@@ -596,10 +659,16 @@ function minutesRequest(context: Context, played: PlayedManagedMatch): void {
     );
   const player = squad
     .slice(0, 9)
-    .find((candidate) => !started.has(candidate.id));
+    .find(
+      (candidate) =>
+        !started.has(candidate.id) && mayAskForMinutes(context, candidate.id),
+    );
   if (player === undefined) return;
   const names = { player: player.name };
-  push(context, `player_minutes|${context.date.slice(0, 7)}`, {
+  const monthKey = `player_minutes|${context.date.slice(0, 7)}`;
+  if (context.inbox.keys.includes(monthKey)) return;
+  context.inbox.keys.push(minutesAskedKey(player.id, context.date));
+  push(context, monthKey, {
     kind: 'player_request',
     topic: 'player_minutes',
     subject: `${player.name} pede mais minutos`,
@@ -824,6 +893,16 @@ export function resolveInboxDecision(
     throw new InboxRuleError('VALIDATION_ERROR', 'inbox message expired');
   }
   applyEffect(snapshot, message, chosen.effect);
+  if (
+    message.topic === 'player_minutes' &&
+    message.playerId !== undefined &&
+    MINUTES_CLOSING_OPTIONS.has(optionId)
+  ) {
+    snapshot.inbox ??= emptyInbox();
+    snapshot.inbox.keys.push(
+      minutesClosedKey(message.playerId, snapshot.currentDate.slice(0, 4)),
+    );
+  }
   message.status = 'resolved';
   message.chosenOptionId = optionId;
   message.resolvedOn = snapshot.currentDate;
@@ -868,4 +947,96 @@ export function generatedMessages(snapshot: CareerSnapshot): CoachMessage[] {
           }),
     };
   });
+}
+
+/** Whether a projected message still waits for the coach's decision. */
+export function awaitsDecision(
+  message: CoachMessage,
+  currentDate: string,
+): boolean {
+  if (message.choice !== undefined)
+    return (
+      message.choice.status === 'pending' &&
+      message.choice.expiresOn >= currentDate
+    );
+  return (
+    message.decision !== undefined && message.decision.expiresOn >= currentDate
+  );
+}
+
+const remember = (list: string[] | undefined, ids: readonly string[]) =>
+  [...(list ?? []).filter((id) => !ids.includes(id)), ...ids].slice(
+    -KEPT_MARKS,
+  );
+
+/**
+ * Hides removed messages and flags what the coach has already read. Takes
+ * every projected message (all sources), newest first.
+ */
+export function withInboxMarks(
+  snapshot: CareerSnapshot,
+  messages: readonly CoachMessage[],
+): CoachMessage[] {
+  const deleted = new Set(snapshot.inbox?.deleted ?? []);
+  const read = new Set(snapshot.inbox?.read ?? []);
+  return messages
+    .filter(({ id }) => !deleted.has(id))
+    .map((message) => ({ ...message, read: read.has(message.id) }));
+}
+
+/**
+ * `MarkInboxRead`: remembers the ids that are in the inbox now; unknown or
+ * already read ids change nothing.
+ */
+export function markInboxRead(
+  snapshot: CareerSnapshot,
+  visible: readonly CoachMessage[],
+  messageIds: readonly string[],
+): 'applied' | 'unchanged' {
+  const known = new Set(visible.map(({ id }) => id));
+  const already = new Set(snapshot.inbox?.read ?? []);
+  const fresh = [...new Set(messageIds)].filter(
+    (id) => known.has(id) && !already.has(id),
+  );
+  if (fresh.length === 0) return 'unchanged';
+  snapshot.inbox ??= emptyInbox();
+  snapshot.inbox.read = remember(snapshot.inbox.read, fresh);
+  return 'applied';
+}
+
+/**
+ * `DeleteInboxMessage`: generated messages leave the save (their generation
+ * key stays, so they never come back); offers and match reports, projected
+ * from elsewhere, are remembered as deleted. Waiting decisions are refused.
+ */
+export function deleteInboxMessage(
+  snapshot: CareerSnapshot,
+  visible: readonly CoachMessage[],
+  messageId: string,
+): 'applied' | 'unchanged' {
+  if (snapshot.inbox?.deleted?.includes(messageId) === true) return 'unchanged';
+  const message = visible.find(({ id }) => id === messageId);
+  if (message === undefined) {
+    // A generated message already removed is gone from the projection too.
+    if (
+      snapshot.inbox?.keys.some(
+        (key) => `mail_${slug(key)}`.slice(0, 128) === messageId,
+      ) === true
+    )
+      return 'unchanged';
+    throw new InboxRuleError('NOT_FOUND', 'inbox message not found');
+  }
+  if (awaitsDecision(message, snapshot.currentDate))
+    throw new InboxRuleError(
+      'VALIDATION_ERROR',
+      'decide this message before deleting it',
+    );
+  snapshot.inbox ??= emptyInbox();
+  const inbox = snapshot.inbox;
+  const generated = inbox.messages.some(({ id }) => id === messageId);
+  if (generated)
+    inbox.messages = inbox.messages.filter(({ id }) => id !== messageId);
+  else inbox.deleted = remember(inbox.deleted, [messageId]);
+  inbox.read = remember(inbox.read, [messageId]);
+  return 'applied';
 }
