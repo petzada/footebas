@@ -53,15 +53,64 @@ export const inboxDecisionSchema = z.strictObject({
     .max(3),
   expiresOn: gameDateSchema,
 });
+/**
+ * Topics of generated inbox messages (board, athletes, press and notices,
+ * docs/09 Central). Messages with `choice` resolve through
+ * `ResolveInboxDecision { messageId, optionId }`.
+ */
+export const INBOX_TOPICS = [
+  'board_objective',
+  'board_reinforcement',
+  'board_sale',
+  'board_ultimatum',
+  'player_minutes',
+  'player_renewal',
+  'press_conference',
+  'notice_injury',
+  'notice_suspension',
+  'notice_window_open',
+  'notice_window_closing',
+  'notice_contract_end',
+] as const;
+export const inboxTopicSchema = z.enum(INBOX_TOPICS);
+export const inboxChoiceSchema = z.strictObject({
+  messageId: entityIdSchema,
+  options: z
+    .array(
+      z.strictObject({
+        id: entityIdSchema,
+        label: z.string().min(1).max(160),
+        /** Short, readable consequences (e.g. "Diretoria +3"). */
+        effects: z.array(z.string().min(1).max(80)).max(5),
+      }),
+    )
+    .min(2)
+    .max(3),
+  expiresOn: gameDateSchema,
+  status: z.enum(['pending', 'resolved', 'expired']),
+  chosenOptionId: entityIdSchema.optional(),
+});
 export const coachMessageSchema = z.strictObject({
   id: entityIdSchema,
-  kind: z.enum(['match_report', 'transfer_offer', 'sponsor_offer']),
+  kind: z.enum([
+    'match_report',
+    'transfer_offer',
+    'sponsor_offer',
+    'board_message',
+    'player_request',
+    'press_conference',
+    'notice',
+  ]),
+  /** Present on generated board, athlete, press and notice messages. */
+  topic: inboxTopicSchema.optional(),
   /** Present on match reports. */
   situation: z.enum(['win', 'draw', 'loss']).optional(),
   subject: z.string().min(1).max(160),
   body: z.string().min(1).max(600),
   occurredOn: gameDateSchema,
   decision: inboxDecisionSchema.optional(),
+  /** Decision of a generated message (see `ResolveInboxDecision`). */
+  choice: inboxChoiceSchema.optional(),
 });
 export const homeReadModelSchema = z.strictObject({
   ...readBase,
@@ -75,7 +124,7 @@ export const homeReadModelSchema = z.strictObject({
   nextFixtureId: entityIdSchema.optional(),
   pendingActions: z.array(z.string().min(1).max(120)).max(20),
   /** Recent e-mails written in the coach personality's tone, newest first. */
-  inbox: z.array(coachMessageSchema).max(10),
+  inbox: z.array(coachMessageSchema).max(20),
   /** Chemistry of the managed eleven (ADR 0011); absent without a club. */
   chemistry: chemistryReadModelSchema.optional(),
 });
@@ -268,6 +317,8 @@ export const postMatchReadModelSchema = z.strictObject({
 export type HomeReadModel = z.infer<typeof homeReadModelSchema>;
 export type CoachMessage = z.infer<typeof coachMessageSchema>;
 export type InboxDecision = z.infer<typeof inboxDecisionSchema>;
+export type InboxChoice = z.infer<typeof inboxChoiceSchema>;
+export type InboxTopic = z.infer<typeof inboxTopicSchema>;
 export type SquadReadModel = z.infer<typeof squadReadModelSchema>;
 export type NextMatchReadModel = z.infer<typeof nextMatchReadModelSchema>;
 export type StandingsReadModel = z.infer<typeof standingsReadModelSchema>;

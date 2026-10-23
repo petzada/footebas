@@ -144,6 +144,20 @@ export const advanceDateCommandSchema = z.strictObject({
     throughDate: gameDateSchema.optional(),
   }),
 });
+/**
+ * Answers a generated inbox message (board, athletes, press, contract end).
+ * Idempotent: repeating the chosen option changes nothing; a different
+ * option on a resolved message, or any option after `expiresOn`, is refused.
+ */
+export const resolveInboxDecisionCommandSchema = z.strictObject({
+  ...envelopeFields,
+  type: z.literal('ResolveInboxDecision'),
+  payload: z.strictObject({
+    careerId: entityIdSchema,
+    messageId: entityIdSchema,
+    optionId: entityIdSchema,
+  }),
+});
 export const simulateMatchCommandSchema = z.strictObject({
   ...envelopeFields,
   type: z.literal('SimulateMatch'),
@@ -166,6 +180,7 @@ export const commandSchema = z.discriminatedUnion('type', [
   decideSponsorshipOfferCommandSchema,
   counterSponsorshipOfferCommandSchema,
   configureFanMembershipCommandSchema,
+  resolveInboxDecisionCommandSchema,
 ]);
 export const commandAcceptedSchema = z.strictObject({
   version: transportVersionSchema,
@@ -183,5 +198,8 @@ export type SetTacticsCommand = z.infer<typeof setTacticsCommandSchema>;
 export type AutoPickLineupCommand = z.infer<typeof autoPickLineupCommandSchema>;
 export type AdvanceDateCommand = z.infer<typeof advanceDateCommandSchema>;
 export type SimulateMatchCommand = z.infer<typeof simulateMatchCommandSchema>;
+export type ResolveInboxDecisionCommand = z.infer<
+  typeof resolveInboxDecisionCommandSchema
+>;
 export type Command = z.infer<typeof commandSchema>;
 export type CommandAccepted = z.infer<typeof commandAcceptedSchema>;
