@@ -42,6 +42,12 @@ const RENEWAL_RAISE = 1.1;
 const CONTRACT_NOTICE_FROM = '-10-01';
 const RENEWAL_REQUEST_FROM = '-07-01';
 const MAX_CONTRACT_NOTICES = 3;
+/*
+ * Minutes requests (2026-10-23): one open at a time, at most one a month,
+ * 60 days between requests of the same athlete, none while he is listed and
+ * none for the rest of the season after "deny" or "list". Approved as
+ * provisional values until a sim-lab calibration over a few seasons.
+ */
 /** Days before the same athlete asks for minutes again (any answer). */
 export const MINUTES_COOLDOWN_DAYS = 60;
 /** Answers after which the athlete does not ask again in the season. */

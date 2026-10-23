@@ -50,7 +50,9 @@ rodavam sobre o save único (ADR 0006).
      propostas novas por dia, das quais 1 por não listado, e no máximo 2 propostas por não listados esperando o
      treinador ao mesmo tempo. Depois de uma proposta (aceita, recusada ou ignorada) o mesmo atleta só recebe outra
      após 45 dias (10 se listado), e um clube que já tentou por ele não volta a tentar enquanto a proposta antiga
-     estiver guardada (120 dias). O comprador é um clube da
+     estiver guardada (120 dias). **Esses números do `market-ai-v2` (curva de interesse, 45/10 dias, 1 por dia, 2
+     abertas) foram aprovados como provisórios em 2026-10-23, até uma calibração com o sim-lab sobre algumas
+     temporadas.** O comprador é um clube da
      IA com elenco (mais propostas abertas) abaixo de 35, caixa para a taxa e reputação compatível (força entre
      reputação − 15, ou − 25 se listado, e reputação + 12), preferindo quem precisa da posição. Taxa: preço pedido ×
      0,85–1,05 (listado) ou valor × 1,0–1,3 (não listado); salário +10%. Empréstimo listado gera proposta de empréstimo

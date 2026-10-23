@@ -490,6 +490,9 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     const after = await port.remove(report.id);
     expect(after.messages.map(({ id }) => id)).not.toContain(report.id);
     const pending = career.world.news.find(({ pending }) => pending);
+    // No trash icon on a waiting decision, and the server refuses it anyway.
+    for (const item of career.world.news.filter(({ pending }) => pending))
+      expect(item.deletable).toBeUndefined();
     if (pending) await expect(port.remove(pending.id)).rejects.toThrow();
     expect(
       (await client.getCareer())!.world.news.map(({ id }) => id),
