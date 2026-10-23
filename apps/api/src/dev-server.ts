@@ -14,6 +14,15 @@ import {
   UnifiedPhaseFourRepository,
 } from '@footebas/application';
 import { InMemoryUnitOfWork, SystemClock } from '@footebas/database';
+import { InMemoryBillingRepository } from './billing/billing-repository-memory.js';
+import { BillingService } from './billing/service.js';
+import {
+  parsePublicKeyPems,
+  RemotePublicKeys,
+  StaticPublicKeys,
+} from './billing/webhook-signature.js';
+import { FakeWooviClient } from './billing/woovi-fake.js';
+import { WOOVI_SANDBOX_URL, WooviHttpClient } from './billing/woovi-client.js';
 import { buildApi } from './index.js';
 import { withSmokeAuth } from './smoke-auth.js';
 
@@ -42,10 +51,35 @@ const phaseFour = new PhaseFourApplicationService({
   random: new Mulberry32RandomFactory(),
 });
 
+// Billing: offline fake by default; WOOVI_APP_ID (sandbox) switches to the
+// real Woovi API so the PIX flow can be exercised end to end locally.
+const wooviUrl = process.env.WOOVI_API_URL ?? WOOVI_SANDBOX_URL;
+const wooviAppId = process.env.WOOVI_APP_ID?.trim() ?? '';
+const pinnedKeys = parsePublicKeyPems(
+  process.env.WOOVI_WEBHOOK_PUBLIC_KEYS ?? '',
+);
+const billingRepository = new InMemoryBillingRepository();
+const billing = new BillingService({
+  repository: billingRepository,
+  woovi:
+    wooviAppId === ''
+      ? new FakeWooviClient()
+      : new WooviHttpClient({ apiUrl: wooviUrl, appId: wooviAppId }),
+  entitlements: billingRepository.entitlements,
+  webhookKeys:
+    pinnedKeys.length > 0
+      ? new StaticPublicKeys(pinnedKeys)
+      : new RemotePublicKeys({ apiUrl: wooviUrl }),
+  ...(process.env.WOOVI_WEBHOOK_SECRET === undefined
+    ? {}
+    : { webhookSecret: process.env.WOOVI_WEBHOOK_SECRET }),
+});
+
 const api = await buildApi({
   application,
   jobs,
   phaseFour: { application: phaseFour, auth: appAuth },
+  billing: { service: billing, auth: appAuth },
   devAuth: auth,
   health: { version: 'dev' },
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(','),
