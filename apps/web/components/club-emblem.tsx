@@ -232,7 +232,7 @@ export function ClubEmblem({
         y="33"
         textAnchor="middle"
         dominantBaseline="central"
-        fontFamily="Rajdhani, sans-serif"
+        fontFamily="system-ui, sans-serif"
         fontWeight="700"
         fontSize={fontSize}
         letterSpacing="0.5"

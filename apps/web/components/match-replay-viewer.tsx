@@ -143,7 +143,7 @@ function Pitch({
             <text
               dominantBaseline="central"
               fill="#07140f"
-              fontFamily="Rajdhani, sans-serif"
+              fontFamily="system-ui, sans-serif"
               fontSize="2.75"
               fontWeight="800"
               textAnchor="middle"
@@ -283,7 +283,7 @@ export function MatchReplayViewer({
           </div>
           <p
             aria-label={`${match.home.name} ${frame.score.home}, ${match.away.name} ${frame.score.away}`}
-            className="font-[family-name:var(--font-display)] text-4xl font-black leading-none tracking-[.08em] tabular-nums sm:text-5xl"
+            className="scoreboard-digits text-4xl font-black leading-none tracking-[.08em] tabular-nums sm:text-5xl"
           >
             {frame.score.home}
             <span className="px-1 text-[#789487]">:</span>

@@ -81,12 +81,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@fontsource-variable/archivo':
-        specifier: 5.3.0
-        version: 5.3.0
-      '@fontsource/rajdhani':
-        specifier: 5.3.0
-        version: 5.3.0
       '@opennextjs/cloudflare':
         specifier: 1.20.2
         version: 1.20.2(next@16.2.12(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(wrangler@4.152.0(@types/node@24.0.15))
@@ -142,6 +136,9 @@ importers:
       '@footebas/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@footebas/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@footebas/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -1301,12 +1298,6 @@ packages:
 
   '@fastify/swagger@9.8.1':
     resolution: {integrity: sha512-VpHMnqZTY8iBZYJE8WWkbKPrXIYWy2rDfIf5qLr6DzZSpQYZ+KxQVcJFiq/AMlvNwI4gCBd66++iUlxXXGT0IQ==}
-
-  '@fontsource-variable/archivo@5.3.0':
-    resolution: {integrity: sha512-HogK8FJelrD1o7TlZlkIVtHgc20bO5PZRWE7mUeUTdMN055alznQV6/00J00IBeu8FQAH4s3zW9UJNvKExXf+g==}
-
-  '@fontsource/rajdhani@5.3.0':
-    resolution: {integrity: sha512-oBJgSIibWJvVBKseme1JczqPLoDHN97LHti4uh0LjfcJqQoVmnQQlRKIpEjTJV559rmVQ6qbVZZwKwk2wkBTtw==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -7031,10 +7022,6 @@ snapshots:
       yaml: 2.9.0
     transitivePeerDependencies:
       - supports-color
-
-  '@fontsource-variable/archivo@5.3.0': {}
-
-  '@fontsource/rajdhani@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
