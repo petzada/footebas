@@ -28,7 +28,7 @@ export interface MatchReplayViewerProps {
 
 const speedOptions = [1, 2, 4] as const;
 
-function useReducedMotion(override: boolean | undefined): boolean {
+export function useReducedMotion(override: boolean | undefined): boolean {
   const [preferred, setPreferred] = useState(false);
   useEffect(() => {
     if (override !== undefined || typeof window.matchMedia !== 'function')
@@ -54,14 +54,17 @@ function metricPair(home: number | string, away: number | string) {
   );
 }
 
-function Pitch({
+/** The React 2D pitch; `caption={false}` draws only the field (live screen). */
+export function SchematicPitch({
   match,
   minute,
   reducedMotion,
+  caption = true,
 }: {
   match: MatchReplayInput;
   minute: number;
   reducedMotion: boolean;
+  caption?: boolean;
 }) {
   const frame = createMatchReplayFrame(match, minute);
   return (
@@ -166,15 +169,17 @@ function Pitch({
           <path d="m0-1 .8.6-.3 1h-1l-.3-1Z" fill="#07140f" />
         </g>
       </svg>
-      <figcaption className="flex min-h-11 items-center gap-2 px-2 pt-2 text-sm text-[#d7e7df]">
-        <span
-          aria-hidden="true"
-          className="grid size-7 shrink-0 place-items-center rounded-full bg-[#e7ff54] text-[#07140f]"
-        >
-          <SpeakerHigh weight="fill" />
-        </span>
-        {frame.description}
-      </figcaption>
+      {caption ? (
+        <figcaption className="flex min-h-11 items-center gap-2 px-2 pt-2 text-sm text-[#d7e7df]">
+          <span
+            aria-hidden="true"
+            className="grid size-7 shrink-0 place-items-center rounded-full bg-[#e7ff54] text-[#07140f]"
+          >
+            <SpeakerHigh weight="fill" />
+          </span>
+          {frame.description}
+        </figcaption>
+      ) : null}
       <p className="sr-only" data-testid="pitch-text-alternative">
         {textualReplayAlternative(match, frame)}
       </p>
@@ -271,7 +276,7 @@ export function MatchReplayViewer({
           </span>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <TeamMark
               side="home"
@@ -284,7 +289,7 @@ export function MatchReplayViewer({
           </div>
           <p
             aria-label={`${match.home.name} ${frame.score.home}, ${match.away.name} ${frame.score.away}`}
-            className="scoreboard-digits text-4xl font-black leading-none tracking-[.08em] tabular-nums sm:text-5xl"
+            className="scoreboard-digits whitespace-nowrap text-[clamp(1.6rem,8vw,3rem)] font-black leading-none tracking-[.08em] tabular-nums"
           >
             {frame.score.home}
             <span className="px-1 text-[#789487]">:</span>
@@ -307,7 +312,7 @@ export function MatchReplayViewer({
         <div className="min-w-0 space-y-3">
           <MatchStage
             fallback={
-              <Pitch
+              <SchematicPitch
                 match={match}
                 minute={minute}
                 reducedMotion={reducedMotion}

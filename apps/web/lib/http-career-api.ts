@@ -24,6 +24,7 @@ import type {
 } from '@/lib/competition-product';
 import type { MatchReplayInput, ReplayEvent } from '@/lib/match-replay-model';
 import { statisticsFromTimeline } from '@/lib/match-replay-model';
+import { narrateMatch } from '@footebas/engine/narration';
 import type {
   ContractView,
   LedgerEntryView,
@@ -389,7 +390,6 @@ const FORMATION_SLOTS: Readonly<Record<string, readonly string[]>> = {
 const SERVER_POSITION: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(POSITION_LABEL).map(([server, client]) => [client, server]),
 );
-const DECISION_MINUTES = [15, 30, 45, 60, 75] as const;
 const centsToBrl = (value: number) => Math.round(value / 100);
 const brlToCents = (value: number) => Math.round(value * 100);
 const moneyOf = <T extends Record<string, number>>(record: T): T =>
@@ -1129,115 +1129,48 @@ export class HttpCareerApi implements CareerApiPort {
     };
   }
 
+  /**
+   * Narrated feed of the official timeline (ADR 0015): the engine narrator
+   * picks the phrases deterministically, and the match only stops by itself
+   * at half time and at the end (decision 18).
+   */
   #feed(post: PostMatchModel, squad?: SquadModel): MatchUpdate[] {
-    const names = this.#names(post, squad);
-    const club = (side: Side) =>
-      side === 'home' ? post.homeClub.name : post.awayClub.name;
-    const score = { home: 0, away: 0 };
-    const updates: MatchUpdate[] = [
+    const lines = narrateMatch(
+      { matchId: post.matchId, timeline: post.timeline },
       {
-        id: `${post.fixtureId}-0`,
-        progress: 1,
-        minute: 0,
-        message: `Bola rolando: ${post.homeClub.name} × ${post.awayClub.name}`,
-        score: '0 × 0',
-        kind: 'kickoff',
-        decisionPoint: false,
-        done: false,
+        home: { name: post.homeClub.name },
+        away: { name: post.awayClub.name },
+        playerNames: this.#names(post, squad),
       },
-    ];
-    const pauses = [...DECISION_MINUTES];
-    const push = (update: Omit<MatchUpdate, 'progress' | 'done' | 'score'>) =>
-      updates.push({
-        ...update,
-        progress: Math.min(99, Math.round((update.minute / 94) * 100)),
-        score: `${String(score.home)} × ${String(score.away)}`,
-        done: false,
-      });
-    const flushPauses = (minute: number) => {
-      while (pauses[0] !== undefined && pauses[0] < minute) {
-        const pause = pauses.shift()!;
-        push({
-          id: `${post.fixtureId}-pause-${String(pause)}`,
-          minute: pause,
-          message: `Pausa técnica aos ${String(pause)}'. Ajuste ou siga.`,
-          kind: 'save',
-          decisionPoint: true,
-        });
-      }
+    );
+    const kinds: Readonly<Record<string, MatchUpdate['kind']>> = {
+      kickoff: 'kickoff',
+      chance: 'chance',
+      goal: 'goal',
+      card: 'card',
+      injury: 'card',
+      full_time: 'full-time',
     };
-    post.timeline.forEach((event, index) => {
-      flushPauses(event.minute);
-      const id = `${post.fixtureId}-${String(index + 1)}`;
-      const who = (playerId: string) => names.get(playerId) ?? 'um atleta';
-      if (event.type === 'goal') {
-        score[event.side] += 1;
-        push({
-          id,
-          minute: event.minute,
-          message: `GOL do ${club(event.side)}! ${who(event.playerId)} marca.`,
-          kind: 'goal',
-          side: event.side,
-          decisionPoint: false,
-        });
-      } else if (event.type === 'chance')
-        push({
-          id,
-          minute: event.minute,
-          message: `${club(event.side)} finaliza (${event.xg.toFixed(2)} xG).`,
-          kind: 'chance',
-          side: event.side,
-          decisionPoint: false,
-        });
-      else if (event.type === 'card')
-        push({
-          id,
-          minute: event.minute,
-          message: `Cartão ${event.card === 'red' ? 'vermelho' : 'amarelo'} para ${who(event.playerId)}.`,
-          kind: 'card',
-          side: event.side,
-          decisionPoint: false,
-        });
-      else if (event.type === 'injury')
-        push({
-          id,
-          minute: event.minute,
-          message: `${who(event.playerId)} sente lesão (${club(event.side)}).`,
-          kind: 'card',
-          side: event.side,
-          decisionPoint: false,
-        });
-      else if (event.type === 'substitution')
-        push({
-          id,
-          minute: event.minute,
-          message: `${club(event.side)}: entra ${who(event.playerInId)}, sai ${who(event.playerOutId)}.`,
-          kind: 'save',
-          side: event.side,
-          decisionPoint: false,
-        });
-      else
-        push({
-          id,
-          minute: event.minute,
-          message: `${club(event.side)} muda para ${event.formation}.`,
-          kind: 'save',
-          side: event.side,
-          decisionPoint: false,
-        });
+    return lines.map((line, index) => {
+      const next = lines[index + 1];
+      return {
+        id: `${post.fixtureId}-${String(index)}`,
+        progress:
+          line.kind === 'kickoff'
+            ? 1
+            : line.kind === 'full_time'
+              ? 100
+              : Math.min(99, Math.round((line.minute / 94) * 100)),
+        minute: line.minute,
+        message: line.text,
+        score: `${String(line.score.home)} × ${String(line.score.away)}`,
+        kind: kinds[line.kind] ?? 'save',
+        ...(line.side === undefined ? {} : { side: line.side }),
+        decisionPoint: line.kind === 'half_time',
+        done: line.kind === 'full_time',
+        ...(next === undefined ? {} : { nextMinute: next.minute }),
+      };
     });
-    flushPauses(95);
-    updates.push({
-      id: `${post.fixtureId}-end`,
-      progress: 100,
-      minute: 90,
-      message: `Fim de jogo: ${post.homeClub.name} ${String(score.home)} × ${String(score.away)} ${post.awayClub.name}`,
-      score: `${String(score.home)} × ${String(score.away)}`,
-      kind: 'full-time',
-      decisionPoint: false,
-      done: true,
-    });
-    return updates;
   }
 
   #result(
@@ -1585,7 +1518,7 @@ export class HttpCareerApi implements CareerApiPort {
     );
   }
 
-  async beginMatch() {
+  async beginMatch(): Promise<MatchUpdate> {
     const next = await this.#request<NextMatchModel>(
       'GET',
       `/v1/careers/${this.#career()}/next-match`,
@@ -1603,7 +1536,10 @@ export class HttpCareerApi implements CareerApiPort {
     const preview = await this.#preview();
     this.#match.preview = preview;
     this.#match.feed = this.#feed(preview, squad);
-    return structuredClone(this.#match.feed[0]!);
+    return {
+      ...structuredClone(this.#match.feed[0]!),
+      replay: this.#replay(preview, squad),
+    };
   }
 
   async nextMatchEvent() {
@@ -1617,35 +1553,66 @@ export class HttpCareerApi implements CareerApiPort {
     return this.#match;
   }
 
-  #decisionMinute(): number {
+  /**
+   * Minute of a manual pause (decision 18): the live clock where the manager
+   * stopped, never before what was already shown or decided, 0 to 93.
+   */
+  #pauseMinute(requested?: number): number {
     const match = this.#requireMatch();
     const current = match.feed[match.cursor]!;
-    if (!current.decisionPoint)
-      throw new Error('Mudanças só podem ser feitas nas pausas técnicas.');
-    return current.minute;
+    if (current.done) throw new Error('A partida já terminou.');
+    const decided = match.instructions.reduce(
+      (latest, instruction) => Math.max(latest, Number(instruction.minute)),
+      0,
+    );
+    return Math.min(
+      93,
+      Math.max(current.minute, decided, Math.round(requested ?? 0)),
+    );
   }
 
-  async #replan(action: MatchActionView, instruction: Record<string, unknown>) {
+  async #replan(
+    action: MatchActionView,
+    instruction: Record<string, unknown>,
+  ): Promise<MatchUpdate> {
     const match = this.#requireMatch();
     const minute = action.minute;
     match.instructions.push(instruction);
     match.actions.push(action);
     const preview = await this.#preview();
     const feed = this.#feed(preview, this.#squad);
-    // Prefix-stable engine: everything up to the pause stays as already shown.
-    const resume = feed.findIndex(
-      (update) => update.minute === minute && update.decisionPoint,
-    );
+    // Prefix-stable engine and narration: everything up to the pause (and
+    // whatever already happened in that minute) is identical, so the new
+    // feed continues right after what was shown.
+    const shown = match.feed[match.cursor]!;
+    const resume =
+      feed[match.cursor]?.message === shown.message
+        ? match.cursor + 1
+        : feed.findIndex((update) => update.minute > minute);
     match.preview = preview;
     match.feed = [
       ...match.feed.slice(0, match.cursor + 1),
-      ...feed.slice(resume + 1),
+      ...feed.slice(resume < 0 ? feed.length - 1 : resume),
     ];
-    return structuredClone(match.feed[match.cursor]!);
+    const current = match.feed[match.cursor]!;
+    match.feed[match.cursor] = {
+      ...current,
+      ...(match.feed[match.cursor + 1] === undefined
+        ? {}
+        : { nextMinute: match.feed[match.cursor + 1]!.minute }),
+    };
+    return {
+      ...structuredClone(match.feed[match.cursor]!),
+      replay: this.#replay(preview, this.#squad),
+    };
   }
 
-  async makeSubstitution(input: { outgoingId: string; incomingId: string }) {
-    const minute = this.#decisionMinute();
+  async makeSubstitution(input: {
+    outgoingId: string;
+    incomingId: string;
+    minute?: number;
+  }) {
+    const minute = this.#pauseMinute(input.minute);
     const match = this.#requireMatch();
     const squad = this.#squad;
     const formation = squad?.lineup?.formation ?? '4-4-2';
@@ -1673,8 +1640,8 @@ export class HttpCareerApi implements CareerApiPort {
     );
   }
 
-  async changeMatchTactics(input: Partial<TacticsView>) {
-    const minute = this.#decisionMinute();
+  async changeMatchTactics(input: Partial<TacticsView>, at?: number) {
+    const minute = this.#pauseMinute(at);
     const match = this.#requireMatch();
     const squad = this.#squad;
     const current = fromServerTactic(squad?.tactic);

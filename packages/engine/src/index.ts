@@ -2,6 +2,7 @@ export { createPrng, hashSeed, PRNG_VERSION } from './prng.js';
 export type { Prng, PrngVersion } from './prng.js';
 export {
   calculateEffectiveStrength,
+  calculateMatchExpectation,
   calculateMatchup,
   ENGINE_VERSION,
   POSITION_SUITABILITY,
@@ -29,6 +30,17 @@ export type {
   MatchPresentation,
   PlaybackSpeed,
 } from './presentation.js';
+export {
+  narrateMatch,
+  narrateTimeline,
+  NARRATION_VERSION,
+} from './narration.js';
+export type {
+  NarrationContext,
+  NarrationEvent,
+  NarrationKind,
+  NarrationLine,
+} from './narration.js';
 export { prepareMatch } from './preparation.js';
 export type { ApproximateStrength, MatchPreparation } from './preparation.js';
 export {
