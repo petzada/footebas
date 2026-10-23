@@ -332,12 +332,15 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(begin).toHaveBeenCalledTimes(1);
   });
 
-  it('entrega resultado instantâneo com campo 2D e veredito coerente com o placar', async () => {
+  it('entrega resultado instantâneo com placar, resumo e veredito coerente, sem campo 2D', async () => {
     await onboard();
     fireEvent.click(
       screen.getByRole('button', { name: /resultado instantâneo/i }),
     );
-    expect(await screen.findByTestId('match-replay-viewer')).toBeTruthy();
+    expect(await screen.findByTestId('final-scoreboard')).toBeTruthy();
+    expect(screen.getByTestId('match-summary')).toBeTruthy();
+    expect(screen.queryByTestId('match-replay-viewer')).toBeNull();
+    expect(screen.queryByTestId('match-stage')).toBeNull();
     expect(screen.getByText(/flamengo venceu/i)).toBeTruthy();
     expect(screen.getByText(/\+3 pontos/i)).toBeTruthy();
   });

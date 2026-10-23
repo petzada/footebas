@@ -91,8 +91,19 @@ describe('partida ao vivo (decisões 18 e 19)', () => {
       screen.getByRole('button', { name: /começar o segundo tempo/i }),
     );
     await advance(20_000);
-    expect(status()).toMatch(/fim de jogo/i);
-    expect(screen.getByRole('button', { name: /ver relatório/i })).toBeTruthy();
+    // The final whistle stops the match and opens the summary: big score,
+    // next round and no 2D pitch or replay controls.
+    const final = screen.getByRole('region', { name: /placar final/i });
+    expect(within(final).getByText(/fim de jogo/i)).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /preparar próxima rodada/i }),
+    ).toBeTruthy();
+    expect(screen.getByTestId('match-summary')).toBeTruthy();
+    expect(screen.queryByTestId('match-stage')).toBeNull();
+    expect(screen.queryByTestId('match-replay-viewer')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /visual simples/i }),
+    ).toBeNull();
     const total = next.mock.calls.length;
     await advance(10_000);
     expect(next.mock.calls.length).toBe(total);

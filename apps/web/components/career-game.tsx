@@ -62,12 +62,14 @@ import { OfficeScreen } from '@/components/office-screen';
 import { CompetitionScreens } from '@/components/competition-screens';
 import { Phase6Shell, PwaRuntime } from '@/components/phase6-shell';
 import {
-  MatchReplayViewer,
   SchematicPitch,
   useReducedMotion,
 } from '@/components/match-replay-viewer';
 import { MatchStage } from '@/components/match-stage/match-stage';
-import type { MatchReplayInput } from '@/lib/match-replay-model';
+import {
+  describeReplayEvent,
+  type MatchReplayInput,
+} from '@/lib/match-replay-model';
 import { ClubEmblem } from '@/components/club-emblem';
 import { TickerProvider, useTicker } from '@/components/retro/ticker';
 import { stopSounds } from '@/lib/retro/sound';
@@ -872,6 +874,11 @@ function Matchday(props: {
   }, [paused]);
   const minute = Math.max(clock, update.minute);
   const advance = useEffectEvent(() => void props.onNext());
+  // The final whistle stops the match and opens the summary (no 2D replay).
+  const finish = useEffectEvent(() => props.onFinished());
+  useEffect(() => {
+    if (update.done) finish();
+  }, [update.done]);
 
   // The clock walks minute by minute up to the next play, then reveals it.
   useEffect(() => {
@@ -962,7 +969,7 @@ function Matchday(props: {
       </section>
 
       <div className="w-full min-w-0 max-w-full" data-testid="live-pitch">
-        {replay ? (
+        {replay && !update.done ? (
           <MatchStage
             bare
             fallback={
@@ -986,39 +993,42 @@ function Matchday(props: {
         className="flex min-w-0 flex-wrap items-center gap-2"
         data-testid="live-controls"
       >
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={update.done}
-          aria-label={paused ? 'Retomar partida' : 'Pausar partida'}
-          onClick={() => {
-            if (halfTimeStop) setDismissedPauseId(update.id);
-            setManualPaused(halfTimeStop ? false : !manualPaused);
-          }}
-        >
-          {paused ? <Play /> : <Pause />}
-        </Button>
-        <ToggleGroup
-          aria-label="Velocidade da partida"
-          type="single"
-          value={String(speed)}
-          onValueChange={(value) =>
-            value && setSpeed(Number(value) as MatchSpeed)
-          }
-        >
-          {LIVE_SPEEDS.map((value) => (
-            <ToggleGroupItem
-              key={value}
-              value={String(value)}
-              aria-label={`Velocidade ${String(value).replace('.', ',')} vezes`}
+        {!update.done && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label={paused ? 'Retomar partida' : 'Pausar partida'}
+              onClick={() => {
+                if (halfTimeStop) setDismissedPauseId(update.id);
+                setManualPaused(halfTimeStop ? false : !manualPaused);
+              }}
             >
-              {String(value).replace('.', ',')}×
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+              {paused ? <Play /> : <Pause />}
+            </Button>
+            <ToggleGroup
+              aria-label="Velocidade da partida"
+              type="single"
+              value={String(speed)}
+              onValueChange={(value) =>
+                value && setSpeed(Number(value) as MatchSpeed)
+              }
+            >
+              {LIVE_SPEEDS.map((value) => (
+                <ToggleGroupItem
+                  key={value}
+                  value={String(value)}
+                  aria-label={`Velocidade ${String(value).replace('.', ',')} vezes`}
+                >
+                  {String(value).replace('.', ',')}×
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </>
+        )}
         {update.done ? (
-          <Button size="sm" className="ml-auto" onClick={props.onFinished}>
-            Ver relatório
+          <Button className="min-h-12 w-full" onClick={props.onFinished}>
+            Ver resumo da partida
             <Trophy data-icon="inline-end" />
           </Button>
         ) : (
@@ -1221,6 +1231,13 @@ function Matchday(props: {
   );
 }
 
+/** Timeline entries worth a line in the summary (no chances or tactics). */
+const SUMMARY_EVENTS = new Set(['goal', 'card', 'injury', 'substitution']);
+
+/**
+ * End of the match: the match stops, the big scoreboard stays on top with the
+ * next-round button, and a short summary follows. No 2D replay here.
+ */
 function Result({
   career,
   onContinue,
@@ -1229,42 +1246,113 @@ function Result({
   onContinue(): void;
 }) {
   const result = career.lastResult;
-  if (!result)
-    return (
-      <div className="mx-auto max-w-2xl">
-        <Button className="min-h-12 w-full" onClick={onContinue}>
-          Preparar próxima rodada
-          <ArrowRight data-icon="inline-end" />
-        </Button>
-      </div>
-    );
+  const next = (
+    <Button className="min-h-12 w-full" onClick={onContinue}>
+      Preparar próxima rodada
+      <ArrowRight data-icon="inline-end" />
+    </Button>
+  );
+  if (!result) return <div className="mx-auto max-w-2xl">{next}</div>;
+  const { replay } = result;
   const score = parseScore(result.score);
+  const side = replay?.away.name === career.club ? 'away' : 'home';
+  const own = side === 'home' ? score.home : score.away;
+  const rival = side === 'home' ? score.away : score.home;
   const outcome =
-    score.home > score.away
+    own > rival
       ? { verdict: `${career.club} venceu`, summary: '+3 pontos' }
-      : score.home === score.away
+      : own === rival
         ? { verdict: 'Empate', summary: '+1 ponto' }
         : { verdict: `${career.club} perdeu`, summary: 'sem pontos' };
+  const stats = replay ? liveStatistics(replay, Infinity) : undefined;
+  const moments =
+    replay?.timeline.filter((event) => SUMMARY_EVENTS.has(event.type)) ?? [];
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <Card>
-        <CardHeader className="items-center text-center">
-          <Trophy className="size-10 text-accent" weight="fill" />
+    <div
+      className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-3 overflow-x-clip"
+      data-testid="match-result"
+    >
+      <section
+        aria-label="Placar final"
+        className="panel-board min-w-0 px-3 py-3"
+      >
+        <div className="flex items-center justify-between gap-2">
           <Badge>Fim de jogo</Badge>
-          <CardTitle className="scoreboard-digits whitespace-nowrap text-[clamp(2.25rem,13vw,3.75rem)] font-bold">
-            {result.score}
-          </CardTitle>
-          <CardDescription>{outcome.verdict}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 text-center">
-          <div>
-            <h2 className="font-display text-base font-bold uppercase">
-              {result.headline}
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {outcome.summary} · próxima rodada liberada
-            </p>
+          <span className="font-pixel text-[.55rem] text-chalk/80">
+            {outcome.summary}
+          </span>
+        </div>
+        <p
+          className="scoreboard-digits mt-2 whitespace-nowrap text-center text-[clamp(2rem,12vw,6rem)] leading-none text-bulb"
+          data-testid="final-scoreboard"
+        >
+          {result.score}
+        </p>
+        {replay && (
+          <div className="mt-3 grid min-w-0 grid-cols-2 gap-3">
+            {[replay.home.name, replay.away.name].map((club) => (
+              <div
+                key={club}
+                className="flex min-w-0 flex-col items-center gap-1 text-center"
+              >
+                <ClubEmblem name={club} size={64} decorative />
+                <span className="w-full truncate font-pixel text-[.55rem] text-chalk">
+                  {club}
+                </span>
+              </div>
+            ))}
           </div>
+        )}
+        <p className="mt-3 border-t border-chalk/20 pt-2 text-center text-sm font-medium text-chalk">
+          {outcome.verdict}
+        </p>
+      </section>
+
+      {next}
+
+      <Card className="min-w-0" data-testid="match-summary">
+        <CardHeader>
+          <CardTitle className="font-display text-sm uppercase">
+            Resumo da partida
+          </CardTitle>
+          <CardDescription>{result.headline}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {stats && (
+            <div className="panel-board grid min-w-0 gap-4 p-4">
+              <StatBar
+                label="Posse"
+                home={stats.possession.home}
+                away={stats.possession.away}
+                format={(value) => `${String(Math.round(value))}%`}
+              />
+              <StatBar
+                label="Finalizações"
+                home={stats.home.shots}
+                away={stats.away.shots}
+              />
+              <StatBar
+                label="Cartões"
+                home={stats.home.cards}
+                away={stats.away.cards}
+              />
+            </div>
+          )}
+          {replay && moments.length > 0 && (
+            <ol
+              aria-label="Principais lances"
+              className="flex flex-col gap-2 text-sm"
+            >
+              {moments.map((event, index) => (
+                <li
+                  key={`${event.minute}-${event.type}-${index}`}
+                  className="min-w-0 break-words"
+                >
+                  {describeReplayEvent(replay, event)}
+                </li>
+              ))}
+            </ol>
+          )}
           {result.actions.length > 0 && (
             <div className="rounded-md bg-muted p-3 text-left">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -1280,14 +1368,7 @@ function Result({
             </div>
           )}
         </CardContent>
-        <CardFooter>
-          <Button className="min-h-12 w-full" onClick={onContinue}>
-            Preparar próxima rodada
-            <ArrowRight data-icon="inline-end" />
-          </Button>
-        </CardFooter>
       </Card>
-      {result.replay && <MatchReplayViewer match={result.replay} />}
     </div>
   );
 }
