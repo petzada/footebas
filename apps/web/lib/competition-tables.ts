@@ -229,6 +229,11 @@ export function withCareerLeague(
   },
 ): CompetitionTablesView {
   if (career.standings.length === 0) return view;
+  const name = career.division ?? 'Liga';
+  const existing = view.competitions.find(
+    (table) =>
+      table.name === name && table.stages.some(({ kind }) => kind === 'league'),
+  );
   const listed = view.competitions.some((table) =>
     table.stages.some(
       (stage) =>
@@ -238,9 +243,10 @@ export function withCareerLeague(
         ),
     ),
   );
-  if (listed) return view;
-  const name = career.division ?? 'Liga';
-  const existing = view.competitions.find((table) => table.name === name);
+  // Listed and no table carries the career's division name: the server
+  // tables are the whole truth (HTTP). With a same-named league the career
+  // rows win, so the Central and the Classificação always agree (demo).
+  if (listed && !existing) return view;
   const zones =
     existing?.stages.find(({ kind }) => kind === 'league')?.groups[0]?.zones ??
     [];

@@ -94,13 +94,22 @@ describe('tabelas por competição (D7)', () => {
       'Juventude FC',
     ]);
     expect(group.zones.length).toBeGreaterThan(0);
-    // The club is already listed by the server: nothing changes.
+    // The club is listed by the server and no table carries the division
+    // name (HTTP: "Carioca" vs "Campeonato Carioca"): nothing changes.
     expect(
       withCareerLeague(view, {
         club: 'Flamengo',
+        division: 'Carioca',
         standings: [{ position: 1, club: 'Flamengo', played: 1, points: 3 }],
       }),
     ).toBe(view);
+    // Same-named league (demo): the live career rows replace the fixture.
+    const demo = withCareerLeague(view, {
+      club: 'Flamengo',
+      division: 'Série A',
+      standings: [{ position: 1, club: 'Flamengo', played: 1, points: 3 }],
+    });
+    expect(demo.competitions[0]!.stages[0]!.groups[0]!.rows).toHaveLength(1);
   });
 
   it('abrevia nomes longos para as colunas estreitas', () => {

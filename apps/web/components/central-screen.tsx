@@ -595,10 +595,12 @@ function StandingsSummary({
   const zones = useFocusZones(port, career.club);
   const zoneFor = (club: string, position: number) => {
     if (!zones) return undefined;
-    const row = zones.rows.find((item) => item.club.name === club);
-    return row
-      ? zoneOf(zones, row)
-      : zoneOf(zones, { position } as TableRowView);
+    // The career's own position decides the band; a row flagged by the
+    // server (`zone`) only fills in when no band covers that position.
+    return (
+      zoneOf(zones, { position } as TableRowView) ??
+      zones.rows.find((item) => item.club.name === club)?.zone
+    );
   };
   const shownZones = shown
     .map((row) => zoneFor(row.club, row.position))

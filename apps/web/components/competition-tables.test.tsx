@@ -20,10 +20,12 @@ function pickTab(list: RegExp, name: RegExp) {
 
 describe('Classificação por formato (D7)', () => {
   it('pontos corridos: faixas de zona, legenda e o clube do jogador destacado', async () => {
+    // As over HTTP: the server tables list the club, the career's division
+    // name is the estadual, so the fixture's Série A stands.
     render(
       <CompetitionTables
         port={createFakeCompetitionProductPort()}
-        career={await career()}
+        career={{ ...(await career()), division: 'Carioca' }}
       />,
     );
     const competitions = await screen.findByRole('tablist', {

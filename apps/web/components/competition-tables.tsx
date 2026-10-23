@@ -443,7 +443,7 @@ export function LeagueTable({
           const isMine = row.club.name === club;
           const zone = zoneOf(group, row);
           const short = compact
-            ? shortClubName(row.club.name, 11)
+            ? shortClubName(row.club.name, 12)
             : row.club.name;
           return (
             <tr
