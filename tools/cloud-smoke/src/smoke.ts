@@ -10,7 +10,7 @@ export type AuthMode =
 export interface SmokeOptions {
   readonly apiUrl: string;
   readonly auth: AuthMode;
-  /** Club the smoke manager takes over (stable id, e.g. club_flamengo). */
+  /** Club the smoke manager takes over (stable id, e.g. club_brusque; free plan starts in Série C). */
   readonly clubId?: string;
   readonly jobTimeoutMs?: number;
   readonly jobPollMs?: number;
@@ -121,7 +121,7 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const now = options.now ?? Date.now;
   const base = options.apiUrl.replace(/\/+$/, '');
-  const clubId = options.clubId ?? 'club_flamengo';
+  const clubId = options.clubId ?? 'club_brusque';
   const jobTimeoutMs = options.jobTimeoutMs ?? 120_000;
   const jobPollMs = options.jobPollMs ?? 1_000;
   const requestTimeoutMs = options.requestTimeoutMs ?? 30_000;

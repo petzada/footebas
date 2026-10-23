@@ -117,7 +117,7 @@ interface CareerListModel {
     updatedAt?: string;
   }[];
   /** Plan limit (docs/09 decision 5). */
-  limits?: { maxCareers: number; activeCareers?: number };
+  limits?: { maxCareers: number; activeCareers?: number; anyClub?: boolean };
 }
 
 // --- transport shapes (subset of @footebas/contracts read models) ---
@@ -844,7 +844,14 @@ export class HttpCareerApi implements CareerApiPort {
         ...(item.currentDate ? { currentDate: item.currentDate } : {}),
         ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
       })),
-      ...(list.limits === undefined ? {} : { limit: list.limits.maxCareers }),
+      ...(list.limits === undefined
+        ? {}
+        : {
+            limit: list.limits.maxCareers,
+            ...(list.limits.anyClub === undefined
+              ? {}
+              : { anyClub: list.limits.anyClub }),
+          }),
     };
   }
 

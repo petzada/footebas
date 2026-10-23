@@ -329,7 +329,14 @@ function CareerFlow({
     });
 
   const loadStats = useCallback(() => api.getPublicStats(), [api]);
-  const listCareers = useCallback(() => api.listCareers(), [api]);
+  // Free plan starts in Série C; the career list tells whether the license
+  // lets this coach pick any club (docs/05 §5).
+  const [anyClub, setAnyClub] = useState(true);
+  const listCareers = useCallback(async () => {
+    const list = await api.listCareers();
+    setAnyClub(list.anyClub ?? true);
+    return list;
+  }, [api]);
   const removeCareer = useCallback(
     async (careerId: string) => {
       try {
@@ -408,6 +415,7 @@ function CareerFlow({
       <>
         <PwaRuntime />
         <NewCareerWizard
+          anyClub={anyClub}
           initialCoach={session?.name ?? ''}
           pending={commandState === 'pending'}
           error={error}

@@ -49,7 +49,7 @@ No PowerShell: `$env:API_URL='https://api.footebas.com.br'; $env:SMOKE_TOKEN='<t
 | `SMOKE_TOKEN`        | (obrigatória em `smoke`) | Mesmo valor do secret do Worker (≥ 32)   |
 | `AUTH`               | `smoke`                  | `dev` usa `POST /v1/dev/session` (local) |
 | `SMOKE_EMAIL`        | `smoke@footebas.invalid` | E-mail da sessão dev                     |
-| `SMOKE_CLUB`         | `club_flamengo`          | Clube assumido pela carreira             |
+| `SMOKE_CLUB`         | `club_brusque`           | Clube assumido pela carreira             |
 | `JOB_TIMEOUT_MS`     | `120000`                 | Tempo máximo esperando o job             |
 | `JOB_POLL_MS`        | `1000`                   | Intervalo do polling do job              |
 | `REQUEST_TIMEOUT_MS` | `30000`                  | Tempo máximo de cada requisição          |

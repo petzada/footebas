@@ -138,6 +138,7 @@ function run(api: typeof fetch, extra: { jobTimeoutMs?: number } = {}) {
   return runSmoke({
     apiUrl: 'https://api.example.test/',
     auth: { kind: 'smoke', token },
+    clubId: club.id,
     fetch: api,
     log: (line) => lines.push(line),
     sleep: (ms) => {

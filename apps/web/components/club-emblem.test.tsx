@@ -45,19 +45,31 @@ describe('emblema genérico de clube', () => {
   });
 
   it('renderiza o mesmo desenho e expõe rótulo acessível', () => {
-    const { container, rerender } = render(<ClubEmblem name="Palmeiras" />);
-    const svg = screen.getByRole('img', { name: 'Emblema do Palmeiras' });
+    const { container, rerender } = render(<ClubEmblem name="Palmares" />);
+    const svg = screen.getByRole('img', { name: 'Emblema do Palmares' });
     const shape = svg.getAttribute('data-shape');
     const pattern = svg.getAttribute('data-pattern');
     expect(svg.textContent).toBe('PAL');
-    rerender(<ClubEmblem name="Palmeiras" />);
-    const again = screen.getByRole('img', { name: 'Emblema do Palmeiras' });
+    rerender(<ClubEmblem name="Palmares" />);
+    const again = screen.getByRole('img', { name: 'Emblema do Palmares' });
     expect(again.getAttribute('data-shape')).toBe(shape);
     expect(again.getAttribute('data-pattern')).toBe(pattern);
-    rerender(<ClubEmblem name="Palmeiras" decorative />);
+    rerender(<ClubEmblem name="Palmares" decorative />);
     expect(screen.queryByRole('img')).toBeNull();
     expect(container.querySelector('svg')?.getAttribute('aria-hidden')).toBe(
       'true',
     );
+  });
+
+  it('usa o escudo pixel quando o clube tem um, inclusive pelo id do catálogo', () => {
+    const { rerender } = render(<ClubEmblem name="São Paulo" />);
+    const crest = screen.getByRole('img', { name: 'Escudo do São Paulo' });
+    expect(crest.getAttribute('src')).toBe('/crests/club_sao_paulo.png');
+    rerender(<ClubEmblem name="Qualquer" id="club_flamengo" />);
+    expect(
+      screen
+        .getByRole('img', { name: 'Escudo do Qualquer' })
+        .getAttribute('src'),
+    ).toBe('/crests/club_flamengo.png');
   });
 });

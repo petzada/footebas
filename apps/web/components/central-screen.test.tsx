@@ -66,7 +66,7 @@ describe('Central', () => {
       />,
     );
     const club = screen.getByRole('region', { name: 'Flamengo' });
-    expect(within(club).getByRole('img', { name: /emblema do flamengo/i }));
+    expect(within(club).getByRole('img', { name: /escudo do flamengo/i }));
     expect(club.textContent).toMatch(/série a/i);
     expect(club.textContent).toMatch(/carreira de ana/i);
     const coach = within(club).getByRole('group', { name: 'Treinador' });

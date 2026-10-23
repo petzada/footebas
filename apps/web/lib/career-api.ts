@@ -213,6 +213,8 @@ export interface CareerList {
   careers: readonly CareerSummary[];
   /** Careers allowed by the plan (free: 1, license: 5), when known. */
   limit?: number;
+  /** License lets the coach pick any club; free starts in Série C (docs/05). */
+  anyClub?: boolean;
 }
 
 export const FREE_CAREER_LIMIT = 1;
@@ -922,7 +924,7 @@ export class InMemoryCareerApi implements CareerApiPort {
         round: view.round,
         updatedAt,
       }));
-    return { careers, limit: this.#limit };
+    return { careers, limit: this.#limit, anyClub: true };
   }
 
   async openCareer(careerId: string) {

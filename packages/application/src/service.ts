@@ -255,6 +255,11 @@ export interface ApplicationDependencies {
   readonly content?: CareerContentPort;
   /** Plan limits; defaults to everyone on the free plan. */
   readonly entitlements?: EntitlementsPort;
+  /**
+   * Free plan picks only Série C clubs at the start (docs/05 §5). On in
+   * production; off by default so local demos and tests can pick any club.
+   */
+  readonly enforceStartingDivision?: boolean;
   readonly failPoint?: (
     point: 'before-persist-result',
     job: SimulationJob,
@@ -498,6 +503,18 @@ export class FootebasApplication {
                 'career already manages a club; accept a job proposal to move',
               );
             const division = divisionOf(snapshot, club.id);
+            // Free plan starts at the bottom; the license picks any club
+            // (docs/05 §5, docs/09 decision 5).
+            if (
+              this.deps.enforceStartingDivision === true &&
+              manager.employmentStatus !== 'employed' &&
+              division !== 'serie-c' &&
+              !(await this.entitlements.forUser(userId)).anyClub
+            )
+              throw new ApplicationError(
+                'FORBIDDEN',
+                'o plano grátis começa na Série C; a licença libera qualquer clube',
+              );
             const rank =
               [...snapshot.competition.divisions[division]]
                 .map((id) => snapshot.clubs.find((item) => item.id === id)!)

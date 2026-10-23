@@ -26,10 +26,12 @@ que não depende destes itens; cada item diz o que destrava.
 
 ## Qualidade, jurídico e lançamento
 
-7. **Modelo 3D do estádio** (`football-field`, `football-court`): confirmar a origem e a licença de uso comercial (e
+7. **Escudos dos clubes** (`apps/web/public/crests`, recortados das folhas em `public/images`): são marcas registradas;
+   decidir com revisão jurídica se ficam no lançamento público ou voltam ao emblema genérico.
+8. **Modelo 3D do estádio** (`football-field`, `football-court`): confirmar a origem e a licença de uso comercial (e
    se exige crédito ao autor) antes do lançamento.
-8. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
-9. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
-   tributação da licença.
-10. Beta fechada com 3–5 pessoas e aceite qualitativo do loop.
-11. Aceite humano final.
+9. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
+10. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
+    tributação da licença.
+11. Beta fechada com 3–5 pessoas e aceite qualitativo do loop.
+12. Aceite humano final.

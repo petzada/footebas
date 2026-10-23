@@ -192,6 +192,7 @@ function compose(env: Env) {
     auth,
     clock,
     entitlements: new PostgresEntitlements(sql),
+    enforceStartingDivision: true,
     ids,
     jobs,
     storage: new InMemoryStorage(),
