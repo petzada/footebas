@@ -6,19 +6,23 @@ import {
 import { replayFromFeed } from '@/lib/match-replay-adapter';
 import type { MatchReplayInput } from '@/lib/match-replay-model';
 
+/** Shell destinations; the first seven are the main areas of docs/09. */
 export type Screen =
-  | 'home'
+  | 'central'
+  | 'map'
+  | 'squad'
+  | 'market'
+  | 'office'
+  | 'season'
+  | 'ranking'
   | 'inbox'
   | 'calendar'
-  | 'squad'
   | 'tactics'
   | 'table'
-  | 'market'
-  | 'club'
-  | 'finance'
-  | 'history'
   | 'competitions'
-  | 'world';
+  | 'stadium'
+  | 'finance'
+  | 'history';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
 export type SquadRole = 'starter' | 'bench' | 'reserve';
 export type AutoPickStrategy = 'best' | 'rest' | 'develop';

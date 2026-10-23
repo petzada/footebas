@@ -24,9 +24,7 @@ describe('entrada com conta', () => {
       await screen.findByRole('button', { name: /entrar com google/i }),
     ).toBeTruthy();
     expect(screen.getByLabelText(/seu e-mail/i)).toBeTruthy();
-    expect(
-      screen.queryByRole('button', { name: /narrar partida/i }),
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: /jogar partida/i })).toBeNull();
   });
 
   it('envia o link mágico pelo port e pede para conferir o e-mail', async () => {
@@ -74,11 +72,18 @@ describe('entrada com conta', () => {
     expect(auth.calls.google).toBe(1);
   });
 
-  it('com sessão carrega o jogo e permite sair', async () => {
+  it('com sessão mostra o Início, carrega a carreira e permite sair', async () => {
     const auth = new FakeAuth({ user: player });
     render(<CareerGame api={await careerReady()} auth={auth} />);
     expect(
-      await screen.findByRole('button', { name: /narrar partida/i }),
+      await screen.findByRole('heading', { level: 1, name: /e aí, ana/i }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /carregar carreira/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /abrir carreira de ana/i }),
+    );
+    expect(
+      await screen.findByRole('button', { name: /jogar partida/i }),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /^sair$/i }));
     expect(
@@ -87,15 +92,18 @@ describe('entrada com conta', () => {
     expect(auth.calls.signOut).toBe(1);
   });
 
-  it('com sessão e sem carreira vai direto para o treinador', async () => {
+  it('com sessão começa uma nova carreira pelo Início', async () => {
     const auth = new FakeAuth({ user: player });
     render(<CareerGame api={new InMemoryCareerApi()} auth={auth} />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: /nova carreira/i }),
+    );
     expect(await screen.findByLabelText(/nome do treinador/i)).toBeTruthy();
   });
 
   it('volta para a entrada quando a sessão expira', async () => {
     const api = new InMemoryCareerApi();
-    api.getCareer = async () => {
+    api.login = async () => {
       throw new SessionExpiredError();
     };
     const auth = new FakeAuth({ user: player });
