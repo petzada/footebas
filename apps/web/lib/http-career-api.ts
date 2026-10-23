@@ -30,6 +30,7 @@ import {
 } from '@/lib/inbox-product';
 import type { MatchReplayInput, ReplayEvent } from '@/lib/match-replay-model';
 import { statisticsFromTimeline } from '@/lib/match-replay-model';
+import { serverErrorMessage } from '@/lib/server-error-message';
 import { narrateMatch } from '@footebas/engine/narration';
 import type {
   ContractView,
@@ -666,8 +667,7 @@ export class HttpCareerApi implements CareerApiPort {
           : error?.code === 'UNAUTHORIZED'
             ? 'Sua sessão expirou. Entre novamente.'
             : ((error?.code && marketRefusalMessage(error.code)) ??
-              error?.message ??
-              'Não foi possível falar com o servidor.'),
+              serverErrorMessage(error?.code, error?.message)),
         response.status,
         error?.code,
       );
@@ -2196,7 +2196,11 @@ export class HttpCareerApi implements CareerApiPort {
     if (!response.ok) {
       const error = payload as { code?: string; message?: string } | undefined;
       throw new ApiRequestError(
-        error?.message ?? 'Não foi possível enviar a imagem.',
+        serverErrorMessage(
+          error?.code,
+          error?.message,
+          'Não foi possível enviar a imagem.',
+        ),
         response.status,
         error?.code,
       );

@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { buildApi } from '@footebas/api';
 import {
+  careerUnitOfWork,
+  catalogCareerContent,
   FakeBearerAuth,
   FakeClock,
   FootebasApplication,
@@ -12,6 +14,7 @@ import {
   PhaseFourApplicationService,
   SequentialIdGenerator,
   UnifiedPhaseFourRepository,
+  type CareerSnapshot,
 } from '@footebas/application';
 import { InMemoryUnitOfWork } from '@footebas/database';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -32,6 +35,9 @@ afterEach(async () => {
   await Promise.all(open.splice(0).map((api) => api.close()));
 });
 
+/** Storage of the last in-process server, for tests that edit the save. */
+let storage: InMemoryUnitOfWork | undefined;
+
 /** The real API in-process; fetch goes through Fastify inject. */
 async function server(
   session: 'dev' | ((auth: FakeBearerAuth) => AccessTokenProvider) = 'dev',
@@ -42,6 +48,7 @@ async function server(
   const ids = new SequentialIdGenerator();
   const jobs = new InMemoryJobQueue();
   const unitOfWork = new InMemoryUnitOfWork(clock);
+  storage = unitOfWork;
   const application = new FootebasApplication({
     auth,
     clock,
@@ -101,7 +108,81 @@ async function start(startDate?: string) {
   return { client, career };
 }
 
+/** Round N left these players hurt or sent off in the saved career. */
+async function sideline(
+  careerId: string,
+  changes: Readonly<
+    Record<string, { injuryRounds?: number; suspensionRounds?: number }>
+  >,
+) {
+  await careerUnitOfWork(storage!, catalogCareerContent).withCareerLock(
+    careerId,
+    async (tx) => {
+      const save = (await tx.saves.peek(careerId))!;
+      const snapshot = structuredClone(
+        save.snapshot,
+      ) as unknown as CareerSnapshot;
+      snapshot.players = snapshot.players.map((player) =>
+        changes[player.id] ? { ...player, ...changes[player.id] } : player,
+      );
+      await tx.saves.update(careerId, save.userId, save.version, {
+        snapshot: snapshot as unknown as typeof save.snapshot,
+        seed: save.seed,
+        versions: save.versions,
+      });
+    },
+  );
+}
+
 describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
+  it('joga a rodada seguinte com titulares lesionado e suspenso: instantâneo, pular e narrado', async () => {
+    for (const mode of ['instant', 'skip', 'narrated'] as const) {
+      const { client } = await start();
+      await client.instantResult();
+      const before = (await client.getCareer())!;
+      const [injured, suspended] = before.players.filter(
+        ({ role, primaryPosition }) =>
+          role === 'starter' && primaryPosition !== 'GOL',
+      );
+      await sideline(before.careerId!, {
+        [injured!.id]: { injuryRounds: 3 },
+        [suspended!.id]: { suspensionRounds: 1 },
+      });
+      await client.validateMatchday();
+      let after;
+      if (mode === 'instant') after = await client.instantResult();
+      else {
+        let update = await client.beginMatch();
+        if (mode === 'narrated')
+          while (!update.done) update = await client.nextMatchEvent();
+        after = await client.finishMatch();
+      }
+      expect(after.lastResult?.score, mode).toMatch(/\d+ × \d+/);
+      const fielded = after.players.filter(({ role }) => role === 'starter');
+      expect(fielded, mode).toHaveLength(11);
+      expect(
+        fielded.filter(
+          ({ injuryRounds, suspended: out }) => injuryRounds > 0 || out,
+        ),
+        mode,
+      ).toEqual([]);
+    }
+  });
+
+  it('mostra em português a recusa de escalar um lesionado', async () => {
+    const { client, career } = await start();
+    const board = buildBoard(career.players, career.formation);
+    const starter = board.slots[1]!;
+    await sideline(career.careerId!, { [starter]: { injuryRounds: 2 } });
+    await client.validateMatchday();
+    await expect(
+      client.setLineup(lineupInput(board, career.players)),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      message: expect.stringMatching(/lesionados ou suspensos/),
+    });
+  });
+
   it('monta a carreira com elenco real, adversário e mundo do servidor', async () => {
     const { career } = await start();
     expect(career.club).toBe('Flamengo');
