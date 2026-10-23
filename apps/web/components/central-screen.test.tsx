@@ -211,3 +211,14 @@ describe('Central', () => {
     expect(screen.getAllByText(/rodada 2/i).length).toBeGreaterThan(0);
   });
 });
+
+describe('shortClubName', () => {
+  it('abrevia só o que não cabe na tabela estreita', async () => {
+    const { shortClubName } = await import('@/components/central-screen');
+    expect(shortClubName('Flamengo')).toBe('Flamengo');
+    expect(shortClubName('Atlético Mineiro')).toBe('Atlético M.');
+    expect(shortClubName('Red Bull Bragantino')).toBe('RB Bragantino');
+    expect(shortClubName('Athletico Paranaense')).toBe('Athletico P.');
+    expect(shortClubName('Independiente del Valle')).toBe('ID Valle');
+  });
+});
