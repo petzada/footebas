@@ -97,7 +97,7 @@ describe('elenco e matchday mobile-first', () => {
   it('aplica escalação automática e mantém até duas características visíveis', async () => {
     const api = await onboard();
     fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
-    fireEvent.click(await screen.findByRole('button', { name: /^poupar$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^poupar/i }));
     await waitFor(async () => {
       const career = await api.getCareer();
       expect(

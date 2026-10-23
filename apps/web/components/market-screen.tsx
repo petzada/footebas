@@ -408,7 +408,7 @@ export function MarketScreen({
                         play('click');
                         // The chosen athlete's card opens at the top (docs/09).
                         requestAnimationFrame(() =>
-                          targetPanel.current?.scrollIntoView({
+                          targetPanel.current?.scrollIntoView?.({
                             block: 'start',
                           }),
                         );
