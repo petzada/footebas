@@ -50,6 +50,18 @@ describe('Escritório · patrocínio, sócio-torcedor e finanças', () => {
     const card = screen.getByRole('article', {
       name: /proposta de loja vestiário/i,
     });
+    // Each card names its sponsor on the three decision buttons, so a
+    // screen reader never hears three identical "Aceitar".
+    expect(
+      within(card).getByRole('button', {
+        name: 'Aceitar proposta de Loja Vestiário',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(card).getByRole('button', {
+        name: 'Recusar proposta de Loja Vestiário',
+      }),
+    ).toBeTruthy();
     fireEvent.click(within(card).getByRole('button', { name: /aceitar/i }));
     await screen.findByText(/contrato assinado com loja vestiário/i);
     const office = await api.getOffice();

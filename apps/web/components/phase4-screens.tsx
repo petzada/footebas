@@ -84,16 +84,16 @@ function SectionHeading({
   description: string;
 }) {
   return (
-    <header className="mb-4">
-      <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">
+    // Sits on the grass, not on a panel: chalk tones keep AA contrast
+    // (primary green and the muted ink would be below 2:1 here).
+    <header className="mb-4 text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
+      <p className="text-xs font-bold uppercase tracking-[.18em] text-chalk/90">
         {eyebrow}
       </p>
       <h2 className="font-display text-xs font-bold uppercase sm:text-sm">
         {title}
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-        {description}
-      </p>
+      <p className="mt-1 max-w-2xl text-sm">{description}</p>
     </header>
   );
 }
@@ -784,7 +784,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
           </Card>
         </TabsContent>
         <TabsContent value="youth" className="mt-4">
-          <div className="mb-3 rounded-md border bg-muted p-3 text-sm">
+          <div className="mb-3 rounded-md border bg-muted p-3 text-sm text-ink">
             <strong>Identidade do conteúdo:</strong> todos os atletas abaixo são{' '}
             <Badge variant="outline">gerados pelo universo</Badge>. Força e
             dimensões ocultas aparecem apenas como estimativas textuais.
@@ -827,7 +827,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
                     {youth.readiness}
                   </p>
                 </CardContent>
-                <CardFooter className="grid grid-cols-3 gap-2">
+                <CardFooter className="grid gap-2 min-[400px]:grid-cols-3">
                   <Button
                     size="sm"
                     variant="outline"

@@ -211,7 +211,9 @@ function CardStat({
   return (
     <div className="min-w-0">
       <dt className="font-pixel text-[.5rem] text-muted-foreground">{label}</dt>
-      <dd className="font-pixel text-xs leading-relaxed break-words min-[400px]:text-base sm:text-xl">
+      {/* Wraps only at spaces: "R$ 38,6 mi" may take two lines at 320px, but
+          "mi" is never split into "M / I". */}
+      <dd className="font-pixel text-xs leading-relaxed break-normal min-[400px]:text-base sm:text-xl">
         {value}
         {hint && (
           <span className="ml-1 text-xs text-muted-foreground">{hint}</span>

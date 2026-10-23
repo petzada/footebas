@@ -172,29 +172,34 @@ export function MarketScreen({
         {notice}
       </p>
       <header className="panel-board grid gap-2 p-3 sm:grid-cols-[1fr_auto]">
+        {/* "R$ 38,6 mi" is 10 pixel glyphs: the digits shrink on phones and
+            wrap only at the space ("R$ 38,6" / "mi"), never mid-word. */}
         <dl className="grid grid-cols-3 gap-2 text-center">
-          <div>
+          <div className="min-w-0">
             <dt className="font-pixel text-[.5rem] uppercase text-chalk/80">
               Caixa
             </dt>
-            <dd className="led text-base">
+            <dd className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
               {formatBrl(market.club?.cash ?? 0)}
             </dd>
           </div>
-          <div>
+          <div className="min-w-0">
             <dt className="font-pixel text-[.5rem] uppercase text-chalk/80">
               Folha/mês
             </dt>
-            <dd className="led text-base">
+            <dd className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
               {formatBrl(market.club?.monthlyWageBill ?? 0)}
             </dd>
           </div>
-          <div>
+          <div className="min-w-0">
             <dt className="font-pixel text-[.5rem] uppercase text-chalk/80">
               Elenco
             </dt>
             <dd
-              className={cn('led text-base', squadFull && 'text-destructive')}
+              className={cn(
+                'led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base',
+                squadFull && 'text-destructive',
+              )}
             >
               {market.club?.squadSize ?? 0}/{market.club?.maxSquadSize ?? 35}
             </dd>
@@ -220,7 +225,7 @@ export function MarketScreen({
               ? `${String(market.window.daysRemaining ?? 0)}d`
               : `${String(market.window.daysUntilNext)}d`}
           </span>
-          <span className="text-[.6rem]">
+          <span className="text-xs">
             {windowOpen
               ? `fecha em ${formatDate(market.window.closesOn ?? '')}`
               : `${market.window.nextName.replace('Janela ', '')} · ${formatDate(market.window.nextOpensOn)}`}
@@ -271,7 +276,7 @@ export function MarketScreen({
                   </Button>
                 </div>
                 <details className="group">
-                  <summary className="cursor-pointer font-pixel text-[.55rem]">
+                  <summary className="flex min-h-11 cursor-pointer items-center font-pixel text-[.55rem]">
                     Mais filtros
                   </summary>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -785,7 +790,9 @@ function OfferList({
                   : 'Encerrada'}
             </p>
             {offer.awaiting === 'manager' && (
-              <div className="grid grid-cols-3 gap-1">
+              // Three pixel-font labels never fit side by side on a phone:
+              // stacked there, one row from `sm` up.
+              <div className="grid gap-1 sm:grid-cols-3">
                 <Button
                   size="sm"
                   disabled={busy}

@@ -446,6 +446,13 @@ function CareerFlow({
     ...(session?.avatarUrl ? { avatarUrl: session.avatarUrl } : {}),
   };
 
+  // The live scoreboard and the final score open at the top of the page;
+  // otherwise the phone stays scrolled where "Jogar partida" was tapped.
+  useEffect(() => {
+    if (stage === 'match' || stage === 'result')
+      globalThis.scrollTo?.({ top: 0 });
+  }, [stage]);
+
   const resumeSession = useEffectEvent(() => void login());
   const userId = session?.id;
   useEffect(() => {
@@ -1071,6 +1078,7 @@ function Matchday(props: {
             <Button
               size="sm"
               variant="outline"
+              className="min-h-11 min-w-11"
               aria-label={paused ? 'Retomar partida' : 'Pausar partida'}
               onClick={() => {
                 if (halfTimeStop) setDismissedPauseId(update.id);
@@ -1091,6 +1099,7 @@ function Matchday(props: {
                 <ToggleGroupItem
                   key={value}
                   value={String(value)}
+                  className="min-h-11 min-w-11"
                   aria-label={`Velocidade ${String(value).replace('.', ',')} vezes`}
                 >
                   {String(value).replace('.', ',')}×
