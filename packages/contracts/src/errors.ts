@@ -59,6 +59,14 @@ export const jobFailedErrorSchema = z.strictObject({
   jobId: entityIdSchema,
   retryable: z.boolean(),
 });
+/** CreateCareer refused: the user already has the plan's maximum of active careers. */
+export const careerLimitReachedErrorSchema = z.strictObject({
+  ...base,
+  code: z.literal('CAREER_LIMIT_REACHED'),
+  message: z.string().min(1).max(500),
+  plan: z.enum(['free', 'licensed']).optional(),
+  maxCareers: z.int().min(0).optional(),
+});
 export const internalErrorSchema = z.strictObject({
   ...base,
   code: z.literal('INTERNAL_ERROR'),
@@ -72,6 +80,7 @@ export const apiErrorSchema = z.discriminatedUnion('code', [
   versionConflictErrorSchema,
   idempotencyConflictErrorSchema,
   jobFailedErrorSchema,
+  careerLimitReachedErrorSchema,
   internalErrorSchema,
 ]);
 export type ApiError = z.infer<typeof apiErrorSchema>;

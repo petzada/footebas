@@ -19,6 +19,7 @@ import {
   transportVersionSchema,
   versionSchema,
 } from './primitives.js';
+import { careerNameSchema, coachProfileSchema } from './coach.js';
 
 const readBase = {
   version: transportVersionSchema,
@@ -35,15 +36,27 @@ const scoreSchema = z.strictObject({
   home: z.int().min(0).max(99),
   away: z.int().min(0).max(99),
 });
+export const coachMessageSchema = z.strictObject({
+  id: entityIdSchema,
+  kind: z.enum(['match_report']),
+  situation: z.enum(['win', 'draw', 'loss']),
+  subject: z.string().min(1).max(160),
+  body: z.string().min(1).max(600),
+  occurredOn: gameDateSchema,
+});
 export const homeReadModelSchema = z.strictObject({
   ...readBase,
   managerName: nonEmptyTextSchema,
+  careerName: careerNameSchema,
+  coach: coachProfileSchema,
   club: clubSummarySchema.optional(),
   currentDate: gameDateSchema,
   season: z.int().positive(),
   balance: moneySchema.optional(),
   nextFixtureId: entityIdSchema.optional(),
   pendingActions: z.array(z.string().min(1).max(120)).max(20),
+  /** Recent e-mails written in the coach personality's tone, newest first. */
+  inbox: z.array(coachMessageSchema).max(10),
 });
 const squadPlayerSchema = z.strictObject({
   id: entityIdSchema,
@@ -230,6 +243,7 @@ export const postMatchReadModelSchema = z.strictObject({
   }),
 });
 export type HomeReadModel = z.infer<typeof homeReadModelSchema>;
+export type CoachMessage = z.infer<typeof coachMessageSchema>;
 export type SquadReadModel = z.infer<typeof squadReadModelSchema>;
 export type NextMatchReadModel = z.infer<typeof nextMatchReadModelSchema>;
 export type StandingsReadModel = z.infer<typeof standingsReadModelSchema>;

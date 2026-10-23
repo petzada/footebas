@@ -10,6 +10,11 @@ import {
   transportVersionSchema,
   versionSchema,
 } from './primitives.js';
+import {
+  careerLimitsSchema,
+  careerNameSchema,
+  coachProfileSchema,
+} from './coach.js';
 
 const signedMoneySchema = z
   .int()
@@ -163,12 +168,16 @@ export const careerListReadModelSchema = z.strictObject({
       careerId: entityIdSchema,
       aggregateVersion: versionSchema,
       managerName: nonEmptyTextSchema,
+      careerName: careerNameSchema,
+      coach: coachProfileSchema,
       clubId: entityIdSchema.optional(),
       clubName: nonEmptyTextSchema.optional(),
       season: z.int().positive(),
       currentDate: gameDateSchema,
     }),
   ),
+  /** Plan limit (docs/09 decision 5): active careers against maxCareers. */
+  limits: careerLimitsSchema,
 });
 
 export const devSessionRequestSchema = z.strictObject({

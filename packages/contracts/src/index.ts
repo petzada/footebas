@@ -1,4 +1,5 @@
 export * from './auth.js';
+export * from './coach.js';
 export * from './commands.js';
 export * from './errors.js';
 export * from './jobs.js';
