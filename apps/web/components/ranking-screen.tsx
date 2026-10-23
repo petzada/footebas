@@ -1,7 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Ranking as RankingIcon, Rocket } from '@phosphor-icons/react';
+import { useEffect, useState, type FocusEvent } from 'react';
+import {
+  CalendarStar,
+  Ranking as RankingIcon,
+  Rocket,
+  Trophy,
+} from '@phosphor-icons/react';
 import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { PixelTrophy } from '@/components/retro/sprites';
@@ -10,24 +15,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { COACH_AVATARS, type CoachAvatarId } from '@/lib/coach-profile';
 import {
   currentPeriod,
+  formatCount,
   periodLabel,
+  RANKING_SCOPES,
   recentPeriods,
   SCOPE_LABEL,
   type MyRankingEntry,
   type RankingPort,
+  type RankingRow,
   type RankingScope,
   type RankingView,
 } from '@/lib/ranking-product';
 import { cn } from '@/lib/utils';
 
-const SCOPES: readonly RankingScope[] = ['global', 'rise', 'monthly'];
-
 const RULES: Record<RankingScope, string> = {
-  global:
-    'Soma os pontos de conquistas validadas pelo servidor: títulos (continental 180, Série A 100, B 60, C 40, copa nacional 70, estadual 25), acessos (45) e temporada completa no cargo (5). Só a sua melhor carreira conta.',
+  general:
+    'Soma os pontos de conquistas validadas pelo servidor: títulos (continental 180, Série A 100, B 60, C 40, copa nacional 70, estadual 25), acessos (45) e temporada completa no cargo (5). O título vale assim que o campeonato termina. Só a sua melhor carreira conta.',
+  titles:
+    'Conta os títulos (liga, copa, estadual e continental) da sua melhor carreira. Empate: mais pontos, depois quem chegou primeiro.',
+  best_season:
+    'A maior soma de pontos numa única temporada da sua melhor carreira. Empate: a temporada mais antiga.',
   rise: 'Mede façanhas de clube pequeno: só títulos e acessos de clubes com reputação até 65, multiplicados por até 3× quanto menor a reputação. Temporada completa não conta.',
   monthly:
     'Soma os pontos validados no mês civil em que o servidor registrou a conquista. Fecha no dia 1 do mês seguinte.',
+};
+
+const ICON: Record<RankingScope, typeof RankingIcon> = {
+  general: RankingIcon,
+  titles: Trophy,
+  best_season: CalendarStar,
+  rise: Rocket,
+  monthly: RankingIcon,
+};
+
+/** Header of the value column of each scope. */
+const MEASURE: Record<RankingScope, string> = {
+  general: 'Pontos',
+  titles: 'Títulos',
+  best_season: 'Pontos',
+  rise: 'Pontos',
+  monthly: 'Pontos',
 };
 
 type Loaded =
@@ -35,9 +62,17 @@ type Loaded =
   | { status: 'ready'; view: RankingView }
   | { status: 'error'; message: string };
 
+/** Keeps a tab that got focus (keyboard or touch) fully inside the strip. */
+function revealTab(event: FocusEvent<HTMLButtonElement>) {
+  // jsdom and old browsers have no scrollIntoView options.
+  event.currentTarget.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+}
+
 /**
- * Ranking global (docs/09 decision 10, ADR 0013): Global / Ascensão / Mensal
- * tabs over cached snapshots, with the player's own position highlighted.
+ * Ranking de treinadores (docs/09 decision 10, ADR 0013, ADR 0017): five
+ * scopes in a horizontal strip of tabs that scrolls and snaps (decision D8:
+ * on a phone the next tab stays half visible), live boards and the player's
+ * own position out of every participant.
  */
 export function RankingScreen({
   port,
@@ -46,7 +81,7 @@ export function RankingScreen({
   port: RankingPort;
   now?: () => Date;
 }) {
-  const [scope, setScope] = useState<RankingScope>('global');
+  const [scope, setScope] = useState<RankingScope>('general');
   const [period, setPeriod] = useState(() => currentPeriod(now()));
   const [boards, setBoards] = useState<Record<string, Loaded>>({});
   const [mine, setMine] = useState<readonly MyRankingEntry[] | null>(null);
@@ -99,20 +134,21 @@ export function RankingScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [port, scope, period, key]);
 
+  // The monthly position of /me is the current month's only.
   const myEntry = mine?.find(
     (entry) =>
       entry.scope === scope && (scope !== 'monthly' || entry.period === period),
   );
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 gap-4">
       <section
         aria-labelledby="ranking-titulo"
         className="panel-board flex flex-wrap items-center justify-between gap-3 p-4"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <PixelTrophy size={28} />
-          <div>
+          <div className="min-w-0">
             <h2 id="ranking-titulo" className="led text-sm sm:text-base">
               Ranking de treinadores
             </h2>
@@ -122,55 +158,68 @@ export function RankingScreen({
             </p>
           </div>
         </div>
-        <MyPosition entry={myEntry} signedIn={mine !== null} />
+        <MyPosition entry={myEntry} scope={scope} signedIn={mine !== null} />
       </section>
 
       <Tabs
         value={scope}
         onValueChange={(value) => setScope(value as RankingScope)}
+        className="min-w-0"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <TabsList aria-label="Escopo do ranking">
-            {SCOPES.map((item) => (
-              <TabsTrigger key={item} value={item}>
-                {SCOPE_LABEL[item]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {scope === 'monthly' && (
-            <label className="flex items-center gap-2 text-xs">
-              <span className="font-pixel text-[.5rem]">Mês</span>
-              <select
-                aria-label="Mês do ranking"
-                className="min-h-10 border-2 border-ink bg-popover px-2 font-pixel text-[.5rem]"
-                value={period}
-                onChange={(event) => setPeriod(event.target.value)}
-              >
-                {recentPeriods(6, now()).map((item) => (
-                  <option key={item} value={item}>
-                    {periodLabel(item)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-        {SCOPES.map((item) => (
-          <TabsContent key={item} value={item}>
-            <Board state={board} scope={item} myEntry={myEntry} />
-            <p className="panel mt-3 flex items-start gap-2 p-3 text-xs text-muted-foreground">
-              {item === 'rise' ? (
-                <Rocket className="mt-0.5 size-4 shrink-0" aria-hidden />
-              ) : (
-                <RankingIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-              )}
-              <span>
-                <strong>Como pontua:</strong> {RULES[item]} O quadro atualiza a
-                cada 15 minutos.
-              </span>
-            </p>
-          </TabsContent>
-        ))}
+        {/*
+          Five scopes do not fit 320–430 px: the strip scrolls sideways and
+          snaps to a tab; each tab takes 40% of the strip on a phone, so the
+          third one shows by half and invites the swipe.
+        */}
+        <TabsList
+          aria-label="Escopo do ranking"
+          data-scroll-snap="x"
+          className="panel-wood flex w-full snap-x snap-mandatory scroll-px-1 items-stretch justify-start gap-1 overflow-x-auto overscroll-x-contain p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {RANKING_SCOPES.map((item) => (
+            <TabsTrigger
+              key={item}
+              value={item}
+              onFocus={revealTab}
+              className="min-h-11 min-w-0 flex-none basis-[40%] snap-start whitespace-normal bg-ink/35 px-2 text-center leading-tight text-chalk data-[state=active]:shadow-[inset_0_-3px_0_0_var(--bulb)] sm:basis-auto sm:px-3"
+            >
+              {SCOPE_LABEL[item]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {scope === 'monthly' && (
+          <label className="mt-2 flex items-center justify-end gap-2 text-xs">
+            <span className="font-pixel text-[.5rem]">Mês</span>
+            <select
+              aria-label="Mês do ranking"
+              className="min-h-11 border-2 border-ink bg-popover px-2 font-pixel text-[.5rem]"
+              value={period}
+              onChange={(event) => setPeriod(event.target.value)}
+            >
+              {recentPeriods(6, now()).map((item) => (
+                <option key={item} value={item}>
+                  {periodLabel(item)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {RANKING_SCOPES.map((item) => {
+          const Icon = ICON[item];
+          return (
+            <TabsContent key={item} value={item}>
+              <Board state={board} scope={item} myEntry={myEntry} />
+              <p className="panel mt-3 flex items-start gap-2 p-3 text-xs text-muted-foreground">
+                <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>
+                  <strong>Como pontua:</strong> {RULES[item]} O quadro é ao vivo
+                  (atualiza em até 30 segundos). Toda conta entra com 0; a lista
+                  mostra quem já criou carreira.
+                </span>
+              </p>
+            </TabsContent>
+          );
+        })}
       </Tabs>
     </div>
   );
@@ -238,30 +287,65 @@ export function RankingAvatar({
   );
 }
 
+/** Value shown for the scope: titles, or points. */
+function measureOf(
+  scope: RankingScope,
+  row: Pick<RankingRow, 'points' | 'titles'>,
+) {
+  return scope === 'titles' ? (row.titles ?? 0) : row.points;
+}
+
+function measureUnit(scope: RankingScope, value: number) {
+  if (scope === 'titles') return value === 1 ? 'título' : 'títulos';
+  return 'pts';
+}
+
+/** "Sua posição": Nº de M participants, with the scope's measure. */
 function MyPosition({
   entry,
+  scope,
   signedIn,
 }: {
   entry: MyRankingEntry | undefined;
+  scope: RankingScope;
   signedIn: boolean;
 }) {
   if (!signedIn) return null;
+  const value =
+    entry === undefined
+      ? 0
+      : measureOf(scope, {
+          points: entry.points ?? 0,
+          titles: entry.titles ?? 0,
+        });
   return (
     <div
-      aria-label="Minha posição"
+      aria-label="Sua posição"
       role="group"
       className="border-2 border-chalk/40 bg-ink/40 px-3 py-2 text-right"
     >
-      <p className="font-pixel text-[.45rem] text-chalk/70">Minha posição</p>
+      <p className="font-pixel text-[.45rem] text-chalk/70">Sua posição</p>
       {entry?.position ? (
-        <p className="led text-lg">
-          {entry.position}º
-          <span className="ml-2 text-[.5rem] text-chalk/80">
-            {entry.points} pts
-          </span>
-        </p>
+        <>
+          <p className="led text-lg">
+            {formatCount(entry.position)}º
+            {entry.total ? (
+              <span className="ml-1 text-[.5rem] text-chalk/80">
+                de {formatCount(entry.total)}
+              </span>
+            ) : null}
+          </p>
+          <p className="font-pixel text-[.45rem] text-chalk/80">
+            {formatCount(value)} {measureUnit(scope, value)}
+            {scope === 'best_season' && entry.season
+              ? ` · temporada ${String(entry.season)}`
+              : ''}
+          </p>
+        </>
       ) : (
-        <p className="text-xs text-chalk/80">Ainda sem pontos aqui</p>
+        <p className="text-xs text-chalk/80">
+          Crie uma carreira para entrar no quadro
+        </p>
       )}
     </div>
   );
@@ -285,40 +369,46 @@ function Board({
       </p>
     );
   const { view } = state;
+  const label = SCOPE_LABEL[scope];
   if (view.rows.length === 0)
     return (
       <section
-        aria-label={`Ranking ${SCOPE_LABEL[scope]} vazio`}
+        aria-label={`Ranking ${label} vazio`}
         className="panel-chalk flex flex-col items-center gap-3 p-6 text-center"
       >
         <PixelTrophy size={40} />
         <h3 className="font-pixel text-[.65rem]">O pódio está vazio</h3>
         <p className="max-w-sm text-sm text-chalk/90">
           {scope === 'monthly'
-            ? `Ninguém pontuou em ${periodLabel(view.period).toLowerCase()} ainda. Feche uma temporada com título ou acesso e seu nome acende aqui.`
-            : 'Ainda não há conquistas validadas. Seja o primeiro: conquiste um título ou um acesso e volte depois do fechamento da temporada.'}
+            ? `Ninguém entrou no quadro de ${periodLabel(view.period).toLowerCase()} ainda. O primeiro título ou acesso do mês acende seu nome aqui.`
+            : 'Ainda não há treinadores no quadro. Crie sua carreira: você entra com 0 e o primeiro título já muda a lista.'}
         </p>
       </section>
     );
-  const inRows = view.rows.some(
-    (row) =>
-      myEntry?.position !== undefined && row.position === myEntry.position,
-  );
+  const isMine = (row: RankingRow) =>
+    myEntry?.position !== undefined &&
+    row.position === myEntry.position &&
+    (myEntry.displayName === undefined ||
+      myEntry.displayName === row.displayName);
+  const inRows = view.rows.some(isMine);
+  const myValue =
+    myEntry === undefined
+      ? 0
+      : measureOf(scope, {
+          points: myEntry.points ?? 0,
+          titles: myEntry.titles ?? 0,
+        });
   return (
-    <section
-      aria-label={`Ranking ${SCOPE_LABEL[scope]}`}
-      className="panel-board p-3"
-    >
-      <div className="flex items-center justify-between gap-2 px-1">
+    <section aria-label={`Ranking ${label}`} className="panel-board p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
         <p className="font-pixel text-[.5rem] text-chalk/70">
-          {periodLabel(view.period)} · {view.total}{' '}
-          {view.total === 1 ? 'treinador' : 'treinadores'}
+          {periodLabel(view.period)} · {formatCount(view.total)}{' '}
+          {view.total === 1 ? 'participante' : 'participantes'}
         </p>
         {view.generatedAt && (
           <Badge variant="board" className="normal-case">
+            Ao vivo ·{' '}
             {new Intl.DateTimeFormat('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
               hour: '2-digit',
               minute: '2-digit',
             }).format(new Date(view.generatedAt))}
@@ -327,28 +417,24 @@ function Board({
       </div>
       <table className="teletext mt-2 w-full text-chalk">
         <caption className="sr-only">
-          Ranking {SCOPE_LABEL[scope]} · {periodLabel(view.period)}
+          Ranking {label} · {periodLabel(view.period)}
         </caption>
         <thead>
           <tr className="text-left text-bulb">
-            <th scope="col" className="w-8 pb-1 pl-1">
+            <th scope="col" className="w-10 pb-1 pl-1">
               #
             </th>
             <th scope="col" className="pb-1">
               Treinador
             </th>
             <th scope="col" className="pb-1 pr-1 text-right">
-              Pontos
+              {MEASURE[scope]}
             </th>
           </tr>
         </thead>
         <tbody>
           {view.rows.map((row) => {
-            const mine =
-              myEntry?.position !== undefined &&
-              row.position === myEntry.position &&
-              (myEntry.displayName === undefined ||
-                myEntry.displayName === row.displayName);
+            const mine = isMine(row);
             return (
               <tr
                 key={`${String(row.position)}-${row.displayName}`}
@@ -358,26 +444,38 @@ function Board({
                 )}
                 {...(mine ? { 'aria-current': 'true' as const } : {})}
               >
-                <td className="py-1.5 pl-1">
+                <td className="py-1.5 pl-1 tabular-nums">
                   {row.position <= 3 ? (
                     <span aria-hidden="true">
                       {['🥇', '🥈', '🥉'][row.position - 1]}
                     </span>
                   ) : null}
                   <span className={cn(row.position <= 3 && 'sr-only')}>
-                    {row.position}
+                    {formatCount(row.position)}
                   </span>
                 </td>
                 {/* max-w-0: the name truncates instead of widening the table. */}
                 <td className="w-full max-w-0 py-1.5">
                   <span className="flex min-w-0 items-center gap-2">
                     <RankingAvatar avatar={row.avatar} name={row.displayName} />
-                    <span className="min-w-0 truncate">{row.displayName}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate">{row.displayName}</span>
+                      {scope === 'best_season' && row.season ? (
+                        <span className="block text-[.7rem] opacity-80">
+                          Temporada {row.season}
+                        </span>
+                      ) : null}
+                    </span>
                     {mine && <span className="sr-only"> (você)</span>}
                   </span>
                 </td>
                 <td className="py-1.5 pr-1 text-right tabular-nums">
-                  {row.points}
+                  {formatCount(measureOf(scope, row))}
+                  {scope === 'titles' ? (
+                    <span className="block text-[.7rem] opacity-80">
+                      {formatCount(row.points)} pts
+                    </span>
+                  ) : null}
                 </td>
               </tr>
             );
@@ -387,7 +485,9 @@ function Board({
               className="border-t-2 border-bulb bg-bulb text-bulb-foreground"
               aria-current="true"
             >
-              <td className="py-1.5 pl-1">{myEntry.position}</td>
+              <td className="py-1.5 pl-1 tabular-nums">
+                {formatCount(myEntry.position)}
+              </td>
               <td className="w-full max-w-0 py-1.5">
                 <span className="flex min-w-0 items-center gap-2">
                   <RankingAvatar
@@ -400,7 +500,7 @@ function Board({
                 </span>
               </td>
               <td className="py-1.5 pr-1 text-right tabular-nums">
-                {myEntry.points}
+                {formatCount(myValue)}
               </td>
             </tr>
           )}

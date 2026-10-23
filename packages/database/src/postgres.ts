@@ -18,6 +18,7 @@ import {
   type CommandRepository,
   type GameSaveRepository,
   type IdempotentOptions,
+  type RankingEnrollment,
   type TransactionContext,
   type UnitOfWork,
   type ValidatedAchievement,
@@ -447,5 +448,9 @@ export class PostgresCareerSaveStore implements CareerSaveStore {
     careerId: string,
   ): Promise<readonly ValidatedAchievement[]> {
     return new PostgresAchievementLedger(this.sql).listByCareer(careerId);
+  }
+
+  public enrollRanking(career: RankingEnrollment): Promise<void> {
+    return new PostgresAchievementLedger(this.sql).enroll(career);
   }
 }
