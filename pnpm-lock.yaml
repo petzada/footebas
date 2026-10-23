@@ -283,6 +283,8 @@ importers:
         specifier: workspace:*
         version: link:../domain
 
+  tools/cloud-smoke: {}
+
   tools/sim-lab:
     dependencies:
       '@footebas/domain':

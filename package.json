@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
     "smoke": "pnpm --filter @footebas/sim-lab smoke",
+    "smoke:cloud": "pnpm --filter @footebas/cloud-smoke smoke",
     "test": "turbo run test",
     "test:phase1": "pnpm --filter @footebas/sim-lab phase1-gate",
     "typecheck": "turbo run typecheck"

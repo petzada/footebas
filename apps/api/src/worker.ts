@@ -16,6 +16,7 @@ import type { JobStatus } from '@footebas/contracts';
 import { PostgresUnitOfWork, SystemClock } from '@footebas/database';
 import postgres from 'postgres';
 import { createFetchHandler } from './fetch-router.js';
+import { withSmokeAuth } from './smoke-auth.js';
 import { SupabaseJwtAuth } from './supabase-auth.js';
 
 interface QueueMessage<T> {
@@ -32,6 +33,10 @@ export interface Env {
   readonly SIMULATION_QUEUE: { send(body: SimulationJob): Promise<void> };
   readonly SUPABASE_URL: string;
   readonly CORS_ORIGINS?: string;
+  /** Secret (wrangler secret put SMOKE_TOKEN) enabling the cloud smoke bearer. */
+  readonly SMOKE_TOKEN?: string;
+  /** Workers version metadata binding, reported by GET /health. */
+  readonly CF_VERSION_METADATA?: { readonly id: string; readonly tag?: string };
 }
 
 /** Job status lives in Postgres; Cloudflare Queues carries the job itself. */
@@ -75,7 +80,10 @@ function compose(env: Env) {
   });
   const clock = new SystemClock();
   const ids = new RandomIdGenerator();
-  const auth = new SupabaseJwtAuth({ projectUrl: env.SUPABASE_URL });
+  const auth = withSmokeAuth(
+    new SupabaseJwtAuth({ projectUrl: env.SUPABASE_URL }),
+    env.SMOKE_TOKEN,
+  );
   const unitOfWork = new PostgresUnitOfWork(sql, clock);
   const jobs = new QueueJobStore(sql, env.SIMULATION_QUEUE);
   const application = new FootebasApplication({
@@ -104,7 +112,16 @@ async function handle(request: Request, env: Env): Promise<Response> {
       application,
       jobs,
       phaseFour: { application: phaseFour, auth },
-      corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br').split(','),
+      corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
+        .split(',')
+        .map((origin) => origin.trim()),
+      health: {
+        version: env.CF_VERSION_METADATA?.id ?? 'unknown',
+        timeoutMs: 2000,
+        database: async () => {
+          await sql`select 1`;
+        },
+      },
     })(request);
   } finally {
     await sql.end({ timeout: 1 });
