@@ -13,6 +13,21 @@ interface HistoryState {
   readonly footebas?: GameLocation;
 }
 
+/**
+ * Our location on top of whatever the entry already holds. Next.js keeps its
+ * router state in the same entry (`__NA` and the tree) and reloads the page
+ * on a `popstate` whose state lacks `__NA`. Its own pushState/replaceState
+ * patch is installed only after this hook's first effect, so we must never
+ * drop those keys ourselves.
+ */
+function withLocation(location: GameLocation): Record<string, unknown> {
+  const current: unknown = window.history.state;
+  return {
+    ...(typeof current === 'object' && current !== null ? current : {}),
+    footebas: location,
+  };
+}
+
 function locationOf(state: unknown): GameLocation | undefined {
   const candidate = (state as HistoryState | null)?.footebas;
   return candidate && typeof candidate.stage === 'string'
@@ -46,7 +61,6 @@ export function useGameHistory({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const state: HistoryState = { footebas: { stage, screen } };
     if (restoring.current) {
       restoring.current = false;
       return;
@@ -56,11 +70,11 @@ export function useGameHistory({
     // the entry the page was opened on.
     if (!started.current || stage === 'login' || previous?.stage === 'login') {
       started.current = true;
-      window.history.replaceState(state, '');
+      window.history.replaceState(withLocation({ stage, screen }), '');
       return;
     }
     if (previous?.stage === stage && previous.screen === screen) return;
-    window.history.pushState(state, '');
+    window.history.pushState(withLocation({ stage, screen }), '');
   }, [stage, screen]);
 
   const onPopState = useEffectEvent((event: PopStateEvent) => {
@@ -68,10 +82,7 @@ export function useGameHistory({
     if (!target) return;
     if (stage === 'match') {
       onBackInMatch?.();
-      window.history.pushState(
-        { footebas: { stage, screen } } satisfies HistoryState,
-        '',
-      );
+      window.history.pushState(withLocation({ stage, screen }), '');
       return;
     }
     if (target.stage === stage && target.screen === screen) return;
