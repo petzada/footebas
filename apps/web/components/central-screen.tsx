@@ -68,30 +68,33 @@ export function CentralScreen({
   onInstant(): void;
   navigate(value: Screen): void;
 }) {
+  // Phones (D3): the next match, with "Jogar partida", comes first; the club
+  // card follows. From `lg` the club card spans the top and the three
+  // panels sit side by side (table, match, calendar), as before.
   return (
-    <div className="grid gap-4">
-      <ClubCard career={career} />
-      <div className="grid gap-4 lg:grid-cols-[minmax(15rem,.8fr)_minmax(0,1.4fr)_minmax(15rem,.8fr)]">
-        <div className="lg:order-2">
-          <NextMatch
-            career={career}
-            onNarrate={onNarrate}
-            onInstant={onInstant}
-            onReview={() => navigate('tactics')}
-          />
-        </div>
-        <div className="lg:order-1">
-          <StandingsSummary career={career} onOpen={() => navigate('table')} />
-        </div>
-        <div className="lg:order-3">
-          <Upcoming
-            career={career}
-            port={calendar}
-            onOpen={() => navigate('calendar')}
-          />
-        </div>
+    <div className="grid gap-4 lg:grid-cols-[minmax(15rem,.8fr)_minmax(0,1.4fr)_minmax(15rem,.8fr)]">
+      <div className="order-1 lg:order-3" data-testid="central-next-match">
+        <NextMatch
+          career={career}
+          onNarrate={onNarrate}
+          onInstant={onInstant}
+          onReview={() => navigate('tactics')}
+        />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="order-2 lg:order-1 lg:col-span-3">
+        <ClubCard career={career} />
+      </div>
+      <div className="order-3 lg:order-2">
+        <StandingsSummary career={career} onOpen={() => navigate('table')} />
+      </div>
+      <div className="order-4">
+        <Upcoming
+          career={career}
+          port={calendar}
+          onOpen={() => navigate('calendar')}
+        />
+      </div>
+      <div className="order-5 grid gap-4 md:grid-cols-2 lg:col-span-3">
         {inbox ? (
           <InboxDecisions
             port={inbox}
