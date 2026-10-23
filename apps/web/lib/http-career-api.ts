@@ -22,6 +22,12 @@ import type {
   CompetitionProductView,
   CompetitionView,
 } from '@/lib/competition-product';
+import {
+  formatGameDate,
+  isPending,
+  KIND_LABEL,
+  type InboxMessage,
+} from '@/lib/inbox-product';
 import type { MatchReplayInput, ReplayEvent } from '@/lib/match-replay-model';
 import { statisticsFromTimeline } from '@/lib/match-replay-model';
 import { narrateMatch } from '@footebas/engine/narration';
@@ -139,6 +145,8 @@ interface HomeModel {
   season: number;
   nextFixtureId?: string;
   pendingActions: string[];
+  /** Same persisted messages the Central inbox lists (newest first). */
+  inbox?: InboxMessage[];
 }
 interface SquadPlayer {
   id: string;
@@ -344,6 +352,7 @@ interface WorldModel {
     id: string;
     type: string;
     season: number;
+    occurredOn?: string;
     clubName?: string;
     competitionId?: string;
     playerName?: string;
@@ -394,6 +403,56 @@ const FORMATION_SLOTS: Readonly<Record<string, readonly string[]>> = {
 const SERVER_POSITION: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(POSITION_LABEL).map(([server, client]) => [client, server]),
 );
+const MILESTONE_TAG: Readonly<Record<string, string>> = {
+  title: 'Título',
+  promotion: 'Acesso',
+  relegation: 'Rebaixamento',
+  retirement: 'Aposentadoria',
+};
+
+/**
+ * Notícias = the persisted inbox the Central lists (`home.inbox`) plus the
+ * career milestones of the world history, newest first. Before this the
+ * screen behind "Ver todas" only read the milestones, so it stayed empty
+ * while the Central showed messages.
+ */
+function worldNews(
+  home: Pick<HomeModel, 'currentDate' | 'inbox'>,
+  history: WorldModel['history'],
+): Phase4View['news'] {
+  const messages = (home.inbox ?? []).map((message) => ({
+    id: message.id,
+    tag: KIND_LABEL[message.kind] ?? 'Mensagem',
+    headline: message.subject,
+    detail: message.body,
+    date: message.occurredOn,
+    ...(isPending(message, home.currentDate) ? { pending: true } : {}),
+  }));
+  const milestones = history.slice(0, 12).map((event) => ({
+    id: event.id,
+    tag: MILESTONE_TAG[event.type] ?? 'Carreira',
+    headline:
+      event.type === 'title'
+        ? `${event.clubName ?? 'Clube'} campeão`
+        : event.type === 'retirement'
+          ? `${event.playerName ?? 'Atleta'} se aposenta`
+          : `${event.clubName ?? event.playerName ?? 'Carreira'}`,
+    detail: `Temporada ${String(event.season)}${
+      event.occurredOn ? ` · ${formatGameDate(event.occurredOn)}` : ''
+    }`,
+    ...(event.occurredOn ? { date: event.occurredOn } : {}),
+  }));
+  // Stable: messages keep the server order on equal (or missing) dates.
+  return [...messages, ...milestones]
+    .map((item, index) => ({ item, index }))
+    .sort(
+      (left, right) =>
+        (right.item.date ?? '').localeCompare(left.item.date ?? '') ||
+        left.index - right.index,
+    )
+    .map(({ item }) => item);
+}
+
 const centsToBrl = (value: number) => Math.round(value / 100);
 const brlToCents = (value: number) => Math.round(value * 100);
 const moneyOf = <T extends Record<string, number>>(record: T): T =>
@@ -956,7 +1015,7 @@ export class HttpCareerApi implements CareerApiPort {
         goalDifference: row.goalDifference,
       })),
       opponent: this.#opponent(next, players),
-      world: await this.#world(world, squad),
+      world: await this.#world(world, squad, home),
       ...(post === undefined
         ? {}
         : { lastResult: this.#result(post, squad, home.club?.id) }),
@@ -1204,7 +1263,11 @@ export class HttpCareerApi implements CareerApiPort {
   }
 
   // --- world (phase four) ---------------------------------------------------
-  async #world(world: WorldModel, squad: SquadModel): Promise<Phase4View> {
+  async #world(
+    world: WorldModel,
+    squad: SquadModel,
+    home: Pick<HomeModel, 'currentDate' | 'inbox'>,
+  ): Promise<Phase4View> {
     const market = await this.#optional<MarketEntry[]>(
       `/v1/phase-four/careers/${this.#career()}/market?minStrength=60`,
     );
@@ -1363,27 +1426,9 @@ export class HttpCareerApi implements CareerApiPort {
             salary: 0,
           })),
       },
-      news: world.history.slice(0, 12).map((event) => ({
-        id: event.id,
-        tag:
-          event.type === 'title'
-            ? 'Título'
-            : event.type === 'promotion'
-              ? 'Acesso'
-              : event.type === 'relegation'
-                ? 'Rebaixamento'
-                : event.type === 'retirement'
-                  ? 'Aposentadoria'
-                  : 'Carreira',
-        headline:
-          event.type === 'title'
-            ? `${event.clubName ?? 'Clube'} campeão`
-            : event.type === 'retirement'
-              ? `${event.playerName ?? 'Atleta'} se aposenta`
-              : `${event.clubName ?? event.playerName ?? 'Carreira'}`,
-        detail: `Temporada ${String(event.season)}`,
-      })),
+      news: worldNews(home, world.history),
       history: {
+        // Season by season comes from the season read model (Histórico).
         seasons: [],
         champions: world.history
           .filter(({ type }) => type === 'title')
@@ -1392,8 +1437,22 @@ export class HttpCareerApi implements CareerApiPort {
             competition: event.competitionId ?? '',
             club: event.clubName ?? '',
           })),
-        records: [],
-        idols: [],
+        records: world.history
+          .filter(({ type }) => type === 'record' || type === 'top_scorer')
+          .map((event) => ({
+            label:
+              event.type === 'top_scorer'
+                ? `Artilheiro · temporada ${String(event.season)}`
+                : `Recorde · temporada ${String(event.season)}`,
+            value: event.playerName ?? event.clubName ?? '—',
+            holder: event.clubName ?? '',
+          })),
+        idols: world.history
+          .filter(({ type, playerName }) => type === 'idol' && playerName)
+          .map((event) => ({
+            name: event.playerName!,
+            reason: `Ídolo${event.clubName ? ` do ${event.clubName}` : ''} · temporada ${String(event.season)}`,
+          })),
       },
       prestige: {
         points: Math.round(world.manager.prestige),

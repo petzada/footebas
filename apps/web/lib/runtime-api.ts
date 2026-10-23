@@ -78,22 +78,31 @@ export interface ProductPorts {
   readonly account: AccountPort;
 }
 
+const portsByApi = new WeakMap<CareerApiPort, ProductPorts>();
+
 /**
  * Over HTTP every port talks to the authoritative server; the in-memory
- * runtime (offline demo, tests) gets deterministic fakes.
+ * runtime (offline demo, tests) gets deterministic fakes. One set per
+ * runtime: the Central and the Notícias/Histórico/Ranking/Save screens read
+ * the same inbox, season and ranking (and share the ranking cache).
  */
 export function productPortsFor(api: CareerApiPort): ProductPorts {
-  if (api instanceof HttpCareerApi)
-    return {
-      season: httpSeasonPort(api),
-      inbox: httpInboxPort(api),
-      ranking: cachedRankingPort(httpRankingPort(api)),
-      account: httpAccountPort(api),
-    };
-  return {
-    season: createFakeSeasonPort(),
-    inbox: createFakeInboxPort(),
-    ranking: createFakeRankingPort(),
-    account: createFakeAccountPort(),
-  };
+  const known = portsByApi.get(api);
+  if (known) return known;
+  const ports: ProductPorts =
+    api instanceof HttpCareerApi
+      ? {
+          season: httpSeasonPort(api),
+          inbox: httpInboxPort(api),
+          ranking: cachedRankingPort(httpRankingPort(api)),
+          account: httpAccountPort(api),
+        }
+      : {
+          season: createFakeSeasonPort(),
+          inbox: createFakeInboxPort(),
+          ranking: createFakeRankingPort(),
+          account: createFakeAccountPort(),
+        };
+  portsByApi.set(api, ports);
+  return ports;
 }
