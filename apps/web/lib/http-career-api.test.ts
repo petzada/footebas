@@ -16,6 +16,7 @@ import {
 import { InMemoryUnitOfWork } from '@footebas/database';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FakeAuth } from '@/lib/fake-auth';
+import { buildBoard, lineupInput, placePlayer } from '@/lib/management-model';
 import {
   HttpCareerApi,
   httpCompetitionPort,
@@ -32,6 +33,7 @@ afterEach(async () => {
 /** The real API in-process; fetch goes through Fastify inject. */
 async function server(
   session: 'dev' | ((auth: FakeBearerAuth) => AccessTokenProvider) = 'dev',
+  startDate?: string,
 ) {
   const clock = new FakeClock();
   const auth = new FakeBearerAuth();
@@ -80,14 +82,15 @@ async function server(
     baseUrl: 'http://api.test',
     fetch: fetchVia,
     jobPollMs: 0,
+    ...(startDate ? { startDate } : {}),
     ...(session === 'dev'
       ? { devSession: true }
       : { getAccessToken: session(auth) }),
   });
 }
 
-async function start() {
-  const client = await server();
+async function start(startDate?: string) {
+  const client = await server('dev', startDate);
   await client.login('marcio@footebas.com');
   await client.createCareer({ coach: 'Marcio' });
   await client.selectClub('Flamengo');
@@ -183,6 +186,96 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     await expect(client.maintainStadium()).rejects.toBeInstanceOf(
       NotSupportedYetError,
     );
+  });
+
+  it('envia SetLineup com as posições dos slots e lê a escalação de volta', async () => {
+    const { client, career } = await start();
+    const board = buildBoard(career.players, career.formation);
+    const benched = board.slots[1]!;
+    const promoted = board.bench[0]!;
+    const next = placePlayer(
+      placePlayer(board, benched, { kind: 'bench' }),
+      promoted,
+      { kind: 'slot', index: 1 },
+    );
+    const input = lineupInput(next, career.players);
+    expect(input.starters).toHaveLength(11);
+    const saved = await client.setLineup(input);
+    const byId = new Map(saved.players.map((player) => [player.id, player]));
+    expect(byId.get(promoted)?.role).toBe('starter');
+    expect(byId.get(promoted)?.lineupPosition).toBe(
+      input.starters[1]!.position,
+    );
+    expect(byId.get(benched)?.role).toBe('bench');
+    expect(saved.formation).toBe(input.formation);
+    expect(saved.chemistry?.value).toBeGreaterThanOrEqual(0);
+    expect(buildBoard(saved.players, saved.formation).slots).toEqual(
+      next.slots,
+    );
+  });
+
+  it('lê o mercado do servidor em reais, anuncia e retira um atleta', async () => {
+    const { client, career } = await start();
+    const market = await client.getMarket({
+      origin: 'foreign',
+      minStrength: 1,
+    });
+    expect(market.window.status).toBe('open');
+    expect(market.window.nextOpensOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(market.club?.maxSquadSize).toBe(35);
+    expect(market.club?.cash).toBeLessThan(1_000_000_000);
+    expect(market.search.results.length).toBeGreaterThan(0);
+    expect(market.search.results.every((r) => r.origin === 'foreign')).toBe(
+      true,
+    );
+    const player = career.players.at(-1)!;
+    const listed = await client.listForTransfer({
+      playerId: player.id,
+      mode: 'sale',
+      askingPrice: 2_500_000,
+    });
+    expect(listed.listings).toEqual([
+      expect.objectContaining({ playerId: player.id, askingPrice: 2_500_000 }),
+    ]);
+    const withdrawn = await client.withdrawListing(player.id);
+    expect(withdrawn.listings).toEqual([]);
+  });
+
+  it('traduz janela fechada do servidor em mensagem em português', async () => {
+    const { client } = await start('2026-03-10');
+    const market = await client.getMarket({ minStrength: 1 });
+    expect(market.window.status).toBe('closed');
+    const target = market.search.results.find((r) => r.clubId)!;
+    await expect(
+      client.submitMarketOffer({
+        playerId: target.id,
+        kind: 'buy',
+        fee: target.value,
+        wage: target.wage,
+      }),
+    ).rejects.toMatchObject({
+      code: 'TRANSFER_WINDOW_CLOSED',
+      message: expect.stringMatching(/janela de transferências está fechada/i),
+    });
+  });
+
+  it('lê o escritório, aceita um patrocínio e configura o sócio-torcedor', async () => {
+    const { client } = await start();
+    const office = await client.getOffice();
+    expect(office.proposals.sponsorship.length).toBeGreaterThan(0);
+    expect(office.membership?.priceRange).toEqual({ min: 5, max: 200 });
+    expect(office.finances.month.period).toMatch(/^\d{4}-\d{2}$/);
+    expect(office.coach.managerName).toBe('Marcio');
+    const offer = office.proposals.sponsorship[0]!;
+    const signed = await client.decideSponsorship(offer.id, 'accept');
+    expect(signed.sponsorship.contract?.sponsorName).toBe(offer.sponsorName);
+    expect(signed.sponsorship.contract?.monthlyValue).toBe(offer.monthlyValue);
+    const configured = await client.configureMembership({
+      monthlyPrice: 30,
+      tier: 'premium',
+    });
+    expect(configured.membership?.monthlyPrice).toBe(30);
+    expect(configured.membership?.tier).toBe('premium');
   });
 
   it('carrega pirâmide, calendário e transição para as telas de competição', async () => {

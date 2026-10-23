@@ -31,6 +31,22 @@ import type {
   Phase4View,
   TransferKind,
 } from '@/lib/phase4-model';
+import {
+  marketRefusalMessage,
+  type ChemistryView,
+  type FinanceCategories,
+  type LineupInput,
+  type ListingInput,
+  type MarketListingView,
+  type MarketOfferInput,
+  type MarketOfferView,
+  type MarketQuery,
+  type MarketView,
+  type MembershipTier,
+  type OfficeView,
+  type SponsorContractView,
+  type SponsorOfferView,
+} from '@/lib/management-model';
 
 /** A capability the authoritative server does not offer yet. Never faked. */
 export class NotSupportedYetError extends Error {
@@ -169,7 +185,60 @@ interface SquadModel {
     bench: string[];
     reserves: string[];
   };
+  chemistry?: ChemistryView;
 }
+/** `careerMarketReadModelSchema` (money in minor units). */
+interface MarketModel {
+  currentDate: string;
+  club?: {
+    id: string;
+    name: string;
+    cash: number;
+    squadSize: number;
+    maxSquadSize: number;
+    monthlyWageBill: number;
+  };
+  window: {
+    status: 'open' | 'closed';
+    current?: { name: string; closesOn: string };
+    daysRemaining?: number;
+    next: { name: string; opensOn: string };
+    daysUntilNext: number;
+  };
+  listings: (MarketListingView & { position: string })[];
+  offersReceived: (MarketOfferView & {
+    counterpartClubId?: string;
+    decisionId?: string;
+  })[];
+  offersSent: (MarketOfferView & {
+    counterpartClubId?: string;
+    decisionId?: string;
+  })[];
+  loans: MarketView['loans'];
+  search: {
+    total: number;
+    results: {
+      id: string;
+      name: string;
+      age: number;
+      position: string;
+      strength: number;
+      value: number;
+      wage: number;
+      clubId?: string;
+      clubName?: string;
+      origin?: 'national' | 'state' | 'foreign';
+      country?: string;
+      freeAgent: boolean;
+      listed: boolean;
+    }[];
+  };
+}
+/** `careerOfficeReadModelSchema` (money in minor units). */
+type OfficeModel = Omit<OfficeView, 'club' | 'coach'> & {
+  club?: NonNullable<OfficeView['club']>;
+  coach: OfficeView['coach'] & { profile: unknown; clubId?: string };
+};
 interface NextMatchModel {
   fixtureId: string;
   competition: string;
@@ -317,8 +386,66 @@ const FORMATION_SLOTS: Readonly<Record<string, readonly string[]>> = {
   '4-3-3': ['GK', 'RB', 'CB', 'CB', 'LB', 'DM', 'CM', 'AM', 'RW', 'LW', 'ST'],
   '3-5-2': ['GK', 'CB', 'CB', 'CB', 'RB', 'LB', 'DM', 'CM', 'AM', 'ST', 'ST'],
 };
+const SERVER_POSITION: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(POSITION_LABEL).map(([server, client]) => [client, server]),
+);
 const DECISION_MINUTES = [15, 30, 45, 60, 75] as const;
 const centsToBrl = (value: number) => Math.round(value / 100);
+const brlToCents = (value: number) => Math.round(value * 100);
+const moneyOf = <T extends Record<string, number>>(record: T): T =>
+  Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [key, centsToBrl(value)]),
+  ) as T;
+const financesOf = <T extends FinanceCategories>(value: T): T => ({
+  ...value,
+  income: moneyOf(value.income),
+  expenses: moneyOf(value.expenses),
+  totalIncome: centsToBrl(value.totalIncome),
+  totalExpenses: centsToBrl(value.totalExpenses),
+  net: centsToBrl(value.net),
+});
+const sponsorOfferOf = (offer: SponsorOfferView): SponsorOfferView => ({
+  ...offer,
+  monthlyValue: centsToBrl(offer.monthlyValue),
+  bonuses: moneyOf(offer.bonuses),
+  terminationFee: centsToBrl(offer.terminationFee),
+  ...(offer.counter
+    ? {
+        counter: {
+          ...offer.counter,
+          monthlyValue: centsToBrl(offer.counter.monthlyValue),
+        },
+      }
+    : {}),
+  ...(offer.counterRange ? { counterRange: moneyOf(offer.counterRange) } : {}),
+});
+const sponsorContractOf = (
+  contract: SponsorContractView,
+): SponsorContractView => ({
+  ...contract,
+  monthlyValue: centsToBrl(contract.monthlyValue),
+  bonuses: moneyOf(contract.bonuses),
+  terminationFee: centsToBrl(contract.terminationFee),
+});
+const offerOf = (
+  offer: MarketModel['offersReceived'][number],
+): MarketOfferView => ({
+  id: offer.id,
+  kind: offer.kind,
+  playerId: offer.playerId,
+  playerName: offer.playerName,
+  ...(offer.counterpartClubName
+    ? { counterpartClubName: offer.counterpartClubName }
+    : {}),
+  fee: centsToBrl(offer.fee),
+  wage: centsToBrl(offer.wage),
+  ...(offer.loan ? { loan: offer.loan } : {}),
+  status: offer.status,
+  createdOn: offer.createdOn,
+  expiresOn: offer.expiresOn,
+  awaiting: offer.awaiting,
+  ...(offer.counterOf ? { counterOf: offer.counterOf } : {}),
+});
 
 const toServerTactic = (
   formation: Formation,
@@ -416,6 +543,8 @@ export class HttpCareerApi implements CareerApiPort {
   #version = 0;
   #squad: SquadModel | undefined;
   #roles = new Map<string, SquadRole>();
+  /** Slot position (client code) of each starter, in lineup order. */
+  #positions = new Map<string, string>();
   #scouted = new Set<string>();
   #match: LiveMatch | undefined;
   #sequence = 0;
@@ -473,7 +602,9 @@ export class HttpCareerApi implements CareerApiPort {
           ? 'A carreira mudou em outro lugar. Os dados foram recarregados; tente de novo.'
           : error?.code === 'UNAUTHORIZED'
             ? 'Sua sessão expirou. Entre novamente.'
-            : (error?.message ?? 'Não foi possível falar com o servidor.'),
+            : ((error?.code && marketRefusalMessage(error.code)) ??
+              error?.message ??
+              'Não foi possível falar com o servidor.'),
         response.status,
         error?.code,
       );
@@ -784,6 +915,7 @@ export class HttpCareerApi implements CareerApiPort {
     this.#roles = this.#rolesFrom(squad);
     const players = squad.players.map((player) => this.#player(player));
     return {
+      careerId: id,
       coach: home.managerName,
       ...(home.careerName ? { careerName: home.careerName } : {}),
       ...(home.coach ? { coachProfile: home.coach } : {}),
@@ -813,12 +945,21 @@ export class HttpCareerApi implements CareerApiPort {
       ...(post === undefined
         ? {}
         : { lastResult: this.#result(post, squad, home.club?.id) }),
+      ...(squad.chemistry ? { chemistry: squad.chemistry } : {}),
     };
   }
 
   #rolesFrom(squad: SquadModel): Map<string, SquadRole> {
     const starters = new Set(squad.lineup?.starters ?? []);
     const bench = new Set(squad.lineup?.bench ?? []);
+    // The server keeps starters in slot order (SetLineup/AutoPickLineup).
+    const slots = FORMATION_SLOTS[squad.lineup?.formation ?? ''] ?? [];
+    this.#positions = new Map(
+      (squad.lineup?.starters ?? []).flatMap((id, index) => {
+        const slot = slots[index];
+        return slot ? [[id, POSITION_LABEL[slot] ?? slot] as const] : [];
+      }),
+    );
     return new Map(
       squad.players.map((player) => [
         player.id,
@@ -862,6 +1003,7 @@ export class HttpCareerApi implements CareerApiPort {
       goals: player.careerStats.goals,
       appearances: player.careerStats.appearances,
       lastRating: player.lastMatchRating ?? null,
+      lineupPosition: this.#positions.get(player.id),
       scoutingEstimates: {
         potential:
           estimate.potential === 'excellent'
@@ -1713,6 +1855,273 @@ export class HttpCareerApi implements CareerApiPort {
   async acceptJobProposal(proposalId: string) {
     await this.#worldCommand('AcceptJobProposal', { proposalId });
     return this.#view();
+  }
+
+  // --- management screens ---------------------------------------------------
+  async setLineup(input: LineupInput) {
+    const squad = this.#squad ?? (await this.#view(), this.#squad);
+    if (!squad) throw new Error('Elenco indisponível.');
+    if (squad.tactic && squad.tactic.formation !== input.formation)
+      await this.#command('SetTactics', {
+        careerId: this.#career(),
+        ...squad.tactic,
+        formation: input.formation,
+      });
+    await this.#command('SetLineup', {
+      careerId: this.#career(),
+      clubId: squad.club.id,
+      starters: input.starters.map(({ playerId, position }) => ({
+        playerId,
+        position: SERVER_POSITION[position] ?? position,
+      })),
+      substitutes: [...input.bench],
+      reserves: [...input.reserves],
+      captainId: input.captainId,
+    });
+    return this.#view();
+  }
+
+  async getMarket(query: MarketQuery = {}): Promise<MarketView> {
+    if (!this.#careerId) await this.getCareer();
+    const params = new URLSearchParams();
+    if (query.text?.trim()) params.set('text', query.text.trim());
+    if (query.position)
+      params.set('position', SERVER_POSITION[query.position] ?? query.position);
+    if (query.minStrength) params.set('minStrength', String(query.minStrength));
+    if (query.maxAge) params.set('maxAge', String(query.maxAge));
+    if (query.maxValue !== undefined)
+      params.set('maxValue', String(brlToCents(query.maxValue)));
+    if (query.origin && query.origin !== 'all')
+      params.set('origin', query.origin);
+    if (query.freeAgentsOnly) params.set('freeAgentsOnly', 'true');
+    params.set('limit', '40');
+    const model = await this.#request<MarketModel>(
+      'GET',
+      `/v1/careers/${this.#career()}/market?${params.toString()}`,
+    );
+    return {
+      currentDate: model.currentDate,
+      ...(model.club
+        ? {
+            club: {
+              ...model.club,
+              cash: centsToBrl(model.club.cash),
+              monthlyWageBill: centsToBrl(model.club.monthlyWageBill),
+            },
+          }
+        : {}),
+      window: {
+        status: model.window.status,
+        ...(model.window.current
+          ? {
+              name: model.window.current.name,
+              closesOn: model.window.current.closesOn,
+            }
+          : {}),
+        ...(model.window.daysRemaining === undefined
+          ? {}
+          : { daysRemaining: model.window.daysRemaining }),
+        nextName: model.window.next.name,
+        nextOpensOn: model.window.next.opensOn,
+        daysUntilNext: model.window.daysUntilNext,
+      },
+      listings: model.listings.map((listing) =>
+        listing.mode === 'sale'
+          ? {
+              ...listing,
+              position: POSITION_LABEL[listing.position] ?? listing.position,
+              value: centsToBrl(listing.value),
+              askingPrice: centsToBrl(listing.askingPrice),
+            }
+          : {
+              ...listing,
+              position: POSITION_LABEL[listing.position] ?? listing.position,
+              value: centsToBrl(listing.value),
+            },
+      ),
+      offersReceived: model.offersReceived.map(offerOf),
+      offersSent: model.offersSent.map(offerOf),
+      loans: model.loans,
+      search: {
+        total: model.search.total,
+        results: model.search.results.map((result) => ({
+          ...result,
+          position: POSITION_LABEL[result.position] ?? result.position,
+          value: centsToBrl(result.value),
+          wage: centsToBrl(result.wage),
+          origin: result.origin ?? 'national',
+        })),
+      },
+    };
+  }
+
+  async listForTransfer(input: ListingInput) {
+    await this.#worldCommand(
+      'ListPlayerForTransfer',
+      input.mode === 'sale'
+        ? { ...input, askingPrice: brlToCents(input.askingPrice) }
+        : { ...input },
+    );
+    return this.getMarket();
+  }
+
+  async withdrawListing(playerId: string) {
+    await this.#worldCommand('WithdrawTransferListing', { playerId });
+    return this.getMarket();
+  }
+
+  async submitMarketOffer(input: MarketOfferInput) {
+    const [market, world] = await Promise.all([
+      this.getMarket({ text: '' }),
+      this.#worldState(),
+    ]);
+    if (!world.club) throw new Error('Clube indisponível.');
+    const target =
+      market.search.results.find(({ id }) => id === input.playerId) ??
+      (await this.getMarket({ minStrength: 1 })).search.results.find(
+        ({ id }) => id === input.playerId,
+      );
+    await this.#worldCommand('SubmitTransferOffer', {
+      playerId: input.playerId,
+      ...(target?.clubId ? { fromClubId: target.clubId } : {}),
+      toClubId: world.club.id,
+      kind: input.kind,
+      fee: brlToCents(input.fee),
+      wage: brlToCents(input.wage),
+      expiresOn: addDays(world.currentDate, 7),
+      ...(input.kind === 'loan'
+        ? {
+            loan: input.loan ?? {
+              endsOn: `${world.currentDate.slice(0, 4)}-12-31`,
+              wageSharePercentage: 50,
+            },
+          }
+        : {}),
+    });
+    return this.getMarket();
+  }
+
+  async decideMarketOffer(offerId: string, decision: 'accept' | 'reject') {
+    await this.#worldCommand('DecideTransferOffer', { offerId, decision });
+    return this.getMarket();
+  }
+
+  async counterMarketOffer(
+    offerId: string,
+    terms: { fee: number; wage: number },
+  ) {
+    const world = await this.#worldState();
+    await this.#worldCommand('CounterTransferOffer', {
+      offerId,
+      fee: brlToCents(terms.fee),
+      wage: brlToCents(terms.wage),
+      expiresOn: addDays(world.currentDate, 7),
+    });
+    return this.getMarket();
+  }
+
+  async getOffice(): Promise<OfficeView> {
+    if (!this.#careerId) await this.getCareer();
+    const model = await this.#request<OfficeModel>(
+      'GET',
+      `/v1/careers/${this.#career()}/office`,
+    );
+    const coach: OfficeView['coach'] = {
+      managerName: model.coach.managerName,
+      employmentStatus: model.coach.employmentStatus,
+      boardConfidence: model.coach.boardConfidence,
+      fanConfidence: model.coach.fanConfidence,
+      prestige: model.coach.prestige,
+      seasons: model.coach.seasons,
+      appointments: model.coach.appointments,
+      achievements: model.coach.achievements,
+    };
+    return {
+      currentDate: model.currentDate,
+      season: model.season,
+      ...(model.club
+        ? {
+            club: {
+              ...model.club,
+              cash: centsToBrl(model.club.cash),
+              monthlyWageBill: centsToBrl(model.club.monthlyWageBill),
+            },
+          }
+        : {}),
+      proposals: {
+        sponsorship: model.proposals.sponsorship.map(sponsorOfferOf),
+        jobs: model.proposals.jobs,
+        transfers: model.proposals.transfers.map((offer) => ({
+          ...offer,
+          fee: centsToBrl(offer.fee),
+          wage: centsToBrl(offer.wage),
+        })),
+      },
+      sponsorship: {
+        ...(model.sponsorship.contract
+          ? { contract: sponsorContractOf(model.sponsorship.contract) }
+          : {}),
+        fallbackMonthly: centsToBrl(model.sponsorship.fallbackMonthly),
+        history: model.sponsorship.history.map(sponsorContractOf),
+      },
+      ...(model.membership
+        ? {
+            membership: {
+              ...model.membership,
+              monthlyPrice: centsToBrl(model.membership.monthlyPrice),
+              priceRange: moneyOf(model.membership.priceRange),
+              referencePrice: centsToBrl(model.membership.referencePrice),
+              tiers: model.membership.tiers.map((tier) => ({
+                ...tier,
+                costPerMember: centsToBrl(tier.costPerMember),
+              })),
+              monthlyRevenue: centsToBrl(model.membership.monthlyRevenue),
+              monthlyCost: centsToBrl(model.membership.monthlyCost),
+            },
+          }
+        : {}),
+      finances: {
+        month: financesOf(model.finances.month),
+        season: financesOf(model.finances.season),
+        pendingGate: centsToBrl(model.finances.pendingGate),
+      },
+      contracts: model.contracts.map((contract) => ({
+        ...contract,
+        wage: centsToBrl(contract.wage),
+      })),
+      coach,
+      ...(model.chemistry ? { chemistry: model.chemistry } : {}),
+    };
+  }
+
+  async decideSponsorship(offerId: string, decision: 'accept' | 'reject') {
+    await this.#command('DecideSponsorshipOffer', {
+      careerId: this.#career(),
+      offerId,
+      decision,
+    });
+    return this.getOffice();
+  }
+
+  async counterSponsorship(offerId: string, monthlyValue: number) {
+    await this.#command('CounterSponsorshipOffer', {
+      careerId: this.#career(),
+      offerId,
+      monthlyValue: brlToCents(monthlyValue),
+    });
+    return this.getOffice();
+  }
+
+  async configureMembership(input: {
+    monthlyPrice: number;
+    tier: MembershipTier;
+  }) {
+    await this.#command('ConfigureFanMembership', {
+      careerId: this.#career(),
+      monthlyPrice: brlToCents(input.monthlyPrice),
+      tier: input.tier,
+    });
+    return this.getOffice();
   }
 }
 

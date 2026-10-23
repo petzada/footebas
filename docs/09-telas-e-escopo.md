@@ -37,7 +37,9 @@ complementa `docs/08-mvp-fonte-de-verdade.md`; em conflito sobre telas, vale est
   laterais; abaixo, e-mails com decisões e notícias.
 - **Mapa (ilustração clicável).**
 - **Elenco:** campo interativo com arrastar (e alternativa por toque/teclado), tabela, táticas e presets,
-  escalações salvas, estatísticas. Sem batedores; camisa real da pesquisa.
+  escalações salvas, estatísticas. Sem batedores; camisa real da pesquisa. Decisão (2026-10-23): as escalações
+  salvas (até 3 por carreira, nomeáveis) ficam no navegador (`localStorage`, chave por carreira) até o servidor
+  expor o recurso; só guardam ids, formação e tática, e são revalidadas contra o elenco ao aplicar.
 - **Mercado:** caixa, janelas, status, compra/venda/empréstimo nacional e dos estrangeiros do catálogo.
 - **Escritório:** propostas (atletas, empregos, patrocínios), finanças, contratos, carreira do treinador,
   sócio-torcedor, receitas e despesas.

@@ -11,6 +11,32 @@ import {
   defaultCareerName,
   type CoachProfile,
 } from '@/lib/coach-profile';
+import {
+  createDemoManagement,
+  demoChemistry,
+  demoConfigureMembership,
+  demoCounterOffer,
+  demoCounterSponsorship,
+  demoDecideOffer,
+  demoDecideSponsorship,
+  demoListPlayer,
+  demoMarketView,
+  demoOfficeView,
+  demoSubmitOffer,
+  demoWithdrawListing,
+  type DemoManagement,
+  type SquadChange,
+} from '@/lib/management-demo';
+import type {
+  ChemistryView,
+  LineupInput,
+  ListingInput,
+  MarketOfferInput,
+  MarketQuery,
+  MarketView,
+  MembershipTier,
+  OfficeView,
+} from '@/lib/management-model';
 
 export type { CoachProfile } from '@/lib/coach-profile';
 
@@ -73,6 +99,8 @@ export interface PlayerView {
   goals: number;
   appearances: number;
   lastRating: number | null;
+  /** Slot the starter occupies in the saved lineup (client position code). */
+  lineupPosition?: string | undefined;
   scoutingEstimates: {
     potential: 'limitado' | 'bom' | 'alto';
     consistency: 'irregular' | 'estável' | 'muito estável';
@@ -121,6 +149,8 @@ export interface FixtureView {
 }
 
 export interface CareerView {
+  /** Server career id; keys client-side data such as saved lineups. */
+  careerId?: string;
   coach: string;
   /** Career name (home read model); absent on older servers. */
   careerName?: string;
@@ -139,6 +169,8 @@ export interface CareerView {
   opponent: OpponentView;
   world: Phase4View;
   lastResult?: MatchResultView;
+  /** Chemistry of the managed eleven (ADR 0011), when the server sends it. */
+  chemistry?: ChemistryView;
 }
 
 export interface MatchUpdate {
@@ -260,6 +292,36 @@ export interface CareerApiPort {
   acceptJobProposal(proposalId: string): Promise<CareerView>;
   finishMatch(): Promise<CareerView>;
   instantResult(): Promise<CareerView>;
+  // --- management screens (docs/09: Elenco, Mercado, Escritório) ---------
+  /** `SetLineup`: the whole board (slots with positions, bench, reserves). */
+  setLineup(input: LineupInput): Promise<CareerView>;
+  /** `GET /v1/careers/:id/market` with search filters. */
+  getMarket(query?: MarketQuery): Promise<MarketView>;
+  listForTransfer(input: ListingInput): Promise<MarketView>;
+  withdrawListing(playerId: string): Promise<MarketView>;
+  submitMarketOffer(input: MarketOfferInput): Promise<MarketView>;
+  decideMarketOffer(
+    offerId: string,
+    decision: 'accept' | 'reject',
+  ): Promise<MarketView>;
+  counterMarketOffer(
+    offerId: string,
+    terms: { fee: number; wage: number },
+  ): Promise<MarketView>;
+  /** `GET /v1/careers/:id/office`. */
+  getOffice(): Promise<OfficeView>;
+  decideSponsorship(
+    offerId: string,
+    decision: 'accept' | 'reject',
+  ): Promise<OfficeView>;
+  counterSponsorship(
+    offerId: string,
+    monthlyValue: number,
+  ): Promise<OfficeView>;
+  configureMembership(input: {
+    monthlyPrice: number;
+    tier: MembershipTier;
+  }): Promise<OfficeView>;
 }
 
 const defaultTactics: TacticsView = {
@@ -697,6 +759,7 @@ interface StoredCareer {
   readonly id: string;
   view: CareerView;
   updatedAt: string;
+  management: DemoManagement;
 }
 
 const LOCAL_CLUBS = ['Flamengo', 'Fluminense', 'Atlético Mineiro'] as const;
@@ -708,13 +771,22 @@ export class InMemoryCareerApi implements CareerApiPort {
   #sequence = 0;
   readonly #limit: number;
   readonly #now: () => Date;
+  /** Career date of the demo world (drives the transfer window). */
+  readonly #startDate: string;
   #eventIndex = -1;
   #matchPlayers: PlayerView[] = [];
   #matchActions: MatchActionView[] = [];
 
-  public constructor(options: { careerLimit?: number; now?: () => Date } = {}) {
+  public constructor(
+    options: {
+      careerLimit?: number;
+      now?: () => Date;
+      startDate?: string;
+    } = {},
+  ) {
     this.#limit = options.careerLimit ?? FREE_CAREER_LIMIT;
     this.#now = options.now ?? (() => new Date());
+    this.#startDate = options.startDate ?? '2026-01-20';
   }
 
   /** The active career; writes also stamp its last update. */
@@ -750,10 +822,16 @@ export class InMemoryCareerApi implements CareerApiPort {
       );
     this.#sequence += 1;
     const id = `career-${this.#sequence}`;
+    const players = createRoster();
     this.#careers.set(id, {
       id,
       updatedAt: this.#now().toISOString(),
+      management: createDemoManagement(
+        this.#startDate,
+        players.filter((player) => player.role === 'starter').map((p) => p.id),
+      ),
       view: {
+        careerId: id,
         coach: coach.trim(),
         careerName: name,
         coachProfile: { ...(coachProfile ?? DEFAULT_COACH_PROFILE) },
@@ -763,7 +841,7 @@ export class InMemoryCareerApi implements CareerApiPort {
         round: 1,
         formation: '4-3-3',
         tactics: { ...defaultTactics },
-        players: createRoster(),
+        players,
         standings: initialTable,
         opponent: opponents[0],
         world: createPhase4View(coach.trim(), ''),
@@ -785,7 +863,34 @@ export class InMemoryCareerApi implements CareerApiPort {
   }
 
   async getCareer() {
-    return this.#career ? structuredClone(this.#career) : null;
+    return this.#career ? structuredClone(this.#withChemistry()) : null;
+  }
+
+  /** Active demo state of the market and the office. */
+  get #management(): DemoManagement {
+    const stored = this.#activeId && this.#careers.get(this.#activeId);
+    if (!stored) throw new Error('Carreira não encontrada.');
+    return stored.management;
+  }
+
+  #withChemistry(): CareerView {
+    const view = this.#require();
+    return {
+      ...view,
+      chemistry: demoChemistry(
+        this.#management,
+        view.players.filter((p) => p.role === 'starter').map((p) => p.id),
+      ),
+    };
+  }
+
+  #applySquadChange(change: SquadChange) {
+    const current = this.#require();
+    let players = current.players;
+    if (change.removeId)
+      players = players.filter((player) => player.id !== change.removeId);
+    if (change.add) players = [...players, change.add];
+    if (players !== current.players) this.#career = { ...current, players };
   }
 
   async getPublicStats(): Promise<PublicStats> {
@@ -1459,6 +1564,119 @@ export class InMemoryCareerApi implements CareerApiPort {
   #require() {
     if (!this.#career) throw new Error('Carreira não encontrada.');
     return this.#career;
+  }
+
+  // --- management screens ---------------------------------------------------
+  async setLineup(input: LineupInput) {
+    const current = this.#require();
+    const byId = new Map(current.players.map((player) => [player.id, player]));
+    if (input.starters.length !== 11)
+      throw new Error('A escalação precisa de exatamente 11 titulares.');
+    for (const { playerId } of input.starters) {
+      const player = byId.get(playerId);
+      if (!player) throw new Error('Jogador não encontrado.');
+      if (player.injuryRounds > 0)
+        throw new Error(
+          `${player.name} está lesionado e não pode ser titular.`,
+        );
+      if (player.suspended)
+        throw new Error(`${player.name} está suspenso e não pode ser titular.`);
+    }
+    if (input.bench.length > 7)
+      throw new Error('O banco aceita no máximo 7 jogadores.');
+    const slot = new Map(input.starters.map((s) => [s.playerId, s.position]));
+    const bench = new Set(input.bench);
+    this.#career = {
+      ...current,
+      formation: input.formation,
+      players: current.players.map((player) => ({
+        ...player,
+        role: slot.has(player.id)
+          ? 'starter'
+          : bench.has(player.id)
+            ? 'bench'
+            : 'reserve',
+        lineupPosition: slot.get(player.id),
+      })),
+    };
+    return structuredClone(this.#withChemistry());
+  }
+
+  async getMarket(query: MarketQuery = {}) {
+    const view = this.#require();
+    return structuredClone(
+      demoMarketView(this.#management, view.club, view.players, query),
+    );
+  }
+
+  async listForTransfer(input: ListingInput) {
+    demoListPlayer(this.#management, this.#require().players, input);
+    return this.getMarket();
+  }
+
+  async withdrawListing(playerId: string) {
+    demoWithdrawListing(this.#management, playerId);
+    return this.getMarket();
+  }
+
+  async submitMarketOffer(input: MarketOfferInput) {
+    this.#applySquadChange(
+      demoSubmitOffer(this.#management, this.#require().players, input),
+    );
+    return this.getMarket();
+  }
+
+  async decideMarketOffer(offerId: string, decision: 'accept' | 'reject') {
+    this.#applySquadChange(
+      demoDecideOffer(
+        this.#management,
+        this.#require().players,
+        offerId,
+        decision,
+      ),
+    );
+    return this.getMarket();
+  }
+
+  async counterMarketOffer(
+    offerId: string,
+    terms: { fee: number; wage: number },
+  ) {
+    this.#applySquadChange(demoCounterOffer(this.#management, offerId, terms));
+    return this.getMarket();
+  }
+
+  async getOffice() {
+    const view = this.#require();
+    return structuredClone(
+      demoOfficeView(this.#management, {
+        coach: view.coach,
+        club: view.club,
+        players: view.players,
+        contracts: view.world.contracts,
+        jobs: view.world.board.proposals,
+        board: view.world.board,
+        prestige: view.world.prestige,
+      }),
+    );
+  }
+
+  async decideSponsorship(offerId: string, decision: 'accept' | 'reject') {
+    demoDecideSponsorship(this.#management, offerId, decision);
+    return this.getOffice();
+  }
+
+  async counterSponsorship(offerId: string, monthlyValue: number) {
+    demoCounterSponsorship(this.#management, offerId, monthlyValue);
+    return this.getOffice();
+  }
+
+  async configureMembership(input: {
+    monthlyPrice: number;
+    tier: MembershipTier;
+  }) {
+    demoConfigureMembership(this.#management, input);
+    return this.getOffice();
   }
 }
 
