@@ -50,6 +50,36 @@ export async function buildApi(
   if (deps.documentation ?? true)
     await app.register(swaggerUi, { routePrefix: '/documentation' });
 
+  // Keep the raw JSON text next to the parsed body: webhook signatures
+  // (Woovi) are verified over the exact bytes received.
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (request, body, done) => {
+      const text = typeof body === 'string' ? body : body.toString('utf8');
+      (request as { rawBody?: string }).rawBody = text;
+      const invalid = () =>
+        Object.assign(new Error('invalid JSON body'), {
+          statusCode: 400,
+          validation: [],
+        });
+      if (text === '') {
+        done(null, undefined);
+        return;
+      }
+      if (/"__proto__"\s*:/.test(text)) {
+        done(invalid(), undefined);
+        return;
+      }
+      try {
+        done(null, JSON.parse(text) as unknown);
+      } catch {
+        done(invalid(), undefined);
+      }
+    },
+  );
+
   const origins = new Set(deps.corsOrigins ?? []);
   app.addHook('onRequest', async (request, reply) => {
     const origin = request.headers.origin;
@@ -76,6 +106,7 @@ export async function buildApi(
       url: route.path,
       ...(route.schema ? { schema: route.schema } : {}),
       async handler(request, reply) {
+        const rawBody = (request as { rawBody?: unknown }).rawBody;
         const input: ApiRequest = {
           params: flatten(request.params as Record<string, unknown>) as Record<
             string,
@@ -84,6 +115,7 @@ export async function buildApi(
           query: flatten((request.query ?? {}) as Record<string, unknown>),
           headers: flatten(request.headers),
           body: request.body,
+          ...(typeof rawBody === 'string' ? { rawBody } : {}),
         };
         const result = await route.handler(input);
         for (const [name, value] of Object.entries(result.headers ?? {}))

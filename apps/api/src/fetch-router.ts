@@ -111,6 +111,7 @@ export function createFetchHandler(
           query: Object.fromEntries(url.searchParams),
           headers: Object.fromEntries(request.headers),
           body,
+          rawBody: text,
         });
         for (const [name, value] of Object.entries(result.headers ?? {}))
           headers.set(name, value);

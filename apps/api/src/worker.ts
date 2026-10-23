@@ -9,12 +9,29 @@ import {
   PhaseFourApplicationService,
   RandomIdGenerator,
   UnifiedPhaseFourRepository,
+  type AuthPort,
   type JobQueuePort,
   type SimulationJob,
 } from '@footebas/application';
 import type { JobStatus } from '@footebas/contracts';
-import { PostgresUnitOfWork, SystemClock } from '@footebas/database';
+import {
+  PostgresEntitlements,
+  PostgresUnitOfWork,
+  SystemClock,
+} from '@footebas/database';
 import postgres from 'postgres';
+import { PostgresBillingRepository } from './billing/billing-repository-postgres.js';
+import { BillingService, DEFAULT_BILLING_CONFIG } from './billing/service.js';
+import {
+  parsePublicKeyPems,
+  RemotePublicKeys,
+  StaticPublicKeys,
+} from './billing/webhook-signature.js';
+import {
+  UnconfiguredWooviClient,
+  WOOVI_SANDBOX_URL,
+  WooviHttpClient,
+} from './billing/woovi-client.js';
 import { createFetchHandler } from './fetch-router.js';
 import { withSmokeAuth } from './smoke-auth.js';
 import { SupabaseJwtAuth } from './supabase-auth.js';
@@ -37,6 +54,57 @@ export interface Env {
   readonly SMOKE_TOKEN?: string;
   /** Workers version metadata binding, reported by GET /health. */
   readonly CF_VERSION_METADATA?: { readonly id: string; readonly tag?: string };
+  /** Woovi base URL (var): sandbox or https://api.woovi.com. */
+  readonly WOOVI_API_URL?: string;
+  /** Secret: Woovi AppID (`wrangler secret put WOOVI_APP_ID`). */
+  readonly WOOVI_APP_ID?: string;
+  /** Optional pinned webhook public key(s), PEM or base64 PEM. */
+  readonly WOOVI_WEBHOOK_PUBLIC_KEYS?: string;
+  /** Optional secret: `authorization` header value set on the Woovi webhook. */
+  readonly WOOVI_WEBHOOK_SECRET?: string;
+  /** License price in cents (default 4990). */
+  readonly LICENSE_PRICE_CENTS?: string;
+  /** PIX charge lifetime in seconds (default 3600, min 300). */
+  readonly LICENSE_CHARGE_EXPIRES_IN?: string;
+}
+
+function positiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return value !== undefined && Number.isInteger(parsed) && parsed > 0
+    ? parsed
+    : fallback;
+}
+
+function billing(env: Env, sql: postgres.Sql, auth: AuthPort) {
+  const apiUrl = env.WOOVI_API_URL ?? WOOVI_SANDBOX_URL;
+  const appId = env.WOOVI_APP_ID?.trim() ?? '';
+  const pinned = parsePublicKeyPems(env.WOOVI_WEBHOOK_PUBLIC_KEYS ?? '');
+  const service = new BillingService({
+    repository: new PostgresBillingRepository(sql),
+    woovi:
+      appId === ''
+        ? new UnconfiguredWooviClient()
+        : new WooviHttpClient({ apiUrl, appId }),
+    entitlements: new PostgresEntitlements(sql),
+    webhookKeys:
+      pinned.length > 0
+        ? new StaticPublicKeys(pinned)
+        : new RemotePublicKeys({ apiUrl }),
+    ...(env.WOOVI_WEBHOOK_SECRET === undefined
+      ? {}
+      : { webhookSecret: env.WOOVI_WEBHOOK_SECRET }),
+    config: {
+      priceCents: positiveInteger(
+        env.LICENSE_PRICE_CENTS,
+        DEFAULT_BILLING_CONFIG.priceCents,
+      ),
+      chargeExpiresInSeconds: positiveInteger(
+        env.LICENSE_CHARGE_EXPIRES_IN,
+        DEFAULT_BILLING_CONFIG.chargeExpiresInSeconds,
+      ),
+    },
+  });
+  return { service, auth };
 }
 
 /** Job status lives in Postgres; Cloudflare Queues carries the job itself. */
@@ -112,6 +180,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
       application,
       jobs,
       phaseFour: { application: phaseFour, auth },
+      billing: billing(env, sql, auth),
       corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
         .split(',')
         .map((origin) => origin.trim()),

@@ -11,10 +11,15 @@
   "routes": [{ "pattern": "api.footebas.com.br", "custom_domain": true }],
   // Exposes the deployed version id in GET /health.
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
-  // Secrets (never in the repo): SMOKE_TOKEN via `wrangler secret put`.
+  // Secrets (never in the repo), via `wrangler secret put`: SMOKE_TOKEN,
+  // WOOVI_APP_ID and, optionally, WOOVI_WEBHOOK_SECRET (see src/billing/README.md).
   "vars": {
     "SUPABASE_URL": "https://wjisqiiwsuykfbmqglfb.supabase.co",
     "CORS_ORIGINS": "https://footebas.com.br,https://www.footebas.com.br,http://localhost:3000",
+    // Woovi sandbox until launch; production is https://api.woovi.com.
+    "WOOVI_API_URL": "https://api.woovi-sandbox.com",
+    "LICENSE_PRICE_CENTS": "4990",
+    "LICENSE_CHARGE_EXPIRES_IN": "3600",
   },
   "hyperdrive": [
     {
