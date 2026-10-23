@@ -331,7 +331,24 @@ export async function buildApi(
       async (request) => {
         const identity = await phaseFour.auth.authenticate(bearer(request));
         const { id } = paramsSchemaParse(request.params);
-        const query = marketSearchQuerySchema.parse(request.query);
+        const raw = request.query as Record<string, string | undefined>;
+        const numeric = (value?: string) =>
+          value === undefined || value === '' ? undefined : Number(value);
+        const query = marketSearchQuerySchema.parse(
+          Object.fromEntries(
+            Object.entries({
+              text: raw.text || undefined,
+              position: raw.position,
+              minStrength: numeric(raw.minStrength),
+              maxAge: numeric(raw.maxAge),
+              maxValue: numeric(raw.maxValue),
+              freeAgentsOnly:
+                raw.freeAgentsOnly === undefined
+                  ? undefined
+                  : raw.freeAgentsOnly === 'true',
+            }).filter(([, value]) => value !== undefined),
+          ),
+        );
         return phaseFour.application.market(identity.userId, id, query);
       },
     );

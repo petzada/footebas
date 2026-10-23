@@ -49,7 +49,6 @@ import {
   type DefensiveLine,
   type Focus,
   type Formation,
-  InMemoryCareerApi,
   type Marking,
   type MatchSpeed,
   type MatchUpdate,
@@ -70,14 +69,14 @@ import { CompetitionScreens } from '@/components/competition-screens';
 import { Phase6Shell, PwaRuntime } from '@/components/phase6-shell';
 import { MatchReplayViewer } from '@/components/match-replay-viewer';
 import { parseScore } from '@/lib/match-replay-adapter';
+import { competitionPortFor, createCareerApi } from '@/lib/runtime-api';
 
 type Stage = 'login' | 'coach' | 'club' | 'game' | 'match' | 'result';
 
-export function CareerGame({
-  api = new InMemoryCareerApi(),
-}: {
-  api?: CareerApiPort;
-}) {
+export function CareerGame({ api: provided }: { api?: CareerApiPort }) {
+  // Created once: a fresh port per render would drop the session.
+  const [api] = useState<CareerApiPort>(() => provided ?? createCareerApi());
+  const [competitionPort] = useState(() => competitionPortFor(api));
   const [stage, setStage] = useState<Stage>('login');
   const [screen, setScreen] = useState<Screen>('home');
   const [career, setCareer] = useState<CareerView | null>(null);
@@ -276,9 +275,17 @@ export function CareerGame({
             initialTab="finance"
           />
         ) : screen === 'calendar' ? (
-          <CompetitionScreens key={screen} initialTab="calendar" />
+          <CompetitionScreens
+            key={screen}
+            initialTab="calendar"
+            {...(competitionPort ? { port: competitionPort } : {})}
+          />
         ) : screen === 'competitions' ? (
-          <CompetitionScreens key={screen} initialTab="pyramid" />
+          <CompetitionScreens
+            key={screen}
+            initialTab="pyramid"
+            {...(competitionPort ? { port: competitionPort } : {})}
+          />
         ) : screen === 'inbox' ? (
           <WorldScreen
             career={career}

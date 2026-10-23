@@ -124,6 +124,15 @@ importers:
         specifier: 3.3.1
         version: 3.3.1
     devDependencies:
+      '@footebas/api':
+        specifier: workspace:*
+        version: link:../api
+      '@footebas/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@footebas/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@tailwindcss/postcss':
         specifier: 4.3.3
         version: 4.3.3
