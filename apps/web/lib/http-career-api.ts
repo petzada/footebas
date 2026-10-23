@@ -1471,7 +1471,7 @@ export class HttpCareerApi implements CareerApiPort {
       },
       leaderboards: { global: [], underdog: [], monthly: [] },
       archive: {
-        saveVersion: 'game-save-v2',
+        saveVersion: 'game-save-v3',
         migrationStatus: 'atualizado',
         archiveStatus: 'sem compactação pendente',
         lastCompaction: '—',
