@@ -22,6 +22,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      # Linha de base de tamanho do bundle (docs/10-latencia-e-escala.md, Onda 0).
+      - name: Tamanho do bundle do web
+        run: node tools/bundle-report.mjs apps/web/.next/static >> "$GITHUB_STEP_SUMMARY"
+      - name: Análise do bundle (Turbopack)
+        continue-on-error: true
+        run: pnpm --filter @footebas/web exec next experimental-analyze --output
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle-analysis
+          path: apps/web/.next/diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
 
   # Playwright (Chromium) contra o web em modo dev com a API Fastify em memória
   # (tools/e2e/playwright.config.ts sobe os dois servidores). Roda em paralelo

@@ -53,9 +53,9 @@ deploy` (no Windows o `cf:build` local falha por symlink; se o deploy der erro g
    Bernardo e Itabaiana. Recorte igual a `apps/web/public/crests`.
 2. **Webhook AbacatePay real:** o formato do payload foi inferido. Na primeira compra real, conferir nos Workers
    Logs se aparece `billing.completed_not_paid` (pagamento confirmado que não virou licença).
-3. **Latência abaixo de 0,8 s:** o resto é distância Worker (Brasil) ↔ Supabase (`us-east-1`). Decisão de
-   infraestrutura: Smart Placement, `locationHint` nos objetos ou Supabase em `sa-east-1`. Conferir também se o
-   cache de consultas do Hyperdrive está desligado.
+3. **Latência e escala:** diagnóstico e plano em ondas em `docs/10-latencia-e-escala.md`. Não migrar o Supabase
+   para `sa-east-1` (os DOs nascem no leste dos EUA); começar pela medição (Onda 0) e pelos ajustes de configuração
+   (Onda 1: CORS max-age, `prepare: true`, cache do Hyperdrive desligado, `idle_timeout` no DO).
 4. **Ranking vazio** até alguém fechar uma temporada (regra do ADR 0013). Mudar exige decisão.
 5. **Regra a decidir:** depois de um reembolso, excluir a carreira mais antiga libera a próxima (mesmo da Série
    A/B) no plano grátis.

@@ -39,6 +39,7 @@
     "react-dom": "19.2.7",
     "tailwind-merge": "3.3.1",
     "three": "0.186.1",
+    "web-vitals": "6.2.3",
     "zzfx": "1.4.0"
   },
   "devDependencies": {

@@ -321,14 +321,20 @@ describe('Fase 6 · shell mobile-first', () => {
 
   it('mostra estado offline e de reconexão sem bloquear a tela', async () => {
     await onboard();
+    // The Central may still show a loading status of its own (slow CI): pick
+    // the network banner among the live regions.
+    const network = () =>
+      screen
+        .getAllByRole('status')
+        .find((node) => /conexão/i.test(node.textContent ?? ''))?.textContent;
     act(() => {
       window.dispatchEvent(new Event('offline'));
     });
-    expect(screen.getByRole('status').textContent).toMatch(/sem conexão/i);
+    expect(network()).toMatch(/sem conexão/i);
     act(() => {
       window.dispatchEvent(new Event('online'));
     });
-    expect(screen.getByRole('status').textContent).toMatch(/conexão voltou/i);
+    expect(network()).toMatch(/conexão voltou/i);
     expect(screen.getByRole('button', { name: /jogar partida/i })).toBeTruthy();
   });
 

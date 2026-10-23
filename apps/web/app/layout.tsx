@@ -1,5 +1,6 @@
 import '@fontsource/press-start-2p/latin-400.css';
 import './globals.css';
+import { RumRuntime } from '@/components/rum-runtime';
 
 const OG_IMAGE = {
   url: 'https://lp.footebas.com.br/og.png',
@@ -39,7 +40,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        {children}
+        <RumRuntime />
+      </body>
     </html>
   );
 }

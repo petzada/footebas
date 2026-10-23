@@ -89,7 +89,9 @@ describe('log por requisição', () => {
         method: 'GET',
         route: '/v1/careers/:id/home',
         status: 401,
-        durationMs: 7,
+        // The fake clock steps 7 ms per reading: start, handler in/out, end.
+        durationMs: 21,
+        timing: { app: 7 },
       },
     ]);
   });

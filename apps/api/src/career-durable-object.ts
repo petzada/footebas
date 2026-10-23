@@ -37,9 +37,14 @@ import {
   DurableCareerUnitOfWork,
   type CareerObjectStorage,
 } from './career-unit-of-work.js';
-import { createFetchHandler, type ForwardInput } from './fetch-router.js';
+import {
+  createFetchHandler,
+  type ForwardInput,
+  type TimingMetric,
+} from './fetch-router.js';
 import { consoleLogSink, errorFields } from './observability.js';
 import { QueueJobStore, type SimulationQueue } from './queue-job-store.js';
+import { isolateLocation, QueryCounter } from './request-timing.js';
 import { withSmokeAuth } from './smoke-auth.js';
 import { SupabaseJwtAuth } from './supabase-auth.js';
 
@@ -63,6 +68,10 @@ export interface CareerObjectDependencies {
   readonly careerSlots?: () => CareerSlotsPort;
   /** Free plan starts in Série C (docs/05 §5); on in production. */
   readonly enforceStartingDivision?: boolean;
+  /** Postgres queries sent so far by this object (Server-Timing `do-pg`). */
+  readonly queries?: () => number;
+  /** Cloudflare location running this object, once known (`do-colo`). */
+  readonly location?: () => string | undefined;
 }
 
 /** Runtime-independent core of the career object (tested with fakes). */
@@ -131,6 +140,28 @@ export class CareerObject {
       random: new Mulberry32RandomFactory(),
     });
     const requestId = request.headers.get('x-request-id');
+    // Deltas of this object's counters while the request ran (approximate
+    // when requests overlap, as reads can).
+    const stages = { ...this.unitOfWork.stages };
+    const queries = this.deps.queries?.() ?? 0;
+    const timings = (): TimingMetric[] => {
+      const location = this.deps.location?.();
+      return [
+        ...(['queue', 'load', 'commit'] as const).map((name) => ({
+          name,
+          dur: this.unitOfWork.stages[name] - stages[name],
+        })),
+        ...(this.deps.queries === undefined
+          ? []
+          : [
+              {
+                name: 'pg',
+                desc: `n=${String(this.deps.queries() - queries)}`,
+              },
+            ]),
+        ...(location === undefined ? [] : [{ name: 'colo', desc: location }]),
+      ];
+    };
     return createFetchHandler(
       {
         application,
@@ -139,6 +170,8 @@ export class CareerObject {
         ...(requestId === null ? {} : { nextRequestId: () => requestId }),
       },
       {
+        timingPrefix: 'do-',
+        timings,
         onComplete: (completion) => {
           if (completion.error !== undefined)
             consoleLogSink({
@@ -185,11 +218,13 @@ export class CareerDurableObject {
     env: CareerObjectEnv,
   ) {
     const clock = new SystemClock();
+    const queries = new QueryCounter();
     const sql = () =>
       (this.sql ??= postgres(env.HYPERDRIVE.connectionString, {
         max: 2,
         fetch_types: false,
         idle_timeout: POSTGRES_IDLE_TIMEOUT_SECONDS,
+        debug: queries.hook,
       }));
     // Lives as long as the object, so reads stay in memory most of the time.
     const entitlements = cachedLicensedEntitlements(
@@ -209,6 +244,8 @@ export class CareerDurableObject {
       entitlements: () => entitlements,
       careerSlots: () => careerSlots,
       enforceStartingDivision: true,
+      queries: () => queries.count,
+      location: () => isolateLocation(),
     });
   }
 

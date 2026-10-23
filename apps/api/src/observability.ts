@@ -26,6 +26,12 @@ export interface RequestCompletion {
   readonly route: string;
   readonly status: number;
   readonly durationMs: number;
+  /**
+   * Stages of the request, as sent in Server-Timing: milliseconds (`rl`,
+   * `app`, `fwd`, the career object's `do-load`…) or a description (`pg`
+   * query count, `edge` colo).
+   */
+  readonly timing?: Readonly<Record<string, number | string>>;
   /** Error behind a 5xx answer, if one was thrown. */
   readonly error?: unknown;
 }
@@ -58,6 +64,7 @@ export function requestLogEntry(
     route: completion.route,
     status: completion.status,
     durationMs: completion.durationMs,
+    ...(completion.timing === undefined ? {} : { timing: completion.timing }),
     ...(identity.userHash === undefined ? {} : { userHash: identity.userHash }),
     version,
     ...(completion.error === undefined ? {} : errorFields(completion.error)),
@@ -92,5 +99,26 @@ export function jobLogEntry(run: JobRun, version: string): LogEntry {
     result: run.result,
     version,
     ...(run.error === undefined ? {} : errorFields(run.error)),
+  };
+}
+
+/** One line per real-user report (`POST /v1/telemetry/vitals`). */
+export function rumLogEntry(
+  report: Readonly<{
+    page: string;
+    connection?: string | undefined;
+    metrics: readonly Readonly<Record<string, unknown>>[];
+  }>,
+  version: string,
+): LogEntry {
+  return {
+    type: 'rum',
+    level: 'info',
+    page: report.page,
+    ...(report.connection === undefined
+      ? {}
+      : { connection: report.connection }),
+    metrics: report.metrics,
+    version,
   };
 }

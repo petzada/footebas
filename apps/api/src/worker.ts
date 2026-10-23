@@ -50,6 +50,7 @@ import {
   errorFields,
   jobLogEntry,
   requestLogEntry,
+  rumLogEntry,
   type JobOutcome,
 } from './observability.js';
 import {
@@ -59,6 +60,7 @@ import {
 } from './rate-limit.js';
 import { identifyRequest } from './request-identity.js';
 import { QueueJobStore } from './queue-job-store.js';
+import { coloOfRequest, QueryCounter } from './request-timing.js';
 import { errorBody } from './routes.js';
 import { withSmokeAuth } from './smoke-auth.js';
 import { SupabaseJwtAuth } from './supabase-auth.js';
@@ -205,12 +207,13 @@ async function reconcileBilling(
   }
 }
 
-function compose(env: Env) {
+function compose(env: Env, queries?: QueryCounter) {
   // Prepared statements stay on: Hyperdrive caches them, and `prepare: false`
   // costs extra round trips and can hang under its transaction pooling.
   const sql = postgres(env.HYPERDRIVE.connectionString, {
     max: 5,
     fetch_types: false,
+    ...(queries === undefined ? {} : { debug: queries.hook }),
   });
   const clock = new SystemClock();
   const ids = new RandomIdGenerator();
@@ -286,7 +289,12 @@ async function handle(
     read: env.RATE_LIMIT_READS,
     public: env.RATE_LIMIT_PUBLIC,
   });
-  const { sql, auth, jobs, application, phaseFour, rankings } = compose(env);
+  const queries = new QueryCounter();
+  const edge = coloOfRequest(request);
+  const { sql, auth, jobs, application, phaseFour, rankings } = compose(
+    env,
+    queries,
+  );
   try {
     return await createFetchHandler(
       {
@@ -308,19 +316,27 @@ async function handle(
         ...(env.CAREERS === undefined || ctx === undefined
           ? {}
           : { onCareerCreated: careerWarmer(env.CAREERS, ctx, version) }),
+        rum: (report) => {
+          consoleLogSink(rumLogEntry(report, version));
+        },
         corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
           .split(',')
           .map((origin) => origin.trim()),
         health: {
           version,
           timeoutMs: 2000,
+          // now() is never cached by Hyperdrive: this measures the origin.
           database: async () => {
-            await sql`select 1`;
+            await sql`select now()`;
           },
         },
       },
       {
         rateLimit: rateLimitGuard(limiter, identity),
+        timings: () => [
+          { name: 'pg', desc: `n=${String(queries.count)}` },
+          ...(edge === undefined ? [] : [{ name: 'edge', desc: edge }]),
+        ],
         ...(env.CAREERS === undefined
           ? {}
           : { forward: careerForwarder(env.CAREERS) }),

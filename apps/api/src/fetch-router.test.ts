@@ -56,3 +56,47 @@ describe('fetch router: CORS e rotas', () => {
     }
   });
 });
+
+describe('fetch router: Server-Timing', () => {
+  it('mede rate limit, handler e total, com métricas extras e prefixo', async () => {
+    let clock = 0;
+    const response = await createFetchHandler(deps(), {
+      now: () => (clock += 5),
+      timingPrefix: 'do-',
+      rateLimit: () => Promise.resolve({ allowed: true, retryAfterSeconds: 0 }),
+      timings: () => [
+        { name: 'pg', desc: 'n=2' },
+        { name: 'colo', desc: 'IAD' },
+      ],
+    })(new Request(`${BASE}/v1/public/stats`, { headers: { origin: ORIGIN } }));
+    const header = response.headers.get('server-timing') ?? '';
+    expect(header).toMatch(/^do-rl;dur=\d+, do-app;dur=\d+, /);
+    expect(header).toContain('do-pg;desc="n=2"');
+    expect(header).toContain('do-colo;desc="IAD"');
+    expect(header).toMatch(/do-total;dur=\d+$/);
+    expect(response.headers.get('timing-allow-origin')).toBe(ORIGIN);
+    expect(response.headers.get('access-control-expose-headers')).toContain(
+      'server-timing',
+    );
+  });
+
+  it('mantém as métricas do objeto encaminhado e soma as do Worker', async () => {
+    const completions: (Record<string, number | string> | undefined)[] = [];
+    const response = await createFetchHandler(deps(), {
+      forward: () =>
+        Promise.resolve(
+          new Response('{}', {
+            headers: { 'server-timing': 'do-load;dur=40, do-total;dur=55' },
+          }),
+        ),
+      timings: () => [{ name: 'edge', desc: 'GRU' }],
+      onComplete: (completion) => completions.push(completion.timing),
+    })(new Request(`${BASE}/v1/public/stats`));
+    const header = response.headers.get('server-timing') ?? '';
+    expect(header).toMatch(/^do-load;dur=40, do-total;dur=55, fwd;dur=\d+/);
+    expect(header).toContain('edge;desc="GRU"');
+    expect(completions).toHaveLength(1);
+    expect(typeof completions[0]?.fwd).toBe('number');
+    expect(completions[0]?.edge).toBe('GRU');
+  });
+});

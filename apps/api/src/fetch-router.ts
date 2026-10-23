@@ -25,6 +25,28 @@ export interface FetchHandlerOptions {
    * with this router's CORS and request id headers.
    */
   readonly forward?: (input: ForwardInput) => Promise<Response | undefined>;
+  /** Prefix of this router's Server-Timing names (the career object: `do-`). */
+  readonly timingPrefix?: string;
+  /** Extra Server-Timing metrics, read once the response is ready. */
+  readonly timings?: () => readonly TimingMetric[];
+}
+
+/** One Server-Timing metric: a duration in ms and/or a short description. */
+export interface TimingMetric {
+  readonly name: string;
+  readonly dur?: number;
+  readonly desc?: string;
+}
+
+function serverTiming(prefix: string, metrics: readonly TimingMetric[]) {
+  return metrics
+    .map(
+      ({ name, dur, desc }) =>
+        `${prefix}${name}` +
+        (dur === undefined ? '' : `;dur=${String(dur)}`) +
+        (desc === undefined ? '' : `;desc="${desc.replace(/["\\]/g, '')}"`),
+    )
+    .join(', ');
 }
 
 export interface ForwardInput {
@@ -94,10 +116,23 @@ export function createFetchHandler(
   // Image uploads (avatars) only; JSON routes keep the small limit above.
   const binaryLimit = 2 * 1024 * 1024 + 1024;
   const now = options.now ?? Date.now;
+  const prefix = options.timingPrefix ?? '';
+  const timed = async <T>(
+    state: DispatchState,
+    name: string,
+    work: () => Promise<T>,
+  ): Promise<T> => {
+    const started = now();
+    try {
+      return await work();
+    } finally {
+      state.timings.push({ name, dur: Math.max(0, now() - started) });
+    }
+  };
   const dispatch = async (
     request: Request,
     requestId: string,
-    state: { route: string; error?: unknown },
+    state: DispatchState,
   ): Promise<Response> => {
     const headers = new Headers({
       'x-content-type-options': 'nosniff',
@@ -115,8 +150,10 @@ export function createFetchHandler(
       headers.set('access-control-allow-methods', 'GET, POST, OPTIONS');
       headers.set(
         'access-control-expose-headers',
-        'etag, idempotency-key, retry-after, x-request-id',
+        'etag, idempotency-key, retry-after, server-timing, x-request-id',
       );
+      // Lets the game's Resource Timing entries carry our Server-Timing.
+      headers.set('timing-allow-origin', origin);
       if (request.method === 'OPTIONS') {
         state.route = 'preflight';
         headers.set(
@@ -152,10 +189,13 @@ export function createFetchHandler(
         }
       }
       if (found) state.route = found.compiled.route.path;
-      const decision = await options.rateLimit?.(
-        request,
-        found?.compiled.route.path,
-      );
+      const limiter = options.rateLimit;
+      const decision =
+        limiter === undefined
+          ? undefined
+          : await timed(state, 'rl', () =>
+              limiter(request, found?.compiled.route.path),
+            );
       if (decision && !decision.allowed) {
         headers.set('retry-after', String(decision.retryAfterSeconds));
         return respond(429, {
@@ -175,26 +215,28 @@ export function createFetchHandler(
             413,
             errorBody(requestId, 'VALIDATION_ERROR', 'request body too large'),
           );
-        const result = await compiled.route.handler({
-          params: Object.fromEntries(
-            compiled.names.map((name, index) => [
-              name,
-              decodeURIComponent(match[index + 1] ?? ''),
-            ]),
-          ),
-          query: Object.fromEntries(url.searchParams),
-          headers: Object.fromEntries(request.headers),
-          body: undefined,
-          bytes: async () => {
-            const bytes = await request.arrayBuffer();
-            if (bytes.byteLength > binaryLimit)
-              throw new ApplicationError(
-                'VALIDATION_ERROR',
-                'request body too large',
-              );
-            return bytes;
-          },
-        });
+        const result = await timed(state, 'app', () =>
+          compiled.route.handler({
+            params: Object.fromEntries(
+              compiled.names.map((name, index) => [
+                name,
+                decodeURIComponent(match[index + 1] ?? ''),
+              ]),
+            ),
+            query: Object.fromEntries(url.searchParams),
+            headers: Object.fromEntries(request.headers),
+            body: undefined,
+            bytes: async () => {
+              const bytes = await request.arrayBuffer();
+              if (bytes.byteLength > binaryLimit)
+                throw new ApplicationError(
+                  'VALIDATION_ERROR',
+                  'request body too large',
+                );
+              return bytes;
+            },
+          }),
+        );
         for (const [name, value] of Object.entries(result.headers ?? {}))
           headers.set(name, value);
         return respond(result.status ?? 200, result.body);
@@ -226,14 +268,20 @@ export function createFetchHandler(
             decodeURIComponent(match[index + 1] ?? ''),
           ]),
         );
-        const forwarded = await options.forward?.({
-          request,
-          route: compiled.route.path,
-          params,
-          body,
-          rawBody: text,
-          requestId,
-        });
+        const forward = options.forward;
+        const forwarded =
+          forward === undefined
+            ? undefined
+            : await timed(state, 'fwd', () =>
+                forward({
+                  request,
+                  route: compiled.route.path,
+                  params,
+                  body,
+                  rawBody: text,
+                  requestId,
+                }),
+              );
         if (forwarded !== undefined) {
           for (const [name, value] of forwarded.headers)
             if (!name.startsWith('access-control-') && name !== 'vary')
@@ -244,13 +292,15 @@ export function createFetchHandler(
             headers,
           });
         }
-        const result = await compiled.route.handler({
-          params,
-          query: Object.fromEntries(url.searchParams),
-          headers: Object.fromEntries(request.headers),
-          body,
-          rawBody: text,
-        });
+        const result = await timed(state, 'app', () =>
+          compiled.route.handler({
+            params,
+            query: Object.fromEntries(url.searchParams),
+            headers: Object.fromEntries(request.headers),
+            body,
+            rawBody: text,
+          }),
+        );
         for (const [name, value] of Object.entries(result.headers ?? {}))
           headers.set(name, value);
         return respond(
@@ -271,16 +321,38 @@ export function createFetchHandler(
     const requestId =
       deps.nextRequestId?.() ??
       `request_${crypto.randomUUID().replaceAll('-', '')}`;
-    const state: { route: string; error?: unknown } = { route: 'unmatched' };
+    const state: DispatchState = { route: 'unmatched', timings: [] };
     const response = await dispatch(request, requestId, state);
+    const durationMs = Math.max(0, now() - started);
+    const metrics = [
+      ...state.timings,
+      ...(options.timings?.() ?? []),
+      { name: 'total', dur: durationMs },
+    ];
+    // A forwarded response already carries the career object's own metrics.
+    response.headers.append('server-timing', serverTiming(prefix, metrics));
     options.onComplete?.({
       requestId,
       method: request.method,
       route: state.route,
       status: response.status,
-      durationMs: Math.max(0, now() - started),
+      durationMs,
+      timing: Object.fromEntries(
+        metrics
+          .filter(({ name }) => name !== 'total')
+          .map(({ name, dur, desc }) => [
+            `${prefix}${name}`,
+            dur ?? desc ?? '',
+          ]),
+      ),
       ...(state.error === undefined ? {} : { error: state.error }),
     });
     return response;
   };
+}
+
+interface DispatchState {
+  route: string;
+  error?: unknown;
+  readonly timings: TimingMetric[];
 }
