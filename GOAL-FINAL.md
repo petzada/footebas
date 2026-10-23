@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Um jogador entra com Google ou link mágico, cria carreira, joga temporadas inteiras (todas as competições, mercado, finanças, diretoria) e disputa o ranking global, tudo na nuvem, no celular e no desktop.
+Um jogador entra com Google ou link mágico, cria carreira, joga temporadas inteiras (todas as competições, mercado, finanças, diretoria) e disputa o ranking global, tudo na nuvem e no celular.
 
 ## Estado atual (não refazer)
 
