@@ -155,44 +155,44 @@ describe('simulateMatch', () => {
       first: result.timeline.slice(0, 4),
     }).toMatchInlineSnapshot(`
       {
-        "events": 44,
+        "events": 40,
         "first": [
           {
             "minute": 1,
             "side": "away",
             "type": "chance",
-            "xg": 0.027,
+            "xg": 0.187,
           },
           {
-            "minute": 3,
+            "minute": 4,
             "side": "away",
             "type": "chance",
-            "xg": 0.026,
+            "xg": 0.192,
           },
           {
-            "minute": 6,
+            "minute": 9,
+            "side": "away",
+            "type": "chance",
+            "xg": 0.073,
+          },
+          {
+            "minute": 10,
             "side": "home",
             "type": "chance",
-            "xg": 0.273,
-          },
-          {
-            "minute": 7,
-            "side": "away",
-            "type": "chance",
-            "xg": 0.302,
+            "xg": 0.339,
           },
         ],
         "score": [
-          4,
-          1,
+          0,
+          2,
         ],
         "shots": [
-          17,
-          14,
+          7,
+          19,
         ],
         "xg": [
-          3.122,
-          1.866,
+          1.571,
+          4.093,
         ],
       }
     `);
@@ -374,5 +374,37 @@ describe('simulateMatch', () => {
           if (event.scorerId === 'home_player_10') other++;
         }
     expect(star).toBeGreaterThan(other * 1.4);
+  });
+
+  it('keeps every event before a manager decision unchanged (prefix stability)', () => {
+    for (let index = 0; index < 60; index++) {
+      const input = match(`prefix-${String(index)}`, 72, 70);
+      const minute = ([15, 30, 45, 60, 75] as const)[index % 5]!;
+      const before = (events: readonly { minute: number }[]) =>
+        events.filter((event) => event.minute <= minute);
+      const plain = simulateMatch(input);
+      const decided = simulateMatch(
+        createMatchInput({
+          ...input,
+          instructions: [
+            {
+              type: 'substitution',
+              minute,
+              side: 'home',
+              playerOutId: input.home.lineup.starters[9]!.playerId,
+              playerInId: input.home.lineup.substitutes[0]!,
+              position: 'ST',
+            },
+          ],
+        }),
+      );
+      expect(
+        before(
+          decided.timeline.filter((event) => event.type !== 'substitution'),
+        ),
+      ).toEqual(
+        before(plain.timeline.filter((event) => event.type !== 'substitution')),
+      );
+    }
   });
 });

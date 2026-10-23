@@ -306,6 +306,7 @@ function poisson(random: Prng, mean: number): number {
 
 interface SideEvents {
   events: MatchEvent[];
+  applied: MatchInstruction[];
   shots: number;
   shotsOnTarget: number;
   xg: number;
@@ -313,139 +314,211 @@ interface SideEvents {
   yellow: number;
   red: number;
 }
+
+/**
+ * Fifteen-minute segments, each with its own random stream. A manager decision
+ * at minute 15, 30, 45, 60 or 75 only affects later segments, so everything
+ * already played stays identical whatever is decided next (prefix stability).
+ */
+const SEGMENTS: readonly (readonly [number, number])[] = [
+  [1, 15],
+  [16, 30],
+  [31, 45],
+  [46, 60],
+  [61, 75],
+  [76, 94],
+];
+
+function instructionFactor(
+  side: MatchSideInput,
+  instruction: MatchInstruction,
+): number {
+  const duration = (90 - instruction.minute) / 90;
+  if (instruction.type === 'substitution') {
+    const outgoing = playerFor(side, instruction.playerOutId);
+    const incoming = playerFor(side, instruction.playerInId);
+    return (
+      1 +
+      ((Number(incoming.strength) - Number(outgoing.strength)) / 100) *
+        duration *
+        0.18
+    );
+  }
+  const attackDelta =
+    instruction.tactic.mentality === 'all_out_attack'
+      ? 0.06
+      : instruction.tactic.mentality === 'counter_attack'
+        ? -0.015
+        : 0;
+  const pressDelta =
+    instruction.tactic.press === 'high'
+      ? 0.018
+      : instruction.tactic.press === 'low'
+        ? -0.008
+        : 0;
+  return 1 + (attackDelta + pressDelta) * duration;
+}
+
+function inRange(random: Prng, from: number, to: number): number | undefined {
+  return from > to ? undefined : random.nextInt(from, to);
+}
+
 function generateSideEvents(
-  random: Prng,
+  seed: string,
   sideName: MatchSide,
   side: MatchSideInput,
   expectedGoals: number,
   discipline: number,
-  automaticSubstitutions: boolean,
+  instructions: readonly MatchInstruction[],
 ): SideEvents {
   const events: MatchEvent[] = [];
-  const shotCount = clamp(poisson(random, 8.2 + expectedGoals * 2.8), 2, 24);
+  const applied: MatchInstruction[] = [];
+  const onPitch = new Set<PlayerId>(
+    side.lineup.starters.map(({ playerId }) => playerId),
+  );
+  const usedBench = new Set<PlayerId>();
+  let modifier = 1;
+  let managerActed = false;
+  let automatic = 0;
+  let shots = 0;
   let goals = 0;
   let onTarget = 0;
   let xgTotal = 0;
-  for (let index = 0; index < shotCount; index += 1) {
-    const minute = random.nextInt(1, 94);
-    const xg = round(
-      clamp(
-        0.025 + random.next() ** 2 * (0.34 + expectedGoals * 0.055),
-        0.02,
-        0.72,
-      ),
-    );
-    xgTotal += xg;
-    events.push({ type: 'chance', minute, side: sideName, xg });
-    const target = random.next() < clamp(0.28 + xg * 0.85, 0.3, 0.88);
-    if (target) onTarget += 1;
-    if (
-      random.next() <
-      xg * clamp(expectedGoals / Math.max(0.35, xgTotal), 0.72, 1.35)
-    ) {
-      const scorerId = weightedPlayer(random, side, 'attack');
-      const assistId =
-        random.next() < 0.72
-          ? weightedPlayer(random, side, 'attack')
-          : undefined;
-      events.push(
-        assistId === undefined || assistId === scorerId
-          ? { type: 'goal', minute, side: sideName, scorerId }
-          : { type: 'goal', minute, side: sideName, scorerId, assistId },
-      );
-      goals += 1;
-      onTarget = Math.max(onTarget, goals);
-    }
-  }
-  const yellow = clamp(poisson(random, 1.45 * discipline), 0, 7);
+  let yellow = 0;
   let red = 0;
-  for (let index = 0; index < yellow; index += 1)
-    events.push({
-      type: 'card',
-      minute: random.nextInt(8, 93),
-      side: sideName,
-      playerId: weightedPlayer(random, side, 'any'),
-      card: 'yellow',
-    });
-  if (random.next() < 0.035 * discipline) {
-    red = 1;
-    events.push({
-      type: 'card',
-      minute: random.nextInt(25, 92),
-      side: sideName,
-      playerId: weightedPlayer(random, side, 'any'),
-      card: 'red',
-    });
-  }
-  if (random.next() < 0.075)
-    events.push({
-      type: 'injury',
-      minute: random.nextInt(12, 86),
-      side: sideName,
-      playerId: weightedPlayer(random, side, 'any'),
-      rounds: random.nextInt(1, 5),
-    });
-  const substitutions = automaticSubstitutions
-    ? Math.min(side.lineup.substitutes.length, random.nextInt(2, 3))
-    : 0;
-  const usedOut = new Set<PlayerId>();
-  for (let index = 0; index < substitutions; index += 1) {
-    const available = side.lineup.starters.filter(
-      ({ playerId }) => !usedOut.has(playerId),
-    );
-    const out = available[random.nextInt(0, available.length - 1)]!.playerId;
-    usedOut.add(out);
-    events.push({
-      type: 'substitution',
-      minute: random.nextInt(58 + index * 5, 78 + index * 6),
-      side: sideName,
-      playerOutId: out,
-      playerInId: side.lineup.substitutes[index]!,
-      source: 'automatic',
-    });
-  }
+  let injured = false;
+  SEGMENTS.forEach(([from, to], segment) => {
+    for (const instruction of instructions) {
+      if (instruction.minute !== from - 1) continue;
+      managerActed = true;
+      if (instruction.type === 'substitution') {
+        if (
+          !onPitch.has(instruction.playerOutId) ||
+          onPitch.has(instruction.playerInId) ||
+          usedBench.has(instruction.playerInId)
+        )
+          continue;
+        onPitch.delete(instruction.playerOutId);
+        onPitch.add(instruction.playerInId);
+        usedBench.add(instruction.playerInId);
+      }
+      modifier = clamp(
+        modifier * instructionFactor(side, instruction),
+        0.9,
+        1.12,
+      );
+      applied.push(instruction);
+    }
+    const random = createPrng(`${seed}|${sideName}|segment-${String(segment)}`);
+    const share = (to - from + 1) / 94;
+    const segmentGoals = expectedGoals * modifier;
+    const segmentShots = poisson(random, (8.2 + segmentGoals * 2.8) * share);
+    for (let index = 0; index < segmentShots; index += 1) {
+      const minute = random.nextInt(from, to);
+      const xg = round(
+        clamp(
+          0.025 + random.next() ** 2 * (0.34 + segmentGoals * 0.055),
+          0.02,
+          0.72,
+        ),
+      );
+      shots += 1;
+      xgTotal += xg;
+      events.push({ type: 'chance', minute, side: sideName, xg });
+      const target = random.next() < clamp(0.28 + xg * 0.85, 0.3, 0.88);
+      if (target) onTarget += 1;
+      if (
+        random.next() <
+        xg * clamp(segmentGoals / Math.max(0.35, xgTotal), 0.72, 1.35)
+      ) {
+        const scorerId = weightedPlayer(random, side, 'attack');
+        const assistId =
+          random.next() < 0.72
+            ? weightedPlayer(random, side, 'attack')
+            : undefined;
+        events.push(
+          assistId === undefined || assistId === scorerId
+            ? { type: 'goal', minute, side: sideName, scorerId }
+            : { type: 'goal', minute, side: sideName, scorerId, assistId },
+        );
+        goals += 1;
+        onTarget = Math.max(onTarget, goals);
+      }
+    }
+    const cards = poisson(random, 1.45 * discipline * share);
+    for (let index = 0; index < cards && yellow < 7; index += 1) {
+      const minute = inRange(random, Math.max(8, from), Math.min(93, to));
+      if (minute === undefined) break;
+      yellow += 1;
+      events.push({
+        type: 'card',
+        minute,
+        side: sideName,
+        playerId: weightedPlayer(random, side, 'any'),
+        card: 'yellow',
+      });
+    }
+    if (red === 0 && random.next() < 0.035 * discipline * share) {
+      const minute = inRange(random, Math.max(25, from), Math.min(92, to));
+      if (minute !== undefined) {
+        red = 1;
+        events.push({
+          type: 'card',
+          minute,
+          side: sideName,
+          playerId: weightedPlayer(random, side, 'any'),
+          card: 'red',
+        });
+      }
+    }
+    if (!injured && random.next() < 0.075 * share) {
+      const minute = inRange(random, Math.max(12, from), Math.min(86, to));
+      if (minute !== undefined) {
+        injured = true;
+        events.push({
+          type: 'injury',
+          minute,
+          side: sideName,
+          playerId: weightedPlayer(random, side, 'any'),
+          rounds: random.nextInt(1, 5),
+        });
+      }
+    }
+    if (managerActed || from < 61) return;
+    const wanted = from === 61 ? random.nextInt(1, 2) : random.nextInt(0, 1);
+    for (let index = 0; index < wanted && automatic < 3; index += 1) {
+      const incoming = side.lineup.substitutes.find((id) => !usedBench.has(id));
+      const candidates = [...onPitch].filter((id) =>
+        side.lineup.starters.some(
+          ({ playerId, position }) => playerId === id && position !== 'GK',
+        ),
+      );
+      if (incoming === undefined || candidates.length === 0) break;
+      const out = candidates[random.nextInt(0, candidates.length - 1)]!;
+      onPitch.delete(out);
+      onPitch.add(incoming);
+      usedBench.add(incoming);
+      automatic += 1;
+      events.push({
+        type: 'substitution',
+        minute: random.nextInt(from, to),
+        side: sideName,
+        playerOutId: out,
+        playerInId: incoming,
+        source: 'automatic',
+      });
+    }
+  });
   return {
     events,
-    shots: shotCount,
-    shotsOnTarget: Math.min(shotCount, onTarget),
+    applied,
+    shots,
+    shotsOnTarget: Math.min(shots, onTarget),
     xg: round(xgTotal),
     goals,
     yellow,
     red,
   };
-}
-
-function instructionModifier(input: MatchInput, sideName: MatchSide): number {
-  const side = input[sideName];
-  let modifier = 1;
-  for (const instruction of input.instructions ?? []) {
-    if (instruction.side !== sideName) continue;
-    const duration = (90 - instruction.minute) / 90;
-    if (instruction.type === 'substitution') {
-      const outgoing = playerFor(side, instruction.playerOutId);
-      const incoming = playerFor(side, instruction.playerInId);
-      modifier *=
-        1 +
-        ((Number(incoming.strength) - Number(outgoing.strength)) / 100) *
-          duration *
-          0.18;
-    } else {
-      const attackDelta =
-        instruction.tactic.mentality === 'all_out_attack'
-          ? 0.06
-          : instruction.tactic.mentality === 'counter_attack'
-            ? -0.015
-            : 0;
-      const pressDelta =
-        instruction.tactic.press === 'high'
-          ? 0.018
-          : instruction.tactic.press === 'low'
-            ? -0.008
-            : 0;
-      modifier *= 1 + (attackDelta + pressDelta) * duration;
-    }
-  }
-  return clamp(modifier, 0.9, 1.12);
 }
 
 function instructionEvents(
@@ -559,30 +632,33 @@ function performances(
 
 export function simulateMatch(input: MatchInput): MatchResult {
   const valid = createMatchInput(input);
-  const random = createPrng(
-    `${valid.seed}|${valid.engineVersion}|${valid.rulesVersion}|${valid.fixtureId}`,
-  );
+  const seed = `${valid.seed}|${valid.engineVersion}|${valid.rulesVersion}|${valid.fixtureId}`;
   const matchup = calculateMatchup(valid);
+  const orders = (side: MatchSide) =>
+    [...(valid.instructions ?? [])]
+      .filter((instruction) => instruction.side === side)
+      .sort((left, right) => left.minute - right.minute);
   const home = generateSideEvents(
-    random,
+    seed,
     'home',
     valid.home,
-    matchup.expectedGoals.home * instructionModifier(valid, 'home'),
+    matchup.expectedGoals.home,
     matchup.home.discipline,
-    !(valid.instructions ?? []).some(({ side }) => side === 'home'),
+    orders('home'),
   );
   const away = generateSideEvents(
-    random,
+    seed,
     'away',
     valid.away,
-    matchup.expectedGoals.away * instructionModifier(valid, 'away'),
+    matchup.expectedGoals.away,
     matchup.away.discipline,
-    !(valid.instructions ?? []).some(({ side }) => side === 'away'),
+    orders('away'),
   );
+  const decisions = [...home.applied, ...away.applied];
   const timeline = [
     ...home.events,
     ...away.events,
-    ...instructionEvents(valid.instructions ?? []),
+    ...instructionEvents(decisions),
   ].sort(
     (left, right) =>
       left.minute - right.minute ||
@@ -632,7 +708,7 @@ export function simulateMatch(input: MatchInput): MatchResult {
       timeline,
       seed: valid.seed,
       engineVersion: valid.engineVersion,
-      decisions: valid.instructions ?? [],
+      decisions,
       playerPerformances: [
         ...performances(valid, timeline, 'home', home.goals, away.goals),
         ...performances(valid, timeline, 'away', away.goals, home.goals),
