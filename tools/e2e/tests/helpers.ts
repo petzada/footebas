@@ -40,7 +40,7 @@ export async function createCareer(
   await page
     .getByRole('radio', { name: new RegExp(club, 'i') })
     .first()
-    .check();
+    .check({ force: true });
   await next();
   await expect(
     page.getByRole('heading', { name: /quem é o treinador/i }),
