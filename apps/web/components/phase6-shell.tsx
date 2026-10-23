@@ -18,6 +18,7 @@ import {
   Storefront,
   Strategy,
   Trophy,
+  UserCircle,
   UsersThree,
   WifiHigh,
   WifiSlash,
@@ -59,6 +60,7 @@ export const moreDestinations = [
   ['stadium', 'Estádio', SoccerBall],
   ['finance', 'Finanças', Bank],
   ['history', 'Histórico', ClockCounterClockwise],
+  ['profile', 'Perfil', UserCircle],
 ] as const satisfies ReadonlyArray<Destination>;
 
 const destinations: readonly Destination[] = [

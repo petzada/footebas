@@ -56,7 +56,8 @@ export type Screen =
   | 'competitions'
   | 'stadium'
   | 'finance'
-  | 'history';
+  | 'history'
+  | 'profile';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
 export type SquadRole = 'starter' | 'bench' | 'reserve';
 export type AutoPickStrategy = 'best' | 'rest' | 'develop';
