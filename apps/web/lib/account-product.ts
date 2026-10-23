@@ -148,7 +148,7 @@ export function createFakeAccountPort(
   };
   let order: OrderView | null = null;
   let polls = 0;
-  const price = options.priceCents ?? 4990;
+  const price = options.priceCents ?? 2990;
   return {
     async me() {
       return profile;

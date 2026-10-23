@@ -23,8 +23,8 @@
     "AVATAR_PUBLIC_URL": "https://cdn.footebas.com.br",
     // Fallback provider (PAYMENT_PROVIDER=woovi): sandbox until launch.
     "WOOVI_API_URL": "https://api.woovi-sandbox.com",
-    "LICENSE_PRICE_CENTS": "4990",
-    "LICENSE_CHARGE_EXPIRES_IN": "3600",
+    "LICENSE_PRICE_CENTS": "2990",
+    "LICENSE_CHARGE_EXPIRES_IN": "900",
   },
   "hyperdrive": [
     {

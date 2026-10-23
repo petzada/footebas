@@ -76,8 +76,8 @@ Payloads da Woovi trazem CPF, nome e conta do pagador. Antes de gravar em `webho
 | `WOOVI_APP_ID`              | **secret**          | —                               | `Authorization: <AppID>` (sem `Bearer`). Sem ele, checkout/reembolso respondem 502.                    |
 | `WOOVI_WEBHOOK_PUBLIC_KEYS` | var/secret opcional | —                               | PEM(s) ou PEM em base64 para fixar a chave. Sem ele, a API busca e cacheia (1 h) as chaves publicadas. |
 | `WOOVI_WEBHOOK_SECRET`      | **secret** opcional | —                               | Valor do header `authorization` configurado no webhook do painel.                                      |
-| `LICENSE_PRICE_CENTS`       | var                 | `4990`                          | R$ 49,90, meio da faixa R$ 39,90/49,90/59,90 de `docs/05-monetizacao.md` §2 (a testar).                |
-| `LICENSE_CHARGE_EXPIRES_IN` | var                 | `3600`                          | Validade do QR code em segundos (mínimo 300).                                                          |
+| `LICENSE_PRICE_CENTS`       | var                 | `2990`                          | R$ 29,90, preço de lançamento definido pelo responsável em 2026-10-23.                                 |
+| `LICENSE_CHARGE_EXPIRES_IN` | var                 | `900`                           | Validade do QR code em segundos (15 min; mínimo 300).                                                  |
 
 Segredos só por `wrangler secret put` (nunca no repositório):
 

@@ -23,7 +23,7 @@ import { crestFor } from '@/lib/club-crests';
  * Landing arcade (docs/09 "Mapa de telas"): a public page that sells the game
  * in its own retro style (ADR 0012). Facts come from the codebase: the free
  * and licensed entitlements (lib/account-product), the default price
- * (apps/api/src/billing/service.ts: R$ 49,90) and the screens that exist.
+ * (apps/api/src/billing/service.ts: R$ 29,90) and the screens that exist.
  */
 
 /** The game lives on its own host (next.config.ts); the landing on lp. */
@@ -31,7 +31,7 @@ const GAME_URL =
   process.env['NEXT_PUBLIC_GAME_URL'] ?? 'https://game.footebas.com.br/';
 
 /** Default licence price; the checkout always shows the server's value. */
-const LICENSE_PRICE_CENTS = 4990;
+const LICENSE_PRICE_CENTS = 2990;
 
 const SERIE_A = [
   'club_flamengo',
