@@ -15,7 +15,7 @@ const OLD_HOSTS = ['footebas.com.br', 'www.footebas.com.br'];
 // also match lp./game.; anchor and escape every host.
 const host = (name: string) => ({
   type: 'host' as const,
-  value: `^${name.replaceAll('.', '\.')}$`,
+  value: `^${name.replaceAll('.', '\\.')}$`,
 });
 
 const nextConfig: NextConfig = {
@@ -54,13 +54,18 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      {
-        source: '/',
-        has: [host(LANDING_HOST)],
-        destination: '/landing',
-      },
-    ];
+    return {
+      // Before files: "/" is also a real page (the game), which would win.
+      beforeFiles: [
+        {
+          source: '/',
+          has: [host(LANDING_HOST)],
+          destination: '/landing',
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 
