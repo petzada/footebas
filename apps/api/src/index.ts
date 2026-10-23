@@ -337,7 +337,7 @@ export async function buildApi(
         const query = marketSearchQuerySchema.parse(
           Object.fromEntries(
             Object.entries({
-              text: raw.text || undefined,
+              text: raw.text === '' ? undefined : raw.text,
               position: raw.position,
               minStrength: numeric(raw.minStrength),
               maxAge: numeric(raw.maxAge),
