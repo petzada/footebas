@@ -731,7 +731,7 @@ export function SquadScreen({
                 <div
                   role="group"
                   aria-label="Modos de escalação automática"
-                  className="grid grid-cols-3 gap-1"
+                  className="grid gap-1 sm:grid-cols-3"
                 >
                   {AUTO_PICK_MODES.map((mode) => (
                     <button
@@ -739,15 +739,18 @@ export function SquadScreen({
                       type="button"
                       disabled={busy}
                       onClick={() => void autoPick(mode.id)}
-                      className="btn-px btn-chalk grid min-h-14 content-center gap-0.5 px-1 py-1.5 text-center disabled:opacity-60"
+                      className="btn-px btn-chalk flex min-h-10 items-center gap-2 px-2 py-1.5 text-left disabled:opacity-60 sm:grid sm:min-h-14 sm:content-center sm:gap-0.5 sm:px-1 sm:text-center"
                     >
-                      <span className="flex items-center justify-center gap-1 text-[.6rem]">
+                      <span className="flex min-w-[5.5rem] items-center gap-1 text-[.55rem] leading-tight sm:min-w-0 sm:justify-center sm:text-[.6rem]">
                         {mode.id === 'best' ? (
-                          <Sparkle size={12} />
+                          <Sparkle size={12} className="hidden sm:inline" />
                         ) : mode.id === 'rest' ? (
-                          <ArrowsClockwise size={12} />
+                          <ArrowsClockwise
+                            size={12}
+                            className="hidden sm:inline"
+                          />
                         ) : (
-                          <UsersThree size={12} />
+                          <UsersThree size={12} className="hidden sm:inline" />
                         )}
                         {mode.label}
                       </span>
@@ -1129,8 +1132,8 @@ function FocusCard({
             </Button>
           )}
           <details className="contents">
-            <summary className="btn-px btn-chalk flex min-h-9 cursor-pointer list-none items-center justify-center gap-2 px-2 text-xs font-semibold [&::-webkit-details-marker]:hidden">
-              <MagnifyingGlass size={16} />
+            <summary className="btn-px btn-chalk flex min-h-9 cursor-pointer list-none items-center justify-center gap-2 px-2 font-pixel text-[.55rem] uppercase leading-tight [&::-webkit-details-marker]:hidden">
+              <MagnifyingGlass size={14} />
               Ver estatísticas
             </summary>
             <div className="col-span-2">
