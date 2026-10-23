@@ -21,9 +21,11 @@
     "@fastify/swagger-ui": "6.1.0",
     "@footebas/application": "workspace:*",
     "@footebas/contracts": "workspace:*",
+    "@footebas/database": "workspace:*",
     "fastify": "5.10.0",
-    "zod": "4.4.3",
-    "@footebas/database": "workspace:*"
+    "jose": "6.1.0",
+    "postgres": "3.4.7",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "vitest": "4.1.10"

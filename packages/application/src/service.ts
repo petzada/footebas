@@ -510,6 +510,17 @@ export class FootebasApplication {
   public async runNextJob(): Promise<JobStatus | undefined> {
     const job = await this.deps.jobs.take();
     if (!job) return undefined;
+    return this.runJob(job);
+  }
+
+  /**
+   * Runs one simulation job. With `requeueOnFailure` false the caller (e.g. a
+   * Cloudflare Queues consumer) owns retries and dead-lettering.
+   */
+  public async runJob(
+    job: SimulationJob,
+    options: Readonly<{ requeueOnFailure?: boolean }> = {},
+  ): Promise<JobStatus> {
     const prior = await this.deps.jobs.status(job.id);
     if (prior?.state === 'succeeded') return prior;
     const attempt =
@@ -550,7 +561,7 @@ export class FootebasApplication {
       );
     } catch (error) {
       this.deps.telemetry.error(error, { jobId: job.id });
-      await this.deps.jobs.enqueue(job);
+      if (options.requeueOnFailure ?? true) await this.deps.jobs.enqueue(job);
       return await this.setJobStatus(
         job,
         'failed',

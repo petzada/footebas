@@ -1,0 +1,34 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "footebas-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "limits": { "cpu_ms": 120000 },
+  "observability": { "enabled": true },
+  "vars": {
+    "SUPABASE_URL": "https://wjisqiiwsuykfbmqglfb.supabase.co",
+    "CORS_ORIGINS": "https://footebas.com.br,https://www.footebas.com.br,http://localhost:3000",
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "REPLACE_WITH_HYPERDRIVE_ID",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    },
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "SIMULATION_QUEUE", "queue": "footebas-simulation" },
+    ],
+    "consumers": [
+      {
+        "queue": "footebas-simulation",
+        "max_batch_size": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "footebas-simulation-dlq",
+      },
+    ],
+  },
+  "routes": [{ "pattern": "api.footebas.com.br", "custom_domain": true }],
+}
