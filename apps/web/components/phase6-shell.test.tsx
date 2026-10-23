@@ -244,6 +244,15 @@ describe('Fase 6 · shell mobile-first', () => {
         .querySelector('.grid')
         ?.className.includes('grid-cols-3'),
     ).toBe(true);
+    // "Classificação" (13 glyphs) never hyphenates: labels wrap only at
+    // spaces and the pixel font drops to .4rem below 360px (3 columns of
+    // ~90px at 320px: 13 × 6.4px = 83px).
+    const table = within(dialog).getByRole('button', { name: 'Classificação' });
+    expect(table.className).toMatch(/break-normal/);
+    expect(table.className).not.toMatch(/hyphens|break-words/);
+    expect(table.className).toMatch(/text-\[\.4rem\]/);
+    expect(table.className).toMatch(/min-\[360px\]:text-\[\.45rem\]/);
+    expect(13 * 0.4 * 16).toBeLessThanOrEqual((320 - 2 * 12 - 2 * 8) / 3 - 4);
     // Focus lands on the current screen and the grid answers the arrows.
     const current = within(dialog).getByRole('button', { name: 'Central' });
     expect(current.getAttribute('aria-current')).toBe('page');

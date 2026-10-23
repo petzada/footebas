@@ -696,6 +696,7 @@ function CareerFlow({
             player={player}
             loadCareers={listCareers}
             onSignOut={onSignOut}
+            saveArchive={career.world.archive}
           />
         ) : screen === 'office' || screen === 'finance' ? (
           <OfficeScreen

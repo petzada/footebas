@@ -312,10 +312,15 @@ não são mensagens da caixa (mesmo id), com lixeira quando o servidor marca `de
 `MarkInboxRead` (efeito já existente em `career-game.tsx`) e o contador do menu/barra some; no demo em memória
 `InMemoryCareerApi.markNewsRead/removeNews` espelham os comandos (`runtime-api.ts`, `inboxDemo`). "Mundo"
 (`WorldScreen`, item Histórico) ficou só com o card de prestígio e a História; as abas Notícias, Ranking e Save
-saíram (Ranking continua no menu; as carreiras salvas continuam em Perfil; o painel técnico "Integridade do save"
-foi removido, ver pergunta aberta). A tela entra no histórico do navegador como qualquer outra (D1). Testes:
-`inbox-screen.test.tsx`, `phase6-shell.test.tsx` (contador some ao abrir), `game-history.test.tsx` (Voltar),
-`phase4-screens.test.tsx` (Mundo sem abas).
+saíram (Ranking continua no menu; as carreiras salvas continuam em Perfil). A tela entra no histórico do navegador
+como qualquer outra (D1). Testes: `inbox-screen.test.tsx`, `phase6-shell.test.tsx` (contador some ao abrir),
+`game-history.test.tsx` (Voltar), `phase4-screens.test.tsx` (Mundo sem abas).
+**Respostas do responsável (2026-10-23):** o estado técnico do save (versão, migração, arquivo, compactação,
+checksum) vai para o **Perfil, recolhido** — `<details>` "Detalhes técnicos do save" em `profile-screen.tsx`,
+fechado por padrão, `summary` de 44 px (teste em `profile-screen.test.tsx`). As notícias do demo em memória passam
+a ser `deletable`, para a lixeira aparecer também offline (`phase4-model.ts`). O item "Classificação" do menu em
+320 px não hifeniza mais: rótulos quebram só em espaços (`break-normal`) e a fonte pixel cai para `.4rem` abaixo de
+360 px (`game-menu.tsx`; teste em `phase6-shell.test.tsx`).
 
 **D7 — Classificação completa mais pobre que o resumo.** Problema: a tela Classificação mostra J e Pts; o resumo da
 Central mostra J, SG, Pts (e V/E/D em ≥ 414 px). Regra: `docs/07` §2 ("números legíveis — tabela são
@@ -339,6 +344,8 @@ horizontal controlada; (b) manter. Recomendação: (a).
   o clube está; sem a leitura de tabelas (servidor antigo) a Classificação mostra a liga do read model como antes.
   No demo em memória, a liga do save substitui a tabela de mesmo nome da fixture (`withCareerLeague`), para a
   Central e a Classificação concordarem.
+  **Resposta do responsável (2026-10-23):** legenda **mantida** como está — todas as zonas da competição na tela
+  completa (mesmo sem linhas nelas), só as zonas visíveis na janela da Central.
   Testes: `lib/competition-tables.test.ts` (zonas, confrontos, grupos, demo) e `components/competition-tables.test.tsx`
   (liga, copa, Libertadores, campeão, fase lembrada, fallback). Verificado no navegador embutido em 320, 360 e 430 px
   (sem rolagem lateral, alvos ≥ 44 px).
