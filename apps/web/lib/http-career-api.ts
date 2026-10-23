@@ -2117,6 +2117,34 @@ export class HttpCareerApi implements CareerApiPort {
   }
 
   /** Sends a career command (`/v1/commands`) with `careerId` filled in. */
+  /** Raw binary upload (e.g. the coach picture) with the user's bearer. */
+  public async upload<T>(path: string, file: Blob): Promise<T> {
+    const bearer = await this.#token(false);
+    const response = await this.#fetch(`${this.#options.baseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
+        'content-type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    });
+    if (response.status === 401) {
+      this.#options.onSessionExpired?.();
+      throw new SessionExpiredError();
+    }
+    const text = await response.text();
+    const payload: unknown = text ? JSON.parse(text) : undefined;
+    if (!response.ok) {
+      const error = payload as { code?: string; message?: string } | undefined;
+      throw new ApiRequestError(
+        error?.message ?? 'Não foi possível enviar a imagem.',
+        response.status,
+        error?.code,
+      );
+    }
+    return payload as T;
+  }
+
   public async command(
     type: string,
     payload: Record<string, unknown>,

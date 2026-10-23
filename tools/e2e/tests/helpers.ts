@@ -17,8 +17,9 @@ export async function signIn(page: Page, email: string): Promise<void> {
 }
 
 /**
- * Nova Carreira em cinco etapas (modo → universo → clube → treinador → nome),
- * até a Central.
+ * Nova Carreira em seis etapas (modo → universo → clube → treinador → estilo
+ * → nome), até a Central. O cartão do clube abre a folha do elenco e
+ * "Escolher este clube" já avança.
  */
 export async function createCareer(
   page: Page,
@@ -40,12 +41,19 @@ export async function createCareer(
   await expect(
     page.getByRole('heading', { name: /escolha seu clube/i }),
   ).toBeVisible();
-  await chooseCard(page, new RegExp(club, 'i'));
-  await next();
+  await chooseCard(page, new RegExp(club, 'i'), { check: false });
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /escolher este clube/i })
+    .click({ force: true });
   await expect(
     page.getByRole('heading', { name: /quem é o treinador/i }),
   ).toBeVisible();
   await page.getByLabel(/nome do treinador/i).fill(coach);
+  await next();
+  await expect(
+    page.getByRole('heading', { name: /qual é o estilo do treinador/i }),
+  ).toBeVisible();
   await chooseCard(page, /^estrategista/i);
   await next();
   await expect(
@@ -56,10 +64,14 @@ export async function createCareer(
 }
 
 /** Cartões de escolha escondem o radio (sr-only): clica no rótulo visível. */
-async function chooseCard(page: Page, name: RegExp): Promise<void> {
+async function chooseCard(
+  page: Page,
+  name: RegExp,
+  { check = true }: { check?: boolean } = {},
+): Promise<void> {
   const radio = page.getByRole('radio', { name }).first();
   await page.locator('label').filter({ has: radio }).first().click();
-  await expect(radio).toBeChecked();
+  if (check) await expect(radio).toBeChecked();
 }
 
 export function playButton(page: Page) {

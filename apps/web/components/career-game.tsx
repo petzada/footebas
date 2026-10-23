@@ -432,6 +432,9 @@ function CareerFlow({
         <PwaRuntime />
         <NewCareerWizard
           anyClub={anyClub}
+          account={products.account}
+          avatarUrl={session?.avatarUrl}
+          onLicensed={() => setAnyClub(true)}
           initialCoach={session?.name ?? ''}
           pending={commandState === 'pending'}
           error={error}

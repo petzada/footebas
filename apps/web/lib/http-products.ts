@@ -98,5 +98,6 @@ export function httpAccountPort(api: HttpCareerApi): AccountPort {
       ),
     refund: () =>
       providerAware(api.call<RefundView>('POST', '/v1/billing/refund')),
+    uploadAvatar: (file) => api.upload<{ url: string }>('/v1/me/avatar', file),
   };
 }
