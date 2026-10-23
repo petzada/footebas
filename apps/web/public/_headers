@@ -3,3 +3,17 @@
 
 /sw.js
   Cache-Control: no-cache
+
+# Pixel art and the stadium model keep their names across deploys, so they are
+# not immutable: one day fresh, then served stale while revalidating.
+/crests/*
+  Cache-Control: public,max-age=86400,stale-while-revalidate=604800
+
+/flags/*
+  Cache-Control: public,max-age=86400,stale-while-revalidate=604800
+
+/assets/*
+  Cache-Control: public,max-age=86400,stale-while-revalidate=604800
+
+/og.png
+  Cache-Control: public,max-age=86400,stale-while-revalidate=604800

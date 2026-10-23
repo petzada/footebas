@@ -165,6 +165,13 @@ export interface CareerObjectEnv {
 }
 
 /**
+ * Idle seconds before the object's Postgres connections close. An open
+ * outbound connection keeps a Durable Object alive (and billed for duration)
+ * for up to 15 minutes; reconnecting through Hyperdrive costs a few ms.
+ */
+const POSTGRES_IDLE_TIMEOUT_SECONDS = 10;
+
+/**
  * Cloudflare class (SQLite-backed, `migrations` in wrangler.jsonc). Its
  * Postgres client lives as long as the object: concurrent requests of a
  * Durable Object share one I/O context.
@@ -182,7 +189,7 @@ export class CareerDurableObject {
       (this.sql ??= postgres(env.HYPERDRIVE.connectionString, {
         max: 2,
         fetch_types: false,
-        prepare: false,
+        idle_timeout: POSTGRES_IDLE_TIMEOUT_SECONDS,
       }));
     // Lives as long as the object, so reads stay in memory most of the time.
     const entitlements = cachedLicensedEntitlements(
@@ -218,8 +225,16 @@ export interface CareerObjectStub {
 /** Subset of `DurableObjectNamespace` used by the Worker. */
 export interface CareerObjectNamespace {
   idFromName(name: string): unknown;
-  get(id: never): CareerObjectStub;
+  get(id: never, options?: { locationHint?: string }): CareerObjectStub;
 }
+
+/**
+ * Where new career objects are created. Durable Objects do not spawn in South
+ * America (a `sam` hint lands in eastern North America), and the database is
+ * in AWS us-east-1: say so explicitly. Only the first `get()` of an object
+ * uses the hint; existing objects never move.
+ */
+export const CAREER_OBJECT_LOCATION = 'enam';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -260,7 +275,9 @@ function stubOf(
   namespace: CareerObjectNamespace,
   careerId: string,
 ): CareerObjectStub {
-  return namespace.get(namespace.idFromName(careerId) as never);
+  return namespace.get(namespace.idFromName(careerId) as never, {
+    locationHint: CAREER_OBJECT_LOCATION,
+  });
 }
 
 /** `forward` option of the Worker's router: career routes go to the object. */

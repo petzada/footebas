@@ -20,6 +20,7 @@ import {
 } from '@footebas/database';
 import { describe, expect, it } from 'vitest';
 import {
+  CAREER_OBJECT_LOCATION,
   CareerObject,
   careerForwarder,
   careerOfRoute,
@@ -638,4 +639,32 @@ describe('GET /v1/careers/:id/bundle', () => {
           .status,
       ).toBe(403);
     });
+});
+
+describe('local dos objetos de carreira', () => {
+  it('pede o leste da América do Norte, perto do banco, em toda obtenção', async () => {
+    const hints: (string | undefined)[] = [];
+    const namespace: CareerObjectNamespace = {
+      idFromName: (name) => name,
+      get: (_id, options) => {
+        hints.push(options?.locationHint);
+        return {
+          fetch: () => Promise.resolve(new Response(null, { status: 204 })),
+        };
+      },
+    };
+    await warmCareerObject(namespace, 'career_1');
+    await careerForwarder(namespace)({
+      request: new Request(
+        'https://api.footebas.com.br/v1/careers/career_1/home',
+      ),
+      route: '/v1/careers/:id/home',
+      params: { id: 'career_1' },
+      body: undefined,
+      rawBody: '',
+      requestId: 'request_test',
+    });
+    expect(hints).toEqual([CAREER_OBJECT_LOCATION, CAREER_OBJECT_LOCATION]);
+    expect(CAREER_OBJECT_LOCATION).toBe('enam');
+  });
 });

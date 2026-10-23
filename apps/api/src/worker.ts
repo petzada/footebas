@@ -206,10 +206,11 @@ async function reconcileBilling(
 }
 
 function compose(env: Env) {
+  // Prepared statements stay on: Hyperdrive caches them, and `prepare: false`
+  // costs extra round trips and can hang under its transaction pooling.
   const sql = postgres(env.HYPERDRIVE.connectionString, {
     max: 5,
     fetch_types: false,
-    prepare: false,
   });
   const clock = new SystemClock();
   const ids = new RandomIdGenerator();
@@ -329,7 +330,10 @@ async function handle(
       },
     )(request);
   } finally {
-    await sql.end({ timeout: 1 });
+    // Closing the client must not delay the response.
+    const closing = sql.end({ timeout: 1 });
+    if (ctx === undefined) await closing;
+    else ctx.waitUntil(closing);
   }
 }
 
