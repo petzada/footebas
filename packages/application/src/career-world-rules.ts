@@ -39,6 +39,7 @@ import {
   type PlayerId,
   type PrestigeAchievement,
   type Stadium,
+  type TransferListing,
   type TransferOffer,
   type YouthCandidate,
 } from '@footebas/domain';
@@ -68,6 +69,12 @@ export interface CareerWorldState {
   gate: Record<string, number>;
   /** Counter behind every id minted by world rules, so replays are exact. */
   sequence: number;
+  /** Transfer list of the managed club (docs/adr/0008); absent in old saves. */
+  market?: CareerMarketState;
+}
+
+export interface CareerMarketState {
+  listings: TransferListing[];
 }
 
 export interface WorldContext {
@@ -167,6 +174,7 @@ export function createCareerWorld(
     openMonth: startDate.slice(0, 7),
     gate: {},
     sequence: 0,
+    market: { listings: [] },
   };
 }
 
@@ -250,15 +258,39 @@ export function recordGate(
     attendance * Number(stadium.ticketPrice);
 }
 
-function wageBill(world: CareerWorldState, clubId: ClubId): number {
-  return world.contracts
-    .filter(
-      (contract) =>
-        contract.clubId === clubId &&
-        (contract.status === 'active' || contract.status === 'expiring'),
-    )
-    .reduce((sum, { wage }) => sum + Number(wage), 0);
+/**
+ * Monthly wages a club pays: its active contracts, with loaned players split
+ * by the loan's wage share (the borrower pays its share, the owner the rest).
+ */
+export function clubWageBill(
+  world: Pick<CareerWorldState, 'contracts' | 'loans' | 'offers'>,
+  clubId: ClubId,
+): number {
+  const shares = new Map<string, { borrower: ClubId; share: number }>();
+  for (const loan of world.loans) {
+    if (loan.status !== 'active') continue;
+    const offer = world.offers.find(({ id }) => id === loan.offerId);
+    shares.set(loan.playerId, {
+      borrower: loan.borrowingClubId,
+      share: offer?.loan?.wageSharePercentage ?? 0,
+    });
+  }
+  let total = 0;
+  for (const contract of world.contracts) {
+    if (contract.status !== 'active' && contract.status !== 'expiring')
+      continue;
+    const loan = shares.get(contract.playerId);
+    const borrowerPart =
+      loan === undefined
+        ? 0
+        : Math.round((Number(contract.wage) * loan.share) / 100);
+    if (contract.clubId === clubId)
+      total += Number(contract.wage) - borrowerPart;
+    if (loan?.borrower === clubId) total += borrowerPart;
+  }
+  return total;
 }
+const wageBill = clubWageBill;
 
 /** Settles every closed month before `date`: gate, sponsorship and wages. */
 export function settleMonths(context: WorldContext, date: string): void {

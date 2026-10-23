@@ -3,6 +3,7 @@ import {
   apiErrorSchema,
   commandAcceptedSchema,
   careerListReadModelSchema,
+  careerMarketQuerySchema,
   publicStatsSchema,
   careerWorldReadModelSchema,
   commandSchema,
@@ -17,6 +18,7 @@ import {
   type CoachProfile,
   type Command,
   type CareerListReadModel,
+  type CareerMarketReadModel,
   type CareerWorldReadModel,
   type CommandAccepted,
   type HomeReadModel,
@@ -92,11 +94,14 @@ import {
   createCareerWorld,
   withMatchPlanStrength,
   employManager,
+  clubWageBill,
   recordGate,
   settleMonths,
   type CareerWorldState,
   type WorldContext,
 } from './career-world-rules.js';
+import { runMarketDay } from './career-market.js';
+import { projectCareerMarket, transferOfferMessages } from './market-read.js';
 import {
   catalogCareerContent,
   type CareerContent,
@@ -716,7 +721,11 @@ export class FootebasApplication {
       date !== undefined && (target === undefined || date <= target.date);
       date = nextMatchDate(snapshot.competition)
     ) {
-      withWorld(snapshot, (context) => settleMonths(context, date));
+      withWorld(snapshot, (context) => {
+        settleMonths(context, date);
+        runMarketDay(context, date, seed);
+      });
+      syncManagedClub(snapshot);
       const today = fixturesOn(snapshot.competition, date);
       const scores: CompetitionMatchResult[] = [];
       const playing = new Set<string>();
@@ -1184,14 +1193,7 @@ export class FootebasApplication {
                   clubCashBalance(world.ledger, club.id, club.balance),
                 ),
                 openingBalance: Number(club.balance),
-                monthlyWageBill: world.contracts
-                  .filter(
-                    (contract) =>
-                      contract.clubId === club.id &&
-                      (contract.status === 'active' ||
-                        contract.status === 'expiring'),
-                  )
-                  .reduce((sum, { wage }) => sum + Number(wage), 0),
+                monthlyWageBill: clubWageBill(world, club.id),
                 stadium: {
                   capacity: stadium.capacity,
                   ticketPrice: Number(stadium.ticketPrice),
@@ -1287,6 +1289,34 @@ export class FootebasApplication {
           })),
       });
     });
+  }
+
+  /**
+   * Market screen (docs/adr/0008): cash, transfer window, squad status,
+   * transfer list, offers sent and received, loans and catalog search.
+   */
+  public async careerMarket(
+    bearer: string,
+    careerId: string,
+    rawQuery: unknown = {},
+  ): Promise<CareerMarketReadModel> {
+    const parsed = careerMarketQuerySchema.safeParse(rawQuery);
+    if (!parsed.success)
+      throw new ApplicationError('VALIDATION_ERROR', parsed.error.message);
+    return this.query(bearer, careerId, (save, snapshot, now) =>
+      projectCareerMarket({
+        careerId: save.id,
+        aggregateVersion: save.version,
+        projectedAt: now,
+        snapshot,
+        query: parsed.data,
+        origins: new Map(
+          Object.entries(
+            this.loadContent(snapshot.contentVersion).clubOrigins ?? {},
+          ),
+        ),
+      }),
+    );
   }
 
   private competitionView<T>(
@@ -1814,8 +1844,20 @@ function managedOutcome(
     opponentId: home ? fixture.awayClubId : fixture.homeClubId,
   };
 }
-/** Match reports written in the coach personality's tone, newest first. */
+/**
+ * Inbox, newest first: match reports in the coach personality's tone and
+ * transfer proposals that wait for a decision (docs/adr/0008).
+ */
 function coachInbox(snapshot: Snapshot): CoachMessage[] {
+  return [...transferOfferMessages(snapshot), ...matchReports(snapshot)]
+    .sort(
+      (left, right) =>
+        right.occurredOn.localeCompare(left.occurredOn) ||
+        left.id.localeCompare(right.id),
+    )
+    .slice(0, 10);
+}
+function matchReports(snapshot: Snapshot): CoachMessage[] {
   const clubName = (id: string) =>
     snapshot.clubs.find((club) => club.id === id)?.name;
   return snapshot.matches

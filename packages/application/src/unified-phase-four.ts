@@ -55,6 +55,7 @@ export function phaseFourStateOf(save: GameSave): PhaseFourState {
     events: world.events,
     archiveKeys: world.archiveKeys,
     coachPersonality: careerProfileOf(snapshot).coach.personality,
+    market: { seed: save.seed, listings: world.market?.listings ?? [] },
   });
 }
 
@@ -127,6 +128,7 @@ export class UnifiedPhaseFourRepository implements PhaseFourStateRepository {
       ...(Object.fromEntries(
         WORLD_FIELDS.map((field) => [field, state[field]]),
       ) as Pick<CareerSnapshot['world'], (typeof WORLD_FIELDS)[number]>),
+      market: { listings: [...(state.market?.listings ?? [])] },
     };
     syncManagedClub(snapshot);
     await tx.saves.update(save.id, save.userId, expectedVersion, {

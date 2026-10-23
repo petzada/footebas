@@ -1,5 +1,7 @@
 import {
+  apiErrorSchema,
   phaseFourCommandSchema,
+  type ApiError,
   type MarketSearchQuery,
   type PhaseFourCareerReadModel,
   type PhaseFourCommand,
@@ -11,6 +13,11 @@ import {
 import { checksumSnapshot } from '@footebas/database';
 import {
   coachEffects,
+  MAX_SQUAD_SIZE,
+  buyerCounterLimit,
+  createTransferListing,
+  decideSellerResponse,
+  transferWindowStatus,
   acceptJobProposal,
   appendLedgerEntry,
   canonicalJson,
@@ -60,6 +67,37 @@ import type {
 export class PhaseFourAuthorizationError extends Error {}
 export class PhaseFourConflictError extends Error {}
 export class PhaseFourNotFoundError extends Error {}
+
+/**
+ * A market rule refused the command (docs/adr/0008). It is a conflict for
+ * existing transports (HTTP 409); `toApiError` gives the contract body with
+ * the dedicated `TRANSFER_WINDOW_CLOSED` or `SQUAD_LIMIT_REACHED` code.
+ */
+export class TransferMarketError extends PhaseFourConflictError {
+  public constructor(
+    public readonly contractCode:
+      'TRANSFER_WINDOW_CLOSED' | 'SQUAD_LIMIT_REACHED',
+    message: string,
+    public readonly details: Readonly<{
+      nextWindowOpensOn?: string;
+      clubId?: string;
+      maxSquadSize?: number;
+    }> = {},
+  ) {
+    super(message);
+  }
+
+  public toApiError(requestId: string, commandId?: string): ApiError {
+    return apiErrorSchema.parse({
+      version: 1,
+      requestId,
+      ...(commandId === undefined ? {} : { commandId }),
+      code: this.contractCode,
+      message: this.message,
+      ...this.details,
+    });
+  }
+}
 
 interface Dependencies {
   readonly repository: PhaseFourStateRepository;
@@ -311,6 +349,10 @@ export class PhaseFourApplicationService {
         return this.counter(state, command);
       case 'DecideTransferOffer':
         return this.decide(state, command);
+      case 'ListPlayerForTransfer':
+        return this.listPlayer(state, command);
+      case 'WithdrawTransferListing':
+        return this.withdrawListing(state, command);
       case 'SetTicketPrice':
         return this.setTicketPrice(state, command);
       case 'ExpandStadium':
@@ -446,6 +488,8 @@ export class PhaseFourApplicationService {
     const player = this.player(state, command.payload.playerId);
     if (player.clubId !== command.payload.fromClubId)
       throw new PhaseFourConflictError('offer seller does not own player');
+    if (command.payload.fromClubId !== undefined) this.assertWindowOpen(state);
+    this.assertSquadRoom(state, command.payload.toClubId as ClubId);
     const offer = createTransferOffer({
       id: this.dependencies.ids.next('offer'),
       kind: command.payload.kind,
@@ -472,12 +516,14 @@ export class PhaseFourApplicationService {
             },
           }),
     });
+    const priceFactor = coachEffects(state.coachPersonality).negotiationPrice;
+    if (state.market !== undefined && offer.fromClubId !== undefined)
+      return this.submitToAiSeller(state, command, offer, player, priceFactor);
     const buyer = this.profile(state, offer.toClubId);
     const seller =
       offer.fromClubId === undefined
         ? undefined
         : this.profile(state, offer.fromClubId);
-    const priceFactor = coachEffects(state.coachPersonality).negotiationPrice;
     const decision = decideClubOffer(
       offer,
       player,
@@ -553,6 +599,217 @@ export class PhaseFourApplicationService {
     return 'applied';
   }
 
+  /**
+   * Career market (docs/adr/0008): the AI seller answers on value, age,
+   * contract, strength and need; the Diplomata discount lowers its price.
+   */
+  private submitToAiSeller(
+    state: MutableState,
+    command: Extract<PhaseFourCommand, { type: 'SubmitTransferOffer' }>,
+    offer: TransferOffer,
+    player: Player,
+    priceFactor: number,
+  ): 'applied' | 'refused' {
+    const sellerId = offer.fromClubId;
+    if (sellerId === undefined)
+      throw new PhaseFourConflictError('AI seller requires a selling club');
+    if (
+      state.loans.some(
+        ({ status, playerId }) => status === 'active' && playerId === player.id,
+      )
+    )
+      throw new PhaseFourConflictError('player is on loan and cannot move');
+    const buyer = this.club(state, offer.toClubId);
+    const answer =
+      clubCashBalance(state.ledger, buyer.id, buyer.balance) < offer.fee
+        ? ({ decision: 'reject', reason: 'insufficient_cash' } as const)
+        : decideSellerResponse(offer, {
+            player,
+            sellerSquad: state.players.filter(
+              ({ clubId }) => clubId === sellerId,
+            ),
+            sellerReputation: Number(this.club(state, sellerId).reputation),
+            contractEndsOn: state.contracts.find(
+              ({ playerId, status }) =>
+                playerId === player.id &&
+                (status === 'active' || status === 'expiring'),
+            )?.endsOn,
+            onDate: state.currentDate,
+            priceFactor,
+          });
+    state.offers = [...state.offers, offer];
+    this.addEvent(
+      state,
+      command,
+      'TRANSFER_OFFERED',
+      payload({ offerId: offer.id, playerId: player.id }),
+    );
+    if (answer.decision === 'reject') {
+      state.offers = state.offers.map((item) =>
+        item.id === offer.id ? transitionOffer(item, 'rejected') : item,
+      );
+      this.addEvent(
+        state,
+        command,
+        'TRANSFER_REJECTED',
+        payload({
+          offerId: offer.id,
+          decisionSource: 'club_ai',
+          reason: answer.reason,
+        }),
+      );
+      return 'refused';
+    }
+    if (answer.decision === 'accept') {
+      const accepted = transitionOffer(offer, 'accepted');
+      state.offers = state.offers.map((item) =>
+        item.id === accepted.id ? accepted : item,
+      );
+      this.addEvent(
+        state,
+        command,
+        'TRANSFER_ACCEPTED',
+        payload({ offerId: offer.id, decisionSource: 'club_ai' }),
+      );
+      this.completeTransfer(state, command, accepted);
+      return 'applied';
+    }
+    const [countered, counter] = counterOffer(
+      offer,
+      this.dependencies.ids.next('offer'),
+      { fee: answer.fee, wage: offer.wage, expiresOn: offer.expiresOn },
+    );
+    state.offers = [
+      ...state.offers.map((item) =>
+        item.id === countered.id ? countered : item,
+      ),
+      counter,
+    ];
+    this.addEvent(
+      state,
+      command,
+      'TRANSFER_COUNTERED',
+      payload({
+        offerId: offer.id,
+        counterOfferId: counter.id,
+        decisionSource: 'club_ai',
+      }),
+    );
+    return 'applied';
+  }
+
+  /** The AI bidder answers the managed club's counter at once. */
+  private aiBuyerAnswers(
+    state: MutableState,
+    command: PhaseFourCommand,
+    original: TransferOffer,
+    counter: TransferOffer,
+  ): void {
+    const buyer = this.club(state, counter.toClubId);
+    const player = this.player(state, counter.playerId);
+    const limit = buyerCounterLimit(
+      original.fee,
+      player.value,
+      clubCashBalance(state.ledger, buyer.id, buyer.balance),
+      counter.kind,
+    );
+    const accept =
+      counter.fee <= limit &&
+      Number(counter.wage) <= Math.ceil(Number(original.wage) * 1.2) &&
+      state.players.filter(({ clubId }) => clubId === buyer.id).length <
+        MAX_SQUAD_SIZE;
+    const decided = transitionOffer(counter, accept ? 'accepted' : 'rejected');
+    state.offers = state.offers.map((item) =>
+      item.id === decided.id ? decided : item,
+    );
+    this.addEvent(
+      state,
+      command,
+      accept ? 'TRANSFER_ACCEPTED' : 'TRANSFER_REJECTED',
+      payload({ offerId: decided.id, decisionSource: 'club_ai' }),
+    );
+    if (accept) this.completeTransfer(state, command, decided);
+  }
+
+  private listPlayer(
+    state: MutableState,
+    command: Extract<PhaseFourCommand, { type: 'ListPlayerForTransfer' }>,
+  ): 'applied' {
+    const market = this.requireMarket(state);
+    const player = this.player(state, command.payload.playerId);
+    if (player.clubId === undefined)
+      throw new PhaseFourConflictError('free agents cannot be listed');
+    this.assertManagedClub(state, player.clubId);
+    if (
+      state.loans.some(
+        ({ status, playerId, borrowingClubId }) =>
+          status === 'active' &&
+          playerId === player.id &&
+          borrowingClubId === player.clubId,
+      )
+    )
+      throw new PhaseFourConflictError('borrowed players cannot be listed');
+    const { payload: input } = command;
+    const listing = createTransferListing(
+      input.mode === 'sale'
+        ? {
+            playerId: player.id,
+            clubId: player.clubId,
+            mode: 'sale',
+            askingPrice: input.askingPrice as Money,
+            listedOn: state.currentDate,
+          }
+        : {
+            playerId: player.id,
+            clubId: player.clubId,
+            mode: 'loan',
+            durationMonths: input.durationMonths,
+            wageSharePercentage: input.wageSharePercentage,
+            listedOn: state.currentDate,
+          },
+    );
+    state.market = {
+      ...market,
+      listings: [
+        ...market.listings.filter(({ playerId }) => playerId !== player.id),
+        listing,
+      ],
+    };
+    this.addEvent(
+      state,
+      command,
+      'TRANSFER_LISTED',
+      payload({ playerId: player.id, mode: input.mode }),
+    );
+    return 'applied';
+  }
+
+  private withdrawListing(
+    state: MutableState,
+    command: Extract<PhaseFourCommand, { type: 'WithdrawTransferListing' }>,
+  ): 'applied' {
+    const market = this.requireMarket(state);
+    const listing = market.listings.find(
+      ({ playerId }) => playerId === command.payload.playerId,
+    );
+    if (listing === undefined)
+      throw new PhaseFourNotFoundError('transfer listing not found');
+    this.assertManagedClub(state, listing.clubId);
+    state.market = {
+      ...market,
+      listings: market.listings.filter(
+        ({ playerId }) => playerId !== listing.playerId,
+      ),
+    };
+    this.addEvent(
+      state,
+      command,
+      'TRANSFER_UNLISTED',
+      payload({ playerId: listing.playerId }),
+    );
+    return 'applied';
+  }
+
   private counter(
     state: MutableState,
     command: Extract<PhaseFourCommand, { type: 'CounterTransferOffer' }>,
@@ -564,6 +821,7 @@ export class PhaseFourApplicationService {
         'free-agent offer cannot be countered by a club',
       );
     this.assertManagedClub(state, offer.fromClubId);
+    this.assertWindowOpen(state);
     const [previous, next] = counterOffer(
       offer,
       this.dependencies.ids.next('offer'),
@@ -585,6 +843,8 @@ export class PhaseFourApplicationService {
       'TRANSFER_COUNTERED',
       payload({ offerId: offer.id, counterOfferId: next.id }),
     );
+    if (state.market !== undefined)
+      this.aiBuyerAnswers(state, command, offer, next);
     return 'applied';
   }
 
@@ -604,6 +864,10 @@ export class PhaseFourApplicationService {
       throw new PhaseFourAuthorizationError('manager cannot decide this offer');
     const status =
       command.payload.decision === 'accept' ? 'accepted' : 'rejected';
+    if (status === 'accepted') {
+      if (offer.fromClubId !== undefined) this.assertWindowOpen(state);
+      this.assertSquadRoom(state, offer.toClubId);
+    }
     const decided = transitionOffer(offer, status);
     state.offers = state.offers.map((item) =>
       item.id === decided.id ? decided : item,
@@ -644,6 +908,13 @@ export class PhaseFourApplicationService {
     });
     if (completed.loan !== undefined)
       state.loans = [...state.loans, completed.loan];
+    if (state.market !== undefined)
+      state.market = {
+        ...state.market,
+        listings: state.market.listings.filter(
+          ({ playerId }) => playerId !== player.id,
+        ),
+      };
     if (offer.kind === 'buy') {
       state.contracts = state.contracts.map((contract) =>
         contract.playerId === player.id && contract.status === 'active'
@@ -1198,6 +1469,39 @@ export class PhaseFourApplicationService {
     if (offer === undefined)
       throw new PhaseFourNotFoundError(`offer ${id} not found`);
     return offer;
+  }
+  private requireMarket(
+    state: PhaseFourState,
+  ): NonNullable<PhaseFourState['market']> {
+    if (state.market === undefined)
+      throw new PhaseFourConflictError(
+        'the transfer list requires a career save',
+      );
+    return state.market;
+  }
+  /** Club-to-club deals only inside a window (career saves only). */
+  private assertWindowOpen(state: PhaseFourState): void {
+    if (state.market === undefined) return;
+    const window = transferWindowStatus(state.currentDate);
+    if (!window.open)
+      throw new TransferMarketError(
+        'TRANSFER_WINDOW_CLOSED',
+        `transfer window is closed; the next one opens on ${window.next.opensOn}`,
+        { nextWindowOpensOn: window.next.opensOn },
+      );
+  }
+  /** No squad above the catalog cap of 35 (career saves only). */
+  private assertSquadRoom(state: PhaseFourState, clubId: ClubId): void {
+    if (state.market === undefined) return;
+    if (
+      state.players.filter((player) => player.clubId === clubId).length >=
+      MAX_SQUAD_SIZE
+    )
+      throw new TransferMarketError(
+        'SQUAD_LIMIT_REACHED',
+        `club ${clubId} already has ${String(MAX_SQUAD_SIZE)} players`,
+        { clubId, maxSquadSize: MAX_SQUAD_SIZE },
+      );
   }
   private assertManagedClub(state: PhaseFourState, clubId: ClubId): void {
     if (
