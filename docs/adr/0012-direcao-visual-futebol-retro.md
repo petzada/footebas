@@ -20,8 +20,12 @@ animação de jogo e liberdade criativa nas telas e na partida.
 3. **Assets gerados, não baixados de terceiros**: sprites, emblemas, avatares e texturas desenhados por código
    (Phaser `Graphics`/texturas geradas, SVG) ou vindos de bibliotecas com licença aberta compatível (MIT, OFL, CC0)
    instaladas pelo npm. Nada de imagem sem licença clara.
-4. **"3D" é pseudo-3D**: câmera inclinada, escala por profundidade, sombras, paralaxe e sprites em perspectiva no
-   Phaser e nas transições. Three.js e 3D real seguem fora do MVP.
+4. **3D só no estádio da partida.** O responsável forneceu o modelo `football-field` (FBX leve + textura do gramado,
+   na raiz do repositório; preferido ao `football-court`, de 2 MB). Ele pode ser renderizado em 3D real (Three.js,
+   carregado sob demanda só na tela de partida) como cenário, com a animação dos jogadores, bola e eventos por cima,
+   em visual retrô (ex.: render em baixa resolução ampliado com pixels nítidos). Fora do estádio, o restante é
+   pseudo-3D (câmera inclinada, escala por profundidade, sombras, paralaxe). Fallback 2D obrigatório (sem WebGL,
+   movimento reduzido, aparelho fraco). A origem e a licença do modelo precisam ser confirmadas pelo responsável.
 5. Continuam valendo do ADR 0010: Phaser só na partida, sob demanda e render-only; React na interface; avatares
    gerados; potencial como estimativa; movimento reduzido respeitado; "pular para o resultado" a um toque; sons com
    mudo e só após interação.
