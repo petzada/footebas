@@ -1,6 +1,13 @@
 'use client';
 
-import type { KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
 import {
   Barbell,
   Briefcase,
@@ -9,11 +16,16 @@ import {
   Lightning,
   Megaphone,
   SoccerBall,
+  X,
 } from '@phosphor-icons/react';
 import { ClubEmblem } from '@/components/club-emblem';
 import { PixelBall } from '@/components/retro/sprites';
 import { Button } from '@/components/ui/button';
 import type { CareerView, Screen } from '@/lib/career-api';
+import {
+  setScreenOrigin,
+  type ScreenOrigin,
+} from '@/lib/retro/transition-origin';
 import { useSound } from '@/lib/retro/use-sound';
 
 /** Rectangle on the 160 × 120 pixel map: x, y, width, height. */
@@ -99,7 +111,15 @@ export function areaLabel(area: ClubArea): string {
   return `${area.name}: ${area.links.map(([, label]) => label).join(' e ')}`;
 }
 
-/** Mapa do clube: top-down pixel illustration plus an equivalent list. */
+/** Where a building was tapped: viewport point plus the SVG anchor. */
+export interface BuildingTap {
+  readonly area: ClubArea;
+  readonly origin: ScreenOrigin;
+  /** The building element, to give focus back when the sheet closes. */
+  readonly anchor: SVGGElement | null;
+}
+
+/** Mapa do clube: top-down pixel illustration; every building is a button. */
 export function ClubMapScreen({
   career,
   navigate,
@@ -112,9 +132,24 @@ export function ClubMapScreen({
   onInstant(): void;
 }) {
   const { play } = useSound();
-  const go = (screen: Screen) => {
+  const [open, setOpen] = useState<BuildingTap | null>(null);
+  const go = (screen: Screen, origin: ScreenOrigin | null) => {
     play('click');
+    setScreenOrigin(origin);
     navigate(screen);
+  };
+  const onBuilding = (tap: BuildingTap) => {
+    if (tap.area.links.length === 1) {
+      go(tap.area.links[0]![0], tap.origin);
+      return;
+    }
+    play('click');
+    setOpen(tap);
+  };
+  const close = () => {
+    const anchor = open?.anchor;
+    setOpen(null);
+    anchor?.focus();
   };
   return (
     <div className="grid gap-4">
@@ -129,16 +164,25 @@ export function ClubMapScreen({
           </span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cada prédio abre uma tela. A lista logo abaixo tem os mesmos caminhos.
+          Cada prédio abre uma tela do clube.
         </p>
         <nav
           aria-label="Áreas do mapa"
-          className="px-border mt-3 bg-grass-deep sm:mx-auto sm:max-w-2xl"
+          className="px-border relative mt-3 bg-grass-deep sm:mx-auto sm:max-w-2xl"
         >
-          <PixelClub club={career.club} navigate={go} />
+          <PixelClub club={career.club} onBuilding={onBuilding} />
+          {open && (
+            <BuildingSheet
+              tap={open}
+              onPick={(screen) => {
+                setOpen(null);
+                go(screen, open.origin);
+              }}
+              onClose={close}
+            />
+          )}
         </nav>
       </section>
-      <AreaList navigate={go} />
     </div>
   );
 }
@@ -169,18 +213,18 @@ function AdvanceBar({
         </p>
       </div>
       {career.fixture && (
-        <div className="grid grid-cols-2 gap-3 sm:flex">
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:flex">
           <button
             type="button"
-            className="btn-px btn-play flex min-h-11 items-center justify-center gap-2 whitespace-nowrap px-3 text-[.65rem] sm:px-4"
+            className="btn-px btn-play flex min-h-11 min-w-0 items-center justify-center gap-1 px-1.5 text-[.5rem] leading-tight break-words whitespace-normal sm:px-4 sm:text-[.65rem]"
             onClick={onNarrate}
           >
-            <PixelBall size={16} />
+            <PixelBall size={14} />
             Jogar partida
           </button>
           <Button
             variant="outline"
-            className="h-auto min-h-11 whitespace-normal"
+            className="h-auto min-h-11 min-w-0 gap-1 px-1.5 text-[.5rem] leading-tight break-words whitespace-normal sm:px-4 sm:text-[.65rem]"
             onClick={onInstant}
           >
             <Lightning weight="fill" data-icon="inline-start" />
@@ -192,48 +236,110 @@ function AdvanceBar({
   );
 }
 
-function AreaList({ navigate }: { navigate(value: Screen): void }) {
+/**
+ * Small pixel sheet listing the screens of a building: anchored under the
+ * building on wide screens, a short bottom sheet on phones. Traps focus,
+ * closes on Esc, outside tap or the close button.
+ */
+function BuildingSheet({
+  tap,
+  onPick,
+  onClose,
+}: {
+  tap: BuildingTap;
+  onPick(screen: Screen): void;
+  onClose(): void;
+}) {
+  const { area } = tap;
+  const titleId = `sheet-${area.id}`;
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('[data-sheet-item]')?.focus();
+  }, []);
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab' || !ref.current) return;
+    const items = [...ref.current.querySelectorAll<HTMLElement>('button')];
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+  const [x, y, w, h] = area.rect;
+  // Anchor the sheet under the building (SVG units → percentages).
+  const anchorX = Math.min(66, Math.max(2, ((x + w / 2) / 160) * 100 - 16));
+  const anchorY = Math.min(64, ((y + h) / 120) * 100 - 4);
+  const Icon = area.icon;
   return (
-    <nav aria-label="Áreas do clube em lista">
-      <h2 className="mb-2 font-pixel text-[.65rem] text-chalk">
-        Ou escolha na lista
-      </h2>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {CLUB_AREAS.map((area) => {
-          const Icon = area.icon;
-          return (
-            <li key={area.id} className="panel grid gap-2 p-3">
-              <div className="flex items-start gap-3">
-                <span className="grid size-10 shrink-0 place-items-center border-2 border-ink bg-board text-bulb">
-                  <Icon weight="fill" className="size-5" aria-hidden="true" />
-                </span>
-                <div>
-                  <h3 className="font-pixel text-[.6rem] leading-relaxed">
-                    {area.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {area.description}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {area.links.map(([screen, label]) => (
-                  <Button
-                    key={screen}
-                    size="sm"
-                    variant="outline"
-                    className="min-h-10"
-                    onClick={() => navigate(screen)}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <>
+      <div
+        data-testid="sheet-backdrop"
+        className="fixed inset-0 z-40 bg-ink/50 sm:absolute sm:bg-ink/20"
+        onClick={onClose}
+      />
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        data-testid="building-sheet"
+        style={
+          {
+            '--anchor-x': `${anchorX}%`,
+            '--anchor-y': `${anchorY}%`,
+          } as CSSProperties
+        }
+        className="panel px-rise fixed inset-x-2 bottom-[max(.5rem,env(safe-area-inset-bottom))] z-50 grid gap-2 p-3 sm:absolute sm:inset-auto sm:top-[var(--anchor-y)] sm:left-[var(--anchor-x)] sm:w-44"
+        onKeyDown={onKeyDown}
+      >
+        <header className="flex items-center justify-between gap-2">
+          <h3
+            id={titleId}
+            className="flex min-w-0 items-center gap-2 font-pixel text-[.6rem] leading-relaxed"
+          >
+            <Icon
+              weight="fill"
+              className="size-4 shrink-0"
+              aria-hidden="true"
+            />
+            <span className="truncate">{area.name}</span>
+          </h3>
+          <button
+            type="button"
+            aria-label="Fechar"
+            className="btn-px btn-chalk inline-flex size-9 items-center justify-center"
+            onClick={onClose}
+          >
+            <X weight="bold" aria-hidden="true" />
+          </button>
+        </header>
+        <p className="sr-only">{area.description}</p>
+        <div className="grid gap-3">
+          {area.links.map(([screen, label]) => (
+            <Button
+              key={screen}
+              variant="outline"
+              data-sheet-item
+              className="min-h-10 justify-start"
+              onClick={() => onPick(screen)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -459,32 +565,53 @@ function Label({ area }: { area: ClubArea }) {
   );
 }
 
+function centerOf(node: Element): ScreenOrigin {
+  const box = node.getBoundingClientRect();
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+}
+
 function Building({
   area,
-  navigate,
+  onTap,
 }: {
   area: ClubArea;
-  navigate(value: Screen): void;
+  onTap(tap: BuildingTap): void;
 }) {
-  const go = () => navigate(area.links[0]![0]);
+  const ref = useRef<SVGGElement>(null);
+  const tapAt = (origin: ScreenOrigin) =>
+    onTap({ area, origin, anchor: ref.current });
+  const onClick = (event: MouseEvent<SVGGElement>) => {
+    // Keyboard "clicks" carry no pointer position: use the building centre.
+    const pointer = event.clientX || event.clientY;
+    tapAt(
+      pointer
+        ? { x: event.clientX, y: event.clientY }
+        : centerOf(event.currentTarget),
+    );
+  };
   const onKeyDown = (event: KeyboardEvent<SVGGElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      go();
+      tapAt(centerOf(event.currentTarget));
     }
   };
   const [x, y, w, h] = area.rect;
+  const descId = `area-${area.id}-desc`;
   return (
     <g
+      ref={ref}
       role="button"
       tabIndex={0}
       aria-label={areaLabel(area)}
+      aria-describedby={descId}
+      aria-haspopup={area.links.length > 1 ? 'dialog' : undefined}
       className="map-building"
       data-area={area.id}
-      onClick={go}
+      onClick={onClick}
       onKeyDown={onKeyDown}
     >
       <title>{areaLabel(area)}</title>
+      <desc id={descId}>{area.description}</desc>
       <g className="map-lift">
         <BuildingArt area={area} />
         <rect
@@ -515,10 +642,10 @@ const TREES: readonly (readonly [number, number])[] = [
 /** Top-down pixel club (SVG). Every building is a focusable button. */
 function PixelClub({
   club,
-  navigate,
+  onBuilding,
 }: {
   club: string;
-  navigate(value: Screen): void;
+  onBuilding(tap: BuildingTap): void;
 }) {
   return (
     <svg
@@ -568,7 +695,7 @@ function PixelClub({
         ))}
       </g>
       {CLUB_AREAS.map((area) => (
-        <Building key={area.id} area={area} navigate={navigate} />
+        <Building key={area.id} area={area} onTap={onBuilding} />
       ))}
     </svg>
   );
