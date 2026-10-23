@@ -17,6 +17,7 @@ import {
   type SimulationJob,
 } from '@footebas/application';
 import {
+  PostgresCareerSlots,
   PostgresEntitlements,
   PostgresRankingStore,
   PostgresUnitOfWork,
@@ -221,6 +222,7 @@ function compose(env: Env) {
     auth,
     clock,
     entitlements: new PostgresEntitlements(sql),
+    careerSlots: new PostgresCareerSlots(sql),
     enforceStartingDivision: true,
     ids,
     jobs,

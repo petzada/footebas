@@ -71,6 +71,13 @@ function setup() {
         auth,
         clock,
         ids,
+        // Production reads the creation order from Postgres (locked careers).
+        careerSlots: () => ({
+          activeCareerIds: async (userId) =>
+            (await postgres.repositories().saves.listByUser(userId)).map(
+              ({ id }) => id,
+            ),
+        }),
       });
       objects.set(careerId, object);
     }

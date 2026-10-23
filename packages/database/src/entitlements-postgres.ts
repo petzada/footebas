@@ -34,6 +34,27 @@ export function entitlementsFor(plan: Plan): Entitlements {
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
+/** Mirrors `@footebas/application`'s `CareerSlotsPort`. */
+export interface CareerSlotsPort {
+  activeCareerIds(userId: string): Promise<readonly string[]>;
+}
+
+/**
+ * Creation order of a user's active careers (ids only, no snapshots): with
+ * the entitlements it derives which careers are locked after a refund.
+ */
+export class PostgresCareerSlots implements CareerSlotsPort {
+  public constructor(private readonly sql: Sql) {}
+
+  public async activeCareerIds(userId: string): Promise<readonly string[]> {
+    const rows = await this.sql<{ id: string }[]>`
+      select id from footebas.game_saves
+      where user_id = ${userId} and archived_at is null
+      order by created_at, id`;
+    return rows.map(({ id }) => id);
+  }
+}
+
 /** An `active` license row means `licensed`; anything else is `free`. */
 export class PostgresEntitlements implements EntitlementsPort {
   public constructor(private readonly sql: Sql) {}

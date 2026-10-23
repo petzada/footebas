@@ -473,16 +473,25 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
 
   if (deps.phaseFour !== undefined) {
     const phaseFour = deps.phaseFour;
-    const user = async (request: ApiRequest) =>
+    const application = deps.application;
+    // Owner of an unlocked career: careers locked after a refund cannot be
+    // read or receive commands here either (only deleted).
+    const authenticated = async (request: ApiRequest) =>
       (await phaseFour.auth.authenticate(bearer(request))).userId;
+    const user = async (request: ApiRequest) => {
+      const userId = await authenticated(request);
+      await application.assertCareerUnlocked(userId, idOf(request));
+      return userId;
+    };
     routes.push(
       {
         method: 'POST',
         path: '/v1/phase-four/commands',
         schema: { ...commonSchema, body: { type: 'object' } },
         async handler(request) {
-          const userId = await user(request);
+          const userId = await authenticated(request);
           const command = phaseFourCommandSchema.parse(request.body);
+          await application.assertCareerUnlocked(userId, command.careerId);
           return json(
             phaseFourReceiptSchema.parse(
               await phaseFour.application.execute(userId, command),

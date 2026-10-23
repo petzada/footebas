@@ -13,6 +13,7 @@ import {
   catalogCareerContent,
   type AuthPort,
   type CareerContentPort,
+  type CareerSlotsPort,
   type EntitlementsPort,
   type IdGenerator,
   type JobQueuePort,
@@ -21,12 +22,17 @@ import {
 import type { JobStatus } from '@footebas/contracts';
 import {
   PostgresCareerSaveStore,
+  PostgresCareerSlots,
   PostgresEntitlements,
   SystemClock,
   type CareerSaveStore,
   type Clock,
 } from '@footebas/database';
 import postgres from 'postgres';
+import {
+  cachedCareerSlots,
+  cachedLicensedEntitlements,
+} from './career-access-cache.js';
 import {
   DurableCareerUnitOfWork,
   type CareerObjectStorage,
@@ -51,6 +57,8 @@ export interface CareerObjectDependencies {
   readonly content?: CareerContentPort;
   /** Plan limits (careers, starting club); free plan when absent. */
   readonly entitlements?: () => EntitlementsPort;
+  /** Creation order of the user's careers (locked careers after a refund). */
+  readonly careerSlots?: () => CareerSlotsPort;
   /** Free plan starts in Série C (docs/05 §5); on in production. */
   readonly enforceStartingDivision?: boolean;
 }
@@ -83,6 +91,9 @@ export class CareerObject {
       ...(this.deps.entitlements === undefined
         ? {}
         : { entitlements: this.deps.entitlements() }),
+      ...(this.deps.careerSlots === undefined
+        ? {}
+        : { careerSlots: this.deps.careerSlots() }),
       ...(this.deps.enforceStartingDivision === true
         ? { enforceStartingDivision: true }
         : {}),
@@ -165,6 +176,11 @@ export class CareerDurableObject {
         fetch_types: false,
         prepare: false,
       }));
+    // Lives as long as the object, so reads stay in memory most of the time.
+    const entitlements = cachedLicensedEntitlements(
+      () => new PostgresEntitlements(sql()),
+    );
+    const careerSlots = cachedCareerSlots(() => new PostgresCareerSlots(sql()));
     this.object = new CareerObject({
       storage: state.storage,
       store: () => new PostgresCareerSaveStore(sql(), clock),
@@ -175,7 +191,8 @@ export class CareerDurableObject {
       ),
       clock,
       ids: new RandomIdGenerator(),
-      entitlements: () => new PostgresEntitlements(sql()),
+      entitlements: () => entitlements,
+      careerSlots: () => careerSlots,
       enforceStartingDivision: true,
     });
   }
