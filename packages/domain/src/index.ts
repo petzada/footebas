@@ -55,7 +55,8 @@ export type {
 export {
   createMatchInput,
   createMatchResult,
-  MATCH_DECISION_MINUTES,
+  MATCH_INSTRUCTION_MINUTES,
+  MATCH_PLAYS,
 } from './match.js';
 export type {
   MatchEvent,
@@ -65,6 +66,8 @@ export type {
   MatchStatistics,
   MatchInstruction,
   MatchDecisionMinute,
+  MatchPlay,
+  ChanceOutcome,
   PlayerMatchPerformance,
 } from './match.js';
 export {

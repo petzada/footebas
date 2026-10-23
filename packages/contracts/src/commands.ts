@@ -108,16 +108,15 @@ const tacticSchema = z.strictObject({
   defensiveLine: defensiveLineSchema.optional(),
   markingStyle: markingStyleSchema.optional(),
 });
+/**
+ * Decision 18 (docs/09): the manager may pause at any minute, so an
+ * instruction can target any whole minute of the match (ADR 0015).
+ */
+const matchInstructionMinuteSchema = z.int().min(0).max(93);
 export const matchInstructionSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('substitution'),
-    minute: z.union([
-      z.literal(15),
-      z.literal(30),
-      z.literal(45),
-      z.literal(60),
-      z.literal(75),
-    ]),
+    minute: matchInstructionMinuteSchema,
     side: z.enum(['home', 'away']),
     playerOutId: entityIdSchema,
     playerInId: entityIdSchema,
@@ -125,13 +124,7 @@ export const matchInstructionSchema = z.discriminatedUnion('type', [
   }),
   z.strictObject({
     type: z.literal('tactical_change'),
-    minute: z.union([
-      z.literal(15),
-      z.literal(30),
-      z.literal(45),
-      z.literal(60),
-      z.literal(75),
-    ]),
+    minute: matchInstructionMinuteSchema,
     side: z.enum(['home', 'away']),
     tactic: tacticSchema,
   }),

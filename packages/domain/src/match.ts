@@ -16,8 +16,27 @@ import type {
   Tactic,
 } from './entities.js';
 
-export const MATCH_DECISION_MINUTES = [15, 30, 45, 60, 75] as const;
-export type MatchDecisionMinute = (typeof MATCH_DECISION_MINUTES)[number];
+/**
+ * Instructions may target any whole minute (decision 18, ADR 0015): an
+ * instruction at minute m only affects what happens after m.
+ */
+export const MATCH_INSTRUCTION_MINUTES = Object.freeze({
+  first: 0,
+  last: 93,
+} as const);
+export type MatchDecisionMinute = number;
+/** How a chance was built (ADR 0015). Set pieces are outside the MVP. */
+export const MATCH_PLAYS = [
+  'build_up',
+  'counter',
+  'individual',
+  'cross',
+  'long_shot',
+  'defensive_error',
+] as const;
+export type MatchPlay = (typeof MATCH_PLAYS)[number];
+export type ChanceOutcome =
+  'goal' | 'saved' | 'off_target' | 'blocked' | 'woodwork';
 export type MatchInstruction =
   | Readonly<{
       type: 'substitution';
@@ -139,12 +158,14 @@ export function createMatchInput(input: MatchInput): MatchInput {
   };
   for (const instruction of instructions) {
     if (
-      !MATCH_DECISION_MINUTES.includes(instruction.minute) ||
+      !Number.isInteger(instruction.minute) ||
+      instruction.minute < MATCH_INSTRUCTION_MINUTES.first ||
+      instruction.minute > MATCH_INSTRUCTION_MINUTES.last ||
       instruction.minute < previousMinute
     )
       throw new DomainError(
         'INVALID_ENTITY',
-        'match instructions must use ordered decision minutes',
+        'match instructions must use ordered whole minutes from 0 to 93',
       );
     const side = instruction.side === 'home' ? home : away;
     if (instruction.type === 'substitution') {
@@ -197,13 +218,24 @@ export function createMatchInput(input: MatchInput): MatchInput {
 
 export type MatchSide = 'home' | 'away';
 export type MatchEvent =
-  | Readonly<{ type: 'chance'; minute: number; side: MatchSide; xg: number }>
+  | Readonly<{
+      type: 'chance';
+      minute: number;
+      side: MatchSide;
+      xg: number;
+      /** Shooter, assistant, play and outcome exist since match-v4. */
+      playerId?: PlayerId;
+      assistId?: PlayerId;
+      play?: MatchPlay;
+      outcome?: ChanceOutcome;
+    }>
   | Readonly<{
       type: 'goal';
       minute: number;
       side: MatchSide;
       scorerId: PlayerId;
       assistId?: PlayerId;
+      play?: MatchPlay;
     }>
   | Readonly<{
       type: 'card';
@@ -311,8 +343,11 @@ function eventPlayerIds(event: MatchEvent): readonly PlayerId[] {
       return [event.playerId];
     case 'substitution':
       return [event.playerOutId, event.playerInId];
-    case 'tactical_change':
     case 'chance':
+      return [event.playerId, event.assistId].filter(
+        (id): id is PlayerId => id !== undefined,
+      );
+    case 'tactical_change':
       return [];
   }
 }
