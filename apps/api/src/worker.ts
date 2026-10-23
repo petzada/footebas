@@ -41,6 +41,7 @@ import {
 import {
   careerForwarder,
   runJobInCareerObject,
+  warmCareerObject,
   type CareerObjectNamespace,
 } from './career-durable-object.js';
 import { createFetchHandler } from './fetch-router.js';
@@ -245,7 +246,38 @@ function compose(env: Env) {
   return { sql, auth, jobs, application, phaseFour, rankings };
 }
 
-async function handle(request: Request, env: Env): Promise<Response> {
+/** Subset of the Workers `ExecutionContext` used here. */
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+/** Warms a just-created career's object after the response (best effort). */
+function careerWarmer(
+  namespace: CareerObjectNamespace,
+  ctx: ExecutionContext,
+  version: string,
+): (careerId: string) => void {
+  return (careerId) => {
+    ctx.waitUntil(
+      warmCareerObject(namespace, careerId).catch((error: unknown) => {
+        consoleLogSink({
+          type: 'career_object',
+          level: 'warn',
+          route: 'warm',
+          careerId,
+          version,
+          ...errorFields(error),
+        });
+      }),
+    );
+  };
+}
+
+async function handle(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+): Promise<Response> {
   const version = workerVersion(env);
   const identity = await identifyRequest(request);
   const limiter = new WorkersRateLimiter({
@@ -272,6 +304,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
                   env.AVATAR_PUBLIC_URL ?? 'https://cdn.footebas.com.br',
               },
             }),
+        ...(env.CAREERS === undefined || ctx === undefined
+          ? {}
+          : { onCareerCreated: careerWarmer(env.CAREERS, ctx, version) }),
         corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
           .split(',')
           .map((origin) => origin.trim()),
@@ -299,9 +334,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx?: ExecutionContext,
+  ): Promise<Response> {
     try {
-      return await handle(request, env);
+      return await handle(request, env, ctx);
     } catch (error) {
       // Composition failed before the router could answer: log, stay generic.
       const requestId = `request_${crypto.randomUUID().replaceAll('-', '')}`;

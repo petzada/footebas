@@ -210,6 +210,18 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
     return this.serialize(() => this.run(careerId, commandId, work));
   }
 
+  /**
+   * Loads the career into memory now (same path as the first command), so
+   * the next command of a just-created career skips the cold load. Queued
+   * like a command: it never overtakes or interleaves with one.
+   */
+  public warm(careerId: string): Promise<void> {
+    return this.serialize(async () => {
+      await this.bind(careerId);
+      await this.ensureLoaded(careerId);
+    });
+  }
+
   /** Forgets the in-memory aggregate; the next access reloads it. */
   public reset(): void {
     this.loaded = false;
@@ -248,10 +260,12 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
     }
     const store = this.deps.store();
     const local = await this.deps.storage.get<GameSave>(SAVE_KEY);
-    const durable = await store.versionOf(careerId);
+    // Without a local copy the version check would only precede the read.
+    const durable =
+      local === undefined ? undefined : await store.versionOf(careerId);
     let stored: GameSave | undefined;
-    if (durable === undefined) stored = undefined;
-    else if (local?.version === durable) stored = local;
+    if (local !== undefined && durable === undefined) stored = undefined;
+    else if (local !== undefined && local.version === durable) stored = local;
     else {
       stored = await store.peek(careerId);
       if (stored !== undefined)

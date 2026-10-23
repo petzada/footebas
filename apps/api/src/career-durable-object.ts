@@ -45,6 +45,8 @@ import { SupabaseJwtAuth } from './supabase-auth.js';
 
 /** Internal path of the queue consumer; never matched by the public router. */
 export const CAREER_JOB_PATH = '/internal/jobs/run';
+/** Internal path that loads a just-created career; never public either. */
+export const CAREER_WARM_PATH = '/internal/careers/warm';
 const CAREER_HEADER = 'x-footebas-career';
 
 export interface CareerObjectDependencies {
@@ -113,6 +115,12 @@ export class CareerObject {
       return Response.json(
         await this.runJob((await request.json()) as SimulationJob),
       );
+    if (url.pathname === CAREER_WARM_PATH && request.method === 'POST') {
+      const careerId = request.headers.get(CAREER_HEADER) ?? '';
+      if (careerId.length === 0) return new Response(null, { status: 400 });
+      await this.unitOfWork.warm(careerId);
+      return new Response(null, { status: 204 });
+    }
     const jobs = this.deps.jobs();
     const application = this.application(jobs);
     const phaseFour = new PhaseFourApplicationService({
@@ -294,4 +302,26 @@ export async function runJobInCareerObject(
       `career object answered ${String(response.status)} for job ${job.id}`,
     );
   return (await response.json()) as JobStatus;
+}
+
+/**
+ * After CreateCareer (Worker side, off the response path): has the new
+ * career's object load it from Postgres now, so its first command (usually
+ * SelectClub) finds it in memory instead of paying the cold load. Purely an
+ * optimization: the object loads the same way on demand if this never runs.
+ */
+export async function warmCareerObject(
+  namespace: CareerObjectNamespace,
+  careerId: string,
+): Promise<void> {
+  const response = await stubOf(namespace, careerId).fetch(
+    new Request(`https://career.internal${CAREER_WARM_PATH}`, {
+      method: 'POST',
+      headers: { [CAREER_HEADER]: careerId },
+    }),
+  );
+  if (!response.ok)
+    throw new Error(
+      `career object answered ${String(response.status)} warming ${careerId}`,
+    );
 }

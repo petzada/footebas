@@ -9,6 +9,25 @@ export interface SupabaseAuthOptions {
   readonly keys?: JWTVerifyGetKey;
 }
 
+const projectKeySets = new Map<string, JWTVerifyGetKey>();
+
+/**
+ * The project's JWKS, one per issuer for the whole isolate: the Worker builds
+ * a `SupabaseJwtAuth` per request, and a fresh key set would fetch the JWKS
+ * on every request. jose keeps the keys inside the set (refetching on an
+ * unknown `kid`, after its cooldown, and when they get old), so rotation is
+ * still picked up.
+ */
+export function projectKeys(issuer: string): JWTVerifyGetKey {
+  let keys = projectKeySets.get(issuer);
+  if (keys === undefined)
+    projectKeySets.set(
+      issuer,
+      (keys = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`))),
+    );
+  return keys;
+}
+
 /**
  * Validates Supabase Auth access tokens with the project's public signing
  * keys (asymmetric, JWKS). No shared secret lives in the API.
@@ -20,9 +39,7 @@ export class SupabaseJwtAuth implements AuthPort {
   public constructor(options: SupabaseAuthOptions) {
     const base = options.projectUrl.replace(/\/$/, '');
     this.#issuer = `${base}/auth/v1`;
-    this.#keys =
-      options.keys ??
-      createRemoteJWKSet(new URL(`${this.#issuer}/.well-known/jwks.json`));
+    this.#keys = options.keys ?? projectKeys(this.#issuer);
   }
 
   public async authenticate(bearer: string): Promise<FakeAuthIdentity> {

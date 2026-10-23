@@ -17,6 +17,7 @@ import {
   type CommandReceipt,
   type CommandRepository,
   type GameSaveRepository,
+  type IdempotentOptions,
   type TransactionContext,
   type UnitOfWork,
   type ValidatedAchievement,
@@ -58,16 +59,28 @@ function toSave(row: SaveRow): GameSave {
   };
 }
 
+/** Lock key of a user's career set (plan limit checks). */
+const userCareersKey = (userId: string) => `user-careers:${userId}`;
+
+/** Count read under the user's lock, valid until the transaction writes. */
+interface PrimedCount {
+  readonly userId: string;
+  readonly count: number;
+}
+
 class PostgresSaveRepository implements GameSaveRepository {
   public constructor(
     private readonly sql: Sql,
     private readonly clock: Clock,
+    private primed?: PrimedCount,
   ) {}
 
   public async create(input: NewGameSave): Promise<GameSave> {
     assertRequiredMetadata(input.seed, input.versions);
+    this.primed = undefined;
     const instant = this.clock.now().toISOString();
-    const rows = await this.sql<SaveRow[]>`
+    // The snapshot just written is not sent back (it is the input).
+    const rows = await this.sql<Omit<SaveRow, 'snapshot'>[]>`
       insert into footebas.game_saves
         (id, user_id, snapshot, checksum, seed, versions, version, created_at, updated_at)
       values (
@@ -76,11 +89,11 @@ class PostgresSaveRepository implements GameSaveRepository {
         ${this.sql.json(input.versions as never)}, 1, ${instant}, ${instant}
       )
       on conflict (id) do nothing
-      returning *`;
+      returning id, user_id, checksum, seed, versions, version, created_at, updated_at`;
     const row = rows[0];
     if (row === undefined)
       throw new SaveConflictError(`save ${input.id} already exists`);
-    return toSave(row);
+    return toSave({ ...row, snapshot: input.snapshot });
   }
 
   public async load(id: string, userId: string): Promise<GameSave | undefined> {
@@ -106,9 +119,13 @@ class PostgresSaveRepository implements GameSaveRepository {
   }
 
   public async countActiveByUser(userId: string): Promise<number> {
+    // Read together with the receipt, after both locks (executeIdempotent).
+    const primed = this.primed;
+    this.primed = undefined;
+    if (primed?.userId === userId) return primed.count;
     // Serializes limit checks of the same user until the transaction ends.
     await this
-      .sql`select pg_advisory_xact_lock(hashtextextended(${`user-careers:${userId}`}, 0))`;
+      .sql`select pg_advisory_xact_lock(hashtextextended(${userCareersKey(userId)}, 0))`;
     const rows = await this.sql<{ count: number }[]>`
       select count(*)::int as count from footebas.game_saves
       where user_id = ${userId} and archived_at is null`;
@@ -127,6 +144,7 @@ class PostgresSaveRepository implements GameSaveRepository {
     userId: string,
     expectedVersion: number,
   ): Promise<GameSave> {
+    this.primed = undefined;
     const instant = this.clock.now().toISOString();
     const rows = await this.sql<SaveRow[]>`
       update footebas.game_saves set
@@ -142,6 +160,7 @@ class PostgresSaveRepository implements GameSaveRepository {
   }
 
   public async delete(id: string, userId: string): Promise<void> {
+    this.primed = undefined;
     const rows = await this.sql<{ user_id: string }[]>`
       select user_id from footebas.game_saves where id = ${id}`;
     const owner = rows[0]?.user_id;
@@ -177,6 +196,7 @@ class PostgresSaveRepository implements GameSaveRepository {
     update: SaveUpdate,
   ): Promise<GameSave> {
     assertRequiredMetadata(update.seed, update.versions);
+    this.primed = undefined;
     const rows = await this.sql<SaveRow[]>`
       update footebas.game_saves set
         snapshot = ${this.sql.json(update.snapshot)},
@@ -262,19 +282,87 @@ export class PostgresUnitOfWork implements UnitOfWork {
     careerId: string,
     commandId: string,
     work: (tx: TransactionContext) => Promise<T>,
+    options: IdempotentOptions = {},
   ): Promise<T> {
+    const owner = options.countsCareersOf;
+    if (owner !== undefined)
+      return this.executeCounting(careerId, commandId, owner, work);
     return this.withCareerLock(careerId, async (tx) => {
       const previous = await tx.commands.load<T>(careerId, commandId);
       if (previous) return previous.response;
-      const response = await work(tx);
-      await tx.commands.save({
+      return this.finish(tx, careerId, commandId, work);
+    });
+  }
+
+  private async finish<T extends CanonicalValue>(
+    tx: TransactionContext,
+    careerId: string,
+    commandId: string,
+    work: (tx: TransactionContext) => Promise<T>,
+  ): Promise<T> {
+    const response = await work(tx);
+    await tx.commands.save({
+      careerId,
+      commandId,
+      response,
+      createdAt: this.clock.now().toISOString(),
+    });
+    return response;
+  }
+
+  /**
+   * Same transaction as `executeIdempotent` plus the user's career-set lock,
+   * in two statements instead of four: both locks first (career, then user:
+   * the only order either lock is taken in), then the receipt and the count
+   * in one read. Under READ COMMITTED each statement reads a snapshot taken
+   * when it starts, so the read sees everything committed by whoever held
+   * either lock before us; that is why the locks cannot share the read.
+   */
+  private async executeCounting<T extends CanonicalValue>(
+    careerId: string,
+    commandId: string,
+    userId: string,
+    work: (tx: TransactionContext) => Promise<T>,
+  ): Promise<T> {
+    return (await this.sql.begin(async (tx) => {
+      // OFFSET 0 keeps the subquery (and its lock) evaluated first.
+      await tx`
+        select pg_advisory_xact_lock(hashtextextended(${userCareersKey(userId)}, 0))
+        from (
+          select pg_advisory_xact_lock(hashtextextended(${careerId}, 0)) offset 0
+        ) as career`;
+      const rows = await tx<
+        { found: boolean; response: T | null; active: number }[]
+      >`
+        select
+          exists (
+            select 1 from footebas.command_receipts
+            where career_id = ${careerId} and command_id = ${commandId}
+          ) as found,
+          (
+            select response from footebas.command_receipts
+            where career_id = ${careerId} and command_id = ${commandId}
+          ) as response,
+          (
+            select count(*)::int from footebas.game_saves
+            where user_id = ${userId} and archived_at is null
+          ) as active`;
+      const row = rows[0];
+      if (row?.found === true) return row.response as T;
+      return this.finish(
+        {
+          saves: new PostgresSaveRepository(tx, this.clock, {
+            userId,
+            count: row?.active ?? 0,
+          }),
+          commands: new PostgresCommandRepository(tx),
+          achievements: new PostgresAchievementLedger(tx),
+        },
         careerId,
         commandId,
-        response,
-        createdAt: this.clock.now().toISOString(),
-      });
-      return response;
-    });
+        work,
+      );
+    })) as T;
   }
 }
 

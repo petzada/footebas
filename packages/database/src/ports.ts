@@ -160,6 +160,17 @@ export interface CareerSaveStore {
   listAchievements(careerId: string): Promise<readonly ValidatedAchievement[]>;
 }
 
+/** Hints for `executeIdempotent`; adapters may ignore them. */
+export interface IdempotentOptions {
+  /**
+   * The work counts this user's active careers (`countActiveByUser`, plan
+   * limit). Adapters that lock (Postgres) take the user's career-set lock
+   * together with the career lock and read the count with the receipt, so
+   * the check costs two round trips instead of four.
+   */
+  readonly countsCareersOf?: string;
+}
+
 export interface UnitOfWork {
   withCareerLock<T>(
     careerId: string,
@@ -169,5 +180,6 @@ export interface UnitOfWork {
     careerId: string,
     commandId: string,
     work: (tx: TransactionContext) => Promise<T>,
+    options?: IdempotentOptions,
   ): Promise<T>;
 }
