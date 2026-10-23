@@ -1469,9 +1469,18 @@ export class FootebasApplication {
         anyClub: entitlements.anyClub,
         activeCareers: saves.length,
       },
+      // Most recently played first: "Continuar" and a fresh session open the
+      // career the player was on, never just the oldest save. Locks still
+      // follow the creation order above.
       careers: saves
         .filter((save) => save.versions.schema === CAREER_SAVE_SCHEMA)
-        .map((save) => {
+        .map((save, created) => ({ save, created }))
+        .sort(
+          (left, right) =>
+            right.save.updatedAt.localeCompare(left.save.updatedAt) ||
+            left.created - right.created,
+        )
+        .map(({ save }) => {
           const snapshot = snapshotOf(save);
           const club = snapshot.clubs.find(
             ({ id }) => id === snapshot.selectedClubId,
@@ -1485,6 +1494,7 @@ export class FootebasApplication {
             ...(club ? { clubId: club.id, clubName: club.name } : {}),
             season: snapshot.season,
             currentDate: snapshot.currentDate,
+            updatedAt: save.updatedAt,
             locked: isCareerLocked(order, save.id, entitlements),
           };
         }),

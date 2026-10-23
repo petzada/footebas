@@ -130,6 +130,25 @@ interface CareerListModel {
   limits?: { maxCareers: number; activeCareers?: number; anyClub?: boolean };
 }
 
+/**
+ * Careers most recently saved first. The server already sends them in that
+ * order; sorting again keeps an older API (creation order) from reopening
+ * the first save instead of the one just played. Stable for equal dates.
+ */
+function latestCareers<T extends { updatedAt?: string }>(
+  careers: readonly T[],
+): T[] {
+  return careers
+    .map((career, index) => ({ career, index }))
+    .sort(
+      (left, right) =>
+        (right.career.updatedAt ?? '').localeCompare(
+          left.career.updatedAt ?? '',
+        ) || left.index - right.index,
+    )
+    .map(({ career }) => career);
+}
+
 // --- transport shapes (subset of @footebas/contracts read models) ---
 type Side = 'home' | 'away';
 interface ClubSummary {
@@ -899,7 +918,7 @@ export class HttpCareerApi implements CareerApiPort {
     const list = await this.#request<CareerListModel>('GET', '/v1/careers');
     this.#listed = new Map(list.careers.map((item) => [item.careerId, item]));
     return {
-      careers: list.careers.map((item): CareerSummary => ({
+      careers: latestCareers(list.careers).map((item): CareerSummary => ({
         id: item.careerId,
         coach: item.managerName ?? 'Treinador',
         ...(item.careerName ? { name: item.careerName } : {}),
@@ -965,7 +984,10 @@ export class HttpCareerApi implements CareerApiPort {
   async getCareer(): Promise<CareerView | null> {
     if (!this.#careerId) {
       const list = await this.#request<CareerListModel>('GET', '/v1/careers');
-      const career = list.careers.find(({ clubId }) => clubId !== undefined);
+      // The career played last (never a locked one), not the oldest save.
+      const career = latestCareers(list.careers).find(
+        ({ clubId, locked }) => clubId !== undefined && locked !== true,
+      );
       if (!career) return null;
       this.#careerId = career.careerId;
       this.#version = career.aggregateVersion;
