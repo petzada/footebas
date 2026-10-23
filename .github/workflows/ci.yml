@@ -22,3 +22,44 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+
+  # Playwright (Chromium) contra o web em modo dev com a API Fastify em memória
+  # (tools/e2e/playwright.config.ts sobe os dois servidores). Roda em paralelo
+  # ao verify.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build dos pacotes usados pela API local
+        run: pnpm exec turbo run build --filter="@footebas/api^..."
+      - name: Versão do Playwright
+        id: playwright
+        run: echo "version=$(pnpm --filter @footebas/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm --filter @footebas/e2e exec playwright install --with-deps chromium
+      - name: Dependências de sistema do Chromium
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm --filter @footebas/e2e exec playwright install-deps chromium
+      - run: pnpm e2e
+      - name: Relatório do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tools/e2e/dist/
+          retention-days: 14
