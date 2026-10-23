@@ -1,5 +1,10 @@
 import { PixelAvatar } from '@/components/retro/pixel-avatar';
-import { COACH_AVATARS, type CoachAvatarId } from '@/lib/coach-profile';
+import {
+  COACH_AVATARS,
+  isAvatarUrl,
+  type CoachAvatarId,
+  type CoachAvatarRef,
+} from '@/lib/coach-profile';
 import { cn } from '@/lib/utils';
 
 /*
@@ -26,19 +31,36 @@ export function avatarNumber(avatar: CoachAvatarId): number {
   return COACH_AVATARS.indexOf(avatar) + 1;
 }
 
-/** Deterministic pixel coach (`avatar-01` … `avatar-12`). */
+/** Deterministic pixel coach (`avatar-01` … `avatar-12`) or the coach's own picture. */
 export function CoachAvatar({
   avatar,
   size = 64,
   label,
   className,
 }: {
-  avatar: CoachAvatarId;
+  avatar: CoachAvatarRef | string;
   size?: number;
   label?: string;
   className?: string;
 }) {
-  const id = avatar in BACKDROPS ? avatar : 'avatar-01';
+  if (isAvatarUrl(avatar))
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- user picture from our CDN
+      <img
+        src={avatar}
+        alt={label ?? ''}
+        {...(label ? {} : { 'aria-hidden': true })}
+        data-avatar="custom"
+        width={size}
+        height={size}
+        className={cn(
+          'px-border inline-block shrink-0 bg-chalk object-cover',
+          className,
+        )}
+        style={{ width: size, height: size }}
+      />
+    );
+  const id = avatar in BACKDROPS ? (avatar as CoachAvatarId) : 'avatar-01';
   return (
     <span
       data-avatar={avatar}

@@ -74,6 +74,19 @@ export interface AccountPort {
   checkout(): Promise<CheckoutView>;
   order(orderId: string): Promise<OrderView>;
   refund(): Promise<RefundView>;
+  /** `POST /v1/me/avatar`: the coach's own picture, served from our CDN. */
+  uploadAvatar(file: File): Promise<{ url: string }>;
+}
+
+export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+export const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+
+/** Client-side check before the upload; `''` when the file is acceptable. */
+export function avatarFileError(file: Pick<File, 'type' | 'size'>): string {
+  if (!(AVATAR_TYPES as readonly string[]).includes(file.type))
+    return 'Use uma imagem PNG, JPEG ou WebP.';
+  if (file.size > AVATAR_MAX_BYTES) return 'A imagem precisa ter até 2 MB.';
+  return '';
 }
 
 export const FREE_ENTITLEMENTS: Entitlements = {
@@ -191,6 +204,11 @@ export function createFakeAccountPort(
         }
       }
       return order;
+    },
+    async uploadAvatar(file) {
+      const error = avatarFileError(file);
+      if (error) throw new Error(error);
+      return { url: URL.createObjectURL(file) };
     },
     async refund() {
       if (!refundable(profile.license, now()))

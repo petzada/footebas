@@ -30,10 +30,16 @@ export const COACH_AVATARS = [
   'avatar-12',
 ] as const;
 export type CoachAvatarId = (typeof COACH_AVATARS)[number];
+/** A fixed pixel avatar or the https URL of the coach's own picture. */
+export type CoachAvatarRef = CoachAvatarId | `https://${string}`;
+
+export function isAvatarUrl(avatar: string): avatar is `https://${string}` {
+  return avatar.startsWith('https://') || avatar.startsWith('blob:');
+}
 
 export interface CoachProfile {
   readonly nationality: string;
-  readonly avatar: CoachAvatarId;
+  readonly avatar: CoachAvatarRef;
   readonly personality: CoachPersonality;
 }
 
