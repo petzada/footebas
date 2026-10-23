@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- ids come from the same aggregate and are validated on creation */
 import type { PhaseFourEvent } from '@footebas/contracts';
 import {
+  applyPersonalityToConfidence,
+  coachEffects,
+  planStrength,
+  scaleIntegerDelta,
   appendLedgerEntry,
   calculateAttendance,
   calculateManagerPrestige,
@@ -20,6 +24,7 @@ import {
   shouldFireManager,
   type BoardObjective,
   type Club,
+  type CoachPersonality,
   type ClubId,
   type CompetitionCalendarFixture,
   type CompetitionDefinition,
@@ -69,7 +74,13 @@ export interface WorldContext {
   clubs: Club[];
   players: Player[];
   world: CareerWorldState;
+  /** Coach personality of the career (ADR 0007); absent means the default. */
+  personality?: CoachPersonality;
 }
+
+/** Development quality every club gets; the managed youth may get more. */
+export const BASE_DEVELOPMENT_QUALITY = 60;
+const YOUTH_DEVELOPMENT_MAX_AGE = 21;
 
 const SPONSOR_SHARE = 0.85;
 /** Prize money in BRL for the champion; lower places earn a decreasing share. */
@@ -481,10 +492,14 @@ function boardVerdict(context: WorldContext, input: SeasonEndInput): void {
   const { world } = context;
   const nextSeasonStart = `${String(input.year + 1)}-01-01`;
   world.manager = {
-    ...evaluateManagerConfidence(
+    ...applyPersonalityToConfidence(
       world.manager,
-      world.objectives,
-      input.managedForm,
+      evaluateManagerConfidence(
+        world.manager,
+        world.objectives,
+        input.managedForm,
+      ),
+      context.personality,
     ),
     prestige: calculateManagerPrestige(world.achievements),
     seasons: world.manager.seasons + 1,
@@ -557,7 +572,81 @@ function renewOrRelease(context: WorldContext, input: SeasonEndInput): void {
   }));
 }
 
-function developSquads(context: WorldContext, input: SeasonEndInput): void {
+export interface MatchDeltas {
+  readonly conditionDelta: number;
+  readonly moraleDelta: number;
+}
+
+/**
+ * Coach personality on one managed player's post-match deltas (ADR 0007):
+ * morale after wins/defeats, extra morale loss on a losing streak and
+ * condition lost. Integer and deterministic per `key`.
+ */
+export function coachedMatchDeltas(
+  personality: CoachPersonality | undefined,
+  played: MatchDeltas,
+  context: { readonly lossStreak: boolean; readonly key: string },
+): MatchDeltas {
+  const effects = coachEffects(personality);
+  const moraleFactor =
+    played.moraleDelta > 0
+      ? effects.moraleAfterWin
+      : effects.moraleAfterLoss *
+        (context.lossStreak ? effects.moraleAfterLossStreak : 1);
+  return {
+    conditionDelta:
+      played.conditionDelta < 0
+        ? scaleIntegerDelta(
+            played.conditionDelta,
+            effects.conditionLoss,
+            `${context.key}|condition`,
+          )
+        : played.conditionDelta,
+    moraleDelta: scaleIntegerDelta(
+      played.moraleDelta,
+      moraleFactor,
+      `${context.key}|morale`,
+    ),
+  };
+}
+
+/** Match-only copies with the Estrategista edge; never persisted. */
+export function withMatchPlanStrength(
+  players: readonly Player[],
+  personality: CoachPersonality | undefined,
+): Player[] {
+  return players.map(
+    (player) =>
+      ({
+        ...player,
+        strength: planStrength(Number(player.strength), personality),
+      }) as Player,
+  );
+}
+
+/** Development quality for one player; the coach style tilts managed youth. */
+export function developmentQualityFor(
+  player: Pick<Player, 'age' | 'clubId'>,
+  managedClubId: string | undefined,
+  personality: CoachPersonality | undefined,
+): number {
+  return managedClubId !== undefined &&
+    player.clubId === managedClubId &&
+    player.age <= YOUTH_DEVELOPMENT_MAX_AGE
+    ? Math.min(
+        100,
+        Math.round(
+          BASE_DEVELOPMENT_QUALITY * coachEffects(personality).youthDevelopment,
+        ),
+      )
+    : BASE_DEVELOPMENT_QUALITY;
+}
+
+function developSquads(
+  context: WorldContext,
+  input: SeasonEndInput,
+  managedClubId: string | undefined,
+): void {
   const random = createPrng(
     `${input.seed}|development|${String(input.season)}`,
   );
@@ -573,7 +662,11 @@ function developSquads(context: WorldContext, input: SeasonEndInput): void {
             : 400;
     const result = developPlayer(player, {
       usefulMinutes: minutes,
-      developmentQuality: 60,
+      developmentQuality: developmentQualityFor(
+        player,
+        managedClubId,
+        context.personality,
+      ),
       random,
     });
     if (result.outcome === 'retired') {
@@ -670,7 +763,7 @@ export function closeSeasonWorld(
   recordAchievements(context, input);
   boardVerdict(context, input);
   renewOrRelease(context, input);
-  developSquads(context, input);
+  developSquads(context, input, managed);
   refillSquads(context, input);
   rollLedger(context);
 }

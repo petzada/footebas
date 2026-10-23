@@ -18,6 +18,7 @@ import {
   transportVersionSchema,
   versionSchema,
 } from './primitives.js';
+import { careerNameSchema, coachProfileSchema } from './coach.js';
 
 const envelopeFields = {
   version: transportVersionSchema,
@@ -32,7 +33,17 @@ export const createCareerCommandSchema = z.strictObject({
   payload: z.strictObject({
     managerName: nonEmptyTextSchema,
     startDate: gameDateSchema,
+    /** Optional for compatibility; defaults to "Carreira de <managerName>". */
+    careerName: careerNameSchema.optional(),
+    /** Optional for compatibility; defaults to BR, avatar-01, estrategista. */
+    coach: coachProfileSchema.optional(),
   }),
+});
+/** Archives the career (owner only) and frees its slot in the plan limit. */
+export const deleteCareerCommandSchema = z.strictObject({
+  ...envelopeFields,
+  type: z.literal('DeleteCareer'),
+  payload: z.strictObject({ careerId: entityIdSchema }),
 });
 export const selectClubCommandSchema = z.strictObject({
   ...envelopeFields,
@@ -140,6 +151,7 @@ export const simulateMatchCommandSchema = z.strictObject({
 
 export const commandSchema = z.discriminatedUnion('type', [
   createCareerCommandSchema,
+  deleteCareerCommandSchema,
   selectClubCommandSchema,
   setLineupCommandSchema,
   autoPickLineupCommandSchema,
@@ -156,6 +168,7 @@ export const commandAcceptedSchema = z.strictObject({
 });
 
 export type CreateCareerCommand = z.infer<typeof createCareerCommandSchema>;
+export type DeleteCareerCommand = z.infer<typeof deleteCareerCommandSchema>;
 export type SelectClubCommand = z.infer<typeof selectClubCommandSchema>;
 export type SetLineupCommand = z.infer<typeof setLineupCommandSchema>;
 export type SetTacticsCommand = z.infer<typeof setTacticsCommandSchema>;

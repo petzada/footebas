@@ -32,6 +32,7 @@ interface SaveRow {
   version: number;
   created_at: Date | string;
   updated_at: Date | string;
+  archived_at?: Date | string | null;
 }
 
 const iso = (value: Date | string) =>
@@ -48,6 +49,9 @@ function toSave(row: SaveRow): GameSave {
     version: row.version,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
+    ...(row.archived_at === undefined || row.archived_at === null
+      ? {}
+      : { archivedAt: iso(row.archived_at) }),
   };
 }
 
@@ -85,16 +89,82 @@ class PostgresSaveRepository implements GameSaveRepository {
 
   public async peek(id: string): Promise<GameSave | undefined> {
     const rows = await this.sql<SaveRow[]>`
-      select * from footebas.game_saves where id = ${id}`;
+      select * from footebas.game_saves
+      where id = ${id} and archived_at is null`;
     return rows[0] === undefined ? undefined : toSave(rows[0]);
   }
 
   public async listByUser(userId: string): Promise<readonly GameSave[]> {
     const rows = await this.sql<SaveRow[]>`
       select * from footebas.game_saves
-      where user_id = ${userId}
+      where user_id = ${userId} and archived_at is null
       order by created_at`;
     return rows.map(toSave);
+  }
+
+  public async countActiveByUser(userId: string): Promise<number> {
+    // Serializes limit checks of the same user until the transaction ends.
+    await this
+      .sql`select pg_advisory_xact_lock(hashtextextended(${`user-careers:${userId}`}, 0))`;
+    const rows = await this.sql<{ count: number }[]>`
+      select count(*)::int as count from footebas.game_saves
+      where user_id = ${userId} and archived_at is null`;
+    return rows[0]?.count ?? 0;
+  }
+
+  public async countActiveUsers(): Promise<number> {
+    const rows = await this.sql<{ count: number }[]>`
+      select count(distinct user_id)::int as count from footebas.game_saves
+      where archived_at is null`;
+    return rows[0]?.count ?? 0;
+  }
+
+  public async archive(
+    id: string,
+    userId: string,
+    expectedVersion: number,
+  ): Promise<GameSave> {
+    const instant = this.clock.now().toISOString();
+    const rows = await this.sql<SaveRow[]>`
+      update footebas.game_saves set
+        archived_at = ${instant},
+        version = version + 1,
+        updated_at = ${instant}
+      where id = ${id} and user_id = ${userId} and version = ${expectedVersion}
+        and archived_at is null
+      returning *`;
+    const row = rows[0];
+    if (row !== undefined) return toSave(row);
+    throw await this.missedWrite(id, userId, expectedVersion);
+  }
+
+  public async delete(id: string, userId: string): Promise<void> {
+    const rows = await this.sql<{ user_id: string }[]>`
+      select user_id from footebas.game_saves where id = ${id}`;
+    const owner = rows[0]?.user_id;
+    if (owner === undefined)
+      throw new SaveNotFoundError(`save ${id} not found`);
+    if (owner !== userId)
+      throw new SaveOwnershipError(`save ${id} does not belong to user`);
+    await this.sql`
+      delete from footebas.command_receipts where career_id = ${id}`;
+    await this.sql`
+      delete from footebas.game_saves where id = ${id} and user_id = ${userId}`;
+  }
+
+  private async missedWrite(
+    id: string,
+    userId: string,
+    expectedVersion: number,
+  ): Promise<Error> {
+    const current = await this.peek(id);
+    if (current === undefined)
+      return new SaveNotFoundError(`save ${id} not found`);
+    if (current.userId !== userId)
+      return new SaveOwnershipError(`save ${id} does not belong to user`);
+    return new SaveConflictError(
+      `expected version ${String(expectedVersion)}, found ${String(current.version)}`,
+    );
   }
 
   public async update(
@@ -113,17 +183,11 @@ class PostgresSaveRepository implements GameSaveRepository {
         version = version + 1,
         updated_at = ${this.clock.now().toISOString()}
       where id = ${id} and user_id = ${userId} and version = ${expectedVersion}
+        and archived_at is null
       returning *`;
     const row = rows[0];
     if (row !== undefined) return toSave(row);
-    const current = await this.peek(id);
-    if (current === undefined)
-      throw new SaveNotFoundError(`save ${id} not found`);
-    if (current.userId !== userId)
-      throw new SaveOwnershipError(`save ${id} does not belong to user`);
-    throw new SaveConflictError(
-      `expected version ${String(expectedVersion)}, found ${String(current.version)}`,
-    );
+    throw await this.missedWrite(id, userId, expectedVersion);
   }
 }
 

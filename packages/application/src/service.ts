@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- lookups follow explicit guards and content invariants */
 import {
+  apiErrorSchema,
   commandAcceptedSchema,
   careerListReadModelSchema,
+  publicStatsSchema,
   careerWorldReadModelSchema,
   commandSchema,
   homeReadModelSchema,
@@ -10,6 +12,9 @@ import {
   postMatchReadModelSchema,
   squadReadModelSchema,
   standingsReadModelSchema,
+  type ApiError,
+  type CoachMessage,
+  type CoachProfile,
   type Command,
   type CareerListReadModel,
   type CareerWorldReadModel,
@@ -18,6 +23,7 @@ import {
   type JobStatus,
   type NextMatchReadModel,
   type PostMatchReadModel,
+  type PublicStats,
   type SquadReadModel,
   type StandingsReadModel,
 } from '@footebas/contracts';
@@ -33,6 +39,10 @@ import {
 import {
   FORMATION_POSITIONS,
   DomainError,
+  coachEffects,
+  followsMatchPlan,
+  renderCoachVoice,
+  type ApproximateStrength,
   clubCashBalance,
   createLineup,
   createMatchInput,
@@ -78,7 +88,9 @@ import {
 } from './career-competitions.js';
 import {
   closeSeasonWorld,
+  coachedMatchDeltas,
   createCareerWorld,
+  withMatchPlanStrength,
   employManager,
   recordGate,
   settleMonths,
@@ -91,6 +103,12 @@ import {
   type CareerContentPort,
 } from './career-content.js';
 import { defaultTactic } from './tactics.js';
+import { careerProfileOf } from './coach-personality.js';
+import {
+  InMemoryEntitlements,
+  type Entitlements,
+  type EntitlementsPort,
+} from './entitlements.js';
 import {
   AuthenticationError,
   type AuthPort,
@@ -115,6 +133,10 @@ export interface ManagedMatch {
 /** The single career aggregate: world, competitions and matchday in one save. */
 export interface CareerSnapshot {
   managerName: string;
+  /** Career name shown in the career list (1–40 characters). */
+  careerName: string;
+  /** Coach profile; its personality tilts world rules (ADR 0007). */
+  coach: CoachProfile;
   currentDate: string;
   season: number;
   contentVersion: string;
@@ -132,12 +154,21 @@ export interface CareerSnapshot {
 
 type Snapshot = CareerSnapshot;
 
+/** Fills the profile of saves created before careers had one. */
+function withProfile(snapshot: Snapshot): Snapshot {
+  return { ...snapshot, ...careerProfileOf(snapshot) };
+}
+function snapshotOf(save: GameSave): Snapshot {
+  return withProfile(save.snapshot as unknown as Snapshot);
+}
+
 /** Runs world rules over the snapshot and writes the results back. */
 function withWorld(snapshot: Snapshot, work: (context: WorldContext) => void) {
   const context: WorldContext = {
     clubs: snapshot.clubs,
     players: snapshot.players,
     world: snapshot.world,
+    personality: careerProfileOf(snapshot).coach.personality,
   };
   work(context);
   snapshot.clubs = context.clubs;
@@ -154,6 +185,8 @@ export interface ApplicationDependencies {
   readonly telemetry: TelemetryPort;
   readonly unitOfWork: UnitOfWork;
   readonly content?: CareerContentPort;
+  /** Plan limits; defaults to everyone on the free plan. */
+  readonly entitlements?: EntitlementsPort;
   readonly failPoint?: (
     point: 'before-persist-result',
     job: SimulationJob,
@@ -174,6 +207,36 @@ export class ApplicationError extends Error {
   }
 }
 
+/**
+ * CreateCareer refused by the plan limit. It is a FORBIDDEN application
+ * error for existing transports; `toApiError` gives the contract body with
+ * the dedicated `CAREER_LIMIT_REACHED` code.
+ */
+export class CareerLimitReachedError extends ApplicationError {
+  public readonly contractCode = 'CAREER_LIMIT_REACHED' as const;
+
+  public constructor(
+    public readonly entitlements: Entitlements,
+    public readonly activeCareers: number,
+  ) {
+    super(
+      'FORBIDDEN',
+      `plan ${entitlements.plan} allows ${String(entitlements.maxCareers)} active career(s); delete one to create another`,
+    );
+  }
+
+  public toApiError(requestId: string): ApiError {
+    return apiErrorSchema.parse({
+      version: 1,
+      requestId,
+      code: this.contractCode,
+      message: this.message,
+      plan: this.entitlements.plan,
+      maxCareers: this.entitlements.maxCareers,
+    });
+  }
+}
+
 async function careerIdFor(userId: string, key: string): Promise<string> {
   const digest = await crypto.subtle.digest(
     'SHA-256',
@@ -187,9 +250,11 @@ async function careerIdFor(userId: string, key: string): Promise<string> {
 
 export class FootebasApplication {
   private readonly content: CareerContentPort;
+  private readonly entitlements: EntitlementsPort;
 
   public constructor(private readonly deps: ApplicationDependencies) {
     this.content = deps.content ?? catalogCareerContent;
+    this.entitlements = deps.entitlements ?? new InMemoryEntitlements();
   }
 
   public async execute(
@@ -204,7 +269,9 @@ export class FootebasApplication {
     try {
       return command.type === 'CreateCareer'
         ? await this.createCareer(identity.userId, command)
-        : await this.mutate(identity.userId, command);
+        : command.type === 'DeleteCareer'
+          ? await this.deleteCareer(identity.userId, command)
+          : await this.mutate(identity.userId, command);
     } catch (error) {
       throw this.translate(error);
     }
@@ -244,11 +311,24 @@ export class FootebasApplication {
       careerId,
       command.idempotencyKey,
       async (tx) => {
+        const entitlements = await this.entitlements.forUser(userId);
+        const active = await tx.saves.countActiveByUser(userId);
+        if (active >= entitlements.maxCareers)
+          throw new CareerLimitReachedError(entitlements, active);
         const content = this.loadContent();
         const seed = `career-seed:${careerId}`;
         const year = Number(command.payload.startDate.slice(0, 4));
         const snapshot: Snapshot = {
           managerName: command.payload.managerName,
+          ...careerProfileOf({
+            managerName: command.payload.managerName,
+            ...(command.payload.careerName === undefined
+              ? {}
+              : { careerName: command.payload.careerName }),
+            ...(command.payload.coach === undefined
+              ? {}
+              : { coach: command.payload.coach }),
+          }),
           currentDate: command.payload.startDate,
           season: 1,
           contentVersion: content.version,
@@ -290,9 +370,33 @@ export class FootebasApplication {
     return commandAcceptedSchema.parse(response);
   }
 
+  /** Owner-only soft delete; frees the career's slot in the plan limit. */
+  private async deleteCareer(
+    userId: string,
+    command: Extract<Command, { type: 'DeleteCareer' }>,
+  ): Promise<CommandAccepted> {
+    const careerId = command.payload.careerId;
+    const response = await this.deps.unitOfWork.executeIdempotent(
+      careerId,
+      command.idempotencyKey,
+      async (tx) => {
+        const save = await tx.saves.load(careerId, userId);
+        if (!save) throw new SaveNotFoundError(`save ${careerId} not found`);
+        if (save.version !== command.expectedVersion)
+          throw new SaveConflictError(
+            `expected version ${String(command.expectedVersion)}, found ${String(save.version)}`,
+          );
+        const archived = await tx.saves.archive(careerId, userId, save.version);
+        this.deps.telemetry.event('career.deleted', { careerId });
+        return asCanonical(this.accepted(command, archived));
+      },
+    );
+    return commandAcceptedSchema.parse(response);
+  }
+
   private async mutate(
     userId: string,
-    command: Exclude<Command, { type: 'CreateCareer' }>,
+    command: Exclude<Command, { type: 'CreateCareer' | 'DeleteCareer' }>,
   ): Promise<CommandAccepted> {
     const careerId = command.payload.careerId;
     let jobToEnqueue: SimulationJob | undefined;
@@ -305,7 +409,9 @@ export class FootebasApplication {
           throw new SaveConflictError(
             `expected version ${String(command.expectedVersion)}, found ${String(save.version)}`,
           );
-        const snapshot = structuredClone(save.snapshot) as unknown as Snapshot;
+        const snapshot = withProfile(
+          structuredClone(save.snapshot) as unknown as Snapshot,
+        );
         let job: SimulationJob | undefined;
         switch (command.type) {
           case 'SelectClub': {
@@ -529,7 +635,9 @@ export class FootebasApplication {
     try {
       await this.deps.unitOfWork.withCareerLock(job.careerId, async (tx) => {
         const save = await this.load(tx, job.careerId, job.userId);
-        const snapshot = structuredClone(save.snapshot) as unknown as Snapshot;
+        const snapshot = withProfile(
+          structuredClone(save.snapshot) as unknown as Snapshot,
+        );
         if (snapshot.pendingJobId !== job.id) {
           if (save.version > job.expectedVersion) return;
           throw new SaveConflictError('job snapshot version is stale');
@@ -561,6 +669,14 @@ export class FootebasApplication {
       );
     } catch (error) {
       this.deps.telemetry.error(error, { jobId: job.id });
+      // A deleted career never comes back: fail the job without retrying.
+      if (error instanceof SaveNotFoundError)
+        return await this.setJobStatus(
+          job,
+          'failed',
+          (await this.deps.jobs.status(job.id))?.attempt ?? 1,
+          'CAREER_NOT_FOUND',
+        );
       if (options.requeueOnFailure ?? true) await this.deps.jobs.enqueue(job);
       return await this.setJobStatus(
         job,
@@ -648,9 +764,25 @@ export class FootebasApplication {
     seed: string,
     instructions: readonly MatchInstruction[],
   ): MatchInput {
-    const side = (clubId: string) => {
+    const personality = snapshot.coach.personality;
+    const side = (clubId: string, opponentId: string) => {
       const club = snapshot.clubs.find(({ id }) => id === clubId)!;
       const managed = clubId === snapshot.selectedClubId;
+      const players = snapshot.players.filter(
+        (player) => player.clubId === club.id,
+      );
+      // Estrategista (ADR 0007): small effective-strength edge, assembled
+      // here by the application, when the mentality follows the plan.
+      const planned =
+        managed &&
+        coachEffects(personality).matchPlanStrength !== 1 &&
+        followsMatchPlan(
+          snapshot.tactic!.mentality,
+          opponentStrength(snapshot, clubId, opponentId),
+        );
+      const matchPlayers = planned
+        ? withMatchPlanStrength(players, personality)
+        : players;
       return {
         club,
         lineup: managed
@@ -662,7 +794,7 @@ export class FootebasApplication {
               mode: 'best',
             }),
         tactic: managed ? snapshot.tactic! : defaultTactic(),
-        players: snapshot.players.filter((player) => player.clubId === club.id),
+        players: matchPlayers,
       };
     };
     return createMatchInput({
@@ -670,8 +802,8 @@ export class FootebasApplication {
       seed: `${seed}:${fixture.id}`,
       engineVersion: ENGINE_VERSION,
       rulesVersion: RULES_VERSION,
-      home: side(fixture.homeClubId),
-      away: side(fixture.awayClubId),
+      home: side(fixture.homeClubId, fixture.awayClubId),
+      away: side(fixture.awayClubId, fixture.homeClubId),
       instructions,
     });
   }
@@ -751,6 +883,9 @@ export class FootebasApplication {
       return homeReadModelSchema.parse({
         ...base(save, now),
         managerName: s.managerName,
+        careerName: s.careerName,
+        coach: s.coach,
+        inbox: coachInbox(s),
         club: clubSummary(s, s.selectedClubId),
         currentDate: s.currentDate,
         season: s.season,
@@ -927,12 +1062,19 @@ export class FootebasApplication {
       `user:${user.userId}`,
       (tx) => tx.saves.listByUser(user.userId),
     );
+    const entitlements = await this.entitlements.forUser(user.userId);
     return careerListReadModelSchema.parse({
       version: 1,
+      limits: {
+        plan: entitlements.plan,
+        maxCareers: entitlements.maxCareers,
+        anyClub: entitlements.anyClub,
+        activeCareers: saves.length,
+      },
       careers: saves
         .filter((save) => save.versions.schema === CAREER_SAVE_SCHEMA)
         .map((save) => {
-          const snapshot = save.snapshot as unknown as Snapshot;
+          const snapshot = snapshotOf(save);
           const club = snapshot.clubs.find(
             ({ id }) => id === snapshot.selectedClubId,
           );
@@ -940,12 +1082,35 @@ export class FootebasApplication {
             careerId: save.id,
             aggregateVersion: save.version,
             managerName: snapshot.managerName,
+            careerName: snapshot.careerName,
+            coach: snapshot.coach,
             ...(club ? { clubId: club.id, clubName: club.name } : {}),
             season: snapshot.season,
             currentDate: snapshot.currentDate,
           };
         }),
     });
+  }
+
+  /** Public counters for the Início screen; no authentication. */
+  public async publicStats(): Promise<PublicStats> {
+    const content = this.content.load();
+    const coaches = await this.deps.unitOfWork.withCareerLock(
+      'public:stats',
+      (tx) => tx.saves.countActiveUsers(),
+    );
+    return publicStatsSchema.parse({
+      version: 1,
+      coaches,
+      clubs: content.clubs.length,
+      athletes: content.players.length,
+    });
+  }
+
+  /** Plan entitlements of the authenticated user. */
+  public async entitlementsFor(bearer: string): Promise<Entitlements> {
+    const user = await this.identity(bearer);
+    return this.entitlements.forUser(user.userId);
   }
 
   public async careerWorld(
@@ -1173,7 +1338,7 @@ export class FootebasApplication {
         const save = await this.load(tx, careerId, user.userId);
         return project(
           save,
-          save.snapshot as unknown as Snapshot,
+          snapshotOf(save),
           this.deps.clock.now().toISOString(),
         );
       });
@@ -1566,32 +1731,11 @@ function matchPreparation(
           ? ('L' as const)
           : ('D' as const);
     });
-  const mean = (clubId: string) => {
-    const values = snapshot.players
-      .filter(
-        (player) =>
-          player.clubId === clubId &&
-          player.injuryRounds === 0 &&
-          player.suspensionRounds === 0,
-      )
-      .map(({ strength }) => Number(strength))
-      .sort((left, right) => right - left)
-      .slice(0, 16);
-    return (
-      values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
-    );
-  };
-  const difference = mean(opponentId) - mean(snapshot.selectedClubId!);
-  const approximateStrength =
-    difference < -7
-      ? ('much_weaker' as const)
-      : difference < -2
-        ? ('weaker' as const)
-        : difference <= 2
-          ? ('similar' as const)
-          : difference <= 7
-            ? ('stronger' as const)
-            : ('much_stronger' as const);
+  const approximateStrength = opponentStrength(
+    snapshot,
+    snapshot.selectedClubId!,
+    opponentId,
+  );
   const absences = snapshot.players
     .filter(
       (player) =>
@@ -1616,6 +1760,97 @@ function matchPreparation(
     absences,
   };
 }
+/** Opponent strength relative to `clubId`: mean of the 16 best available. */
+function opponentStrength(
+  snapshot: Snapshot,
+  clubId: string,
+  opponentId: string,
+): ApproximateStrength {
+  const mean = (id: string) => {
+    const values = snapshot.players
+      .filter(
+        (player) =>
+          player.clubId === id &&
+          player.injuryRounds === 0 &&
+          player.suspensionRounds === 0,
+      )
+      .map(({ strength }) => Number(strength))
+      .sort((left, right) => right - left)
+      .slice(0, 16);
+    return (
+      values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
+    );
+  };
+  const difference = mean(opponentId) - mean(clubId);
+  return difference < -7
+    ? 'much_weaker'
+    : difference < -2
+      ? 'weaker'
+      : difference <= 2
+        ? 'similar'
+        : difference <= 7
+          ? 'stronger'
+          : 'much_stronger';
+}
+function managedOutcome(
+  snapshot: Snapshot,
+  played: ManagedMatch,
+):
+  | { situation: 'win' | 'draw' | 'loss'; score: string; opponentId: string }
+  | undefined {
+  const { fixture, result } = played;
+  const home = fixture.homeClubId === snapshot.selectedClubId;
+  if (!home && fixture.awayClubId !== snapshot.selectedClubId) return undefined;
+  const goalsFor = home ? result.homeGoals : result.awayGoals;
+  const goalsAgainst = home ? result.awayGoals : result.homeGoals;
+  return {
+    situation:
+      goalsFor > goalsAgainst
+        ? 'win'
+        : goalsFor < goalsAgainst
+          ? 'loss'
+          : 'draw',
+    score: `${String(goalsFor)} x ${String(goalsAgainst)}`,
+    opponentId: home ? fixture.awayClubId : fixture.homeClubId,
+  };
+}
+/** Match reports written in the coach personality's tone, newest first. */
+function coachInbox(snapshot: Snapshot): CoachMessage[] {
+  const clubName = (id: string) =>
+    snapshot.clubs.find((club) => club.id === id)?.name;
+  return snapshot.matches
+    .slice(-5)
+    .reverse()
+    .flatMap((played) => {
+      const outcome = managedOutcome(snapshot, played);
+      if (!outcome) return [];
+      const club = clubName(snapshot.selectedClubId!);
+      const opponent = clubName(outcome.opponentId);
+      const voice = renderCoachVoice(
+        snapshot.coach.personality,
+        outcome.situation,
+        {
+          coach: snapshot.managerName,
+          score: outcome.score,
+          ...(club === undefined ? {} : { club }),
+          ...(opponent === undefined ? {} : { opponent }),
+        },
+      );
+      return [
+        {
+          id: `mail_${played.fixture.id
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')}`,
+          kind: 'match_report' as const,
+          situation: outcome.situation,
+          subject: voice.subject,
+          body: voice.body,
+          occurredOn: played.fixture.date,
+        },
+      ];
+    });
+}
 /** Applies one match to both squads; absences count down per club match. */
 function applyPerformances(
   snapshot: Snapshot,
@@ -1625,6 +1860,22 @@ function applyPerformances(
   const performance = new Map(
     (result.playerPerformances ?? []).map((item) => [item.playerId, item]),
   );
+  // Coach personality (ADR 0007) only touches the managed squad.
+  const managedId = snapshot.selectedClubId;
+  const previous = snapshot.matches.at(-1);
+  const lossStreak =
+    previous !== undefined &&
+    managedOutcome(snapshot, previous)?.situation === 'loss';
+  const coached = (
+    player: Player,
+    played: { conditionDelta: number; moraleDelta: number },
+  ) =>
+    player.clubId === managedId
+      ? coachedMatchDeltas(snapshot.coach.personality, played, {
+          lossStreak,
+          key: `${fixture.id}|${player.id}`,
+        })
+      : played;
   const clubs = new Set<string>([fixture.homeClubId, fixture.awayClubId]);
   snapshot.players = snapshot.players.map((player) => {
     if (player.clubId === undefined || !clubs.has(player.clubId)) return player;
@@ -1637,15 +1888,16 @@ function applyPerformances(
         condition: Math.min(100, Number(player.condition) + 3),
       } as Player;
     const ratedAppearances = (player.careerStats.ratedAppearances ?? 0) + 1;
+    const deltas = coached(player, played);
     return {
       ...player,
       condition: Math.max(
         0,
-        Math.min(100, Number(player.condition) + played.conditionDelta),
+        Math.min(100, Number(player.condition) + deltas.conditionDelta),
       ),
       morale: Math.max(
         0,
-        Math.min(100, Number(player.morale) + played.moraleDelta),
+        Math.min(100, Number(player.morale) + deltas.moraleDelta),
       ),
       matchSharpness: Math.min(
         100,

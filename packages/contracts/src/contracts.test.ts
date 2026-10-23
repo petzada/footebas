@@ -202,6 +202,13 @@ describe('read models and snapshots', () => {
       homeReadModelSchema.safeParse({
         ...base,
         managerName: 'Demo',
+        careerName: 'Carreira de Demo',
+        coach: {
+          nationality: 'BR',
+          avatar: 'avatar-01',
+          personality: 'estrategista',
+        },
+        inbox: [],
         club,
         currentDate: '2026-01-08',
         season: 1,

@@ -5,13 +5,33 @@ export class SaveNotFoundError extends Error {}
 export class SaveConflictError extends Error {}
 export class SaveOwnershipError extends Error {}
 
+/**
+ * Archived saves (deleted by their owner) are invisible to `load`, `peek`,
+ * `listByUser`, `update` and the counters; they only keep their id taken.
+ */
 export interface GameSaveRepository {
   create(input: NewGameSave): Promise<GameSave>;
   load(id: string, userId: string): Promise<GameSave | undefined>;
   /** Loads without an ownership check; callers must authorize the owner. */
   peek(id: string): Promise<GameSave | undefined>;
-  /** Every save owned by a user, oldest first. */
+  /** Every active save owned by a user, oldest first. */
   listByUser(userId: string): Promise<readonly GameSave[]>;
+  /**
+   * Active saves of a user. Adapters that can race (Postgres) also lock the
+   * user's career set until the transaction ends, so a count followed by a
+   * create in the same transaction cannot exceed a limit.
+   */
+  countActiveByUser(userId: string): Promise<number>;
+  /** Distinct users with at least one active save. */
+  countActiveUsers(): Promise<number>;
+  /** Soft delete by the owner: hides the save and frees its slot. */
+  archive(
+    id: string,
+    userId: string,
+    expectedVersion: number,
+  ): Promise<GameSave>;
+  /** Hard delete by the owner, with its command receipts. */
+  delete(id: string, userId: string): Promise<void>;
   update(
     id: string,
     userId: string,

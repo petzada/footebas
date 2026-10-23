@@ -2,6 +2,7 @@ import type {
   BoardObjective,
   Club,
   ClubId,
+  CoachPersonality,
   FinancialLedger,
   HistoryEvent,
   JobProposal,
@@ -46,6 +47,8 @@ export interface PhaseFourState {
   readonly achievements: readonly PrestigeAchievement[];
   readonly events: readonly PhaseFourEvent[];
   readonly archiveKeys: readonly string[];
+  /** Coach personality of the career (ADR 0007); absent means the default. */
+  readonly coachPersonality?: CoachPersonality;
   /** Canonical engine state used only for whole-season orchestration. */
   readonly seasonWorld?: CareerWorldSave;
   /** Explicit boundary mapping from engine provenance ids to transport-safe ids. */

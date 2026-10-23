@@ -10,6 +10,7 @@ import {
 } from '@footebas/contracts';
 import { checksumSnapshot } from '@footebas/database';
 import {
+  coachEffects,
   acceptJobProposal,
   appendLedgerEntry,
   canonicalJson,
@@ -346,8 +347,13 @@ export class PhaseFourApplicationService {
       endsOn: command.payload.endsOn,
     };
     if (
-      evaluateRenewal(contract, proposal, player, Number(club.reputation)) ===
-      'refuse'
+      evaluateRenewal(
+        contract,
+        proposal,
+        player,
+        Number(club.reputation),
+        coachEffects(state.coachPersonality).negotiationPrice,
+      ) === 'refuse'
     ) {
       this.addEvent(
         state,
@@ -471,6 +477,7 @@ export class PhaseFourApplicationService {
       offer.fromClubId === undefined
         ? undefined
         : this.profile(state, offer.fromClubId);
+    const priceFactor = coachEffects(state.coachPersonality).negotiationPrice;
     const decision = decideClubOffer(
       offer,
       player,
@@ -480,6 +487,7 @@ export class PhaseFourApplicationService {
       seller === undefined
         ? []
         : state.players.filter(({ clubId }) => clubId === seller.clubId),
+      priceFactor,
     );
     state.offers = [...state.offers, offer];
     this.addEvent(
@@ -520,7 +528,7 @@ export class PhaseFourApplicationService {
       {
         fee: Math.max(
           offer.fee + 1,
-          Math.floor(Number(player.value) * 0.92),
+          Math.floor(Number(player.value) * 0.92 * priceFactor),
         ) as Money,
         wage: offer.wage,
         expiresOn: offer.expiresOn,

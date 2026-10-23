@@ -86,3 +86,4 @@ export * from './market.js';
 export * from './development.js';
 export * from './career-world.js';
 export * from './competition.js';
+export * from './coach.js';
