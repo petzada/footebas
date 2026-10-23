@@ -395,12 +395,16 @@ function MobileNavigation({
   const pending = Object.keys(badges).filter(
     (id) => !barDestinations.some(([bar]) => bar === id),
   ).length;
+  // Press Start 2P advances 1em per glyph, so "Escritório" is 10em: at
+  // <=375px the labels drop to .4rem and each column is at least as wide as
+  // its label (`minmax(min-content,1fr)`), so nothing overflows or truncates
+  // down to 320px while the columns stay equal whenever they fit.
   const itemClass =
-    'relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-0.5 font-pixel text-[.45rem] leading-none';
+    'relative flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 font-pixel text-[.4rem] leading-none whitespace-nowrap min-[376px]:text-[.45rem]';
   return (
     <nav
       aria-label="Navegação principal mobile"
-      className="panel-wood px-rise fixed inset-x-3 bottom-[max(.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 gap-1 px-1.5 py-1.5 lg:hidden"
+      className="panel-wood px-rise fixed inset-x-3 bottom-[max(.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-[repeat(5,minmax(min-content,1fr))] gap-1 px-1.5 py-1.5 lg:hidden"
     >
       {barDestinations.map(([id, label, Icon]) => (
         <button

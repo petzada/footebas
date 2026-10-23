@@ -826,6 +826,8 @@ export class FootebasApplication {
               careerId: job.careerId,
               userId: job.userId,
               displayName: snapshot.managerName.slice(0, 80),
+              // Shown next to the name on the ranking (ADR 0013).
+              avatar: snapshot.coach.avatar,
               recordedAt: this.deps.clock.now().toISOString(),
             })),
           );

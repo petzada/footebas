@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { RankingScreen } from '@/components/ranking-screen';
+import { RankingAvatar, RankingScreen } from '@/components/ranking-screen';
 import {
   cachedRankingPort,
   createFakeRankingPort,
@@ -87,6 +87,44 @@ describe('Ranking', () => {
     });
     expect(empty.textContent).toMatch(/pódio está vazio/i);
     expect(screen.queryByRole('group', { name: /minha posição/i })).toBeNull();
+  });
+
+  it('mostra o avatar do treinador e cai no pixel quando falta', async () => {
+    render(<RankingScreen port={createFakeRankingPort()} now={now} />);
+    const global = await screen.findByRole('region', {
+      name: /^ranking global$/i,
+    });
+    const rows = within(global).getAllByRole('row').slice(1);
+    // Demo rows: pixel ids for all but the last coach, who has none.
+    expect(rows[0]?.querySelector('[data-avatar="avatar-01"]')).not.toBeNull();
+    expect(
+      rows.at(-1)?.querySelector('[data-avatar-fallback="true"]'),
+    ).not.toBeNull();
+  });
+
+  it('usa a foto do treinador e troca pelo pixel se ela não carregar', () => {
+    const url = 'https://cdn.footebas.com.br/avatars/user_a.png';
+    const { container, rerender } = render(
+      <RankingAvatar avatar={url} name="Ana" />,
+    );
+    // The pixel fallback is an <img> too: look for the coach's picture.
+    const picture = 'img[data-avatar="custom"]';
+    const img = container.querySelector(picture);
+    expect(img?.getAttribute('src')).toBe(url);
+    expect(img?.getAttribute('alt')).toBe('');
+    if (img) fireEvent.error(img);
+    expect(container.querySelector(picture)).toBeNull();
+    expect(
+      container.querySelector('[data-avatar-fallback="true"]'),
+    ).not.toBeNull();
+    // Same name, same pixel coach; an unknown value falls back too.
+    rerender(<RankingAvatar avatar="avatar-99" name="Ana" />);
+    expect(
+      container.querySelector('[data-avatar-fallback="true"]'),
+    ).not.toBeNull();
+    // A new picture is tried again.
+    rerender(<RankingAvatar avatar={`${url}?v=2`} name="Ana" />);
+    expect(container.querySelector(picture)).not.toBeNull();
   });
 
   it('usa cache no cliente por escopo e período', async () => {

@@ -35,6 +35,7 @@ async function setup(instant: string) {
         careerId: 'career_ana',
         userId: 'user_ana',
         displayName: 'Ana',
+        avatar: 'avatar-05',
         type: 'promotion',
         competitionId: 'competition_serie_b',
         clubReputation: 55,
@@ -45,6 +46,7 @@ async function setup(instant: string) {
         careerId: 'career_bia',
         userId: 'user_bia',
         displayName: 'Bia',
+        avatar: 'https://lh3.googleusercontent.com/a/bia',
         type: 'league_title',
         points: 100,
         recordedAt: '2026-09-30T22:00:00.000Z',
@@ -53,6 +55,8 @@ async function setup(instant: string) {
         careerId: 'career_bia_2',
         userId: 'user_bia',
         displayName: 'Bia 2',
+        // Outside the profile contract: the read model drops it.
+        avatar: 'http://example.com/bia.png',
         points: 5,
       }),
     ]);
@@ -83,18 +87,25 @@ describe('ranking service', () => {
       total: 2,
     });
     expect(global.rows).toEqual([
-      { position: 1, displayName: 'Bia', points: 100 },
-      { position: 2, displayName: 'Ana', points: 45 },
+      {
+        position: 1,
+        displayName: 'Bia',
+        avatar: 'https://lh3.googleusercontent.com/a/bia',
+        points: 100,
+      },
+      { position: 2, displayName: 'Ana', avatar: 'avatar-05', points: 45 },
     ]);
     const monthly = await service.leaderboard({ scope: 'monthly' });
     // Bia's title was validated in September; October has her 5 points.
     expect(monthly.rows).toEqual([
-      { position: 1, displayName: 'Ana', points: 45 },
+      { position: 1, displayName: 'Ana', avatar: 'avatar-05', points: 45 },
       { position: 2, displayName: 'Bia 2', points: 5 },
     ]);
     expect(
       (await service.leaderboard({ scope: 'rise', limit: '1' })).rows,
-    ).toEqual([{ position: 1, displayName: 'Ana', points: 75 }]);
+    ).toEqual([
+      { position: 1, displayName: 'Ana', avatar: 'avatar-05', points: 75 },
+    ]);
   });
 
   it('closes the previous month on the first day of a month', async () => {
@@ -142,6 +153,7 @@ describe('ranking service', () => {
         position: 2,
         points: 45,
         displayName: 'Ana',
+        avatar: 'avatar-05',
         generatedAt: '2026-10-23T12:00:00.000Z',
       },
       {
@@ -150,6 +162,7 @@ describe('ranking service', () => {
         position: 1,
         points: 75,
         displayName: 'Ana',
+        avatar: 'avatar-05',
         generatedAt: '2026-10-23T12:00:00.000Z',
       },
       {
@@ -158,6 +171,7 @@ describe('ranking service', () => {
         position: 1,
         points: 45,
         displayName: 'Ana',
+        avatar: 'avatar-05',
         generatedAt: '2026-10-23T12:00:00.000Z',
       },
     ]);

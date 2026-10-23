@@ -7,6 +7,11 @@ export type RankingScope = 'global' | 'rise' | 'monthly';
 export interface RankingRow {
   readonly position: number;
   readonly displayName: string;
+  /**
+   * Coach avatar of the career: pixel id (`avatar-01`…`avatar-12`) or the
+   * https URL of the coach's picture. Absent for older achievements.
+   */
+  readonly avatar?: string;
   readonly points: number;
 }
 
@@ -25,6 +30,7 @@ export interface MyRankingEntry {
   readonly position?: number;
   readonly points?: number;
   readonly displayName?: string;
+  readonly avatar?: string;
 }
 
 export interface RankingPort {
@@ -117,6 +123,10 @@ export function demoRankingView(
     rows: demoNames.map((displayName, index) => ({
       position: index + 1,
       displayName,
+      // The last coach has no avatar yet: the screen shows the fallback.
+      ...(index < demoNames.length - 1
+        ? { avatar: `avatar-${String(index + 1).padStart(2, '0')}` }
+        : {}),
       points: base - index * (scope === 'monthly' ? 9 : 35),
     })),
   };
