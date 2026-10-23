@@ -58,7 +58,7 @@ describe('HttpCareerApi · contadores públicos', () => {
 describe('HttpCareerApi · carreiras do usuário', () => {
   const list = {
     version: 1,
-    careerLimit: 5,
+    limits: { plan: 'licensed', maxCareers: 5, anyClub: true, activeCareers: 2 },
     careers: [
       {
         careerId: 'career_a',
@@ -68,7 +68,7 @@ describe('HttpCareerApi · carreiras do usuário', () => {
         clubName: 'Flamengo',
         season: 2026,
         currentDate: '2026-04-12',
-        name: 'Rumo ao tri',
+        careerName: 'Rumo ao tri',
         updatedAt: '2026-10-20T15:00:00.000Z',
       },
       {

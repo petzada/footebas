@@ -93,13 +93,12 @@ interface CareerListModel {
     clubName?: string;
     season?: number;
     currentDate?: string;
-    /** Assumed: career name, once the server stores it. */
-    name?: string;
-    /** Assumed: last change timestamp (ISO). */
+    careerName?: string;
+    /** Last change timestamp (ISO), when the server sends it. */
     updatedAt?: string;
   }[];
-  /** Assumed: careers allowed by the player's plan. */
-  careerLimit?: number;
+  /** Plan limit (docs/09 decision 5). */
+  limits?: { maxCareers: number; activeCareers?: number };
 }
 
 // --- transport shapes (subset of @footebas/contracts read models) ---
@@ -689,13 +688,13 @@ export class HttpCareerApi implements CareerApiPort {
       careers: list.careers.map((item): CareerSummary => ({
         id: item.careerId,
         coach: item.managerName ?? 'Treinador',
-        ...(item.name ? { name: item.name } : {}),
+        ...(item.careerName ? { name: item.careerName } : {}),
         ...(item.clubName ? { clubName: item.clubName } : {}),
         ...(item.season === undefined ? {} : { season: item.season }),
         ...(item.currentDate ? { currentDate: item.currentDate } : {}),
         ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
       })),
-      ...(list.careerLimit === undefined ? {} : { limit: list.careerLimit }),
+      ...(list.limits === undefined ? {} : { limit: list.limits.maxCareers }),
     };
   }
 
