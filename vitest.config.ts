@@ -6,7 +6,7 @@ export default defineConfig({
       provider: 'v8',
     },
     passWithNoTests: false,
-    exclude: ['**/dist/**', '**/node_modules/**'],
+    exclude: ['**/dist/**', '**/node_modules/**', '**/.claude/**'],
     // Statistical engine tests run thousands of matches; turbo runs packages in
     // parallel on CI, so allow headroom instead of flaking at 10 s.
     testTimeout: 60_000,
