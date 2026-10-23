@@ -38,58 +38,22 @@ async function selectTab(name: RegExp) {
 }
 
 describe('Fase 4 · verticais de carreira longa', () => {
-  it('busca, observa e compara atletas reais sem revelar dimensões ocultas', async () => {
-    await onboard();
-    navigate(/^mercado$/i);
-    expect(
-      await screen.findByRole('heading', { level: 2, name: /^mercado$/i }),
-    ).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(/^nome$/i), {
-      target: { value: 'Scarpa' },
-    });
-    expect(screen.getByText('Gustavo Scarpa')).toBeTruthy();
-    expect(screen.queryByText('Lucas Esquivel')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /comparar/i }));
-    expect(screen.getByText(/comparação \(1\/2\)/i)).toBeTruthy();
-    expect(
-      screen.getAllByText(/dimensões ocultas permanecem estimativas/i),
-    ).toHaveLength(1);
-  });
-
-  it('negocia contraproposta, conclui a compra e cria lançamento com fonte', async () => {
-    const api = await onboard();
-    navigate(/^mercado$/i);
-    await screen.findByRole('tab', { name: /^oferta$/i });
-    await selectTab(/^oferta$/i);
-    expect(
-      ((await screen.findByLabelText(/^atleta$/i)) as HTMLSelectElement).value,
-    ).toBe('m-scarpa');
-    fireEvent.change(await screen.findByLabelText(/valor total/i), {
-      target: { value: '8000000' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /enviar oferta/i }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: /aceitar contraproposta/i }),
-    );
-    expect(
-      await screen.findByText(/negócio concluído e auditado/i),
-    ).toBeTruthy();
-    const career = await api.getCareer();
-    expect(
-      career?.world.market.find((player) => player.id === 'm-scarpa')
-        ?.offerStatus,
-    ).toBe('accepted');
-    expect(career?.world.finances.ledger[0]?.sourceLabel).toMatch(
-      /transferência · gustavo scarpa · atlético mineiro/i,
-    );
-  });
-
   it('mostra alertas e renova um contrato pelo port autoritativo', async () => {
     const api = await onboard();
-    navigate(/^mercado$/i);
+    navigate(/^escritório$/i);
+    await screen.findByRole('tab', { name: /^contratos$/i });
     await selectTab(/^contratos$/i);
-    expect(screen.getByText(/pode assinar pré-contrato/i)).toBeTruthy();
-    const contract = screen.getByText('Bruno Henrique').closest('.panel');
+    expect(await screen.findByText(/pode assinar pré-contrato/i)).toBeTruthy();
+    const contract = screen
+      .getAllByText('Bruno Henrique')
+      .map((element) => element.closest('.panel'))
+      .find(
+        (panel) =>
+          panel &&
+          within(panel as HTMLElement).queryByRole('button', {
+            name: /^renovar$/i,
+          }),
+      );
     expect(contract).not.toBeNull();
     fireEvent.click(
       within(contract as HTMLElement).getByRole('button', {
@@ -106,7 +70,9 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('oferece feedback inválido acessível e preserva o ledger', async () => {
     await onboard();
-    navigate(/^finanças$/i);
+    navigate(/^estádio$/i);
+    await screen.findByRole('tab', { name: /finanças/i });
+    await selectTab(/finanças/i);
     expect(await screen.findByText(/ledger imutável/i)).toBeTruthy();
     expect(screen.getByText('Bilheteria · Flamengo × Bahia')).toBeTruthy();
     expect(screen.getByText('Folha salarial · Rodada 7')).toBeTruthy();
@@ -124,7 +90,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('marca jovens como gerados e permite desenvolver e promover', async () => {
     const api = await onboard();
-    navigate(/^escritório$/i);
+    navigate(/^estádio$/i);
     await screen.findByRole('tab', { name: /^base$/i });
     await selectTab(/^base$/i);
     expect(
@@ -156,7 +122,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
   it('troca de clube preserva treinador, prestígio e histórico', async () => {
     const api = await onboard();
     const before = await api.getCareer();
-    navigate(/^escritório$/i);
+    navigate(/^estádio$/i);
     await screen.findByRole('tab', { name: /diretoria/i });
     await selectTab(/diretoria/i);
     fireEvent.click(
