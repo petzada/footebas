@@ -647,7 +647,7 @@ function Onboarding(props: {
           {props.stage === 'login' && props.signedIn ? (
             <>
               <CardHeader>
-                <CardTitle className="font-display text-3xl uppercase">
+                <CardTitle className="font-display text-xs uppercase">
                   Abrindo o vestiário
                 </CardTitle>
               </CardHeader>
@@ -675,7 +675,7 @@ function Onboarding(props: {
             <>
               <CardHeader>
                 <Badge className="w-fit">Acesso local</Badge>
-                <CardTitle className="font-display text-3xl uppercase">
+                <CardTitle className="font-display text-xs uppercase">
                   Volte para a beira do campo
                 </CardTitle>
                 <CardDescription>
@@ -708,7 +708,7 @@ function Onboarding(props: {
                 <Badge variant="secondary" className="w-fit">
                   Falta o clube
                 </Badge>
-                <CardTitle className="font-display text-3xl uppercase">
+                <CardTitle className="font-display text-xs uppercase">
                   Escolha seu desafio
                 </CardTitle>
                 <CardDescription>
@@ -785,7 +785,7 @@ function Squad({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <h2 className="font-display text-3xl font-bold uppercase">
+          <h2 className="font-display text-xs font-bold uppercase">
             Vestiário
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -814,7 +814,7 @@ function Squad({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(19rem,.8fr)]">
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl uppercase">
+            <CardTitle className="font-display text-sm uppercase">
               Grupos do elenco
             </CardTitle>
             <CardDescription>
@@ -933,14 +933,14 @@ function PlayerDetail({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="font-display text-2xl uppercase">
+            <CardTitle className="font-display text-base uppercase">
               {player.name}
             </CardTitle>
             <CardDescription>
               #{player.shirt} · {player.age} anos · {player.nationality}
             </CardDescription>
           </div>
-          <span className="font-display text-5xl font-bold text-primary">
+          <span className="font-display text-base font-bold text-primary">
             {player.strength}
           </span>
         </div>
@@ -1106,7 +1106,7 @@ function Tactics({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)]">
       <Card>
         <CardHeader>
-          <CardTitle className="font-display text-2xl uppercase">
+          <CardTitle className="font-display text-base uppercase">
             Prancheta compacta
           </CardTitle>
           <CardDescription>
@@ -1243,7 +1243,7 @@ function Pitch({
   return (
     <Card className="xl:sticky xl:top-6 xl:self-start">
       <CardHeader>
-        <CardTitle className="font-display text-xl uppercase">
+        <CardTitle className="font-display text-sm uppercase">
           {formation} em campo
         </CardTitle>
         <CardDescription>Os nomes refletem os 11 titulares.</CardDescription>
@@ -1400,7 +1400,7 @@ function Matchday(props: {
               className="mx-auto mb-3 size-7 text-primary"
               weight="fill"
             />
-            <p className="font-display text-xl font-bold uppercase">
+            <p className="font-display text-sm font-bold uppercase">
               {props.update.message}
             </p>
           </div>
@@ -1435,7 +1435,7 @@ function Matchday(props: {
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl uppercase">
+            <CardTitle className="font-display text-sm uppercase">
               Intervenções
             </CardTitle>
             <CardDescription>
@@ -1535,7 +1535,7 @@ function Matchday(props: {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl uppercase">
+            <CardTitle className="font-display text-sm uppercase">
               Narração
             </CardTitle>
           </CardHeader>
@@ -1603,7 +1603,7 @@ function Result({
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-center">
           <div>
-            <h2 className="font-display text-2xl font-bold uppercase">
+            <h2 className="font-display text-base font-bold uppercase">
               {result.headline}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -1641,7 +1641,7 @@ function Standings({ career }: { career: CareerView }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-display text-2xl uppercase">
+        <CardTitle className="font-display text-base uppercase">
           Classificação
         </CardTitle>
         <CardDescription>
@@ -1664,7 +1664,7 @@ function Standings({ career }: { career: CareerView }) {
               .sort((a, b) => b.points - a.points)
               .map((row, index) => (
                 <TableRow key={row.club}>
-                  <TableCell className="font-display text-lg font-bold">
+                  <TableCell className="font-display text-xs font-bold">
                     {index + 1}
                   </TableCell>
                   <TableCell
@@ -1678,7 +1678,7 @@ function Standings({ career }: { career: CareerView }) {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">{row.played}</TableCell>
-                  <TableCell className="text-right font-display text-lg font-bold">
+                  <TableCell className="text-right font-display text-xs font-bold">
                     {row.points}
                   </TableCell>
                 </TableRow>
@@ -1716,7 +1716,7 @@ function SeasonScreen({
           <div>
             <h2
               id="temporada-em-construcao"
-              className="font-display text-2xl font-bold uppercase"
+              className="font-display text-base font-bold uppercase"
             >
               Em construção
             </h2>

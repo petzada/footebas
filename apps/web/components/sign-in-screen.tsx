@@ -117,7 +117,7 @@ export function SignInScreen({
     <AuthFrame>
       <Card>
         <CardHeader>
-          <CardTitle className="font-display text-3xl uppercase">
+          <CardTitle className="font-display text-xs uppercase">
             {status === 'sent' ? (
               <h1 ref={confirmation} tabIndex={-1} className="outline-none">
                 Confira seu e-mail
