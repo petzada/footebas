@@ -17,7 +17,7 @@ const glueFile = 'dados/elencos/forca-relativa-cola.md';
 const highlightsFile = 'dados/elencos/destaques-2026.md';
 const hasHighlights = existsSync(join(root, highlightsFile));
 const input = {
-  contentVersion: 'catalog-2026-07-v2',
+  contentVersion: 'catalog-2026-07-v3',
   snapshotDate: '2026-07',
   files: Object.fromEntries(
     [
@@ -150,5 +150,26 @@ describe('catálogo canônico de conteúdo', () => {
     expect(
       catalog.notes.filter(({ kind }) => kind === 'excluded-over-cap').length,
     ).toBeGreaterThan(0);
+  });
+
+  it('marca os destaques da pesquisa com fonte e vantagem nos atributos', () => {
+    const catalog = loadCatalog();
+    const craques = catalog.players.filter(
+      ({ highlight }) => highlight?.level === 'craque',
+    );
+    expect(craques.length).toBeGreaterThanOrEqual(10);
+    for (const player of craques) {
+      expect(player.highlight?.source).toMatch(
+        /^(https?:\/\/|dados\/elencos\/)/,
+      );
+      expect(player.derived.bigGame).toBeGreaterThanOrEqual(85);
+    }
+    const flamengo = catalog.players.filter(
+      ({ clubId }) => clubId === 'club_flamengo',
+    );
+    const best = [...flamengo].sort(
+      (a, b) => b.derived.strength - a.derived.strength,
+    )[0];
+    expect(best?.highlight).toBeDefined();
   });
 });

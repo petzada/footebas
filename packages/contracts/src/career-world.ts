@@ -108,6 +108,19 @@ export const careerWorldReadModelSchema = z.strictObject({
       status: z.enum(['active', 'expiring', 'expired', 'terminated']),
     }),
   ),
+  offers: z.array(
+    z.strictObject({
+      id: entityIdSchema,
+      playerId: entityIdSchema,
+      playerName: nonEmptyTextSchema,
+      kind: z.enum(['buy', 'loan']),
+      fee: moneySchema,
+      wage: moneySchema,
+      status: z.string().min(1),
+      expiresOn: gameDateSchema,
+      counterOf: entityIdSchema.optional(),
+    }),
+  ),
   youth: z.array(
     z.strictObject({
       playerId: entityIdSchema,
@@ -143,4 +156,25 @@ export const careerWorldReadModelSchema = z.strictObject({
     .max(200),
 });
 
+export const careerListReadModelSchema = z.strictObject({
+  version: transportVersionSchema,
+  careers: z.array(
+    z.strictObject({
+      careerId: entityIdSchema,
+      aggregateVersion: versionSchema,
+      managerName: nonEmptyTextSchema,
+      clubId: entityIdSchema.optional(),
+      clubName: nonEmptyTextSchema.optional(),
+      season: z.int().positive(),
+      currentDate: gameDateSchema,
+    }),
+  ),
+});
+
+export const devSessionRequestSchema = z.strictObject({
+  email: z.email(),
+  displayName: nonEmptyTextSchema.optional(),
+});
+
+export type CareerListReadModel = z.infer<typeof careerListReadModelSchema>;
 export type CareerWorldReadModel = z.infer<typeof careerWorldReadModelSchema>;

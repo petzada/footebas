@@ -55,6 +55,14 @@ class MemorySaveRepository implements GameSaveRepository {
     const save = this.state.saves.get(id);
     return Promise.resolve(save === undefined ? undefined : clone(save));
   }
+  listByUser(userId: string): Promise<readonly GameSave[]> {
+    return Promise.resolve(
+      [...this.state.saves.values()]
+        .filter((save) => save.userId === userId)
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+        .map(clone),
+    );
+  }
   update(
     id: string,
     userId: string,

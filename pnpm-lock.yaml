@@ -59,6 +59,9 @@ importers:
       '@footebas/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@footebas/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       fastify:
         specifier: 5.10.0
         version: 5.10.0
@@ -176,6 +179,9 @@ importers:
 
   packages/application:
     dependencies:
+      '@footebas/content':
+        specifier: workspace:*
+        version: link:../content
       '@footebas/contracts':
         specifier: workspace:*
         version: link:../contracts

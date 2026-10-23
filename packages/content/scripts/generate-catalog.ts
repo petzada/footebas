@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCatalog, type ExtraClubConfig } from '../src/build.js';
 
-const CONTENT_VERSION = 'catalog-2026-07-v2';
+const CONTENT_VERSION = 'catalog-2026-07-v3';
 const SNAPSHOT_DATE = '2026-07';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');

@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import {
+  attackDirectionSchema,
+  attackFocusSchema,
+  buildUpStyleSchema,
+  defensiveLineSchema,
   entityIdSchema,
+  formationSchema,
+  markingIntensitySchema,
+  markingStyleSchema,
+  mentalitySchema,
+  pressingStyleSchema,
   gameDateSchema,
   moneySchema,
   nonEmptyTextSchema,
@@ -43,6 +52,7 @@ const squadPlayerSchema = z.strictObject({
   position: positionSchema,
   secondaryPositions: z.array(positionSchema),
   preferredSide: z.enum(['left', 'right', 'center']).optional(),
+  shirtNumber: z.int().min(0).max(99).optional(),
   strength: z.number().min(1).max(100),
   traits: z.array(playerTraitSchema).max(2),
   condition: percentageSchema,
@@ -75,6 +85,19 @@ export const squadReadModelSchema = z.strictObject({
   club: clubSummarySchema,
   players: z.array(squadPlayerSchema).max(100),
   lineupPlayerIds: z.array(entityIdSchema).max(100),
+  tactic: z
+    .strictObject({
+      formation: formationSchema,
+      mentality: mentalitySchema,
+      attackDirection: attackDirectionSchema,
+      marking: markingIntensitySchema,
+      buildUp: buildUpStyleSchema.optional(),
+      focus: attackFocusSchema.optional(),
+      press: pressingStyleSchema.optional(),
+      defensiveLine: defensiveLineSchema.optional(),
+      markingStyle: markingStyleSchema.optional(),
+    })
+    .optional(),
   lineup: z
     .strictObject({
       formation: z.enum(['4-4-2', '4-3-3', '3-5-2']),
@@ -185,6 +208,16 @@ export const postMatchReadModelSchema = z.strictObject({
   awayClub: clubSummarySchema,
   score: scoreSchema,
   timeline: z.array(timelineEventSchema).max(500),
+  participants: z
+    .array(
+      z.strictObject({
+        id: entityIdSchema,
+        name: nonEmptyTextSchema,
+        side: z.enum(['home', 'away']),
+      }),
+    )
+    .max(80)
+    .optional(),
   tableUpdated: z.boolean(),
   playback: z.strictObject({
     modes: z.tuple([

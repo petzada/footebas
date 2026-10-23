@@ -10,6 +10,8 @@ export interface GameSaveRepository {
   load(id: string, userId: string): Promise<GameSave | undefined>;
   /** Loads without an ownership check; callers must authorize the owner. */
   peek(id: string): Promise<GameSave | undefined>;
+  /** Every save owned by a user, oldest first. */
+  listByUser(userId: string): Promise<readonly GameSave[]>;
   update(
     id: string,
     userId: string,

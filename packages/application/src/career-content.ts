@@ -74,6 +74,10 @@ export function careerContentFromCatalog(
           id: entityId(player.id, 'player'),
           name: player.name,
           age: player.derived.age,
+          ...(player.shirt.status === 'known' ||
+          player.shirt.status === 'conflict'
+            ? { shirtNumber: player.shirt.number }
+            : {}),
           position: player.position,
           secondaryPositions: SECONDARY[player.position],
           ...(player.preferredSide === undefined

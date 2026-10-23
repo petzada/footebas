@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- lookups follow explicit guards and content invariants */
 import {
   commandAcceptedSchema,
+  careerListReadModelSchema,
   careerWorldReadModelSchema,
   commandSchema,
   homeReadModelSchema,
@@ -10,6 +11,7 @@ import {
   squadReadModelSchema,
   standingsReadModelSchema,
   type Command,
+  type CareerListReadModel,
   type CareerWorldReadModel,
   type CommandAccepted,
   type HomeReadModel,
@@ -772,6 +774,9 @@ export class FootebasApplication {
             position: p.position,
             secondaryPositions: p.secondaryPositions,
             ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
+            ...(p.shirtNumber === undefined
+              ? {}
+              : { shirtNumber: p.shirtNumber }),
             strength: p.strength,
             traits: p.traits,
             condition: p.condition,
@@ -815,6 +820,7 @@ export class FootebasApplication {
               ...(s.lineup.reserves ?? []),
             ]
           : [],
+        ...(s.tactic ? { tactic: s.tactic } : {}),
         lineup:
           s.lineup && s.tactic
             ? {
@@ -904,6 +910,33 @@ export class FootebasApplication {
       return postMatchModel(save, s, played, now, true);
     });
   }
+  public async careers(bearer: string): Promise<CareerListReadModel> {
+    const user = await this.identity(bearer);
+    const saves = await this.deps.unitOfWork.withCareerLock(
+      `user:${user.userId}`,
+      (tx) => tx.saves.listByUser(user.userId),
+    );
+    return careerListReadModelSchema.parse({
+      version: 1,
+      careers: saves
+        .filter((save) => save.versions.schema === CAREER_SAVE_SCHEMA)
+        .map((save) => {
+          const snapshot = save.snapshot as unknown as Snapshot;
+          const club = snapshot.clubs.find(
+            ({ id }) => id === snapshot.selectedClubId,
+          );
+          return {
+            careerId: save.id,
+            aggregateVersion: save.version,
+            managerName: snapshot.managerName,
+            ...(club ? { clubId: club.id, clubName: club.name } : {}),
+            season: snapshot.season,
+            currentDate: snapshot.currentDate,
+          };
+        }),
+    });
+  }
+
   public async careerWorld(
     bearer: string,
     careerId: string,
@@ -1028,6 +1061,23 @@ export class FootebasApplication {
             endsOn: contract.endsOn,
             wage: Number(contract.wage),
             status: contract.status,
+          })),
+        offers: world.offers
+          .filter(
+            (offer) => offer.toClubId === clubId || offer.fromClubId === clubId,
+          )
+          .map((offer) => ({
+            id: offer.id,
+            playerId: offer.playerId,
+            playerName: playerNames.get(offer.playerId) ?? offer.playerId,
+            kind: offer.kind,
+            fee: Number(offer.fee),
+            wage: Number(offer.wage),
+            status: offer.status,
+            expiresOn: offer.expiresOn,
+            ...(offer.counterOf === undefined
+              ? {}
+              : { counterOf: offer.counterOf }),
           })),
         youth: world.youth
           .filter(({ player }) => player.clubId === clubId)
@@ -1414,6 +1464,12 @@ function postMatchModel(
     awayClub: clubSummary(s, f.awayClubId),
     score: { home: result.homeGoals, away: result.awayGoals },
     timeline,
+    participants: (result.playerPerformances ?? []).flatMap((performance) => {
+      const player = s.players.find(({ id }) => id === performance.playerId);
+      return player
+        ? [{ id: player.id, name: player.name, side: performance.side }]
+        : [];
+    }),
     tableUpdated: committed,
     playback: createMatchPresentation(result).playback,
   });

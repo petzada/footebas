@@ -1,12 +1,12 @@
-# Relatório do catálogo catalog-2026-07-v2
+# Relatório do catálogo catalog-2026-07-v3
 
-Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/brasileirao-serie-b-2026.md`, `dados/elencos/brasileirao-serie-c-2026.md`, `dados/elencos/estaduais-1a-divisao-2026.md`, `dados/elencos/copa-do-brasil-2026.md`, `dados/elencos/copa-libertadores-2026.md`, `dados/elencos/forca-relativa-cola.md`.
+Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/brasileirao-serie-b-2026.md`, `dados/elencos/brasileirao-serie-c-2026.md`, `dados/elencos/estaduais-1a-divisao-2026.md`, `dados/elencos/copa-do-brasil-2026.md`, `dados/elencos/copa-libertadores-2026.md`, `dados/elencos/forca-relativa-cola.md`, `dados/elencos/destaques-2026.md`.
 
 - Clubes: 71
 - Jogadores: 2310
 - Clubes [parcial]: 31
 - Clubes por origem: national 60, state 1, foreign 10
-- Destaques: 0 craques, 0 destaques
+- Destaques: 15 craques, 96 destaques
 
 ## Lacunas mantidas explícitas (nada foi inventado)
 
@@ -17,6 +17,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 - `partial-club`: 31
 - `unknown-shirt`: 446
 - `assumed-strength-tier`: 11
+- `highlight-not-in-roster`: 8
 - `name-in-several-clubs`: 492
 
 ## Detalhe
@@ -82,7 +83,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | excluded-over-cap | club_sao_paulo:Aurélio Buta | dados/elencos/brasileirao-serie-a-2026.md:654 |
 | excluded-over-cap | club_sao_paulo:Newton | dados/elencos/brasileirao-serie-a-2026.md:661 |
 | excluded-over-cap | club_sao_paulo:Victor Sá | dados/elencos/brasileirao-serie-a-2026.md:672 |
-| excluded-over-cap | club_sao_paulo:Jonathan Calleri | dados/elencos/brasileirao-serie-a-2026.md:679 |
+| excluded-over-cap | club_sao_paulo:André Silva | dados/elencos/brasileirao-serie-a-2026.md:678 |
 | excluded-over-cap | club_sao_paulo:Luciano | dados/elencos/brasileirao-serie-a-2026.md:680 |
 | excluded-over-cap | club_sao_paulo:Paulinho | dados/elencos/brasileirao-serie-a-2026.md:681 |
 | absent-shirt | player_vasco_da_gama_riquelme | dados/elencos/brasileirao-serie-a-2026.md:694 |
@@ -99,9 +100,9 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | excluded-over-cap | club_america_mineiro:Heitor | dados/elencos/brasileirao-serie-b-2026.md:53 |
 | excluded-over-cap | club_america_mineiro:Leo Izidoro | dados/elencos/brasileirao-serie-b-2026.md:59 |
 | excluded-over-cap | club_america_mineiro:Gabriel Oliveira Santos | dados/elencos/brasileirao-serie-b-2026.md:71 |
+| excluded-over-cap | club_america_mineiro:Thauan | dados/elencos/brasileirao-serie-b-2026.md:75 |
+| excluded-over-cap | club_america_mineiro:Matías Segovia | dados/elencos/brasileirao-serie-b-2026.md:76 |
 | excluded-over-cap | club_america_mineiro:Rodrigo Piñeiro | dados/elencos/brasileirao-serie-b-2026.md:77 |
-| excluded-over-cap | club_america_mineiro:Willian Bigode | dados/elencos/brasileirao-serie-b-2026.md:78 |
-| excluded-over-cap | club_america_mineiro:Gonzalo Mastriani | dados/elencos/brasileirao-serie-b-2026.md:79 |
 | excluded-over-cap | club_america_mineiro:Everton Sidnei De Brito | dados/elencos/brasileirao-serie-b-2026.md:80 |
 | excluded-over-cap | club_america_mineiro:Yarlen | dados/elencos/brasileirao-serie-b-2026.md:81 |
 | excluded-over-cap | club_america_mineiro:Pedro Geovane Paranhos Santos | dados/elencos/brasileirao-serie-b-2026.md:82 |
@@ -115,6 +116,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | excluded-over-cap | club_athletic_club:Eduardo Filipe Silva De Oliveira | dados/elencos/brasileirao-serie-b-2026.md:121 |
 | excluded-over-cap | club_athletic_club:Leandro Silva | dados/elencos/brasileirao-serie-b-2026.md:122 |
 | excluded-over-cap | club_athletic_club:Luiz Fernando Souza Santos | dados/elencos/brasileirao-serie-b-2026.md:123 |
+| excluded-over-cap | club_athletic_club:Léo Chú | dados/elencos/brasileirao-serie-b-2026.md:126 |
 | excluded-over-cap | club_athletic_club:Bruninho | dados/elencos/brasileirao-serie-b-2026.md:128 |
 | excluded-over-cap | club_athletic_club:João Adriano | dados/elencos/brasileirao-serie-b-2026.md:129 |
 | excluded-over-cap | club_athletic_club:Leandro Alves | dados/elencos/brasileirao-serie-b-2026.md:130 |
@@ -126,7 +128,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | excluded-over-cap | club_athletic_club:Wilinton Aponzá | dados/elencos/brasileirao-serie-b-2026.md:137 |
 | excluded-over-cap | club_athletic_club:Caua Medeiros Araujo | dados/elencos/brasileirao-serie-b-2026.md:138 |
 | excluded-over-cap | club_athletic_club:Gabriel Da Silva Sinfronio | dados/elencos/brasileirao-serie-b-2026.md:139 |
-| excluded-over-cap | club_athletic_club:Ronaldo Tavares | dados/elencos/brasileirao-serie-b-2026.md:140 |
 | excluded-over-cap | club_athletic_club:Samuel Da Conceição Schirmer | dados/elencos/brasileirao-serie-b-2026.md:141 |
 | absent-shirt | player_athletic_club_eduardo_freire | dados/elencos/brasileirao-serie-b-2026.md:87 |
 | absent-shirt | player_athletic_club_glauco | dados/elencos/brasileirao-serie-b-2026.md:88 |
@@ -143,7 +144,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | absent-shirt | player_athletic_club_kazim | dados/elencos/brasileirao-serie-b-2026.md:104 |
 | absent-shirt | player_athletic_club_matheus_pimenta | dados/elencos/brasileirao-serie-b-2026.md:105 |
 | absent-shirt | player_athletic_club_sam_philip | dados/elencos/brasileirao-serie-b-2026.md:106 |
-| absent-shirt | player_athletic_club_leo_chu | dados/elencos/brasileirao-serie-b-2026.md:126 |
+| absent-shirt | player_athletic_club_ronaldo_tavares | dados/elencos/brasileirao-serie-b-2026.md:140 |
 | partial-club | club_atletico_goianiense | dados/elencos/brasileirao-serie-b-2026.md:143 |
 | excluded-over-cap | club_atletico_goianiense:Ariel | dados/elencos/brasileirao-serie-b-2026.md:174 |
 | excluded-over-cap | club_atletico_goianiense:Gabriel Araujo | dados/elencos/brasileirao-serie-b-2026.md:175 |
@@ -155,9 +156,9 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | excluded-over-cap | club_atletico_goianiense:Riquelme | dados/elencos/brasileirao-serie-b-2026.md:181 |
 | excluded-over-cap | club_atletico_goianiense:Sancho | dados/elencos/brasileirao-serie-b-2026.md:182 |
 | excluded-over-cap | club_atletico_goianiense:Vitinho | dados/elencos/brasileirao-serie-b-2026.md:183 |
+| excluded-over-cap | club_atletico_goianiense:Marrony | dados/elencos/brasileirao-serie-b-2026.md:188 |
 | excluded-over-cap | club_atletico_goianiense:Daniel Lima | dados/elencos/brasileirao-serie-b-2026.md:189 |
 | excluded-over-cap | club_atletico_goianiense:Geovany Soares | dados/elencos/brasileirao-serie-b-2026.md:190 |
-| excluded-over-cap | club_atletico_goianiense:Gustavo Coutinho | dados/elencos/brasileirao-serie-b-2026.md:191 |
 | excluded-over-cap | club_atletico_goianiense:Léo Jacó | dados/elencos/brasileirao-serie-b-2026.md:192 |
 | excluded-over-cap | club_atletico_goianiense:Alan | dados/elencos/brasileirao-serie-b-2026.md:193 |
 | excluded-over-cap | club_atletico_goianiense:Eduardo Taumaturgo | dados/elencos/brasileirao-serie-b-2026.md:194 |
@@ -200,7 +201,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | absent-shirt | player_atletico_goianiense_bruno_jose | dados/elencos/brasileirao-serie-b-2026.md:185 |
 | absent-shirt | player_atletico_goianiense_lima | dados/elencos/brasileirao-serie-b-2026.md:186 |
 | absent-shirt | player_atletico_goianiense_leo_tocantins | dados/elencos/brasileirao-serie-b-2026.md:187 |
-| absent-shirt | player_atletico_goianiense_marrony | dados/elencos/brasileirao-serie-b-2026.md:188 |
+| absent-shirt | player_atletico_goianiense_gustavo_coutinho | dados/elencos/brasileirao-serie-b-2026.md:191 |
 | partial-club | club_avai | dados/elencos/brasileirao-serie-b-2026.md:201 |
 | excluded-over-cap | club_avai:Reynaldo | dados/elencos/brasileirao-serie-b-2026.md:212 |
 | excluded-over-cap | club_avai:Kevin | dados/elencos/brasileirao-serie-b-2026.md:233 |
@@ -277,7 +278,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | excluded-over-cap | club_juventude:Sasso | dados/elencos/brasileirao-serie-b-2026.md:590 |
 | excluded-over-cap | club_juventude:Schroeder | dados/elencos/brasileirao-serie-b-2026.md:591 |
 | excluded-over-cap | club_juventude:Yarlei | dados/elencos/brasileirao-serie-b-2026.md:592 |
-| excluded-over-cap | club_juventude:Alan Kardec | dados/elencos/brasileirao-serie-b-2026.md:598 |
+| excluded-over-cap | club_juventude:Lucas Alves | dados/elencos/brasileirao-serie-b-2026.md:597 |
 | excluded-over-cap | club_juventude:Alisson Safira | dados/elencos/brasileirao-serie-b-2026.md:599 |
 | excluded-over-cap | club_juventude:Carlinhos | dados/elencos/brasileirao-serie-b-2026.md:600 |
 | excluded-over-cap | club_juventude:João Scatolin | dados/elencos/brasileirao-serie-b-2026.md:601 |
@@ -916,6 +917,14 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | absent-shirt | player_primavera_gabriel_poveda | dados/elencos/estaduais-1a-divisao-2026.md:508 |
 | absent-shirt | player_primavera_neto | dados/elencos/estaduais-1a-divisao-2026.md:509 |
 | absent-shirt | player_primavera_vinicius | dados/elencos/estaduais-1a-divisao-2026.md:510 |
+| highlight-not-in-roster | velo clube:Sillas | dados/elencos/destaques-2026.md:0 |
+| highlight-not-in-roster | portuguesa:Igor Torres | dados/elencos/destaques-2026.md:0 |
+| highlight-not-in-roster | capivariano:Matheus Teixeira | dados/elencos/destaques-2026.md:0 |
+| highlight-not-in-roster | noroeste:Pedro Felipe | dados/elencos/destaques-2026.md:0 |
+| highlight-not-in-roster | jacuipense:Thiaguinho | dados/elencos/destaques-2026.md:0 |
+| highlight-not-in-roster | juazeirense:Zé Romário | dados/elencos/destaques-2026.md:0 |
+| highlight-not-in-roster | atletico de alagoinhas:Miller | dados/elencos/destaques-2026.md:0 |
+| highlight-not-in-roster | galicia:Ivisson | dados/elencos/destaques-2026.md:0 |
 | name-in-several-clubs | player_athletico_paranaense_leo | dados/elencos/brasileirao-serie-a-2026.md:40 |
 | name-in-several-clubs | player_athletico_paranaense_dantas | dados/elencos/brasileirao-serie-a-2026.md:41 |
 | name-in-several-clubs | player_athletico_paranaense_dudu | dados/elencos/brasileirao-serie-a-2026.md:47 |

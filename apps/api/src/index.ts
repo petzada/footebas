@@ -3,6 +3,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import {
   ApplicationError,
   AuthenticationError,
+  FakeBearerAuth,
   PhaseFourApplicationService,
   PhaseFourAuthorizationError,
   PhaseFourConflictError,
@@ -17,7 +18,9 @@ import {
 } from '@footebas/application';
 import {
   apiErrorSchema,
+  careerListReadModelSchema,
   careerWorldReadModelSchema,
+  devSessionRequestSchema,
   commandAcceptedSchema,
   commandSchema,
   comparePlayersQuerySchema,
@@ -56,6 +59,10 @@ export interface ApiDependencies {
     application: PhaseFiveCompetitionService;
     auth: AuthPort;
   }>;
+  /** Development-only sign-in that issues fake bearer tokens. Never in production. */
+  readonly devAuth?: FakeBearerAuth;
+  /** Browser origins allowed to call the API (CORS). */
+  readonly corsOrigins?: readonly string[];
 }
 
 const bearer = (request: FastifyRequest): string => {
@@ -94,6 +101,20 @@ export async function buildApi(
   });
   await app.register(swaggerUi, { routePrefix: '/documentation' });
 
+  const origins = new Set(deps.corsOrigins ?? []);
+  app.addHook('onRequest', async (request, reply) => {
+    const origin = request.headers.origin;
+    if (origin === undefined || !origins.has(origin)) return;
+    reply.header('access-control-allow-origin', origin);
+    reply.header('vary', 'origin');
+    reply.header(
+      'access-control-allow-headers',
+      'authorization, content-type, idempotency-key',
+    );
+    reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
+    reply.header('access-control-expose-headers', 'idempotency-key');
+    if (request.method === 'OPTIONS') await reply.code(204).send();
+  });
   app.addHook('onSend', async (_request, reply, payload) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('cache-control', 'no-store');
@@ -190,21 +211,52 @@ export async function buildApi(
     );
   }
 
+  app.get('/v1/careers', { schema: commonSchema }, async (request) =>
+    careerListReadModelSchema.parse(
+      await deps.application.careers(bearer(request)),
+    ),
+  );
+
+  if (deps.devAuth !== undefined) {
+    const devAuth = deps.devAuth;
+    app.post('/v1/dev/session', (request) => {
+      const { email, displayName } = devSessionRequestSchema.parse(
+        request.body,
+      );
+      const userId = `user_${email
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')}`;
+      return {
+        bearer: devAuth.issue({
+          userId,
+          email,
+          displayName: displayName ?? email.split('@')[0] ?? email,
+        }),
+        userId,
+      };
+    });
+  }
+
   const careerViews = {
     world: {
-      query: deps.application.careerWorld.bind(deps.application),
+      query: (token: string, id: string) =>
+        deps.application.careerWorld(token, id),
       schema: careerWorldReadModelSchema,
     },
     competitions: {
-      query: deps.application.competitions.bind(deps.application),
+      query: (token: string, id: string) =>
+        deps.application.competitions(token, id),
       schema: competitionPyramidReadModelSchema,
     },
     calendar: {
-      query: deps.application.calendar.bind(deps.application),
+      query: (token: string, id: string) =>
+        deps.application.calendar(token, id),
       schema: competitionCalendarReadModelSchema,
     },
     'next-season': {
-      query: deps.application.seasonTransition.bind(deps.application),
+      query: (token: string, id: string) =>
+        deps.application.seasonTransition(token, id),
       schema: nextSeasonTransitionReadModelSchema,
     },
   } as const;
