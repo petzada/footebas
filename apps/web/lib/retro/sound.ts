@@ -100,8 +100,8 @@ export async function play(name: SoundName): Promise<boolean> {
   if (!unlocked || isMuted()) return false;
   if (!synth) {
     try {
-      const module = await import('zzfx');
-      synth = module.zzfx;
+      const loaded = await import('zzfx');
+      synth = loaded.zzfx;
     } catch {
       return false;
     }

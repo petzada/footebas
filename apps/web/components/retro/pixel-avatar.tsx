@@ -40,9 +40,8 @@ export function PixelAvatar({
       draggable={false}
       data-avatar-seed={seed}
       className={cn('pixelated shrink-0 select-none', className)}
-      {...(label
-        ? { alt: label, role: 'img' }
-        : { alt: '', 'aria-hidden': true })}
+      alt={label ?? ''}
+      {...(label ? { role: 'img' } : { 'aria-hidden': true })}
     />
   );
 }

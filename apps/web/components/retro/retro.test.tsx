@@ -182,7 +182,7 @@ describe('letreiro', () => {
           <Announcer />
         </TickerProvider>,
       );
-      const status = screen.getByRole('status');
+      const status = document.querySelector('[data-ticker]')!;
       fireEvent.click(screen.getByRole('button', { name: 'Avisar' }));
       expect(status.textContent).toMatch(/gol confirmado/i);
       fireEvent.click(

@@ -9,11 +9,11 @@ import {
   EnvelopeSimple,
   Lightning,
   Newspaper,
-  Play,
   ShieldWarning,
 } from '@phosphor-icons/react';
 import { ClubEmblem } from '@/components/club-emblem';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { PixelBall, PixelWhistle } from '@/components/retro/sprites';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -97,7 +97,7 @@ function ClubCard({ career }: { career: CareerView }) {
   return (
     <section
       aria-labelledby="central-clube"
-      className="fut-card grid gap-5 p-5 sm:p-6 lg:grid-cols-2 lg:items-center"
+      className="panel grid gap-5 p-5 sm:p-6 lg:grid-cols-2 lg:items-center"
     >
       <div className="flex min-w-0 items-center gap-4">
         <ClubEmblem name={career.club} size={84} />
@@ -126,17 +126,17 @@ function ClubCard({ career }: { career: CareerView }) {
 function ClubTitle({ career }: { career: CareerView }) {
   return (
     <>
-      <p className="fut-muted truncate text-xs font-bold uppercase tracking-[.2em]">
+      <p className="truncate font-pixel text-[.5rem] text-muted-foreground">
         {career.careerName ? `${career.careerName} · ` : ''}
         {career.division ?? 'Temporada'} · Rodada {career.round}
       </p>
       <h2
         id="central-clube"
-        className="truncate text-4xl font-extrabold leading-none sm:text-5xl"
+        className="truncate font-pixel text-base leading-relaxed sm:text-2xl"
       >
         {career.club}
       </h2>
-      <p className="fut-muted mt-1 truncate text-sm">
+      <p className="mt-1 truncate text-sm text-muted-foreground">
         Objetivo: {career.world.board.objective}
       </p>
     </>
@@ -150,11 +150,11 @@ function CoachBadge({ career }: { career: CareerView }) {
     <div
       aria-label="Treinador"
       role="group"
-      className="flex min-w-0 items-center gap-3 rounded-2xl bg-popover/70 p-2.5"
+      className="flex min-w-0 items-center gap-3 border-2 border-ink bg-popover p-2.5"
     >
       {profile && <CoachAvatar avatar={profile.avatar} size={52} />}
       <div className="min-w-0 text-sm">
-        <p className="fut-muted text-[.65rem] font-bold uppercase tracking-wider">
+        <p className="font-pixel text-[.5rem] text-muted-foreground">
           Treinador
         </p>
         <p className="truncate text-base font-extrabold">
@@ -190,13 +190,11 @@ function CardStat({
 }) {
   return (
     <div>
-      <dt className="fut-muted text-[.65rem] font-bold uppercase tracking-wider">
-        {label}
-      </dt>
-      <dd className="text-3xl font-extrabold leading-none tabular-nums">
+      <dt className="font-pixel text-[.5rem] text-muted-foreground">{label}</dt>
+      <dd className="font-pixel text-base leading-relaxed sm:text-xl">
         {value}
         {hint && (
-          <span className="fut-muted ml-1 text-sm font-semibold">{hint}</span>
+          <span className="ml-1 text-xs text-muted-foreground">{hint}</span>
         )}
       </dd>
     </div>
@@ -206,11 +204,9 @@ function CardStat({
 function CardMeter({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <dt className="fut-muted text-[.65rem] font-bold uppercase tracking-wider">
-        {label}
-      </dt>
+      <dt className="font-pixel text-[.5rem] text-muted-foreground">{label}</dt>
       <dd>
-        <span className="text-3xl font-extrabold leading-none tabular-nums">
+        <span className="font-pixel text-base leading-relaxed sm:text-xl">
           {value}%
         </span>
         <Progress
@@ -251,15 +247,12 @@ function NextMatch({
     return (
       <section
         aria-labelledby="proximo-jogo-central"
-        className="glass flex h-full flex-col justify-center rounded-2xl p-6 text-center"
+        className="panel-board flex h-full flex-col justify-center p-6 text-center"
       >
-        <h2
-          id="proximo-jogo-central"
-          className="font-display text-2xl font-bold uppercase"
-        >
+        <h2 id="proximo-jogo-central" className="led text-sm">
           Sem jogo marcado
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-chalk/70">
           O calendário não tem partida pendente para o seu clube agora.
         </p>
       </section>
@@ -268,11 +261,11 @@ function NextMatch({
   return (
     <section
       aria-labelledby="proximo-jogo-central"
-      className="glass overflow-hidden rounded-2xl"
+      className="panel-board overflow-hidden"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
-        <Badge>Próximo jogo</Badge>
-        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        <Badge variant="bulb">Próximo jogo</Badge>
+        <span className="font-pixel text-[.5rem] text-chalk/70">
           {fixture.competition}
           {fixture.date && ` · ${formatFixtureDate(fixture.date)}`} ·{' '}
           {away ? 'fora de casa' : 'em casa'}
@@ -286,18 +279,16 @@ function NextMatch({
         className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-5 py-5"
       >
         <TeamSide name={home} />
-        <span className="scoreboard-digits text-4xl font-bold text-accent sm:text-5xl">
-          VS
-        </span>
+        <span className="led text-2xl sm:text-4xl">VS</span>
         <TeamSide name={visitor} />
       </div>
       <div className="grid grid-cols-2 gap-3 px-5 pb-5 sm:grid-cols-[1.4fr_1fr]">
         <button
           type="button"
-          className="play-button flex min-h-16 items-center justify-center gap-3 px-5 font-display text-2xl font-bold uppercase tracking-wide col-span-2 sm:col-span-1 sm:row-span-2"
+          className="btn-px btn-play col-span-2 flex min-h-16 items-center justify-center gap-3 px-5 text-sm sm:col-span-1 sm:row-span-2 sm:text-base"
           onClick={onNarrate}
         >
-          <Play weight="fill" className="size-6" aria-hidden="true" />
+          <PixelBall size={22} />
           Jogar partida
         </button>
         <Button
@@ -318,7 +309,7 @@ function NextMatch({
           Revisar
         </Button>
       </div>
-      <div className="grid grid-cols-3 gap-2 border-y border-glass-line bg-popover/50 px-5 py-3 text-center">
+      <div className="grid grid-cols-3 gap-2 border-y-4 border-wood-deep bg-ink/40 px-5 py-3 text-center">
         <MiniStat label="Nossa força" value={String(average)} />
         <MiniStat
           label="Adversário"
@@ -328,7 +319,8 @@ function NextMatch({
       </div>
       <div className="flex flex-col gap-3 px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-display text-lg font-bold uppercase">
+          <h3 className="flex items-center gap-2 font-pixel text-[.6rem] text-bulb">
+            <PixelWhistle size={14} />
             Raio-X do rival
           </h3>
           <div
@@ -346,7 +338,7 @@ function NextMatch({
           </div>
         </div>
         <p className="text-sm">{career.opponent.report}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-chalk/70">
           Desfalques: {career.opponent.absences.join(', ') || 'nenhum'}
         </p>
         <ul
@@ -371,7 +363,7 @@ function TeamSide({ name }: { name: string }) {
   return (
     <div className="flex min-w-0 flex-col items-center gap-2 text-center">
       <ClubEmblem name={name} size={64} decorative />
-      <span className="w-full truncate font-display text-xl font-bold uppercase leading-tight sm:text-2xl">
+      <span className="w-full truncate font-pixel text-[.55rem] leading-relaxed sm:text-xs">
         {name}
       </span>
     </div>
@@ -381,10 +373,8 @@ function TeamSide({ name }: { name: string }) {
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[.62rem] font-bold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="font-display text-xl font-bold tabular-nums">{value}</p>
+      <p className="font-pixel text-[.45rem] text-chalk/70">{label}</p>
+      <p className="led text-sm sm:text-base">{value}</p>
     </div>
   );
 }
@@ -393,11 +383,7 @@ function Readiness({ good, label }: { good: boolean; label: string }) {
   return (
     <li className="flex items-center gap-1.5">
       {good ? (
-        <CheckCircle
-          className="text-primary"
-          weight="fill"
-          aria-hidden="true"
-        />
+        <CheckCircle className="text-bulb" weight="fill" aria-hidden="true" />
       ) : (
         <ShieldWarning
           className="text-accent"
@@ -427,11 +413,8 @@ function SideCard({
   children: React.ReactNode;
 }) {
   return (
-    <section
-      aria-labelledby={id}
-      className="surface flex h-full flex-col rounded-2xl p-4"
-    >
-      <h2 id={id} className="font-display text-xl font-bold uppercase">
+    <section aria-labelledby={id} className="panel flex h-full flex-col p-4">
+      <h2 id={id} className="font-pixel text-[.65rem]">
         {title}
       </h2>
       <div className="mt-3 flex-1">{children}</div>
@@ -472,13 +455,13 @@ function StandingsSummary({
           A tabela aparece depois da primeira rodada.
         </p>
       ) : (
-        <table className="w-full text-sm">
+        <table className="teletext w-full">
           <caption className="sr-only">
             Classificação resumida
             {career.division ? ` · ${career.division}` : ''}
           </caption>
           <thead>
-            <tr className="text-left text-[.65rem] uppercase tracking-wider text-muted-foreground">
+            <tr className="bg-board text-left text-bulb">
               <th scope="col" className="w-7 pb-1 font-bold">
                 #
               </th>
@@ -499,15 +482,10 @@ function StandingsSummary({
               return (
                 <tr
                   key={row.club}
-                  className={cn(
-                    'border-t',
-                    isMine && 'bg-primary/10 font-bold',
-                  )}
+                  className={cn('border-t-2', isMine && 'bg-bulb/50')}
                   {...(isMine ? { 'aria-current': 'true' as const } : {})}
                 >
-                  <td className="py-1.5 font-display text-base font-bold tabular-nums">
-                    {row.position}
-                  </td>
+                  <td className="py-1.5 pl-1">{row.position}</td>
                   <td className="py-1.5">
                     <span className="flex min-w-0 items-center gap-2">
                       <ClubEmblem name={row.club} size={22} decorative />
@@ -521,9 +499,7 @@ function StandingsSummary({
                   <td className="py-1.5 text-right tabular-nums">
                     {row.played}
                   </td>
-                  <td className="py-1.5 text-right font-display text-base font-bold tabular-nums">
-                    {row.points}
-                  </td>
+                  <td className="py-1.5 pr-1 text-right">{row.points}</td>
                 </tr>
               );
             })}
@@ -577,7 +553,7 @@ function Upcoming({
     >
       <ol className="flex flex-col gap-2 text-sm">
         {career.fixture && (
-          <li className="flex items-start gap-3 rounded-md border border-primary/40 bg-primary/10 p-2">
+          <li className="flex items-start gap-3 border-2 border-ink bg-bulb/40 p-2">
             <CalendarDots
               className="mt-0.5 size-5 shrink-0 text-primary"
               aria-hidden="true"
@@ -601,7 +577,7 @@ function Upcoming({
         ) : (
           entries.map((entry) => (
             <li key={entry.id} className="flex items-start gap-3 p-2">
-              <span className="w-12 shrink-0 font-display text-sm font-bold uppercase text-primary">
+              <span className="w-12 shrink-0 pt-0.5 font-pixel text-[.5rem] text-primary">
                 {formatFixtureDate(entry.date).replace(/^\S+\s/, '')}
               </span>
               <span className="min-w-0">
@@ -645,14 +621,11 @@ function Inbox({
     })),
   ].slice(0, 4);
   return (
-    <section
-      aria-labelledby="central-caixa"
-      className="surface rounded-2xl p-4"
-    >
+    <section aria-labelledby="central-caixa" className="panel p-4">
       <div className="flex items-center justify-between gap-2">
         <h2
           id="central-caixa"
-          className="flex items-center gap-2 font-display text-xl font-bold uppercase"
+          className="flex items-center gap-2 font-pixel text-[.65rem]"
         >
           <EnvelopeSimple aria-hidden="true" />
           Caixa de entrada
@@ -670,7 +643,7 @@ function Inbox({
           {decisions.map((item) => (
             <li
               key={item.id}
-              className="grid gap-2 rounded-xl bg-popover/70 p-3 sm:grid-cols-[1fr_auto] sm:items-center"
+              className="grid gap-2 border-2 border-ink bg-popover p-3 sm:grid-cols-[1fr_auto] sm:items-center"
             >
               <div className="text-sm">
                 <Badge variant="outline" className="mr-2">
@@ -699,11 +672,11 @@ function News({ career, onOpen }: { career: CareerView; onOpen(): void }) {
   return (
     <section
       aria-labelledby="central-noticias"
-      className="surface flex flex-col rounded-2xl p-4"
+      className="panel flex flex-col p-4"
     >
       <h2
         id="central-noticias"
-        className="flex items-center gap-2 font-display text-xl font-bold uppercase"
+        className="flex items-center gap-2 font-pixel text-[.65rem]"
       >
         <Newspaper aria-hidden="true" />
         Notícias
@@ -715,10 +688,8 @@ function News({ career, onOpen }: { career: CareerView; onOpen(): void }) {
       ) : (
         <ul className="mt-3 flex flex-1 flex-col gap-3">
           {news.map((item) => (
-            <li key={item.id} className="border-l-2 border-accent pl-3">
-              <p className="text-[.65rem] font-bold uppercase tracking-wider text-accent">
-                {item.tag}
-              </p>
+            <li key={item.id} className="border-l-4 border-accent pl-3">
+              <p className="font-pixel text-[.5rem] text-accent">{item.tag}</p>
               <p className="font-semibold leading-snug">{item.headline}</p>
               <p className="line-clamp-2 text-xs text-muted-foreground">
                 {item.detail}

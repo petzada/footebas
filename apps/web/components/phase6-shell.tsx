@@ -22,8 +22,11 @@ import {
   WifiHigh,
   WifiSlash,
 } from '@phosphor-icons/react';
+import { Brand } from '@/components/brand';
 import { ClubEmblem } from '@/components/club-emblem';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { MuteButton } from '@/components/retro/mute-button';
+import { ScreenTransition } from '@/components/retro/screen-transition';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -112,19 +115,20 @@ export function Phase6Shell({
         aria-busy={commandState === 'pending'}
         className="min-w-0 px-4 py-4 sm:px-6 lg:px-8 lg:py-6"
       >
-        <header className="glass mb-5 flex min-h-14 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 sm:px-4">
+        <header className="panel-board mb-5 flex min-h-14 items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
             <ClubEmblem name={career.club} size={44} decorative />
             <div className="min-w-0">
-              <p className="truncate text-xs font-bold uppercase tracking-[.18em] text-primary">
+              <p className="truncate font-pixel text-[.5rem] text-chalk/80">
                 {career.club} · Rodada {career.round}
               </p>
-              <h1 className="font-display text-3xl font-bold uppercase leading-none sm:text-4xl">
+              <h1 className="led truncate text-sm leading-relaxed sm:text-xl">
                 {labels[screen]}
               </h1>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <MuteButton />
             {onHome && (
               <Button
                 variant="outline"
@@ -145,7 +149,7 @@ export function Phase6Shell({
           </div>
         </header>
         <CommandAnnouncer state={commandState} />
-        {children}
+        <ScreenTransition id={screen}>{children}</ScreenTransition>
       </main>
       {showRail && <DesktopRail career={career} navigate={navigate} />}
       <MobileNavigation
@@ -186,7 +190,7 @@ export function PwaRuntime() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-glass-line bg-popover px-4 py-3 text-sm text-popover-foreground shadow-lg"
+      className="ticker fixed inset-x-3 top-3 z-50 mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-3 text-[.6rem] text-chalk"
     >
       <span className="flex items-center gap-2 font-medium">
         {network === 'offline' ? <WifiSlash /> : <WifiHigh />}
@@ -219,7 +223,7 @@ function DesktopSidebar({
   navigate(value: Screen): void;
 }) {
   return (
-    <aside className="sticky top-0 hidden h-dvh border-r border-glass-line bg-card/60 p-4 lg:flex lg:flex-col">
+    <aside className="sticky top-0 hidden h-dvh border-r-4 border-ink bg-board p-4 text-chalk lg:flex lg:flex-col">
       <Brand />
       <a
         href="#conteudo-principal"
@@ -234,8 +238,8 @@ function DesktopSidebar({
         {mainDestinations.map(([id, label, Icon]) => (
           <Button
             key={id}
-            variant={screen === id ? 'secondary' : 'ghost'}
-            className="min-h-10 justify-start font-semibold"
+            variant={screen === id ? 'outline' : 'ghost'}
+            className="min-h-10 justify-start text-[.6rem]"
             aria-current={screen === id ? 'page' : undefined}
             onClick={() => navigate(id)}
           >
@@ -248,7 +252,7 @@ function DesktopSidebar({
         ))}
         <p
           id="mais-areas-desktop"
-          className="mt-4 px-3 text-[.65rem] font-bold uppercase tracking-[.18em] text-muted-foreground"
+          className="mt-4 px-3 font-pixel text-[.5rem] text-chalk/70"
         >
           Mais áreas
         </p>
@@ -259,8 +263,8 @@ function DesktopSidebar({
           {moreDestinations.map(([id, label, Icon]) => (
             <li key={id}>
               <Button
-                variant={screen === id ? 'secondary' : 'ghost'}
-                className="min-h-9 w-full justify-start text-muted-foreground"
+                variant={screen === id ? 'outline' : 'ghost'}
+                className="min-h-9 w-full justify-start text-[.55rem] text-chalk/80"
                 aria-current={screen === id ? 'page' : undefined}
                 onClick={() => navigate(id)}
               >
@@ -280,12 +284,12 @@ function DesktopSidebar({
           <CoachAvatar avatar={career.coachProfile.avatar} size={44} />
         )}
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-chalk/70">
             Treinador
             {career.coachProfile &&
               ` · ${personalityLabel(career.coachProfile.personality)}`}
           </p>
-          <p className="truncate text-base font-extrabold">{career.coach}</p>
+          <p className="truncate font-pixel text-[.6rem]">{career.coach}</p>
         </div>
       </div>
     </aside>
@@ -306,27 +310,17 @@ function DesktopRail({
     maximumFractionDigits: 1,
   }).format(career.world.finances.cash);
   return (
-    <aside className="sticky top-0 hidden h-dvh border-l border-glass-line bg-card/45 p-5 xl:flex xl:flex-col xl:gap-5">
+    <aside className="sticky top-0 hidden h-dvh border-l-4 border-ink bg-board p-5 text-chalk xl:flex xl:flex-col xl:gap-5">
       <section aria-labelledby="proximo-jogo">
-        <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">
-          Próximo jogo
-        </p>
-        <h2
-          id="proximo-jogo"
-          className="mt-1 font-display text-2xl font-bold uppercase"
-        >
+        <p className="led text-[.5rem] tracking-[.2em]">Próximo jogo</p>
+        <h2 id="proximo-jogo" className="mt-1 font-pixel text-[.65rem]">
           {career.club} × {career.opponent.club}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          {career.opponent.report}
-        </p>
+        <p className="mt-1 text-sm text-chalk/70">{career.opponent.report}</p>
       </section>
       <Separator />
       <section aria-labelledby="central-rapida" className="flex flex-col gap-2">
-        <h2
-          id="central-rapida"
-          className="font-display text-lg font-bold uppercase"
-        >
+        <h2 id="central-rapida" className="font-pixel text-[.6rem]">
           Central rápida
         </h2>
         <Button
@@ -351,16 +345,14 @@ function DesktopRail({
           onClick={() => navigate('finance')}
         >
           Caixa do clube
-          <span className="font-display font-bold">{money}</span>
+          <span className="font-pixel">{money}</span>
         </Button>
       </section>
-      <div className="surface mt-auto rounded-2xl p-4">
-        <p className="text-xs font-bold uppercase tracking-[.16em] text-muted-foreground">
+      <div className="panel mt-auto p-4">
+        <p className="font-pixel text-[.5rem] text-muted-foreground">
           Ritmo da carreira
         </p>
-        <p className="mt-1 font-display text-3xl font-bold tabular-nums">
-          {career.round}
-        </p>
+        <p className="mt-1 font-pixel text-2xl">{career.round}</p>
         <p className="text-sm text-muted-foreground">rodadas disputadas</p>
       </div>
     </aside>
@@ -381,11 +373,9 @@ function MobileNavigation({
   return (
     <>
       {open && (
-        <div className="fixed inset-x-3 bottom-24 z-40 rounded-2xl border border-glass-line bg-popover p-3 text-popover-foreground shadow-2xl lg:hidden">
+        <div className="panel px-rise fixed inset-x-3 bottom-24 z-40 p-3 lg:hidden">
           <div className="mb-2 flex items-center justify-between px-2">
-            <p className="font-display text-lg font-bold uppercase">
-              Todas as áreas
-            </p>
+            <p className="font-pixel text-[.6rem]">Todas as áreas</p>
             <Badge variant="secondary">{destinations.length} destinos</Badge>
           </div>
           <nav
@@ -395,8 +385,8 @@ function MobileNavigation({
             {destinations.map(([id, label, Icon]) => (
               <Button
                 key={id}
-                variant={screen === id ? 'secondary' : 'ghost'}
-                className="min-h-11 justify-start"
+                variant={screen === id ? 'outline' : 'ghost'}
+                className="min-h-11 justify-start text-[.55rem]"
                 aria-current={screen === id ? 'page' : undefined}
                 onClick={() => navigate(id)}
               >
@@ -409,17 +399,15 @@ function MobileNavigation({
       )}
       <nav
         aria-label="Navegação principal mobile"
-        className="glass-strong fixed inset-x-3 bottom-[max(.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 rounded-2xl px-1.5 py-1.5 lg:hidden"
+        className="panel-wood fixed inset-x-3 bottom-[max(.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 gap-1 px-1.5 py-1.5 lg:hidden"
       >
         {primaryMobile.map(([id, label, Icon]) => (
           <button
             key={id}
             aria-current={screen === id ? 'page' : undefined}
             className={cn(
-              'flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[.66rem] font-bold uppercase tracking-wide',
-              screen === id
-                ? 'bg-popover text-primary shadow-sm'
-                : 'text-muted-foreground',
+              'flex min-h-14 flex-col items-center justify-center gap-1 px-1 font-pixel text-[.45rem]',
+              screen === id ? 'bg-board text-bulb' : 'text-chalk',
             )}
             onClick={() => navigate(id)}
           >
@@ -433,10 +421,8 @@ function MobileNavigation({
         <button
           aria-expanded={open}
           className={cn(
-            'flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[.66rem] font-bold uppercase tracking-wide',
-            open
-              ? 'bg-popover text-primary shadow-sm'
-              : 'text-muted-foreground',
+            'flex min-h-14 flex-col items-center justify-center gap-1 px-1 font-pixel text-[.45rem]',
+            open ? 'bg-board text-bulb' : 'text-chalk',
           )}
           onClick={() => setOpen(!open)}
         >
@@ -459,18 +445,5 @@ function CommandAnnouncer({ state }: { state: CommandState }) {
             ? 'Jogada confirmada.'
             : ''}
     </p>
-  );
-}
-
-function Brand() {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="btn-grass grid size-9 place-items-center rounded-xl">
-        <SoccerBall weight="fill" />
-      </span>
-      <span className="font-display text-2xl font-bold uppercase tracking-tight">
-        Footebas
-      </span>
-    </div>
   );
 }

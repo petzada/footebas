@@ -82,8 +82,8 @@ export function TickerProvider({
     <TickerContext.Provider value={api}>
       {children}
       <div
-        role="status"
         aria-live="polite"
+        data-ticker
         className="pointer-events-none fixed inset-x-3 top-[max(.75rem,env(safe-area-inset-top))] z-50 mx-auto max-w-xl"
       >
         {current && (
