@@ -5,7 +5,14 @@ import { useSound } from '@/lib/retro/use-sound';
 import { cn } from '@/lib/utils';
 
 /** Mute toggle for the interface sounds; the choice is remembered. */
-export function MuteButton({ className }: { className?: string }) {
+export function MuteButton({
+  className,
+  compact = false,
+}: {
+  className?: string;
+  /** Icon only (header): the state stays in the accessible name. */
+  compact?: boolean;
+}) {
   const { muted, toggle, play } = useSound();
   return (
     <button
@@ -14,7 +21,8 @@ export function MuteButton({ className }: { className?: string }) {
       aria-label={muted ? 'Som desligado' : 'Som ligado'}
       title={muted ? 'Ligar som' : 'Desligar som'}
       className={cn(
-        'btn-px btn-board inline-flex min-h-10 items-center gap-2 px-3 text-[.6rem]',
+        'btn-px btn-board inline-flex min-h-10 items-center gap-2 text-[.6rem]',
+        compact ? 'size-9 justify-center px-0 sm:size-10' : 'px-3',
         className,
       )}
       onClick={() => {
@@ -27,7 +35,9 @@ export function MuteButton({ className }: { className?: string }) {
       ) : (
         <SpeakerHigh weight="fill" aria-hidden="true" />
       )}
-      <span className="hidden sm:inline">{muted ? 'Mudo' : 'Som'}</span>
+      {!compact && (
+        <span className="hidden sm:inline">{muted ? 'Mudo' : 'Som'}</span>
+      )}
     </button>
   );
 }

@@ -56,9 +56,10 @@ describe('Central', () => {
     const onNarrate = vi.fn();
     const onInstant = vi.fn();
     const navigate = vi.fn();
+    const view = await career();
     render(
       <CentralScreen
-        career={await career()}
+        career={view}
         calendar={calendarPort()}
         onNarrate={onNarrate}
         onInstant={onInstant}
@@ -73,6 +74,13 @@ describe('Central', () => {
     expect(coach.textContent).toMatch(/ana/i);
     expect(coach.textContent).toMatch(/personalidade: estrategista/i);
     expect(coach.querySelector('[data-avatar="avatar-01"]')).not.toBeNull();
+    const flag = coach.querySelector('[data-testid="country-flag"]')!;
+    expect(flag.getAttribute('src')).toBe('/flags/br.png');
+    expect(coach.textContent).toMatch(/brasil/i);
+    const objective = within(club).getByTestId('club-objective');
+    expect(objective.textContent).toContain(view.world.board.objective);
+    expect(objective.className).not.toMatch(/truncate/);
+    expect(objective.className).toMatch(/break-words/);
     expect(within(club).getByText('Posição')).toBeTruthy();
     expect(within(club).getByText('Caixa')).toBeTruthy();
     expect(
@@ -83,7 +91,31 @@ describe('Central', () => {
       name: /próximo jogo: flamengo × palmeiras/i,
     });
     expect(within(match).getByText(/raio-x do rival/i)).toBeTruthy();
-    expect(within(match).getByText('≈ 82')).toBeTruthy();
+    // Strength is a plain number (no "≈"), and the rival read is three
+    // labelled rows: form, strength, absences (+ how they play).
+    expect(within(match).getAllByText('82').length).toBeGreaterThan(0);
+    expect(within(match).queryByText(/≈/)).toBeNull();
+    const xray = within(match).getByTestId('rival-xray');
+    expect(
+      within(xray)
+        .getAllByRole('term')
+        .map((t) => t.textContent),
+    ).toEqual(['Forma', 'Força', 'Desfalques', 'Como joga']);
+    expect(xray.querySelectorAll('[data-form]')).toHaveLength(5);
+    expect(xray.querySelector('[data-form="V"]')?.className).toMatch(
+      /bg-primary/,
+    );
+    expect(xray.querySelector('[data-form="D"]')?.className).toMatch(
+      /bg-destructive/,
+    );
+    expect(xray.textContent).toMatch(/vitor roque \(suspenso\)/i);
+    // The instant-result label is small enough for 320px and may wrap.
+    const instant = within(match).getByRole('button', {
+      name: /resultado instantâneo/i,
+    });
+    expect(instant.className).toMatch(/text-\[\.5rem\]/);
+    expect(instant.className).toMatch(/whitespace-normal/);
+    expect(instant.className).not.toMatch(/truncate/);
     fireEvent.click(
       within(match).getByRole('button', { name: /jogar partida/i }),
     );
@@ -116,6 +148,15 @@ describe('Central', () => {
       .getAllByRole('row')
       .find((row) => row.getAttribute('aria-current') === 'true');
     expect(mine?.textContent).toMatch(/flamengo/i);
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((th) => th.textContent),
+    ).toEqual(['#', 'Clube', 'J', 'V', 'E', 'D', 'SG', 'Pts']);
+    expect(within(table).getAllByRole('row')).toHaveLength(1 + 4);
+    expect(within(table).getByText('Atlético Mineiro').className).toMatch(
+      /sr-only/,
+    );
 
     const upcoming = screen.getByRole('region', {
       name: /próximos compromissos/i,
@@ -168,5 +209,16 @@ describe('Central', () => {
       await screen.findByRole('heading', { level: 1, name: 'Central' }),
     ).toBeTruthy();
     expect(screen.getAllByText(/rodada 2/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe('shortClubName', () => {
+  it('abrevia só o que não cabe na tabela estreita', async () => {
+    const { shortClubName } = await import('@/components/central-screen');
+    expect(shortClubName('Flamengo')).toBe('Flamengo');
+    expect(shortClubName('Atlético Mineiro')).toBe('Atlético M.');
+    expect(shortClubName('Red Bull Bragantino')).toBe('RB Bragantino');
+    expect(shortClubName('Athletico Paranaense')).toBe('Athletico P.');
+    expect(shortClubName('Independiente del Valle')).toBe('ID Valle');
   });
 });

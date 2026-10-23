@@ -40,6 +40,28 @@ describe('Caixa de entrada com decisões', () => {
     expect(inbox.textContent).toMatch(/1 decisão/i);
   });
 
+  it('limita a lista (pendentes primeiro) e mantém o "Ver todas"', async () => {
+    const navigate = vi.fn();
+    render(
+      <InboxDecisions
+        port={createFakeInboxPort()}
+        navigate={navigate}
+        limit={2}
+      />,
+    );
+    const inbox = await screen.findByRole('region', {
+      name: /caixa de entrada/i,
+    });
+    const items = within(inbox).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(items[0]!.textContent).toMatch(/diretoria quer saber do reforço/i);
+    expect(items[1]!.textContent).toMatch(/gerson pede mais minutos/i);
+    fireEvent.click(
+      within(inbox).getByRole('button', { name: /ver todas as mensagens/i }),
+    );
+    expect(navigate).toHaveBeenCalledWith('inbox');
+  });
+
   it('desabilita mensagens expiradas com o motivo', async () => {
     render(<InboxDecisions port={createFakeInboxPort()} navigate={vi.fn()} />);
     const inbox = await screen.findByRole('region', {

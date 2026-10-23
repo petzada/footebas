@@ -13,13 +13,14 @@ import {
 } from '@phosphor-icons/react';
 import { ClubEmblem } from '@/components/club-emblem';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { CountryFlag } from '@/components/country-flag';
 import { InboxDecisions } from '@/components/inbox-decisions';
 import { PixelBall, PixelWhistle } from '@/components/retro/sprites';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import type { CareerView, Screen } from '@/lib/career-api';
-import { countryName, flagEmoji, personalityLabel } from '@/lib/coach-profile';
+import { countryName, personalityLabel } from '@/lib/coach-profile';
 import type {
   CompetitionProductPort,
   CompetitionProductView,
@@ -95,6 +96,7 @@ export function CentralScreen({
           <InboxDecisions
             port={inbox}
             navigate={navigate}
+            limit={4}
             {...(onInboxResolved ? { onResolved: onInboxResolved } : {})}
           />
         ) : (
@@ -151,7 +153,10 @@ function ClubTitle({ career }: { career: CareerView }) {
       >
         {career.club}
       </h2>
-      <p className="mt-1 truncate text-sm text-muted-foreground">
+      <p
+        className="mt-1 text-sm leading-snug break-words text-muted-foreground"
+        data-testid="club-objective"
+      >
         Objetivo: {career.world.board.objective}
       </p>
     </>
@@ -172,15 +177,15 @@ function CoachBadge({ career }: { career: CareerView }) {
         <p className="font-pixel text-[.5rem] text-muted-foreground">
           Treinador
         </p>
-        <p className="truncate text-base font-extrabold">
+        <p className="flex min-w-0 items-center gap-2 text-base font-extrabold">
+          <span className="truncate">{career.coach}</span>
           {profile && (
-            <span aria-hidden="true">{flagEmoji(profile.nationality)} </span>
-          )}
-          {career.coach}
-          {profile && (
-            <span className="sr-only">
-              , {countryName(profile.nationality)}
-            </span>
+            <>
+              <CountryFlag code={profile.nationality} width={24} decorative />
+              <span className="sr-only">
+                , {countryName(profile.nationality)}
+              </span>
+            </>
           )}
         </p>
         {profile && (
@@ -206,7 +211,7 @@ function CardStat({
   return (
     <div className="min-w-0">
       <dt className="font-pixel text-[.5rem] text-muted-foreground">{label}</dt>
-      <dd className="font-pixel text-xs leading-relaxed whitespace-nowrap min-[400px]:text-base sm:text-xl">
+      <dd className="font-pixel text-xs leading-relaxed break-words min-[400px]:text-base sm:text-xl">
         {value}
         {hint && (
           <span className="ml-1 text-xs text-muted-foreground">{hint}</span>
@@ -308,15 +313,15 @@ function NextMatch({
         </button>
         <Button
           variant="outline"
-          className="h-auto min-h-12 whitespace-normal"
+          className="col-span-2 h-auto min-h-12 min-w-0 px-2 text-[.5rem] leading-snug break-normal whitespace-normal min-[360px]:col-span-1 sm:text-[.6rem]"
           onClick={onInstant}
         >
           <Lightning weight="fill" data-icon="inline-start" />
-          Resultado instantâneo
+          <span className="min-w-0">Resultado instantâneo</span>
         </Button>
         <Button
           variant="outline"
-          className="min-h-12"
+          className="col-span-2 min-h-12 min-w-0 px-2 text-[.5rem] min-[360px]:col-span-1 sm:text-[.6rem]"
           onClick={onReview}
           aria-label="Revisar escalação e tática"
         >
@@ -328,34 +333,16 @@ function NextMatch({
         <MiniStat label="Nossa força" value={String(average)} />
         <MiniStat
           label="Adversário"
-          value={`≈ ${career.opponent.approximateStrength}`}
+          value={String(career.opponent.approximateStrength)}
         />
         <MiniStat label="Formação" value={career.formation} />
       </div>
       <div className="flex flex-col gap-3 px-5 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 font-pixel text-[.6rem] text-bulb">
-            <PixelWhistle size={14} />
-            Raio-X do rival
-          </h3>
-          <div
-            className="flex gap-1"
-            aria-label={`Forma recente: ${career.opponent.form.join(', ') || 'sem jogos'}`}
-          >
-            {career.opponent.form.map((result, index) => (
-              <Badge
-                key={`${result}-${index}`}
-                variant={result === 'V' ? 'default' : 'secondary'}
-              >
-                {result}
-              </Badge>
-            ))}
-          </div>
-        </div>
-        <p className="text-sm">{career.opponent.report}</p>
-        <p className="text-xs text-chalk/70">
-          Desfalques: {career.opponent.absences.join(', ') || 'nenhum'}
-        </p>
+        <h3 className="flex items-center gap-2 font-pixel text-[.6rem] text-bulb">
+          <PixelWhistle size={14} />
+          Raio-X do rival
+        </h3>
+        <RivalXray opponent={career.opponent} ours={average} />
         <ul
           className="flex flex-wrap gap-x-4 gap-y-1 text-sm"
           aria-label="Prontidão"
@@ -371,6 +358,77 @@ function NextMatch({
         </ul>
       </div>
     </section>
+  );
+}
+
+const FORM_TONE = {
+  V: 'bg-primary text-primary-foreground',
+  E: 'bg-chalk text-ink',
+  D: 'bg-destructive text-destructive-foreground',
+} as const;
+const FORM_WORD = { V: 'vitória', E: 'empate', D: 'derrota' } as const;
+
+/** Labelled rows readable in two seconds; only what the read model has. */
+function RivalXray({
+  opponent,
+  ours,
+}: {
+  opponent: CareerView['opponent'];
+  ours: number;
+}) {
+  const gap = opponent.approximateStrength - ours;
+  const verdict =
+    gap >= 4 ? 'mais forte' : gap <= -4 ? 'mais fraco' : 'parelho';
+  const label = 'pt-0.5 font-pixel text-[.45rem] text-chalk/70';
+  return (
+    <dl
+      className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm"
+      data-testid="rival-xray"
+    >
+      <dt className={label}>Forma</dt>
+      <dd>
+        <span className="sr-only">
+          {opponent.form.length
+            ? opponent.form.map((result) => FORM_WORD[result]).join(', ')
+            : 'sem jogos'}
+        </span>
+        <span aria-hidden="true" className="flex flex-wrap gap-1">
+          {opponent.form.length === 0 && (
+            <span className="text-chalk/70">sem jogos</span>
+          )}
+          {opponent.form.map((result, index) => (
+            <span
+              key={`${result}-${index}`}
+              data-form={result}
+              className={cn(
+                'px-border inline-flex size-5 items-center justify-center font-pixel text-[.5rem]',
+                FORM_TONE[result],
+              )}
+            >
+              {result}
+            </span>
+          ))}
+        </span>
+      </dd>
+      <dt className={label}>Força</dt>
+      <dd>
+        <span className="led">{opponent.approximateStrength}</span>
+        <span className="text-chalk/70">
+          {' '}
+          · {verdict} que nós ({ours})
+        </span>
+      </dd>
+      <dt className={label}>Desfalques</dt>
+      <dd className="break-words">
+        {opponent.absences.length ? opponent.absences.join(', ') : 'nenhum'}
+      </dd>
+      {opponent.report && (
+        <>
+          <dt className={label}>Como joga</dt>
+          <dd className="break-words">{opponent.report}</dd>
+        </>
+      )}
+    </dl>
   );
 }
 
@@ -445,6 +503,46 @@ function SideCard({
   );
 }
 
+/**
+ * Short club name for the narrow table: "Atlético Mineiro" → "Atlético M.",
+ * "Red Bull Bragantino" → "RB Bragantino". Names that fit stay whole.
+ */
+export function shortClubName(name: string, max = 13): string {
+  if (name.length <= max) return name;
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return `${name.slice(0, max - 1)}.`;
+  const [first, ...rest] = words as [string, ...string[]];
+  const candidate =
+    words.length >= 3
+      ? `${words
+          .slice(0, -1)
+          .map((word) => word[0]!.toUpperCase())
+          .join('')} ${words.at(-1)}`
+      : `${first} ${rest.map((word) => `${word[0]!.toUpperCase()}.`).join(' ')}`;
+  if (candidate.length <= max) return candidate;
+  return `${candidate.slice(0, max - 1).trimEnd()}.`;
+}
+
+/** Rows around the user's club (five), or the top five without a position. */
+export function standingsWindow<T extends { position: number; club: string }>(
+  rows: readonly T[],
+  club: string,
+  size = 5,
+): T[] {
+  const sorted = rows.slice().sort((a, b) => a.position - b.position);
+  const index = sorted.findIndex((row) => row.club === club);
+  if (index < 0) return sorted.slice(0, size);
+  const start = Math.max(
+    0,
+    Math.min(index - Math.floor(size / 2), sorted.length - size),
+  );
+  return sorted.slice(start, start + size);
+}
+
+const cell = 'py-1.5 pl-1.5 text-right whitespace-nowrap tabular-nums';
+const head = 'pb-1 pl-1.5 text-right font-bold whitespace-nowrap';
+const wide = 'hidden min-[414px]:table-cell';
+
 function StandingsSummary({
   career,
   onOpen,
@@ -452,12 +550,8 @@ function StandingsSummary({
   career: CareerView;
   onOpen(): void;
 }) {
-  const rows = career.standings
-    .slice()
-    .sort((a, b) => a.position - b.position || b.points - a.points);
-  const top = rows.slice(0, 5);
-  const mine = rows.find((row) => row.club === career.club);
-  const shown = mine && !top.includes(mine) ? [...top.slice(0, 4), mine] : top;
+  const shown = standingsWindow(career.standings, career.club);
+  const hasRecord = shown.some((row) => row.won !== undefined);
   return (
     <SideCard
       id="central-tabela"
@@ -470,23 +564,40 @@ function StandingsSummary({
           A tabela aparece depois da primeira rodada.
         </p>
       ) : (
-        <table className="teletext w-full">
+        <table className="teletext w-full text-[.5rem] sm:text-[.6rem]">
           <caption className="sr-only">
             Classificação resumida
             {career.division ? ` · ${career.division}` : ''}
           </caption>
           <thead>
             <tr className="bg-board text-left text-bulb">
-              <th scope="col" className="w-7 pb-1 font-bold">
+              <th scope="col" className="pb-1 pl-1 font-bold">
                 #
               </th>
-              <th scope="col" className="pb-1 font-bold">
+              {/* `w-full max-w-0` lets the only flexible column truncate. */}
+              <th scope="col" className="w-full max-w-0 pb-1 font-bold">
                 Clube
               </th>
-              <th scope="col" className="pb-1 text-right font-bold">
+              <th scope="col" className={head}>
                 J
               </th>
-              <th scope="col" className="pb-1 text-right font-bold">
+              {hasRecord && (
+                <>
+                  <th scope="col" className={cn(head, wide)}>
+                    V
+                  </th>
+                  <th scope="col" className={cn(head, wide)}>
+                    E
+                  </th>
+                  <th scope="col" className={cn(head, wide)}>
+                    D
+                  </th>
+                  <th scope="col" className={head}>
+                    SG
+                  </th>
+                </>
+              )}
+              <th scope="col" className={cn(head, 'pr-1')}>
                 Pts
               </th>
             </tr>
@@ -494,27 +605,46 @@ function StandingsSummary({
           <tbody>
             {shown.map((row) => {
               const isMine = row.club === career.club;
+              const short = shortClubName(row.club);
+              const diff = row.goalDifference ?? 0;
               return (
                 <tr
                   key={row.club}
                   className={cn('border-t-2', isMine && 'bg-bulb/50')}
                   {...(isMine ? { 'aria-current': 'true' as const } : {})}
                 >
-                  <td className="py-1.5 pl-1">{row.position}</td>
-                  <td className="py-1.5">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <ClubEmblem name={row.club} size={22} decorative />
+                  <td className="py-1.5 pr-1.5 pl-1">{row.position}</td>
+                  <td className="w-full max-w-0 py-1.5">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <ClubEmblem name={row.club} size={16} decorative />
                       <span
-                        className={cn('truncate', isMine && 'text-primary')}
+                        className={cn(
+                          'truncate',
+                          isMine && 'font-bold text-primary',
+                        )}
+                        title={row.club}
                       >
-                        {row.club}
+                        {short === row.club ? (
+                          row.club
+                        ) : (
+                          <>
+                            <span aria-hidden="true">{short}</span>
+                            <span className="sr-only">{row.club}</span>
+                          </>
+                        )}
                       </span>
                     </span>
                   </td>
-                  <td className="py-1.5 text-right tabular-nums">
-                    {row.played}
-                  </td>
-                  <td className="py-1.5 pr-1 text-right">{row.points}</td>
+                  <td className={cell}>{row.played}</td>
+                  {hasRecord && (
+                    <>
+                      <td className={cn(cell, wide)}>{row.won ?? 0}</td>
+                      <td className={cn(cell, wide)}>{row.drawn ?? 0}</td>
+                      <td className={cn(cell, wide)}>{row.lost ?? 0}</td>
+                      <td className={cell}>{diff > 0 ? `+${diff}` : diff}</td>
+                    </>
+                  )}
+                  <td className={cn(cell, 'pr-1 font-bold')}>{row.points}</td>
                 </tr>
               );
             })}

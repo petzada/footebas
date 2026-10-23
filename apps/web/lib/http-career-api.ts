@@ -262,6 +262,10 @@ interface StandingsModel {
     position: number;
     club: ClubSummary;
     played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goalDifference: number;
     points: number;
   }[];
 }
@@ -946,6 +950,10 @@ export class HttpCareerApi implements CareerApiPort {
         club: row.club.name,
         played: row.played,
         points: row.points,
+        won: row.won,
+        drawn: row.drawn,
+        lost: row.lost,
+        goalDifference: row.goalDifference,
       })),
       opponent: this.#opponent(next, players),
       world: await this.#world(world, squad),

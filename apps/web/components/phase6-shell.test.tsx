@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
+import { Phase6Shell } from '@/components/phase6-shell';
 import { completeNewCareer } from '@/components/testing/complete-new-career';
 import { InMemoryCareerApi } from '@/lib/career-api';
 
@@ -101,6 +102,53 @@ describe('Fase 6 · shell mobile-first', () => {
       screen.getByRole('navigation', { name: /navegação principal mobile/i }),
     ).toBeTruthy();
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+  });
+
+  it('cabeçalho: escudo + treinador e só ícones (som, início, sair)', async () => {
+    const api = new InMemoryCareerApi();
+    await api.login('ana@footebas.com');
+    await api.createCareer({ coach: 'Ana' });
+    await api.selectClub('Flamengo');
+    const onSignOut = vi.fn();
+    const onHome = vi.fn();
+    render(
+      <Phase6Shell
+        screen="central"
+        setScreen={vi.fn()}
+        career={(await api.getCareer())!}
+        commandState="idle"
+        onSignOut={onSignOut}
+        onHome={onHome}
+      >
+        <p>Rodada 1</p>
+      </Phase6Shell>,
+    );
+    const header = screen.getByTestId('shell-header');
+    expect(
+      within(header).getByRole('img', { name: /escudo do flamengo/i }),
+    ).toBeTruthy();
+    expect(within(header).getByText('Ana')).toBeTruthy();
+    expect(header.textContent).not.toMatch(/rodada/i);
+    expect(header.textContent).not.toMatch(/sair/i);
+    expect(header.textContent).not.toMatch(/início/i);
+    expect(
+      within(header).getByRole('heading', { level: 1, name: 'Central' })
+        .className,
+    ).toMatch(/sr-only/);
+    expect(
+      within(header).getByRole('button', { name: /som (ligado|desligado)/i }),
+    ).toBeTruthy();
+    fireEvent.click(
+      within(header).getByRole('button', { name: 'Voltar ao início' }),
+    );
+    expect(onHome).toHaveBeenCalledTimes(1);
+    const out = within(header).getByRole('button', { name: 'Sair' });
+    expect(out.getAttribute('aria-label')).toBe('Sair');
+    expect(out.textContent).toBe('');
+    fireEvent.click(out);
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+    // The round label stays visible inside the Central.
+    expect(screen.getAllByText(/rodada 1/i).length).toBeGreaterThan(0);
   });
 
   it('volta ao Início sem perder a carreira', async () => {
