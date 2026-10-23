@@ -32,6 +32,10 @@ const GAME_URL =
 /** Default licence price; the checkout always shows the server's value. */
 const LICENSE_PRICE_CENTS = 2990;
 
+/** Footer text link with a 44px tall tap area (WCAG 2.5.5). */
+const footerLink =
+  'inline-flex min-h-11 items-center underline underline-offset-4';
+
 const SERIE_A = [
   'club_flamengo',
   'club_palmeiras',
@@ -824,13 +828,13 @@ export function LandingPage() {
             aria-label="Documentos legais"
             className="flex flex-wrap justify-center gap-x-8 gap-y-3"
           >
-            <a className="underline underline-offset-4" href="/termos">
+            <a className={footerLink} href="/termos">
               Termos de uso
             </a>
-            <a className="underline underline-offset-4" href="/privacidade">
+            <a className={footerLink} href="/privacidade">
               Privacidade
             </a>
-            <a className="underline underline-offset-4" href={GAME_URL}>
+            <a className={footerLink} href={GAME_URL}>
               Entrar no jogo
             </a>
           </nav>

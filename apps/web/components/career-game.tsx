@@ -17,7 +17,10 @@ import {
   Trophy,
   UserSwitch,
   WarningCircle,
+  X,
 } from '@phosphor-icons/react';
+import { MatchSimulation } from '@/components/retro/match-simulation';
+import { useGameHistory } from '@/lib/game-history';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,14 +33,6 @@ import {
 } from '@/components/ui/card';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   type CareerApiPort,
@@ -290,11 +285,25 @@ function CareerFlow({
       setStage('result');
     });
 
+  // While the server simulates, the Central gives way to a pixel pitch
+  // (no artificial delay: the result replaces it as soon as it lands).
+  const [simulating, setSimulating] = useState(false);
   const instantResult = () =>
     attempt('instant', async () => {
-      setCareer(await api.instantResult());
-      setStage('result');
+      setSimulating(true);
+      try {
+        setCareer(await api.instantResult());
+        setStage('result');
+      } finally {
+        setSimulating(false);
+      }
     });
+
+  /** Leaves a screen: the previous error never follows the player. */
+  const changeScreen = (value: Screen) => {
+    setError('');
+    setScreen(value);
+  };
 
   const login = () =>
     attempt('login', async () => {
@@ -446,6 +455,30 @@ function CareerFlow({
     ...(session?.avatarUrl ? { avatarUrl: session.avatarUrl } : {}),
   };
 
+  // The live scoreboard and the final score open at the top of the page;
+  // otherwise the phone stays scrolled where "Jogar partida" was tapped.
+  useEffect(() => {
+    if (stage === 'match' || stage === 'result')
+      globalThis.scrollTo?.({ top: 0 });
+  }, [stage]);
+
+  // Browser/Android Back walks the screens (D1); in a match it pauses.
+  const [pauseSignal, setPauseSignal] = useState(0);
+  useGameHistory({
+    location: { stage, screen },
+    onBackInMatch: () => setPauseSignal((value) => value + 1),
+    restore: (target) => {
+      setError('');
+      // A finished match cannot be re-entered; a career screen needs a career.
+      const next =
+        target.stage === 'match' || target.stage === 'result'
+          ? 'game'
+          : target.stage;
+      setStage((['game'].includes(next) && !career ? 'start' : next) as Stage);
+      setScreen(target.screen);
+    },
+  });
+
   const resumeSession = useEffectEvent(() => void login());
   const userId = session?.id;
   useEffect(() => {
@@ -553,20 +586,36 @@ function CareerFlow({
       <PwaRuntime />
       <Phase6Shell
         screen={screen}
-        setScreen={setScreen}
+        setScreen={changeScreen}
         career={career}
         commandState={commandState}
         {...(onSignOut ? { onSignOut } : {})}
         onHome={goStart}
         immersive={stage === 'match'}
       >
-        {error && <InlineError message={error} />}
-        {stage === 'match' && matchUpdate ? (
+        {error && (
+          <InlineError message={error} onDismiss={() => setError('')} />
+        )}
+        {simulating ? (
+          <MatchSimulation
+            home={
+              career.fixture?.venue === 'away'
+                ? career.opponent.club
+                : career.club
+            }
+            away={
+              career.fixture?.venue === 'away'
+                ? career.club
+                : career.opponent.club
+            }
+          />
+        ) : stage === 'match' && matchUpdate ? (
           <Matchday
             {...shared}
             api={api}
             update={matchUpdate}
             feed={matchFeed}
+            pauseSignal={pauseSignal}
             onNext={nextEvent}
             onSkip={finishMatch}
             onFinished={finishMatch}
@@ -579,7 +628,7 @@ function CareerFlow({
             career={career}
             onContinue={() => {
               setStage('game');
-              setScreen('central');
+              changeScreen('central');
             }}
           />
         ) : screen === 'central' ? (
@@ -590,12 +639,12 @@ function CareerFlow({
             calendar={competitionPort ?? demoCompetitionPort}
             onNarrate={beginNarratedMatch}
             onInstant={instantResult}
-            navigate={setScreen}
+            navigate={changeScreen}
           />
         ) : screen === 'map' ? (
           <ClubMapScreen
             career={career}
-            navigate={setScreen}
+            navigate={changeScreen}
             onNarrate={beginNarratedMatch}
             onInstant={instantResult}
           />
@@ -683,17 +732,33 @@ function CareerFlow({
   );
 }
 
-function InlineError({ message }: { message: string }) {
+/** Error of the last command: readable on chalk, dismissible, cleared on navigation. */
+function InlineError({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss(): void;
+}) {
   return (
     <div
       role="alert"
-      className="mb-4 flex items-start gap-3 rounded-md border border-destructive/60 bg-destructive/10 p-3 text-sm text-foreground"
+      className="panel mb-4 flex items-start gap-3 border-l-8 border-destructive p-3 text-sm"
     >
       <WarningCircle
         className="mt-0.5 shrink-0 text-destructive"
         weight="fill"
+        aria-hidden="true"
       />
-      <span>{message}</span>
+      <span className="min-w-0 flex-1">{message}</span>
+      <button
+        type="button"
+        aria-label="Fechar aviso"
+        className="btn-px btn-chalk -my-1 inline-flex size-11 shrink-0 items-center justify-center"
+        onClick={onDismiss}
+      >
+        <X weight="bold" aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -910,6 +975,8 @@ function Matchday(props: {
   api: CareerApiPort;
   update: MatchUpdate;
   feed: readonly MatchUpdate[];
+  /** Increments when the browser Back is pressed: pauses instead of leaving. */
+  pauseSignal?: number;
   error: string;
   onNext(): Promise<void>;
   onSkip(): void;
@@ -941,6 +1008,14 @@ function Matchday(props: {
   );
   const halfTimeStop = update.decisionPoint && dismissedPauseId !== update.id;
   const paused = manualPaused || halfTimeStop || update.done;
+  // Derived during render (no setState in effects): a new Back press
+  // pauses the match; the coach may resume afterwards.
+  const { pauseSignal = 0 } = props;
+  const [seenPause, setSeenPause] = useState(pauseSignal);
+  if (seenPause !== pauseSignal) {
+    setSeenPause(pauseSignal);
+    setManualPaused(true);
+  }
   // Pausing (by hand, at half time or at the end) cuts sounds in flight.
   useEffect(() => {
     if (paused) stopSounds();
@@ -1071,6 +1146,7 @@ function Matchday(props: {
             <Button
               size="sm"
               variant="outline"
+              className="min-h-11 min-w-11"
               aria-label={paused ? 'Retomar partida' : 'Pausar partida'}
               onClick={() => {
                 if (halfTimeStop) setDismissedPauseId(update.id);
@@ -1091,6 +1167,7 @@ function Matchday(props: {
                 <ToggleGroupItem
                   key={value}
                   value={String(value)}
+                  className="min-h-11 min-w-11"
                   aria-label={`Velocidade ${String(value).replace('.', ',')} vezes`}
                 >
                   {String(value).replace('.', ',')}×
@@ -1446,55 +1523,114 @@ function Result({
   );
 }
 
+/**
+ * Classificação: teletext table with the record when the read model has
+ * it (V/E/D from 414px, SG always), the coach's club highlighted. Cup and
+ * group formats live in the competition screens; this is the league.
+ */
 function Standings({ career }: { career: CareerView }) {
+  const rows = career.standings
+    .slice()
+    .sort((a, b) => a.position - b.position || b.points - a.points);
+  const hasRecord = rows.some((row) => row.won !== undefined);
+  const cell = 'py-2 pl-1.5 text-right whitespace-nowrap tabular-nums';
+  const head = 'pb-1.5 pl-1.5 text-right font-bold whitespace-nowrap';
+  const wide = 'hidden min-[414px]:table-cell';
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-display text-base uppercase">
-          Classificação
-        </CardTitle>
-        <CardDescription>
-          {career.division ?? 'Liga'} · rodada {career.round}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>#</TableHead>
-              <TableHead>Clube</TableHead>
-              <TableHead className="text-right">J</TableHead>
-              <TableHead className="text-right">Pts</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {career.standings
-              .slice()
-              .sort((a, b) => b.points - a.points)
-              .map((row, index) => (
-                <TableRow key={row.club}>
-                  <TableCell className="font-display text-xs font-bold">
-                    {index + 1}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      row.club === career.club && 'font-bold text-primary',
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      <ClubEmblem name={row.club} size={24} decorative />
-                      {row.club}
+    <section aria-labelledby="classificacao-titulo" className="panel p-4">
+      <h2 id="classificacao-titulo" className="font-pixel text-[.65rem]">
+        Classificação
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {career.division ?? 'Liga'} · rodada {career.round}
+      </p>
+      {rows.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          A tabela aparece depois da primeira rodada.
+        </p>
+      ) : (
+        <table className="teletext mt-3 w-full text-[.5rem] sm:text-[.6rem]">
+          <caption className="sr-only">
+            Classificação completa
+            {career.division ? ` · ${career.division}` : ''}
+          </caption>
+          <thead>
+            <tr className="bg-board text-left text-bulb">
+              <th scope="col" className="pb-1.5 pl-1 font-bold">
+                #
+              </th>
+              <th scope="col" className="w-full max-w-0 pb-1.5 font-bold">
+                Clube
+              </th>
+              <th scope="col" className={head}>
+                J
+              </th>
+              {hasRecord && (
+                <>
+                  <th scope="col" className={cn(head, wide)}>
+                    V
+                  </th>
+                  <th scope="col" className={cn(head, wide)}>
+                    E
+                  </th>
+                  <th scope="col" className={cn(head, wide)}>
+                    D
+                  </th>
+                  <th scope="col" className={head}>
+                    SG
+                  </th>
+                </>
+              )}
+              <th scope="col" className={cn(head, 'pr-1')}>
+                Pts
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const isMine = row.club === career.club;
+              const diff = row.goalDifference ?? 0;
+              return (
+                <tr
+                  key={row.club}
+                  className={cn('border-t-2', isMine && 'bg-bulb/50')}
+                  {...(isMine ? { 'aria-current': 'true' as const } : {})}
+                >
+                  <td className="py-2 pr-1.5 pl-1">
+                    {row.position || index + 1}
+                  </td>
+                  <td className="w-full max-w-0 py-2">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <ClubEmblem name={row.club} size={18} decorative />
+                      <span
+                        className={cn(
+                          'truncate',
+                          isMine && 'font-bold text-primary',
+                        )}
+                        title={row.club}
+                      >
+                        {row.club}
+                      </span>
                     </span>
-                  </TableCell>
-                  <TableCell className="text-right">{row.played}</TableCell>
-                  <TableCell className="text-right font-display text-xs font-bold">
-                    {row.points}
-                  </TableCell>
-                </TableRow>
-              ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                  </td>
+                  <td className={cell}>{row.played}</td>
+                  {hasRecord && (
+                    <>
+                      <td className={cn(cell, wide)}>{row.won ?? 0}</td>
+                      <td className={cn(cell, wide)}>{row.drawn ?? 0}</td>
+                      <td className={cn(cell, wide)}>{row.lost ?? 0}</td>
+                      <td className={cell}>
+                        {diff > 0 ? `+${String(diff)}` : diff}
+                      </td>
+                    </>
+                  )}
+                  <td className={cn(cell, 'pr-1 font-bold')}>{row.points}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }

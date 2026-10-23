@@ -199,6 +199,16 @@ export function NewCareerWizard({
     setErrors(found);
     if (Object.keys(found).length > 0) {
       play('error');
+      // The message renders next to the field, which may sit under the
+      // fixed footer or past the fold on a phone: bring it into view.
+      requestAnimationFrame(() => {
+        const alert = heading.current
+          ?.closest('section')
+          ?.querySelector<HTMLElement>('[role="alert"]');
+        // jsdom has no scrollIntoView.
+        if (alert && 'scrollIntoView' in alert)
+          alert.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
       return;
     }
     if (!last) {

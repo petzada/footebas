@@ -170,16 +170,22 @@ describe('Fase 4 · verticais de carreira longa', () => {
     ).toMatch(/renovação · bruno henrique · 12 meses/i);
   });
 
-  it('oferece feedback inválido acessível e preserva o ledger', async () => {
-    await onboard();
+  it('oferece feedback inválido acessível; Finanças fica só no Escritório', async () => {
+    const api = await onboard();
     navigate(/^estádio$/i);
-    await screen.findByRole('tab', { name: /finanças/i });
-    await selectTab(/finanças/i);
-    expect(await screen.findByText(/ledger imutável/i)).toBeTruthy();
-    expect(screen.getByText('Bilheteria · Flamengo × Bahia')).toBeTruthy();
-    expect(screen.getByText('Folha salarial · Rodada 7')).toBeTruthy();
-    expect(screen.getByText('Patrocínio · Cota mensal')).toBeTruthy();
-    expect(screen.getByText('Premiação · Copa do Brasil')).toBeTruthy();
+    await screen.findByRole('tab', { name: /^estádio$/i });
+    // D5: the legacy Finanças tab left this screen; the ledger is intact.
+    expect(screen.queryByRole('tab', { name: /finanças/i })).toBeNull();
+    expect(
+      (await api.getCareer())?.world.finances.ledger.map(
+        (entry) => entry.sourceLabel,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        'Bilheteria · Flamengo × Bahia',
+        'Folha salarial · Rodada 7',
+      ]),
+    );
     await selectTab(/estádio/i);
     fireEvent.change(await screen.findByLabelText(/preço do ingresso/i), {
       target: { value: '500' },

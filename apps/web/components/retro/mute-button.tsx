@@ -21,8 +21,8 @@ export function MuteButton({
       aria-label={muted ? 'Som desligado' : 'Som ligado'}
       title={muted ? 'Ligar som' : 'Desligar som'}
       className={cn(
-        'btn-px btn-board inline-flex min-h-10 items-center gap-2 text-[.6rem]',
-        compact ? 'size-9 justify-center px-0 sm:size-10' : 'px-3',
+        'btn-px btn-board inline-flex min-h-11 items-center gap-2 text-[.6rem]',
+        compact ? 'size-11 justify-center px-0' : 'px-3',
         className,
       )}
       onClick={() => {
