@@ -28,6 +28,31 @@
       "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
     },
   ],
+  // Rate Limiting bindings (src/rate-limit.ts). Keys: hash of the bearer for
+  // signed-in callers, hash of cf-connecting-ip for anonymous ones. Counters
+  // are per Cloudflare location and eventually consistent (protection against
+  // abuse, not exact accounting). `/health` and the Woovi webhook are exempt.
+  // namespace_id must be unique per account; keep RATE_LIMITS in sync.
+  "ratelimits": [
+    {
+      // POST writes (commands, checkout) per user.
+      "name": "RATE_LIMIT_COMMANDS",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      // Authenticated GETs per user (job polling runs at ~4 req/s).
+      "name": "RATE_LIMIT_READS",
+      "namespace_id": "1002",
+      "simple": { "limit": 600, "period": 60 },
+    },
+    {
+      // Anonymous requests per IP (public stats, unauthenticated calls).
+      "name": "RATE_LIMIT_PUBLIC",
+      "namespace_id": "1003",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
   "queues": {
     "producers": [
       { "binding": "SIMULATION_QUEUE", "queue": "footebas-simulation" },

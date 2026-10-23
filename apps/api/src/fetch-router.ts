@@ -5,6 +5,20 @@ import {
   mapError,
   type ApiDependencies,
 } from './routes.js';
+import type { RequestCompletion } from './observability.js';
+import type { RateLimitDecision } from './rate-limit.js';
+
+export interface FetchHandlerOptions {
+  /** Runs after route matching, before the body is read; denied → 429. */
+  readonly rateLimit?: (
+    request: Request,
+    route: string | undefined,
+  ) => Promise<RateLimitDecision>;
+  /** Called once per request with the outcome (structured logging). */
+  readonly onComplete?: (completion: RequestCompletion) => void;
+  /** Monotonic-ish clock in milliseconds (default `Date.now`). */
+  readonly now?: () => number;
+}
 
 interface CompiledRoute {
   readonly method: string;
@@ -36,14 +50,17 @@ function compile(routes: ReturnType<typeof apiRoutes>): CompiledRoute[] {
 
 export function createFetchHandler(
   deps: ApiDependencies,
+  options: FetchHandlerOptions = {},
 ): (request: Request) => Promise<Response> {
   const routes = compile(apiRoutes(deps));
   const origins = new Set(deps.corsOrigins ?? []);
   const limit = deps.bodyLimit ?? 64 * 1024;
-  return async (request) => {
-    const requestId =
-      deps.nextRequestId?.() ??
-      `request_${crypto.randomUUID().replaceAll('-', '')}`;
+  const now = options.now ?? Date.now;
+  const dispatch = async (
+    request: Request,
+    requestId: string,
+    state: { route: string; error?: unknown },
+  ): Promise<Response> => {
     const headers = new Headers({
       'x-content-type-options': 'nosniff',
       'cache-control': 'no-store',
@@ -58,9 +75,14 @@ export function createFetchHandler(
         'authorization, content-type, idempotency-key',
       );
       headers.set('access-control-allow-methods', 'GET, POST, OPTIONS');
-      headers.set('access-control-expose-headers', 'idempotency-key');
-      if (request.method === 'OPTIONS')
+      headers.set(
+        'access-control-expose-headers',
+        'idempotency-key, retry-after, x-request-id',
+      );
+      if (request.method === 'OPTIONS') {
+        state.route = 'preflight';
         return new Response(null, { status: 204, headers });
+      }
     }
     const respond = (
       status: number,
@@ -77,10 +99,31 @@ export function createFetchHandler(
     };
     try {
       const url = new URL(request.url);
+      let found:
+        { compiled: CompiledRoute; match: RegExpExecArray } | undefined;
       for (const compiled of routes) {
         if (compiled.method !== request.method) continue;
         const match = compiled.pattern.exec(url.pathname);
-        if (!match) continue;
+        if (match) {
+          found = { compiled, match };
+          break;
+        }
+      }
+      if (found) state.route = found.compiled.route.path;
+      const decision = await options.rateLimit?.(
+        request,
+        found?.compiled.route.path,
+      );
+      if (decision && !decision.allowed) {
+        headers.set('retry-after', String(decision.retryAfterSeconds));
+        return respond(
+          429,
+          // Contract has no RATE_LIMITED code yet; FORBIDDEN is the closest.
+          errorBody(requestId, 'FORBIDDEN', 'rate limit exceeded; retry later'),
+        );
+      }
+      if (found) {
+        const { compiled, match } = found;
         const text = request.method === 'GET' ? '' : await request.text();
         if (text.length > limit)
           return respond(
@@ -124,7 +167,25 @@ export function createFetchHandler(
       return respond(404, errorBody(requestId, 'NOT_FOUND', 'route not found'));
     } catch (error) {
       const mapped = mapError(error, requestId);
+      if (mapped.status >= 500) state.error = error;
       return respond(mapped.status, mapped.body);
     }
+  };
+  return async (request) => {
+    const started = now();
+    const requestId =
+      deps.nextRequestId?.() ??
+      `request_${crypto.randomUUID().replaceAll('-', '')}`;
+    const state: { route: string; error?: unknown } = { route: 'unmatched' };
+    const response = await dispatch(request, requestId, state);
+    options.onComplete?.({
+      requestId,
+      method: request.method,
+      route: state.route,
+      status: response.status,
+      durationMs: Math.max(0, now() - started),
+      ...(state.error === undefined ? {} : { error: state.error }),
+    });
+    return response;
   };
 }

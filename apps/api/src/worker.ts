@@ -33,11 +33,27 @@ import {
   WooviHttpClient,
 } from './billing/woovi-client.js';
 import { createFetchHandler } from './fetch-router.js';
+import {
+  consoleLogSink,
+  errorFields,
+  jobLogEntry,
+  requestLogEntry,
+  type JobOutcome,
+} from './observability.js';
+import {
+  rateLimitGuard,
+  WorkersRateLimiter,
+  type RateLimitBinding,
+} from './rate-limit.js';
+import { identifyRequest } from './request-identity.js';
+import { errorBody } from './routes.js';
 import { withSmokeAuth } from './smoke-auth.js';
 import { SupabaseJwtAuth } from './supabase-auth.js';
 
 interface QueueMessage<T> {
   readonly body: T;
+  /** Delivery count (1 on the first attempt). */
+  readonly attempts: number;
   ack(): void;
   retry(options?: { delaySeconds?: number }): void;
 }
@@ -66,6 +82,17 @@ export interface Env {
   readonly LICENSE_PRICE_CENTS?: string;
   /** PIX charge lifetime in seconds (default 3600, min 300). */
   readonly LICENSE_CHARGE_EXPIRES_IN?: string;
+  /** Rate Limiting bindings (`ratelimits` in wrangler.jsonc). */
+  readonly RATE_LIMIT_COMMANDS?: RateLimitBinding;
+  readonly RATE_LIMIT_READS?: RateLimitBinding;
+  readonly RATE_LIMIT_PUBLIC?: RateLimitBinding;
+}
+
+/** Mirrors `max_retries` of the simulation consumer in wrangler.jsonc. */
+const QUEUE_MAX_RETRIES = 5;
+
+function workerVersion(env: Env): string {
+  return env.CF_VERSION_METADATA?.id ?? 'unknown';
 }
 
 function positiveInteger(value: string | undefined, fallback: number): number {
@@ -175,42 +202,115 @@ function compose(env: Env) {
 }
 
 async function handle(request: Request, env: Env): Promise<Response> {
+  const version = workerVersion(env);
+  const identity = await identifyRequest(request);
+  const limiter = new WorkersRateLimiter({
+    command: env.RATE_LIMIT_COMMANDS,
+    read: env.RATE_LIMIT_READS,
+    public: env.RATE_LIMIT_PUBLIC,
+  });
   const { sql, auth, jobs, application, phaseFour } = compose(env);
   try {
-    return await createFetchHandler({
-      application,
-      jobs,
-      phaseFour: { application: phaseFour, auth },
-      billing: billing(env, sql, auth),
-      corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
-        .split(',')
-        .map((origin) => origin.trim()),
-      health: {
-        version: env.CF_VERSION_METADATA?.id ?? 'unknown',
-        timeoutMs: 2000,
-        database: async () => {
-          await sql`select 1`;
+    return await createFetchHandler(
+      {
+        application,
+        jobs,
+        phaseFour: { application: phaseFour, auth },
+        billing: billing(env, sql, auth),
+        corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
+          .split(',')
+          .map((origin) => origin.trim()),
+        health: {
+          version,
+          timeoutMs: 2000,
+          database: async () => {
+            await sql`select 1`;
+          },
         },
       },
-    })(request);
+      {
+        rateLimit: rateLimitGuard(limiter, identity),
+        onComplete: (completion) => {
+          consoleLogSink(requestLogEntry(completion, identity, version));
+        },
+      },
+    )(request);
   } finally {
     await sql.end({ timeout: 1 });
   }
 }
 
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    return handle(request, env);
+  async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      return await handle(request, env);
+    } catch (error) {
+      // Composition failed before the router could answer: log, stay generic.
+      const requestId = `request_${crypto.randomUUID().replaceAll('-', '')}`;
+      consoleLogSink({
+        type: 'request',
+        level: 'error',
+        requestId,
+        method: request.method,
+        route: 'unhandled',
+        status: 500,
+        version: workerVersion(env),
+        ...errorFields(error),
+      });
+      return new Response(
+        JSON.stringify(
+          errorBody(requestId, 'INTERNAL_ERROR', 'internal server error'),
+        ),
+        {
+          status: 500,
+          headers: {
+            'content-type': 'application/json',
+            'cache-control': 'no-store',
+            'x-request-id': requestId,
+          },
+        },
+      );
+    }
   },
   async queue(batch: MessageBatch<SimulationJob>, env: Env): Promise<void> {
+    const version = workerVersion(env);
     const { sql, application } = compose(env);
     try {
       for (const message of batch.messages) {
-        const status = await application.runJob(message.body, {
-          requeueOnFailure: false,
-        });
-        if (status.state === 'failed') message.retry({ delaySeconds: 5 });
-        else message.ack();
+        const started = Date.now();
+        let result: JobOutcome;
+        let failure: unknown;
+        try {
+          const status = await application.runJob(message.body, {
+            requeueOnFailure: false,
+          });
+          if (status.state === 'failed') {
+            message.retry({ delaySeconds: 5 });
+            result =
+              message.attempts > QUEUE_MAX_RETRIES ? 'dead_letter' : 'retry';
+          } else {
+            message.ack();
+            result = status.state;
+          }
+        } catch (error) {
+          failure = error;
+          message.retry({ delaySeconds: 5 });
+          result =
+            message.attempts > QUEUE_MAX_RETRIES ? 'dead_letter' : 'error';
+        }
+        consoleLogSink(
+          jobLogEntry(
+            {
+              jobId: message.body.id,
+              careerId: message.body.careerId,
+              attempts: message.attempts,
+              durationMs: Date.now() - started,
+              result,
+              ...(failure === undefined ? {} : { error: failure }),
+            },
+            version,
+          ),
+        );
       }
     } finally {
       await sql.end({ timeout: 1 });
