@@ -221,6 +221,25 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
     return accepted;
   }
 
+  /** Archives a career at its own version (frees the plan's career slot). */
+  async function deleteCareer(id: string, at: number): Promise<void> {
+    sequence += 1;
+    const idempotencyKey = `smoke:${run}:${String(sequence)}:DeleteCareer`;
+    await ok<Accepted>(
+      'POST',
+      '/v1/commands',
+      {
+        version: 1,
+        commandId: `command_smoke_${run}_${String(sequence)}`,
+        idempotencyKey,
+        expectedVersion: at,
+        type: 'DeleteCareer',
+        payload: { careerId: id },
+      },
+      { 'idempotency-key': idempotencyKey },
+    );
+  }
+
   async function stage<T>(name: string, body: () => Promise<T>): Promise<T> {
     step = name;
     const started = now();
@@ -273,9 +292,15 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
       await ok<CareerList>('GET', '/v1/careers');
     });
 
-    const before = await stage('listar carreiras (antes)', () =>
-      ok<CareerList>('GET', '/v1/careers'),
-    );
+    // The free plan allows one active career: archive leftovers first.
+    const before = await stage('limpar carreiras anteriores', async () => {
+      const listed = await ok<CareerList>('GET', '/v1/careers');
+      for (const old of listed.careers)
+        await deleteCareer(old.careerId, old.aggregateVersion);
+      if (listed.careers.length > 0)
+        log(`       ${String(listed.careers.length)} carreira(s) arquivada(s)`);
+      return ok<CareerList>('GET', '/v1/careers');
+    });
 
     await stage('criar carreira', async () => {
       const accepted = await command('CreateCareer', {
@@ -418,6 +443,15 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
         `lista tinha ${String(before.careers.length)} carreira(s) e agora tem ${String(after.careers.length)}`,
       );
       log(`       ${String(after.careers.length)} carreira(s) do usuário`);
+    });
+
+    await stage('excluir carreira', async () => {
+      await deleteCareer(career(), version);
+      const after = await ok<CareerList>('GET', '/v1/careers');
+      check(
+        !after.careers.some(({ careerId: id }) => id === careerId),
+        'a carreira excluída continua na lista',
+      );
     });
 
     log(`Fumaça OK: carreira ${career()} na versão ${String(version)}.`);

@@ -56,6 +56,7 @@ function fakeApi(
       version += 1;
       if (body.type === 'CreateCareer')
         careers.push({ careerId: 'career_one', aggregateVersion: version });
+      if (body.type === 'DeleteCareer') careers.length = 0;
       return reply(202, {
         version: 1,
         commandId: 'command_x',
