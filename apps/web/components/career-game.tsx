@@ -475,6 +475,7 @@ function CareerFlow({
         commandState={commandState}
         {...(onSignOut ? { onSignOut } : {})}
         onHome={goStart}
+        immersive={stage === 'match'}
       >
         {error && <InlineError message={error} />}
         {stage === 'match' && matchUpdate ? (
