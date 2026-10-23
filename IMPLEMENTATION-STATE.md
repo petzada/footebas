@@ -1,6 +1,6 @@
 # Estado de implementação
 
-Última atualização: 2026-10-22
+Última atualização: 2026-10-23
 
 | Fase                           | Estado    | Evidência                                        |
 | ------------------------------ | --------- | ------------------------------------------------ |
@@ -24,28 +24,30 @@ disjuntos, em três trilhas: **servidor** (`packages/*`, serializada), **web** (
 
 Etapas (as marcadas com ★ entraram com o ADR 0010 — apresentação premium e Phaser):
 
-| Etapa | Conteúdo                                                                                                                                                                                                                          | Estado    |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 1     | Nuvem: login Supabase, web via OpenNext, domínios, fumaça na nuvem                                                                                                                                                                | concluída |
-| 2A    | Telas de entrada: Início, Carregar, Central, Mapa, emblemas                                                                                                                                                                       | concluída |
-| 2B    | Visual ISOPOP (ADR 0009), Mapa isométrico, Nova Carreira em etapas com treinador                                                                                                                                                  | em curso  |
-| 2C ★  | Partida em Phaser sob demanda sobre a timeline oficial, campo 2D como fallback                                                                                                                                                    | pendente  |
-| 2D ★  | Apresentação premium: movimento, feedback, sons com mudo, celebração de gol, avatares gerados                                                                                                                                     | pendente  |
-| 2E    | Telas restantes sobre 2D: Elenco (campo arrastável, presets), Mercado, Escritório, Temporada, Ranking                                                                                                                             | pendente  |
-| 3     | Servidor: personalidade e limites ✔, mercado/janelas/IA ✔, escritório + entrosamento ✔, e-mails com decisões, estatísticas de temporada, ranking com snapshots; variância do motor e pausas só no intervalo e no fim (decisão 18) | em curso  |
-| 4     | Licença Woovi PIX ✔ (sandbox aguarda AppID), perfil, termos e privacidade                                                                                                                                                         | em curso  |
-| 5     | ADR 0014: Durable Object por carreira, save enxuto (< 200 KB), endpoint único da Central, TanStack Query + Zustand no cliente; observabilidade ✔, rate limit ✔, backups ✔, E2E no CI ✔                                            | pendente  |
-| 6     | Landing arcade isométrica                                                                                                                                                                                                         | pendente  |
+| Etapa | Conteúdo                                                                                                                                                                                                                          | Estado                                |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1     | Nuvem: login Supabase, web via OpenNext, domínios, fumaça na nuvem                                                                                                                                                                | concluída                             |
+| 2A    | Telas de entrada: Início, Carregar, Central, Mapa, emblemas                                                                                                                                                                       | concluída                             |
+| 2B    | Visual ISOPOP (ADR 0009), Mapa isométrico, Nova Carreira em etapas com treinador                                                                                                                                                  | concluída (Futebol Retrô, ADR 0012)   |
+| 2C ★  | Partida em Phaser sob demanda sobre a timeline oficial, campo 2D como fallback                                                                                                                                                    | concluída                             |
+| 2D ★  | Apresentação premium: movimento, feedback, sons com mudo, celebração de gol, avatares gerados                                                                                                                                     | concluída                             |
+| 2E    | Telas restantes sobre 2D: Elenco (campo arrastável, presets), Mercado, Escritório, Temporada, Ranking                                                                                                                             | concluída                             |
+| 3     | Servidor: personalidade e limites ✔, mercado/janelas/IA ✔, escritório + entrosamento ✔, e-mails com decisões, estatísticas de temporada, ranking com snapshots; variância do motor e pausas só no intervalo e no fim (decisão 18) | concluída                             |
+| 4     | Licença Woovi PIX ✔ (sandbox aguarda AppID), perfil, termos e privacidade                                                                                                                                                         | concluída (AbacatePay, ADR 0016)      |
+| 5     | ADR 0014: Durable Object por carreira, save enxuto (< 200 KB), endpoint único da Central, TanStack Query + Zustand no cliente; observabilidade ✔, rate limit ✔, backups ✔, E2E no CI ✔                                            | em curso (TanStack/Zustand pendentes) |
+| 6     | Landing arcade isométrica                                                                                                                                                                                                         | concluída (`lp.footebas.com.br`)      |
 
 ### Estado da nuvem
 
-- Web `footebas-web` em um só Worker com quatro hosts (2026-10-23): jogo em `https://game.footebas.com.br`,
-  landing em `https://lp.footebas.com.br` (rota `app/landing`), apex e www → 308 para a landing. Bundle OpenNext
-  gerado no workflow `deploy-web` (Linux) e publicado com wrangler; tela de entrada com Google e link mágico.
-  Pendente no Supabase: incluir `https://game.footebas.com.br/auth/callback` nas Redirect URLs.
-- API `footebas-api` em `https://api.footebas.com.br` (e workers.dev); `/health` com checagem do banco.
-- Supabase: migrations aplicadas; Auth com Site URL `https://footebas.com.br` e callbacks `/auth/callback`; Google
-  OAuth ativo (validação com conta real pendente no checklist).
-- Fumaça na nuvem (`pnpm smoke:cloud`, token `SMOKE_TOKEN` como secret do Worker): criar carreira, escolher clube,
-  escalar, avançar rodada pela Queue, recarregar e listar — verde em 2026-10-22. Latência de 5–9 s por comando
-  por causa do save de ~2 MB (alvo da redução do save na etapa 5).
+Detalhes operacionais (comandos de deploy, segredos, fumaça) e pendências em `HANDOFF.md`.
+
+- Web `footebas-web` em um só Worker com quatro hosts: jogo em `https://game.footebas.com.br`, landing em
+  `https://lp.footebas.com.br`, apex e www → 308 para a landing, `/auth/*` dos hosts antigos → 307 para o jogo.
+  Callback `https://game.footebas.com.br/auth/callback` cadastrado no Supabase.
+- API `footebas-api` em `https://api.footebas.com.br`: Durable Object por carreira, save v3 enxuto, Queues, cron de
+  15 min (reconciliação de pagamentos e ranking), R2 de avatares.
+- Supabase: migrations aplicadas até `20261027000300_ranking_avatar.sql`.
+- Licença: R$ 29,90 por PIX dinâmico da AbacatePay (15 min), webhook com secret, reconciliação automática,
+  carreiras extras bloqueadas após reembolso.
+- Fumaça na nuvem verde em 2026-10-23: CreateCareer ~1,5 s, SelectClub ~1,3 s, demais 0,2–0,9 s (meta de 0,8 s
+  depende de aproximar Worker e banco).
