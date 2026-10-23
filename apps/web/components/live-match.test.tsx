@@ -77,6 +77,8 @@ describe('partida ao vivo (decisões 18 e 19)', () => {
       .spyOn(globalThis, 'scrollTo')
       .mockImplementation(() => {});
     await startLiveMatch();
+    // The scroll runs in an effect: let React flush it (slow CI runners).
+    await advance(50);
     expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
     scrollTo.mockClear();
     // Skipping resolves through the in-memory port: real timers again.
@@ -167,6 +169,9 @@ describe('partida ao vivo (decisões 18 e 19)', () => {
     const mobileNav = () =>
       screen.queryByRole('navigation', { name: /navegação principal mobile/i });
     expect(mobileNav()).toBeNull();
+    // The scroll listener attaches in an effect: let React flush it first,
+    // or the event fires before anyone listens (slow CI runners).
+    await advance(50);
     act(() => {
       Object.defineProperty(window, 'scrollY', {
         configurable: true,
