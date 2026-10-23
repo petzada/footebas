@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
+import { completeNewCareer } from '@/components/testing/complete-new-career';
 import { InMemoryCareerApi } from '@/lib/career-api';
 
 async function onboard(api = new InMemoryCareerApi()) {
@@ -16,10 +17,7 @@ async function onboard(api = new InMemoryCareerApi()) {
   fireEvent.click(
     await screen.findByRole('button', { name: /nova carreira/i }),
   );
-  await screen.findByLabelText(/nome do treinador/i);
-  fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
-  await screen.findByText(/escolha seu desafio/i);
-  fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
+  await completeNewCareer();
   await screen.findByRole('button', { name: /jogar partida/i });
   return api;
 }

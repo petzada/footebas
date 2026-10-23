@@ -111,6 +111,29 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     expect(career.world.market.length).toBeGreaterThan(0);
   });
 
+  it('cria a carreira com nome e perfil e lê de volta na home e na listagem', async () => {
+    const client = await server();
+    await client.login('bia@footebas.com');
+    const coachProfile = {
+      nationality: 'PT',
+      avatar: 'avatar-05',
+      personality: 'disciplinador',
+    } as const;
+    await client.createCareer({
+      coach: 'Bia',
+      careerName: 'Projeto Bia',
+      coachProfile,
+    });
+    await client.selectClub('Flamengo');
+    const career = await client.getCareer();
+    expect(career?.careerName).toBe('Projeto Bia');
+    expect(career?.coachProfile).toEqual(coachProfile);
+    const { careers } = await client.listCareers();
+    expect(careers[0]).toEqual(
+      expect.objectContaining({ name: 'Projeto Bia', coachProfile }),
+    );
+  });
+
   it('lista e reabre a carreira pela listagem do servidor', async () => {
     const { client } = await start();
     const { careers } = await client.listCareers();

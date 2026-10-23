@@ -3,6 +3,8 @@ import type {
   CareerApiPort,
   CareerList,
   CareerSummary,
+  CoachProfile,
+  CreateCareerInput,
   CareerView,
   PublicStats,
   Formation,
@@ -94,6 +96,7 @@ interface CareerListModel {
     season?: number;
     currentDate?: string;
     careerName?: string;
+    coach?: CoachProfile;
     /** Last change timestamp (ISO), when the server sends it. */
     updatedAt?: string;
   }[];
@@ -111,6 +114,9 @@ interface ClubSummary {
 interface HomeModel {
   aggregateVersion: number;
   managerName: string;
+  /** Optional so older servers keep working. */
+  careerName?: string;
+  coach?: CoachProfile;
   club?: ClubSummary;
   currentDate: string;
   season: number;
@@ -612,7 +618,7 @@ export class HttpCareerApi implements CareerApiPort {
     this.#options.storage?.setItem('footebas-bearer', this.#bearer);
   }
 
-  async createCareer({ coach }: { coach: string }) {
+  async createCareer({ coach, careerName, coachProfile }: CreateCareerInput) {
     if (!coach.trim()) throw new Error('Informe o nome do treinador.');
     this.#version = 0;
     // One key per creation: players may keep several careers (plan limit is
@@ -633,6 +639,18 @@ export class HttpCareerApi implements CareerApiPort {
         payload: {
           managerName: coach.trim(),
           startDate: this.#options.startDate ?? '2026-01-01',
+          ...(careerName === undefined
+            ? {}
+            : { careerName: careerName.trim() }),
+          ...(coachProfile === undefined
+            ? {}
+            : {
+                coach: {
+                  nationality: coachProfile.nationality,
+                  avatar: coachProfile.avatar,
+                  personality: coachProfile.personality,
+                },
+              }),
         },
       },
       { 'idempotency-key': idempotencyKey },
@@ -689,6 +707,7 @@ export class HttpCareerApi implements CareerApiPort {
         id: item.careerId,
         coach: item.managerName ?? 'Treinador',
         ...(item.careerName ? { name: item.careerName } : {}),
+        ...(item.coach ? { coachProfile: item.coach } : {}),
         ...(item.clubName ? { clubName: item.clubName } : {}),
         ...(item.season === undefined ? {} : { season: item.season }),
         ...(item.currentDate ? { currentDate: item.currentDate } : {}),
@@ -766,6 +785,8 @@ export class HttpCareerApi implements CareerApiPort {
     const players = squad.players.map((player) => this.#player(player));
     return {
       coach: home.managerName,
+      ...(home.careerName ? { careerName: home.careerName } : {}),
+      ...(home.coach ? { coachProfile: home.coach } : {}),
       club: home.club?.name ?? squad.club.name,
       ...(standings?.competition ? { division: standings.competition } : {}),
       ...(next

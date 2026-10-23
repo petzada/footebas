@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react';
 import { Brand } from '@/components/brand';
 import { ClubEmblem, stableHash } from '@/components/club-emblem';
+import { CoachAvatar } from '@/components/coach-avatar';
 import { Button } from '@/components/ui/button';
 import {
   FREE_CAREER_LIMIT,
@@ -21,6 +22,7 @@ import {
   type CareerSummary,
   type PublicStats,
 } from '@/lib/career-api';
+import { personalityLabel } from '@/lib/coach-profile';
 import { cn } from '@/lib/utils';
 
 export interface PlayerIdentity {
@@ -73,6 +75,7 @@ export function PlayerAvatar({
             'grid size-full place-items-center rounded-full border-4 border-background font-display font-bold uppercase text-white',
             size === 'lg' ? 'text-6xl sm:text-7xl' : 'text-xl',
           )}
+          // Deterministic per-player artwork color (not a UI token).
           style={{
             background: `linear-gradient(140deg, hsl(${hue} 55% 38%), hsl(${(hue + 40) % 360} 60% 22%))`,
           }}
@@ -92,7 +95,7 @@ function StartFrame({
   onSignOut?: (() => void) | undefined;
 }) {
   return (
-    <main className="arcade-hero min-h-dvh px-4 pb-10 pt-4 sm:px-6">
+    <main className="min-h-dvh px-4 pb-10 pt-4 sm:px-6">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
         <Brand />
         {onSignOut && (
@@ -111,19 +114,35 @@ function StartFrame({
 export function StartScreen({
   player,
   loadStats,
+  loadCareers,
   error = '',
   onNewCareer,
   onLoadCareer,
+  onContinue,
   onSignOut,
 }: {
   player: PlayerIdentity;
   loadStats(): Promise<PublicStats | null>;
+  /** Saved careers; the most recent one is offered to continue. */
+  loadCareers?: () => Promise<CareerList>;
   error?: string;
   onNewCareer(): void;
   onLoadCareer(): void;
+  onContinue?: (career: CareerSummary) => void;
   onSignOut?: (() => void) | undefined;
 }) {
   const [stats, setStats] = useState<PublicStats | null>(null);
+  const [latest, setLatest] = useState<CareerSummary | null>(null);
+  useEffect(() => {
+    if (!loadCareers) return;
+    let active = true;
+    loadCareers()
+      .then((list) => active && setLatest(list.careers[0] ?? null))
+      .catch(() => active && setLatest(null));
+    return () => {
+      active = false;
+    };
+  }, [loadCareers]);
   useEffect(() => {
     let active = true;
     loadStats()
@@ -139,7 +158,7 @@ export function StartScreen({
       <div className="mx-auto mt-8 grid max-w-5xl items-center gap-10 lg:mt-16 lg:grid-cols-[1.1fr_.9fr]">
         <section
           aria-labelledby="inicio-titulo"
-          className="flex flex-col items-center text-center lg:items-start lg:text-left"
+          className="glass-strong flex flex-col items-center rounded-[2rem] px-5 pb-6 pt-8 text-center sm:px-8 lg:items-start lg:text-left"
         >
           <PlayerAvatar player={player} />
           <p className="mt-6 text-xs font-bold uppercase tracking-[.24em] text-primary">
@@ -183,9 +202,78 @@ export function StartScreen({
             </Button>
           </div>
         </section>
-        {stats && <Counters stats={stats} />}
+        <div className="grid gap-6">
+          {latest && (
+            <LatestCareer
+              career={latest}
+              {...(onContinue ? { onContinue: () => onContinue(latest) } : {})}
+            />
+          )}
+          {stats && <Counters stats={stats} />}
+        </div>
       </div>
     </StartFrame>
+  );
+}
+
+/** Most recent career: name, coach avatar and personality. */
+function LatestCareer({
+  career,
+  onContinue,
+}: {
+  career: CareerSummary;
+  onContinue?: () => void;
+}) {
+  const title = careerTitle(career);
+  const profile = career.coachProfile;
+  return (
+    <section
+      aria-labelledby="ultima-carreira"
+      className="glass grid gap-3 rounded-2xl p-4"
+    >
+      <p className="text-xs font-bold uppercase tracking-[.2em] text-muted-foreground">
+        Última carreira
+      </p>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
+        {profile ? (
+          <CoachAvatar
+            avatar={profile.avatar}
+            size={64}
+            label={`Avatar do treinador ${career.coach}`}
+          />
+        ) : (
+          <ClubEmblem
+            name={career.clubName ?? career.coach}
+            size={56}
+            decorative
+          />
+        )}
+        <div className="min-w-0">
+          <h2 id="ultima-carreira" className="truncate text-xl font-extrabold">
+            {title}
+          </h2>
+          <p className="truncate text-sm">
+            {career.coach}
+            {profile && (
+              <>
+                {' · '}
+                <strong>{personalityLabel(profile.personality)}</strong>
+              </>
+            )}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {career.clubName ?? 'Clube a escolher'}
+            {career.season ? ` · Temporada ${career.season}` : ''}
+          </p>
+        </div>
+      </div>
+      {onContinue && (
+        <Button className="min-h-11" onClick={onContinue}>
+          <Play data-icon="inline-start" weight="fill" />
+          Continuar<span className="sr-only"> {title}</span>
+        </Button>
+      )}
+    </section>
   );
 }
 
@@ -207,12 +295,12 @@ function Counters({ stats }: { stats: PublicStats }) {
         {items.map(([label, value]) => (
           <div
             key={label}
-            className="counter-tile flex flex-col items-center rounded-xl border px-2 py-4 lg:flex-row lg:justify-between lg:px-5"
+            className="glass flex flex-col items-center rounded-2xl px-2 py-4 lg:flex-row lg:justify-between lg:px-5"
           >
             <dt className="order-2 text-[.7rem] font-bold uppercase tracking-wider text-muted-foreground lg:order-1 lg:text-sm">
               {label}
             </dt>
-            <dd className="order-1 font-display text-3xl font-bold tabular-nums text-primary sm:text-4xl lg:order-2 lg:text-5xl">
+            <dd className="order-1 text-3xl font-extrabold tabular-nums text-foreground sm:text-4xl lg:order-2 lg:text-5xl">
               {numberFormat.format(value)}
             </dd>
           </div>
@@ -391,7 +479,7 @@ export function LoadCareerScreen({
             </Button>
           </div>
         ) : careers.length === 0 ? (
-          <div className="arcade-panel mt-6 rounded-xl border p-8 text-center">
+          <div className="glass mt-6 rounded-2xl p-8 text-center">
             <p className="font-display text-2xl font-bold uppercase">
               Nenhuma carreira salva
             </p>
@@ -437,7 +525,7 @@ function PlanNotice({
     <div
       className={cn(
         'mt-5 rounded-xl border px-4 py-3 text-sm',
-        notice ? 'border-accent/60 bg-accent/10' : 'bg-card/60',
+        notice ? 'border-accent/60 bg-popover' : 'surface',
       )}
     >
       {notice && (
@@ -499,19 +587,30 @@ function CareerRow({
   ].filter(Boolean);
 
   return (
-    <li className="arcade-panel overflow-hidden rounded-xl border">
+    <li className="surface overflow-hidden rounded-2xl">
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4 sm:grid-cols-[auto_1fr_auto]">
-        <ClubEmblem
-          name={career.clubName ?? career.coach}
-          size={56}
-          decorative
-        />
+        <span className="relative">
+          <ClubEmblem
+            name={career.clubName ?? career.coach}
+            size={56}
+            decorative
+          />
+          {career.coachProfile && (
+            <CoachAvatar
+              avatar={career.coachProfile.avatar}
+              size={28}
+              className="absolute -bottom-1 -right-2 ring-2 ring-popover"
+            />
+          )}
+        </span>
         <div className="min-w-0">
           <h2 className="truncate font-display text-2xl font-bold uppercase leading-tight">
             {title}
           </h2>
           <p className="truncate text-sm font-medium">
             {career.clubName ?? 'Clube a escolher'} · {career.coach}
+            {career.coachProfile &&
+              ` · ${personalityLabel(career.coachProfile.personality)}`}
           </p>
           <p className="text-xs text-muted-foreground">
             {details.join(' · ')}
@@ -552,7 +651,7 @@ function CareerRow({
           role="alertdialog"
           aria-labelledby={dialogTitle}
           aria-describedby={dialogText}
-          className="border-t border-destructive/50 bg-destructive/10 p-4"
+          className="border-t border-destructive/50 bg-popover p-4"
           onKeyDown={(event) => {
             if (event.key === 'Escape') onCancelDelete();
           }}
