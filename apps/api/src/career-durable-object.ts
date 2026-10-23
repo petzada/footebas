@@ -13,6 +13,7 @@ import {
   catalogCareerContent,
   type AuthPort,
   type CareerContentPort,
+  type EntitlementsPort,
   type IdGenerator,
   type JobQueuePort,
   type SimulationJob,
@@ -20,6 +21,7 @@ import {
 import type { JobStatus } from '@footebas/contracts';
 import {
   PostgresCareerSaveStore,
+  PostgresEntitlements,
   SystemClock,
   type CareerSaveStore,
   type Clock,
@@ -47,6 +49,10 @@ export interface CareerObjectDependencies {
   readonly clock: Clock;
   readonly ids: IdGenerator;
   readonly content?: CareerContentPort;
+  /** Plan limits (careers, starting club); free plan when absent. */
+  readonly entitlements?: () => EntitlementsPort;
+  /** Free plan starts in Série C (docs/05 §5); on in production. */
+  readonly enforceStartingDivision?: boolean;
 }
 
 /** Runtime-independent core of the career object (tested with fakes). */
@@ -74,6 +80,12 @@ export class CareerObject {
       telemetry: new NoopTelemetry(),
       unitOfWork: this.unitOfWork,
       content: this.content,
+      ...(this.deps.entitlements === undefined
+        ? {}
+        : { entitlements: this.deps.entitlements() }),
+      ...(this.deps.enforceStartingDivision === true
+        ? { enforceStartingDivision: true }
+        : {}),
     });
   }
 
@@ -163,6 +175,8 @@ export class CareerDurableObject {
       ),
       clock,
       ids: new RandomIdGenerator(),
+      entitlements: () => new PostgresEntitlements(sql()),
+      enforceStartingDivision: true,
     });
   }
 
