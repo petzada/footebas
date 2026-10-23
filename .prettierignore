@@ -25,3 +25,4 @@ packages/content/src/generated
 packages/content/catalog-report.md
 pnpm-lock.yaml
 supabase/.temp
+design.md
