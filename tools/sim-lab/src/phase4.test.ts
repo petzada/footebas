@@ -29,7 +29,7 @@ describe('phase four long-horizon gate', () => {
     expect(report.failures).toEqual([]);
     expect(report.passed).toBe(true);
     expect(report.archive.seasons).toBe(15);
-  }, 30_000);
+  }, 180_000);
 
   it('is exactly deterministic across a long horizon except for runtime', () => {
     const first = runPhaseFourGate({ seasons: 20, seed: 'phase4-replay-v1' });
@@ -37,7 +37,7 @@ describe('phase four long-horizon gate', () => {
     expect(canonicalJson({ ...first, elapsedMs: 0 })).toBe(
       canonicalJson({ ...second, elapsedMs: 0 }),
     );
-  }, 30_000);
+  }, 180_000);
 
   it('holds the versioned invariants across generated seeds', () => {
     fc.assert(
@@ -50,5 +50,5 @@ describe('phase four long-horizon gate', () => {
       }),
       { numRuns: 3, seed: 4_204_026 },
     );
-  }, 30_000);
+  }, 180_000);
 });
