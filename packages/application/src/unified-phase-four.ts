@@ -11,6 +11,7 @@ import type {
 } from './phase-four-ports.js';
 import { PhaseFourConflictError } from './phase-four-service.js';
 import { syncManagedClub, type CareerSnapshot } from './service.js';
+import { careerProfileOf } from './coach-personality.js';
 
 const WORLD_FIELDS = [
   'manager',
@@ -53,6 +54,7 @@ export function phaseFourStateOf(save: GameSave): PhaseFourState {
     achievements: world.achievements,
     events: world.events,
     archiveKeys: world.archiveKeys,
+    coachPersonality: careerProfileOf(snapshot).coach.personality,
   });
 }
 
