@@ -59,7 +59,7 @@ export interface RefundView {
   readonly requestedAt: string | null;
 }
 
-/** The server could not reach Woovi (502 payment provider unavailable). */
+/** The server could not reach the PIX provider (502 payment provider unavailable). */
 export class PaymentProviderUnavailableError extends Error {
   public constructor() {
     super(
@@ -118,7 +118,7 @@ export function createFakeAccountPort(
     priceCents?: number;
     /** Polls before the pending order turns `paid` (0 = already paid). */
     paidAfterPolls?: number;
-    /** Simulates Woovi being down on checkout. */
+    /** Simulates the PIX provider being down on checkout. */
     providerDown?: boolean;
     now?: () => Date;
   } = {},

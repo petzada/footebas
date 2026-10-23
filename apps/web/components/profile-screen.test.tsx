@@ -85,7 +85,7 @@ describe('Perfil e licença', () => {
     ).toBeTruthy();
   });
 
-  it('explica quando a Woovi está indisponível e deixa tentar de novo', async () => {
+  it('explica quando o provedor PIX está indisponível e deixa tentar de novo', async () => {
     const account = createFakeAccountPort({ providerDown: true });
     render(<ProfileScreen account={account} player={player} pollMs={20} />);
     fireEvent.click(

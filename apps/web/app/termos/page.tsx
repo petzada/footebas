@@ -61,7 +61,7 @@ export default function TermosPage() {
             edição comprada.
           </li>
           <li>
-            O pagamento é processado pela Woovi (PIX). Não guardamos dados
+            O pagamento é processado pela AbacatePay (PIX). Não guardamos dados
             bancários: recebemos apenas a confirmação do pagamento.
           </li>
           <li>

@@ -37,10 +37,10 @@ export default function PrivacidadePage() {
           </li>
           <li>
             <strong>Pagamento:</strong> ao comprar a licença, registramos o
-            pedido (valor, data, status) e a confirmação enviada pela Woovi.
-            Removemos CPF, nome e dados bancários do pagador antes de guardar
-            qualquer notificação de pagamento. Não temos acesso à sua conta
-            bancária.
+            pedido (valor, data, status) e a confirmação enviada pela
+            AbacatePay. Removemos CPF, nome e dados bancários do pagador antes
+            de guardar qualquer notificação de pagamento. Não temos acesso à sua
+            conta bancária.
           </li>
           <li>
             <strong>Técnicos:</strong> endereço IP, navegador e registros de
@@ -85,10 +85,10 @@ export default function PrivacidadePage() {
         <p>
           <strong>Não vendemos nem alugamos dados pessoais.</strong>{' '}
           Compartilhamos só com operadores necessários ao serviço: Supabase
-          (autenticação e banco de dados), Cloudflare (hospedagem e rede), Woovi
-          (pagamento PIX) e o provedor de e-mail transacional. Alguns deles
-          processam dados fora do Brasil, com salvaguardas contratuais. Também
-          podemos compartilhar por ordem legal.
+          (autenticação e banco de dados), Cloudflare (hospedagem e rede),
+          AbacatePay (pagamento PIX) e o provedor de e-mail transacional. Alguns
+          deles processam dados fora do Brasil, com salvaguardas contratuais.
+          Também podemos compartilhar por ordem legal.
         </p>
       </section>
 
