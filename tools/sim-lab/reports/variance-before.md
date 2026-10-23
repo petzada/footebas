@@ -37,8 +37,8 @@ Gerado por `pnpm --filter @footebas/sim-lab variance` (`match-variance-report-v1
 | Repetição de modelo dentro da mesma partida             | `narrationWithinMatchRepeatRate`        | 0.873  |
 | Modelos distintos de gol                                | `goalNarrationTemplates`                | 1      |
 | % do modelo de gol mais comum                           | `goalNarrationTopShare`                 | 1      |
-| Modelos distintos de finalização                        | `chanceNarrationTemplates`              | 5      |
-| % do modelo de finalização mais comum                   | `chanceNarrationTopShare`               | 0.995  |
+| Modelos distintos de finalização                        | `chanceNarrationTemplates`              | 1      |
+| % do modelo de finalização mais comum                   | `chanceNarrationTopShare`               | 1      |
 | Paradas automáticas no meio do jogo (feed)              | `automaticStopsPerMatchInNarration`     | 5      |
 | % dos gols no 1º tempo                                  | `firstHalfGoalShare`                    | 0.559  |
 | % dos gols entre 1 e 15 min                             | `goalShareMinutes1to15`                 | 0.196  |

@@ -194,40 +194,59 @@ const topShare = (map: Map<string, number>, total: number): number =>
   total === 0 ? 0 : Math.max(0, ...map.values()) / total;
 
 // --- narration ----------------------------------------------------------------
-type Narrator = (result: MatchResult, input: MatchInput) => readonly string[];
+interface NarratedLine {
+  readonly kind: string;
+  readonly text: string;
+}
+type Narrator = (
+  result: MatchResult,
+  input: MatchInput,
+) => readonly NarratedLine[];
 
 /** Replica of the narration the web adapter shipped before ADR 0015. */
 const legacyNarration: Narrator = (result, input) => {
   const name = (side: 'home' | 'away', id: string) =>
     input[side].players.find((player) => player.id === id)?.name ?? 'um atleta';
   const club = (side: 'home' | 'away') => input[side].club.name;
-  const lines: string[] = [];
+  const lines: NarratedLine[] = [];
+  const say = (kind: string, text: string) => lines.push({ kind, text });
   const pauses = [15, 30, 45, 60, 75];
   const flush = (minute: number) => {
     while (pauses[0] !== undefined && pauses[0] < minute)
-      lines.push(`Pausa técnica aos ${pauses.shift()}'. Ajuste ou siga.`);
+      say('pause', `Pausa técnica aos ${pauses.shift()}'. Ajuste ou siga.`);
   };
   for (const event of result.timeline) {
     flush(event.minute);
     if (event.type === 'goal')
-      lines.push(
+      say(
+        'goal',
         `GOL do ${club(event.side)}! ${name(event.side, event.scorerId)} marca.`,
       );
     else if (event.type === 'chance')
-      lines.push(`${club(event.side)} finaliza (${event.xg.toFixed(2)} xG).`);
+      say(
+        'chance',
+        `${club(event.side)} finaliza (${event.xg.toFixed(2)} xG).`,
+      );
     else if (event.type === 'card')
-      lines.push(
+      say(
+        'card',
         `Cartão ${event.card === 'red' ? 'vermelho' : 'amarelo'} para ${name(event.side, event.playerId)}.`,
       );
     else if (event.type === 'injury')
-      lines.push(
+      say(
+        'injury',
         `${name(event.side, event.playerId)} sente lesão (${club(event.side)}).`,
       );
     else if (event.type === 'substitution')
-      lines.push(
+      say(
+        'substitution',
         `${club(event.side)}: entra ${name(event.side, event.playerInId)}, sai ${name(event.side, event.playerOutId)}.`,
       );
-    else lines.push(`${club(event.side)} muda para ${event.tactic.formation}.`);
+    else
+      say(
+        'tactical_change',
+        `${club(event.side)} muda para ${event.tactic.formation}.`,
+      );
   }
   flush(95);
   return lines;
@@ -241,7 +260,7 @@ interface EngineNarration {
       readonly away: Readonly<{ name: string }>;
       readonly playerNames: ReadonlyMap<string, string>;
     },
-  ) => readonly Readonly<{ text: string }>[];
+  ) => readonly NarratedLine[];
   calculateMatchExpectation?: (
     input: MatchInput,
   ) => Readonly<{ expectedGoals: Readonly<{ home: number; away: number }> }>;
@@ -264,7 +283,7 @@ function narratorFor(): { name: string; narrate: Narrator } {
             player.name,
           ]),
         ),
-      }).map(({ text }) => text),
+      }),
   };
 }
 
@@ -448,20 +467,18 @@ export function runVarianceReport(careers = 10): VarianceReport {
             increment(openings, tokens.slice(0, 4).join(' > '));
             const narration = narrator.narrate(result, input);
             const seen = new Set<string>();
-            for (const line of narration) {
-              if (/^Pausa técnica/.test(line)) automaticStops += 1;
+            for (const { kind, text: line } of narration) {
+              if (kind === 'pause') automaticStops += 1;
               const template = maskLine(line, input);
               narrated += 1;
               increment(lines, line);
               increment(templates, template);
               if (seen.has(template)) withinRepeats += 1;
               seen.add(template);
-              if (/GOL/i.test(line)) {
+              if (kind === 'goal') {
                 narratedGoals += 1;
                 increment(goalTemplates, template);
-              } else if (
-                /finaliza|chut|cabece|bate|arremat|tenta|cruz/i.test(line)
-              ) {
+              } else if (kind === 'chance') {
                 narratedChances += 1;
                 increment(chanceTemplates, template);
               }
