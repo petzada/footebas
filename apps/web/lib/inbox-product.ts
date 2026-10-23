@@ -46,6 +46,8 @@ export interface InboxMessage {
   readonly occurredOn: string;
   readonly decision?: InboxOfferDecision;
   readonly choice?: InboxChoice;
+  /** Seen by the coach (persisted by the server with `MarkInboxRead`). */
+  readonly read?: boolean;
 }
 
 export interface InboxView {
@@ -63,6 +65,32 @@ export interface InboxPort {
     offerId: string,
     decision: 'accept' | 'reject',
   ): Promise<InboxView>;
+  /** `MarkInboxRead { messageIds }` (opening the inbox page). */
+  markRead(messageIds: readonly string[]): Promise<InboxView>;
+  /** `DeleteInboxMessage { messageId }`; refused while a decision waits. */
+  remove(messageId: string): Promise<InboxView>;
+}
+
+/** Messages the coach has not seen yet (what the inbox badge counts). */
+export function unreadIds(messages: readonly InboxMessage[]): string[] {
+  return messages
+    .filter((message) => message.read !== true)
+    .map(({ id }) => id);
+}
+
+/** Whether the trash icon applies: nothing is waiting for the coach. */
+export function isDeletable(
+  message: InboxMessage,
+  currentDate: string,
+): boolean {
+  return !isPending(message, currentDate);
+}
+
+/** Unread inbox messages among the Notícias items (badge counter). */
+export function unreadCount(
+  news: readonly { readonly unread?: boolean }[],
+): number {
+  return news.filter(({ unread }) => unread === true).length;
 }
 
 export const KIND_LABEL: Record<InboxKind, string> = {
@@ -251,6 +279,26 @@ export function createFakeInboxPort(
         messages: view.messages.filter(
           (item) => item.decision?.offerId !== offerId,
         ),
+      };
+      return snapshot();
+    },
+    async markRead(messageIds) {
+      const ids = new Set(messageIds);
+      view = {
+        ...view,
+        messages: view.messages.map((item) =>
+          ids.has(item.id) ? { ...item, read: true } : item,
+        ),
+      };
+      return snapshot();
+    },
+    async remove(messageId) {
+      const message = view.messages.find((item) => item.id === messageId);
+      if (message && isPending(message, view.currentDate))
+        throw new Error('Decida a mensagem antes de excluir.');
+      view = {
+        ...view,
+        messages: view.messages.filter((item) => item.id !== messageId),
       };
       return snapshot();
     },

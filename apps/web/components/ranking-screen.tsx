@@ -7,6 +7,7 @@ import {
   Rocket,
   Trophy,
 } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { PixelTrophy } from '@/components/retro/sprites';
 import { Badge } from '@/components/ui/badge';
@@ -360,11 +361,7 @@ function Board({
   myEntry: MyRankingEntry | undefined;
 }) {
   if (state.status === 'loading')
-    return (
-      <p className="panel p-3 text-sm" role="status">
-        Acendendo o placar…
-      </p>
-    );
+    return <ScreenSkeleton label="Acendendo o placar…" rows={6} />;
   if (state.status === 'error')
     return (
       <p className="panel p-3 text-sm" role="alert">

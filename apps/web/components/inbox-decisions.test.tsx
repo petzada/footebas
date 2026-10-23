@@ -70,8 +70,37 @@ describe('Caixa de entrada com decisões', () => {
     const expired = within(inbox)
       .getByText(/coletiva: pressão por título/i)
       .closest('li')!;
-    expect(within(expired).queryAllByRole('button')).toHaveLength(0);
+    // Only the trash icon is left: the options are gone.
+    expect(
+      within(expired)
+        .queryAllByRole('button')
+        .map((button) => button.getAttribute('aria-label')),
+    ).toEqual(['Excluir: Coletiva: pressão por título']);
     expect(expired.textContent).toMatch(/prazo encerrado em 05\/02/i);
+  });
+
+  it('exclui pela lixeira só o que não espera decisão', async () => {
+    const fake = createFakeInboxPort();
+    const remove = vi.fn(fake.remove);
+    render(<InboxDecisions port={{ ...fake, remove }} navigate={vi.fn()} />);
+    const inbox = await screen.findByRole('region', {
+      name: /caixa de entrada/i,
+    });
+    expect(
+      within(inbox).queryByRole('button', {
+        name: /excluir: a diretoria quer saber do reforço/i,
+      }),
+    ).toBeNull();
+    fireEvent.click(
+      within(inbox).getByRole('button', {
+        name: /excluir: vitória sólida sobre o palmeiras/i,
+      }),
+    );
+    expect(await within(inbox).findByText(/mensagem excluída/i)).toBeTruthy();
+    expect(remove).toHaveBeenCalledWith('msg_report');
+    expect(
+      within(inbox).queryByText(/vitória sólida sobre o palmeiras/i),
+    ).toBeNull();
   });
 
   it('usa os comandos de proposta existentes e leva a contraproposta ao mercado', async () => {

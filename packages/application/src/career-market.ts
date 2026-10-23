@@ -36,14 +36,49 @@ export const MARKET_RULES_VERSION =
 
 /** New AI proposals for managed players per market day. */
 export const MAX_AI_OFFERS_PER_DAY = 2;
+/** Of those, proposals for players the coach did not list. */
+export const MAX_UNLISTED_OFFERS_PER_DAY = 1;
+/** Unlisted proposals waiting for the coach at the same time. */
+export const MAX_OPEN_UNLISTED_OFFERS = 2;
+/**
+ * Days after a proposal (answered or not) before the same player gets
+ * another one: short for listed players, long for the rest.
+ */
+export const OFFER_COOLDOWN_DAYS = { listed: 10, other: 45 } as const;
 /** AI-to-AI transfers per market day. */
 export const MAX_AI_TRANSFERS_PER_DAY = 3;
 /** Days an AI proposal stays open (never past the window close). */
 export const AI_OFFER_DAYS = 7;
 /** Resolved offers older than this are pruned (unless they back a loan). */
 const OFFER_RETENTION_DAYS = 120;
-/** Daily chance that an AI club bids for a managed player. */
-const INTEREST = { listed: 0.35, star: 0.1, other: 0.02 } as const;
+/**
+ * Daily chance that an AI club bids for a managed player (market-ai-v2):
+ * listed players 35%; the rest by quality inside the squad, from 0.3% for
+ * the weakest to 4.8% for the strongest (`0.003 + 0.045 × q²`, q in 0–1),
+ * ×1.5 for a highlight (strength ≥ club reputation + 5).
+ */
+const INTEREST = {
+  listed: 0.35,
+  floor: 0.003,
+  quality: 0.045,
+  highlight: 1.5,
+} as const;
+
+function interestOf(
+  player: Player,
+  listed: boolean,
+  range: { min: number; max: number },
+  reputation: number,
+): number {
+  if (listed) return INTEREST.listed;
+  const strength = Number(player.strength);
+  const quality =
+    range.max === range.min
+      ? 0.5
+      : (strength - range.min) / (range.max - range.min);
+  const chance = INTEREST.floor + INTEREST.quality * quality * quality;
+  return strength >= reputation + 5 ? chance * INTEREST.highlight : chance;
+}
 
 export function marketOf(world: CareerWorldState): CareerMarketState {
   world.market ??= { listings: [] };
@@ -257,21 +292,40 @@ export function aiOffersForManagedPlayers(
   const incoming = new Map<ClubId, number>();
   for (const offer of pending)
     incoming.set(offer.toClubId, (incoming.get(offer.toClubId) ?? 0) + 1);
-  const stars = new Set(
-    [...squad]
-      .sort(
-        (left, right) =>
-          Number(right.strength) - Number(left.strength) ||
-          left.id.localeCompare(right.id),
-      )
-      .slice(0, 3)
-      .map(({ id }) => id),
-  );
+  // Every proposal already made for a managed player (kept 120 days): the
+  // last date per player and the clubs that already tried.
+  const lastOffer = new Map<PlayerId, string>();
+  const triedBy = new Map<PlayerId, Set<ClubId>>();
+  for (const offer of world.offers) {
+    if (offer.fromClubId !== managedId || offer.counterOf !== undefined)
+      continue;
+    if ((lastOffer.get(offer.playerId) ?? '') < offer.createdOn)
+      lastOffer.set(offer.playerId, offer.createdOn);
+    triedBy.set(
+      offer.playerId,
+      (triedBy.get(offer.playerId) ?? new Set()).add(offer.toClubId),
+    );
+  }
+  let openUnlisted = pending.filter(
+    (offer) => offer.fromClubId === managedId && !listings.has(offer.playerId),
+  ).length;
+  const strengths = squad.map(({ strength }) => Number(strength));
+  const range = {
+    min: Math.min(...strengths),
+    max: Math.max(...strengths),
+  };
+  const reputation = day.reputation.get(managedId) ?? 0;
+  let unlistedToday = 0;
   const chosen = squad
-    .filter(
-      (player) =>
-        !bidFor.has(player.id) && day.loans.get(player.id) !== managedId,
-    )
+    .filter((player) => {
+      if (bidFor.has(player.id) || day.loans.get(player.id) === managedId)
+        return false;
+      const last = lastOffer.get(player.id);
+      const cooldown = listings.has(player.id)
+        ? OFFER_COOLDOWN_DAYS.listed
+        : OFFER_COOLDOWN_DAYS.other;
+      return last === undefined || addDays(last, cooldown) <= date;
+    })
     .map((player) => ({
       player,
       listing: listings.get(player.id),
@@ -279,17 +333,23 @@ export function aiOffersForManagedPlayers(
     }))
     .filter(
       ({ player, listing, roll }) =>
-        roll <
-        (listing !== undefined
-          ? INTEREST.listed
-          : stars.has(player.id)
-            ? INTEREST.star
-            : INTEREST.other),
+        roll < interestOf(player, listing !== undefined, range, reputation),
     )
     .sort(
       (left, right) =>
         left.roll - right.roll || left.player.id.localeCompare(right.player.id),
     )
+    .filter(({ listing }) => {
+      if (listing !== undefined) return true;
+      if (
+        unlistedToday >= MAX_UNLISTED_OFFERS_PER_DAY ||
+        openUnlisted >= MAX_OPEN_UNLISTED_OFFERS
+      )
+        return false;
+      unlistedToday += 1;
+      openUnlisted += 1;
+      return true;
+    })
     .slice(0, MAX_AI_OFFERS_PER_DAY);
   const expiresOn =
     addDays(date, AI_OFFER_DAYS) < closesOn
@@ -309,6 +369,8 @@ export function aiOffersForManagedPlayers(
     const buyer = context.clubs
       .filter((club) => {
         if (club.id === managedId) return false;
+        // A club that already tried for this player does not insist.
+        if (triedBy.get(player.id)?.has(club.id) === true) return false;
         const size =
           (day.squads.get(club.id)?.length ?? 0) + (incoming.get(club.id) ?? 0);
         const reputation = day.reputation.get(club.id) ?? 0;

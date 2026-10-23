@@ -44,7 +44,15 @@ rodavam sobre o save único (ADR 0006).
    - empréstimos vencidos voltam ao dono; propostas pendentes vencidas viram `cancelled`; resolvidas com mais de 120
      dias saem do save (menos as que sustentam um empréstimo ativo);
    - dentro da janela, cada atleta do clube gerido sem proposta aberta recebe interesse com chance diária de 35%
-     (listado), 10% (três mais fortes) ou 2% (demais); no máximo 2 propostas novas por dia. O comprador é um clube da
+     (listado) ou, nos demais, pela qualidade dentro do elenco: `0,3% + 4,5% × q²` (q de 0 no mais fraco a 1 no mais
+     forte), × 1,5 para destaque (força ≥ reputação do clube + 5) — `market-ai-v2`, que substituiu o 10% fixo dos três
+     mais fortes e o 2% dos demais (o mesmo atleta recebia proposta logo depois de cada recusa). No máximo 2
+     propostas novas por dia, das quais 1 por não listado, e no máximo 2 propostas por não listados esperando o
+     treinador ao mesmo tempo. Depois de uma proposta (aceita, recusada ou ignorada) o mesmo atleta só recebe outra
+     após 45 dias (10 se listado), e um clube que já tentou por ele não volta a tentar enquanto a proposta antiga
+     estiver guardada (120 dias). **Esses números do `market-ai-v2` (curva de interesse, 45/10 dias, 1 por dia, 2
+     abertas) foram aprovados como provisórios em 2026-10-23, até uma calibração com o sim-lab sobre algumas
+     temporadas.** O comprador é um clube da
      IA com elenco (mais propostas abertas) abaixo de 35, caixa para a taxa e reputação compatível (força entre
      reputação − 15, ou − 25 se listado, e reputação + 12), preferindo quem precisa da posição. Taxa: preço pedido ×
      0,85–1,05 (listado) ou valor × 1,0–1,3 (não listado); salário +10%. Empréstimo listado gera proposta de empréstimo

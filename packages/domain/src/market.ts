@@ -440,7 +440,7 @@ export function decideClubOffer(
 export const MAX_SQUAD_SIZE = 35;
 /** AI clubs never sell below this squad size. */
 export const AI_MINIMUM_SQUAD_SIZE = 22;
-export const MARKET_AI_RULES_VERSION = 'market-ai-v1' as const;
+export const MARKET_AI_RULES_VERSION = 'market-ai-v2' as const;
 
 /** Fewest players per primary position a squad needs; below it the club buys. */
 export const POSITION_MINIMUMS: Readonly<Record<Position, number>> =

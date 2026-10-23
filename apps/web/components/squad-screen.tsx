@@ -584,7 +584,7 @@ export function SquadScreen({
         </h3>
         <button
           type="button"
-          className="btn-px btn-chalk px-2 py-1 text-[.5rem] disabled:opacity-60"
+          className="btn-px btn-chalk min-h-10 px-2 py-1 text-[.5rem] disabled:opacity-60"
           disabled={!selectedId}
           onClick={() => onTargetActivate({ kind })}
           aria-label={

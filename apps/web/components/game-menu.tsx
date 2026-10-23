@@ -31,6 +31,7 @@ import {
 } from '@phosphor-icons/react';
 import { MuteButton } from '@/components/retro/mute-button';
 import type { CareerView, Screen } from '@/lib/career-api';
+import { unreadCount } from '@/lib/inbox-product';
 import { transferWindowOn } from '@/lib/management-model';
 import { useSound } from '@/lib/retro/use-sound';
 import { cn } from '@/lib/utils';
@@ -106,7 +107,7 @@ export function menuBadges(
   career: CareerView,
 ): Partial<Record<Screen, string>> {
   const badges: Partial<Record<Screen, string>> = {};
-  const mail = career.world.news.length;
+  const mail = unreadCount(career.world.news);
   if (mail > 0) badges.inbox = mail > 99 ? '99+' : String(mail);
   // The next fixture date is the closest thing to "today" the shell has.
   const date = career.fixture?.date;
@@ -316,7 +317,9 @@ function MenuSection({
 }
 
 const menuItemClass =
-  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2 text-center text-[.45rem] normal-case leading-tight tracking-tight break-words';
+  // `hyphens-auto` (html lang="pt-BR") breaks "Classificação" at a syllable
+  // on narrow phones instead of cutting the last letter onto its own line.
+  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2 text-center text-[.45rem] normal-case leading-tight tracking-tight break-words hyphens-auto';
 
 function MenuButton({
   label,
