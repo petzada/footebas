@@ -54,6 +54,7 @@ import {
   billingRoutes,
   type BillingRouteDependencies,
 } from './billing/routes.js';
+import { avatarRoutes, type AvatarRouteDependencies } from './avatar-routes.js';
 import { WooviApiError } from './billing/woovi-client.js';
 
 export interface ApiDependencies {
@@ -74,6 +75,7 @@ export interface ApiDependencies {
   readonly rankings?: RankingService;
   /** Licença única via Woovi/PIX and `GET /v1/me` (Fase 8). */
   readonly billing?: BillingRouteDependencies;
+  readonly avatars?: AvatarRouteDependencies;
   /** Development-only sign-in that issues fake bearer tokens. Never in production. */
   readonly devAuth?: FakeBearerAuth;
   /** Browser origins allowed to call the API (CORS). */
@@ -164,6 +166,8 @@ export interface ApiRequest {
   readonly body: unknown;
   /** Body exactly as received (webhook signatures are computed over it). */
   readonly rawBody?: string;
+  /** Binary routes only: the raw request bytes (image uploads). */
+  readonly bytes?: () => Promise<ArrayBuffer>;
 }
 
 export interface ApiReply {
@@ -179,6 +183,8 @@ export interface ApiRoute {
   readonly path: string;
   /** OpenAPI/JSON schema used by the Fastify adapter. */
   readonly schema?: Readonly<Record<string, unknown>>;
+  /** Body is binary (not JSON): handlers read it through `bytes()`. */
+  readonly binary?: boolean;
   handler(request: ApiRequest): Promise<ApiReply>;
 }
 
@@ -703,6 +709,7 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
   }
 
   if (deps.billing !== undefined) routes.push(...billingRoutes(deps.billing));
+  if (deps.avatars !== undefined) routes.push(...avatarRoutes(deps.avatars));
 
   routes.push(
     {

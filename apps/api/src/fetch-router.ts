@@ -1,4 +1,5 @@
 // Workers adapter: the same route table behind a plain fetch handler.
+import { ApplicationError } from '@footebas/application';
 import {
   apiRoutes,
   errorBody,
@@ -71,6 +72,8 @@ export function createFetchHandler(
   const routes = compile(apiRoutes(deps));
   const origins = new Set(deps.corsOrigins ?? []);
   const limit = deps.bodyLimit ?? 64 * 1024;
+  // Image uploads (avatars) only; JSON routes keep the small limit above.
+  const binaryLimit = 2 * 1024 * 1024 + 1024;
   const now = options.now ?? Date.now;
   const dispatch = async (
     request: Request,
@@ -140,6 +143,38 @@ export function createFetchHandler(
           ),
           retryAfterSeconds: decision.retryAfterSeconds,
         });
+      }
+      if (found?.compiled.route.binary) {
+        const { compiled, match } = found;
+        const declared = Number(request.headers.get('content-length') ?? 0);
+        if (declared > binaryLimit)
+          return respond(
+            413,
+            errorBody(requestId, 'VALIDATION_ERROR', 'request body too large'),
+          );
+        const result = await compiled.route.handler({
+          params: Object.fromEntries(
+            compiled.names.map((name, index) => [
+              name,
+              decodeURIComponent(match[index + 1] ?? ''),
+            ]),
+          ),
+          query: Object.fromEntries(url.searchParams),
+          headers: Object.fromEntries(request.headers),
+          body: undefined,
+          bytes: async () => {
+            const bytes = await request.arrayBuffer();
+            if (bytes.byteLength > binaryLimit)
+              throw new ApplicationError(
+                'VALIDATION_ERROR',
+                'request body too large',
+              );
+            return bytes;
+          },
+        });
+        for (const [name, value] of Object.entries(result.headers ?? {}))
+          headers.set(name, value);
+        return respond(result.status ?? 200, result.body);
       }
       if (found) {
         const { compiled, match } = found;

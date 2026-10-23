@@ -19,6 +19,8 @@
     "CORS_ORIGINS": "https://footebas.com.br,https://www.footebas.com.br,http://localhost:3000",
     // AbacatePay: the API key decides dev mode vs production (same URL).
     "PAYMENT_PROVIDER": "abacatepay",
+    // Public base of the avatars bucket (custom domain on R2).
+    "AVATAR_PUBLIC_URL": "https://cdn.footebas.com.br",
     // Fallback provider (PAYMENT_PROVIDER=woovi): sandbox until launch.
     "WOOVI_API_URL": "https://api.woovi-sandbox.com",
     "LICENSE_PRICE_CENTS": "4990",
@@ -60,6 +62,8 @@
   // keeps the hydrated aggregate in memory, serializes its commands, stores
   // idempotency receipts and writes each change to Postgres (game_saves).
   // Without this binding the Worker falls back to Postgres directly.
+  // Coach avatars uploaded in Nova Carreira (public via cdn.footebas.com.br).
+  "r2_buckets": [{ "binding": "AVATARS", "bucket_name": "footebas-avatars" }],
   "durable_objects": {
     "bindings": [{ "name": "CAREERS", "class_name": "CareerDurableObject" }],
   },

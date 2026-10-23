@@ -80,6 +80,15 @@ export async function buildApi(
     },
   );
 
+  // Avatar uploads arrive as raw image bytes.
+  app.addContentTypeParser(
+    ['image/png', 'image/jpeg', 'image/webp'],
+    { parseAs: 'buffer', bodyLimit: 2 * 1024 * 1024 },
+    (_request, body, done) => {
+      done(null, body);
+    },
+  );
+
   const origins = new Set(deps.corsOrigins ?? []);
   app.addHook('onRequest', async (request, reply) => {
     const origin = request.headers.origin;
@@ -114,8 +123,22 @@ export async function buildApi(
           >,
           query: flatten((request.query ?? {}) as Record<string, unknown>),
           headers: flatten(request.headers),
-          body: request.body,
+          body: route.binary ? undefined : request.body,
           ...(typeof rawBody === 'string' ? { rawBody } : {}),
+          ...(route.binary
+            ? {
+                bytes: () => {
+                  const raw = request.body;
+                  const buffer = Buffer.isBuffer(raw) ? raw : Buffer.alloc(0);
+                  return Promise.resolve(
+                    buffer.buffer.slice(
+                      buffer.byteOffset,
+                      buffer.byteOffset + buffer.byteLength,
+                    ) as ArrayBuffer,
+                  );
+                },
+              }
+            : {}),
         };
         const result = await route.handler(input);
         for (const [name, value] of Object.entries(result.headers ?? {}))

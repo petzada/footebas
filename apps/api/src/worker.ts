@@ -24,6 +24,7 @@ import {
 } from '@footebas/database';
 import postgres from 'postgres';
 import { PostgresBillingRepository } from './billing/billing-repository-postgres.js';
+import { r2AvatarStore } from './avatar-routes.js';
 import { AbacatePayClient } from './billing/abacatepay-client.js';
 import { BillingService, DEFAULT_BILLING_CONFIG } from './billing/service.js';
 import {
@@ -82,6 +83,9 @@ export interface Env {
   readonly CORS_ORIGINS?: string;
   /** Secret (wrangler secret put SMOKE_TOKEN) enabling the cloud smoke bearer. */
   readonly SMOKE_TOKEN?: string;
+  /** R2 bucket for coach avatars (public at AVATAR_PUBLIC_URL). */
+  readonly AVATARS?: Parameters<typeof r2AvatarStore>[0];
+  readonly AVATAR_PUBLIC_URL?: string;
   /** Workers version metadata binding, reported by GET /health. */
   readonly CF_VERSION_METADATA?: { readonly id: string; readonly tag?: string };
   /** PIX provider (var): `abacatepay` (default, ADR 0016) or `woovi`. */
@@ -223,6 +227,16 @@ async function handle(request: Request, env: Env): Promise<Response> {
         phaseFour: { application: phaseFour, auth },
         rankings,
         billing: billing(env, sql, auth),
+        ...(env.AVATARS === undefined
+          ? {}
+          : {
+              avatars: {
+                auth,
+                store: r2AvatarStore(env.AVATARS),
+                publicBaseUrl:
+                  env.AVATAR_PUBLIC_URL ?? 'https://cdn.footebas.com.br',
+              },
+            }),
         corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
           .split(',')
           .map((origin) => origin.trim()),

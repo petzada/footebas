@@ -25,7 +25,26 @@ export const COACH_AVATARS = [
   'avatar-11',
   'avatar-12',
 ] as const;
-export const coachAvatarSchema = z.enum(COACH_AVATARS);
+/** Hosts allowed for a custom avatar: our R2 CDN and Google profile photos. */
+export const AVATAR_IMAGE_HOSTS = [
+  'cdn.footebas.com.br',
+  'lh3.googleusercontent.com',
+] as const;
+/** Mirrors AVATAR_IMAGE_HOSTS: https only, any path on those hosts. */
+const AVATAR_URL_PATTERN =
+  /^https:\/\/(cdn\.footebas\.com\.br|lh3\.googleusercontent\.com)\/\S+$/;
+const avatarImageUrlSchema = z
+  .string()
+  .max(500)
+  .regex(
+    AVATAR_URL_PATTERN,
+    'Expected an avatar image from the Footebas CDN or Google',
+  );
+/** A pixel avatar id, or the URL of an uploaded or Google profile picture. */
+export const coachAvatarSchema = z.union([
+  z.enum(COACH_AVATARS),
+  avatarImageUrlSchema,
+]);
 
 /** Officially assigned ISO 3166-1 alpha-2 codes. */
 export const ISO_COUNTRY_CODES: readonly string[] = Object.freeze(
