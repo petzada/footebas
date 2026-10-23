@@ -22,6 +22,10 @@ que não depende destes itens; cada item diz o que destrava.
 ## Pagamento
 
 6. **AbacatePay (PIX da licença, ADR 0016).**
+   - A chave já está em `.env.local.txt` (ignorado pelo git). Para levá-la ao Worker sem copiar e colar, rode na raiz do
+     repositório (Git Bash):
+     `grep -i '^ABACATEPAY_API_KEY=' .env.local.txt | cut -d= -f2- | tr -d '
+"' | pnpm --filter @footebas/api exec wrangler secret put ABACATEPAY_API_KEY`
    - Gravar os segredos sem colar no chat:
      `pnpm --filter @footebas/api exec wrangler secret put ABACATEPAY_API_KEY` e
      `pnpm --filter @footebas/api exec wrangler secret put ABACATEPAY_WEBHOOK_SECRET` (uma frase longa e aleatória).
