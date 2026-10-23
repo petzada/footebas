@@ -157,7 +157,7 @@ export function OfficeScreen({
       </header>
 
       <Tabs defaultValue={initialTab}>
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="proposals">
             Propostas{pending > 0 && ` (${String(pending)})`}
           </TabsTrigger>
