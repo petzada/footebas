@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import {
   Bank,
   CheckCircle,
@@ -67,15 +67,26 @@ export function InboxDecisions({
   port,
   navigate,
   onResolved,
+  onView,
   limit = 6,
+  variant = 'summary',
 }: {
   port: InboxPort;
   navigate(value: Screen): void;
   /** Called after any decision, so the caller can refresh the career. */
   onResolved?: () => void;
+  /** Every inbox view loaded or changed (the inbox screen filters its news). */
+  onView?: (view: InboxView) => void;
   limit?: number;
+  /** `full` (the Caixa de entrada screen): every message, no "Ver todas". */
+  variant?: 'summary' | 'full';
 }) {
   const [view, setView] = useState<InboxView | null>(null);
+  // Every view the component holds is also handed to the caller.
+  const viewChanged = useEffectEvent((next: InboxView) => onView?.(next));
+  useEffect(() => {
+    if (view) viewChanged(view);
+  }, [view]);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<Record<string, string>>({});
@@ -132,7 +143,7 @@ export function InboxDecisions({
   const shown = [
     ...pending,
     ...messages.filter((item) => !isPending(item, currentDate)),
-  ].slice(0, limit);
+  ].slice(0, variant === 'full' ? undefined : limit);
   // Offers leave the inbox once decided: keep their confirmation visible.
   const gone = Object.entries(confirmed).filter(
     ([id]) => !messages.some((item) => item.id === id),
@@ -146,7 +157,7 @@ export function InboxDecisions({
           className="flex items-center gap-2 font-pixel text-[.65rem]"
         >
           <EnvelopeSimple aria-hidden="true" />
-          Caixa de entrada
+          {variant === 'full' ? 'Mensagens' : 'Caixa de entrada'}
         </h2>
         <Badge variant={pending.length ? 'default' : 'secondary'}>
           {pending.length} {pending.length === 1 ? 'decisão' : 'decisões'}
@@ -221,7 +232,7 @@ export function InboxDecisions({
           ))}
         </ul>
       )}
-      {messages.length > 0 && (
+      {variant === 'summary' && messages.length > 0 && (
         <Button
           variant="ghost"
           className="mt-3 min-h-11 w-full justify-between"
@@ -298,7 +309,7 @@ function Envelope({
           <Button
             variant="ghost"
             size="icon"
-            className="size-8 shrink-0"
+            className="size-11 shrink-0"
             aria-label={`Excluir: ${message.subject}`}
             disabled={disabled}
             onClick={onRemove}

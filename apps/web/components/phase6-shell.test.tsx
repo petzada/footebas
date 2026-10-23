@@ -1,5 +1,12 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
 import { Phase6Shell } from '@/components/phase6-shell';
@@ -99,6 +106,40 @@ describe('Fase 6 · shell mobile-first', () => {
         .getByRole('button', { name: 'Elenco' })
         .getAttribute('aria-current'),
     ).toBe('page');
+  });
+
+  it('abrir a Caixa de entrada marca as mensagens como lidas e o contador some (D6)', async () => {
+    const api = await onboard();
+    const nav = screen.getByRole('navigation', {
+      name: /navegação principal desktop/i,
+    });
+    expect(
+      within(nav).getByRole('button', { name: /caixa de entrada \(\d+\)/i }),
+    ).toBeTruthy();
+    fireEvent.click(
+      within(nav).getByRole('button', { name: /^caixa de entrada/i }),
+    );
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Caixa de entrada',
+      }),
+    ).toBeTruthy();
+    // The screen of its own: decisions and messages, then the Notícias.
+    expect(
+      await screen.findByRole('region', { name: /mensagens/i }),
+    ).toBeTruthy();
+    expect(screen.getByRole('region', { name: /notícias/i })).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        within(nav).queryByRole('button', {
+          name: /caixa de entrada \(\d+\)/i,
+        }),
+      ).toBeNull(),
+    );
+    expect(
+      (await api.getCareer())!.world.news.some(({ unread }) => unread),
+    ).toBe(false);
   });
 
   it('esconde a barra inferior na partida ao vivo e a devolve ao rolar', async () => {

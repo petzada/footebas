@@ -1,3 +1,5 @@
+import { demoCompetitionTables } from '@/lib/competition-tables';
+
 export interface CompetitionView {
   id: string;
   name: string;
@@ -176,7 +178,7 @@ export function mainGroupOf(
 
 export interface CompetitionProductPort {
   load(): Promise<CompetitionProductView>;
-  /** Tables and brackets of every competition (absent on the offline demo). */
+  /** Tables and brackets of every competition (the offline demo uses a fixture). */
   tables?(): Promise<CompetitionTablesView>;
 }
 
@@ -334,5 +336,9 @@ export function createFakeCompetitionProductPort(): CompetitionProductPort {
       ],
     },
   };
-  return { load: async () => structuredClone(value) };
+  return {
+    load: async () => structuredClone(value),
+    // Offline demo tables (docs/design revisão mobile, D7).
+    tables: async () => demoCompetitionTables(),
+  };
 }
