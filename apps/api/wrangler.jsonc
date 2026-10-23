@@ -53,6 +53,9 @@
       "simple": { "limit": 120, "period": 60 },
     },
   ],
+  // Ranking snapshots (ADR 0013): the `scheduled` handler of src/worker.ts
+  // aggregates validated achievements into footebas.ranking_snapshots.
+  "triggers": { "crons": ["*/15 * * * *"] },
   "queues": {
     "producers": [
       { "binding": "SIMULATION_QUEUE", "queue": "footebas-simulation" },

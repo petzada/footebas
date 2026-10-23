@@ -1,4 +1,5 @@
-// Cloudflare Workers entry: HTTP API (fetch) and simulation consumer (queue).
+// Cloudflare Workers entry: HTTP API (fetch), simulation consumer (queue) and
+// the ranking snapshot job (scheduled, Cron Trigger).
 // Persistence is Supabase Postgres through Hyperdrive; auth is Supabase JWT.
 import {
   FootebasApplication,
@@ -8,6 +9,7 @@ import {
   NoopTelemetry,
   PhaseFourApplicationService,
   RandomIdGenerator,
+  RankingService,
   UnifiedPhaseFourRepository,
   type AuthPort,
   type JobQueuePort,
@@ -16,6 +18,7 @@ import {
 import type { JobStatus } from '@footebas/contracts';
 import {
   PostgresEntitlements,
+  PostgresRankingStore,
   PostgresUnitOfWork,
   SystemClock,
 } from '@footebas/database';
@@ -59,6 +62,10 @@ interface QueueMessage<T> {
 }
 interface MessageBatch<T> {
   readonly messages: readonly QueueMessage<T>[];
+}
+interface ScheduledController {
+  readonly cron: string;
+  readonly scheduledTime: number;
 }
 
 export interface Env {
@@ -198,7 +205,12 @@ function compose(env: Env) {
     ids,
     random: new Mulberry32RandomFactory(),
   });
-  return { sql, auth, jobs, application, phaseFour };
+  const rankings = new RankingService({
+    store: new PostgresRankingStore(sql),
+    clock,
+    auth,
+  });
+  return { sql, auth, jobs, application, phaseFour, rankings };
 }
 
 async function handle(request: Request, env: Env): Promise<Response> {
@@ -209,13 +221,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     read: env.RATE_LIMIT_READS,
     public: env.RATE_LIMIT_PUBLIC,
   });
-  const { sql, auth, jobs, application, phaseFour } = compose(env);
+  const { sql, auth, jobs, application, phaseFour, rankings } = compose(env);
   try {
     return await createFetchHandler(
       {
         application,
         jobs,
         phaseFour: { application: phaseFour, auth },
+        rankings,
         billing: billing(env, sql, auth),
         corsOrigins: (env.CORS_ORIGINS ?? 'https://footebas.com.br')
           .split(',')
@@ -270,6 +283,39 @@ export default {
           },
         },
       );
+    }
+  },
+  /** Cron Trigger (wrangler.jsonc `triggers.crons`): ranking snapshots. */
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    const version = workerVersion(env);
+    const { sql, rankings } = compose(env);
+    const started = Date.now();
+    try {
+      const run = await rankings.generateSnapshots();
+      consoleLogSink({
+        type: 'cron',
+        level: 'info',
+        task: 'ranking_snapshots',
+        cron: controller.cron,
+        durationMs: Date.now() - started,
+        version,
+        snapshots: run.snapshots.map(
+          ({ scope, period, rows }) => `${scope}:${period}:${String(rows)}`,
+        ),
+      });
+    } catch (error) {
+      consoleLogSink({
+        type: 'cron',
+        level: 'error',
+        task: 'ranking_snapshots',
+        cron: controller.cron,
+        durationMs: Date.now() - started,
+        version,
+        ...errorFields(error),
+      });
+      throw error;
+    } finally {
+      await sql.end({ timeout: 1 });
     }
   },
   async queue(batch: MessageBatch<SimulationJob>, env: Env): Promise<void> {

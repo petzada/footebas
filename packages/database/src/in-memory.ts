@@ -1,4 +1,10 @@
-import { canonicalJson, type CanonicalValue } from '@footebas/domain';
+import {
+  aggregateRanking,
+  canonicalJson,
+  type CanonicalValue,
+  type RankingRow,
+  type RankingScope,
+} from '@footebas/domain';
 import {
   assertRequiredMetadata,
   checksumSnapshot,
@@ -11,18 +17,34 @@ import {
   SaveConflictError,
   SaveNotFoundError,
   SaveOwnershipError,
+  type AchievementLedgerPort,
   type CommandReceipt,
   type CommandRepository,
   type GameSaveRepository,
+  type RankingPeriod,
+  type RankingSnapshot,
+  type RankingSnapshotRow,
+  type RankingStorePort,
   type TransactionContext,
   type UnitOfWork,
+  type ValidatedAchievement,
 } from './ports.js';
 
 const clone = <T>(value: T): T => structuredClone(value);
 interface State {
   saves: Map<string, GameSave>;
   commands: Map<string, CommandReceipt>;
+  achievements: Map<string, ValidatedAchievement>;
 }
+
+/** Uniqueness of a validated achievement (career, type, season, competition). */
+export const achievementKey = (
+  entry: Pick<
+    ValidatedAchievement,
+    'careerId' | 'type' | 'season' | 'competitionId'
+  >,
+): string =>
+  `${entry.careerId}|${entry.type}|${String(entry.season)}|${entry.competitionId}`;
 
 class MemorySaveRepository implements GameSaveRepository {
   constructor(
@@ -169,8 +191,36 @@ class MemoryCommandRepository implements CommandRepository {
   }
 }
 
+class MemoryAchievementLedger implements AchievementLedgerPort {
+  constructor(private readonly state: State) {}
+  record(entries: readonly ValidatedAchievement[]): Promise<void> {
+    for (const entry of entries) {
+      const key = achievementKey(entry);
+      if (!this.state.achievements.has(key))
+        this.state.achievements.set(key, clone(entry));
+    }
+    return Promise.resolve();
+  }
+  listByCareer(careerId: string): Promise<readonly ValidatedAchievement[]> {
+    return Promise.resolve(
+      [...this.state.achievements.values()]
+        .filter((entry) => entry.careerId === careerId)
+        .sort(
+          (left, right) =>
+            left.recordedAt.localeCompare(right.recordedAt) ||
+            achievementKey(left).localeCompare(achievementKey(right)),
+        )
+        .map(clone),
+    );
+  }
+}
+
 export class InMemoryUnitOfWork implements UnitOfWork {
-  private state: State = { saves: new Map(), commands: new Map() };
+  private state: State = {
+    saves: new Map(),
+    commands: new Map(),
+    achievements: new Map(),
+  };
   private readonly tails = new Map<string, Promise<void>>();
   constructor(private readonly clock: Clock) {}
   repositories(): TransactionContext {
@@ -180,7 +230,12 @@ export class InMemoryUnitOfWork implements UnitOfWork {
     return {
       saves: new MemorySaveRepository(state, this.clock),
       commands: new MemoryCommandRepository(state),
+      achievements: new MemoryAchievementLedger(state),
     };
+  }
+  /** Committed validated achievements (for the in-memory ranking store). */
+  achievements(): readonly ValidatedAchievement[] {
+    return [...this.state.achievements.values()].map(clone);
   }
   async withCareerLock<T>(
     careerId: string,
@@ -198,6 +253,9 @@ export class InMemoryUnitOfWork implements UnitOfWork {
       saves: new Map([...this.state.saves].map(([k, v]) => [k, clone(v)])),
       commands: new Map(
         [...this.state.commands].map(([k, v]) => [k, clone(v)]),
+      ),
+      achievements: new Map(
+        [...this.state.achievements].map(([k, v]) => [k, clone(v)]),
       ),
     };
     try {
@@ -226,5 +284,55 @@ export class InMemoryUnitOfWork implements UnitOfWork {
       });
       return clone(response);
     });
+  }
+}
+
+/** Ranking snapshots over the in-memory ledger (tests, local server). */
+export class InMemoryRankingStore implements RankingStorePort {
+  private readonly snapshots = new Map<string, RankingSnapshot>();
+  constructor(private readonly ledger: () => readonly ValidatedAchievement[]) {}
+  aggregate(scope: RankingScope, period?: string): Promise<RankingRow[]> {
+    return Promise.resolve(aggregateRanking(this.ledger(), scope, period));
+  }
+  replaceSnapshot(
+    scope: RankingScope,
+    period: RankingPeriod,
+    rows: readonly RankingRow[],
+    generatedAt: string,
+  ): Promise<void> {
+    this.snapshots.set(`${scope}|${period}`, {
+      scope,
+      period,
+      generatedAt,
+      total: rows.length,
+      rows: rows.map(clone),
+    });
+    return Promise.resolve();
+  }
+  snapshot(
+    scope: RankingScope,
+    period: RankingPeriod,
+    limit: number,
+  ): Promise<RankingSnapshot | undefined> {
+    const stored = this.snapshots.get(`${scope}|${period}`);
+    return Promise.resolve(
+      stored === undefined
+        ? undefined
+        : { ...stored, rows: stored.rows.slice(0, limit).map(clone) },
+    );
+  }
+  positionsOf(
+    userId: string,
+    snapshots: readonly { scope: RankingScope; period: RankingPeriod }[],
+  ): Promise<readonly RankingSnapshotRow[]> {
+    return Promise.resolve(
+      snapshots.flatMap(({ scope, period }) => {
+        const stored = this.snapshots.get(`${scope}|${period}`);
+        const row = stored?.rows.find((item) => item.userId === userId);
+        return stored === undefined || row === undefined
+          ? []
+          : [{ ...row, scope, period, generatedAt: stored.generatedAt }];
+      }),
+    );
   }
 }

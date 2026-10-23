@@ -17,10 +17,12 @@ import {
   type JobQueuePort,
   type PhaseFiveCompetitionService,
   type PhaseFourApplicationService,
+  type RankingService,
 } from '@footebas/application';
 import {
   apiErrorSchema,
   careerListReadModelSchema,
+  careerSeasonReadModelSchema,
   careerWorldReadModelSchema,
   commandAcceptedSchema,
   commandSchema,
@@ -31,6 +33,7 @@ import {
   jobSseEventSchema,
   jobStatusSchema,
   marketSearchQuerySchema,
+  myRankingReadModelSchema,
   nextSeasonTransitionReadModelSchema,
   phaseFiveCommandSchema,
   phaseFiveReceiptSchema,
@@ -40,6 +43,7 @@ import {
   phaseFourLeaderboardReadModelSchema,
   phaseFourReceiptSchema,
   postMatchReadModelSchema,
+  rankingReadModelSchema,
   type ApiError,
   type JobSseEvent,
   type JobStatus,
@@ -65,6 +69,8 @@ export interface ApiDependencies {
     application: PhaseFiveCompetitionService;
     auth: AuthPort;
   }>;
+  /** Global ranking snapshots (`GET /v1/rankings`, ADR 0013). */
+  readonly rankings?: RankingService;
   /** Licença única via Woovi/PIX and `GET /v1/me` (Fase 8). */
   readonly billing?: BillingRouteDependencies;
   /** Development-only sign-in that issues fake bearer tokens. Never in production. */
@@ -242,6 +248,7 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
             'DecideSponsorshipOffer',
             'CounterSponsorshipOffer',
             'ConfigureFanMembership',
+            'ResolveInboxDecision',
           ].map((type) => ({
             type: 'object',
             required: [
@@ -328,6 +335,8 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
       nextSeasonTransitionReadModelSchema.parse(
         await app.seasonTransition(token, id),
       ),
+    season: async (token, id) =>
+      careerSeasonReadModelSchema.parse(await app.careerSeason(token, id)),
   };
   for (const [name, query] of Object.entries(reads))
     routes.push({
@@ -605,6 +614,62 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
           return json(await project(await user(request), idOf(request)));
         },
       });
+  }
+
+  if (deps.rankings !== undefined) {
+    const rankings = deps.rankings;
+    routes.push(
+      {
+        method: 'GET',
+        path: '/v1/rankings',
+        schema: {
+          summary:
+            'Global coach ranking snapshot (scope=global|rise|monthly, period=YYYY-MM)',
+          querystring: {
+            type: 'object',
+            properties: {
+              scope: { type: 'string', enum: ['global', 'rise', 'monthly'] },
+              period: { type: 'string' },
+              limit: { type: 'string' },
+            },
+          },
+        },
+        async handler(request) {
+          const query = Object.fromEntries(
+            Object.entries({
+              scope: request.query.scope,
+              period: request.query.period,
+              limit: request.query.limit,
+            }).filter(([, value]) => value !== undefined && value !== ''),
+          );
+          // Snapshots change every 15 minutes (Cron Trigger); cache ~5 min.
+          return {
+            status: 200,
+            headers: {
+              'cache-control': 'public, max-age=300, s-maxage=300',
+            },
+            body: rankingReadModelSchema.parse(
+              await rankings.leaderboard(query),
+            ),
+          };
+        },
+      },
+      {
+        method: 'GET',
+        path: '/v1/rankings/me',
+        schema: {
+          ...commonSchema,
+          summary: 'Position of the authenticated user in each ranking scope',
+        },
+        async handler(request) {
+          return json(
+            myRankingReadModelSchema.parse(
+              await rankings.mine(bearer(request)),
+            ),
+          );
+        },
+      },
+    );
   }
 
   if (deps.billing !== undefined) routes.push(...billingRoutes(deps.billing));

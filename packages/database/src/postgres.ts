@@ -19,6 +19,7 @@ import {
   type TransactionContext,
   type UnitOfWork,
 } from './ports.js';
+import { PostgresAchievementLedger } from './rankings-postgres.js';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
 
@@ -250,6 +251,7 @@ export class PostgresUnitOfWork implements UnitOfWork {
       return work({
         saves: new PostgresSaveRepository(tx, this.clock),
         commands: new PostgresCommandRepository(tx),
+        achievements: new PostgresAchievementLedger(tx),
       });
     })) as T;
   }
