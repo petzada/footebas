@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { coachAvatarSchema } from './coach.js';
 import { nonEmptyTextSchema, transportVersionSchema } from './primitives.js';
 
 /**
@@ -22,6 +23,11 @@ const rankingRowSchema = z.strictObject({
   position: z.int().positive(),
   /** Coach name chosen in the game (best career of the user). */
   displayName: nonEmptyTextSchema,
+  /**
+   * Coach avatar of that career: pixel avatar id or picture URL. Absent for
+   * achievements validated before avatars were recorded.
+   */
+  avatar: coachAvatarSchema.optional(),
   points: z.int().positive(),
 });
 
@@ -50,6 +56,7 @@ export const myRankingReadModelSchema = z.strictObject({
         position: z.int().positive().optional(),
         points: z.int().positive().optional(),
         displayName: nonEmptyTextSchema.optional(),
+        avatar: coachAvatarSchema.optional(),
         generatedAt: z.iso.datetime({ offset: true }).optional(),
       }),
     )

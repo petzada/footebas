@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { Ranking as RankingIcon, Rocket } from '@phosphor-icons/react';
+import { CoachAvatar } from '@/components/coach-avatar';
 import { PixelTrophy } from '@/components/retro/sprites';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { COACH_AVATARS, type CoachAvatarId } from '@/lib/coach-profile';
 import {
   currentPeriod,
   periodLabel,
@@ -173,6 +175,68 @@ export function RankingScreen({
   );
 }
 
+const AVATAR_SIZE = 24;
+
+/** Same pixel coach for the same name when a row has no usable avatar. */
+function fallbackAvatar(name: string): CoachAvatarId {
+  let hash = 0;
+  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return COACH_AVATARS[hash % COACH_AVATARS.length] ?? 'avatar-01';
+}
+
+/**
+ * Coach avatar beside the name. Decorative (`alt=""`): the name is right
+ * next to it. A picture URL that fails to load, an unknown id or a missing
+ * avatar falls back to a pixel coach derived from the name.
+ */
+export function RankingAvatar({
+  avatar,
+  name,
+}: {
+  avatar: string | undefined;
+  name: string;
+}) {
+  // The URL that failed, so a row that gets a new avatar tries it again.
+  const [brokenSrc, setBrokenSrc] = useState<string>();
+  // Only https pictures (our CDN or Google, validated by the API).
+  if (avatar?.startsWith('https://') && avatar !== brokenSrc)
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- coach picture from our CDN or Google
+      <img
+        src={avatar}
+        alt=""
+        data-avatar="custom"
+        width={AVATAR_SIZE}
+        height={AVATAR_SIZE}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setBrokenSrc(avatar)}
+        className="px-border inline-block shrink-0 bg-chalk object-cover"
+        // A photo shrunk to a few pixels reads better smoothed than with
+        // nearest-neighbour; the pixel avatars are crisp SVG already.
+        style={{
+          width: AVATAR_SIZE,
+          height: AVATAR_SIZE,
+          imageRendering: 'auto',
+        }}
+      />
+    );
+  const id =
+    avatar !== undefined &&
+    (COACH_AVATARS as readonly string[]).includes(avatar)
+      ? (avatar as CoachAvatarId)
+      : fallbackAvatar(name);
+  return (
+    <span
+      aria-hidden="true"
+      data-avatar-fallback={id === avatar ? undefined : 'true'}
+      className="inline-flex shrink-0"
+    >
+      <CoachAvatar avatar={id} size={AVATAR_SIZE} />
+    </span>
+  );
+}
+
 function MyPosition({
   entry,
   signedIn,
@@ -307,9 +371,13 @@ function Board({
                     {row.position}
                   </span>
                 </td>
-                <td className="py-1.5">
-                  <span className="truncate">{row.displayName}</span>
-                  {mine && <span className="sr-only"> (você)</span>}
+                {/* max-w-0: the name truncates instead of widening the table. */}
+                <td className="w-full max-w-0 py-1.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <RankingAvatar avatar={row.avatar} name={row.displayName} />
+                    <span className="min-w-0 truncate">{row.displayName}</span>
+                    {mine && <span className="sr-only"> (você)</span>}
+                  </span>
                 </td>
                 <td className="py-1.5 pr-1 text-right tabular-nums">
                   {row.points}
@@ -323,7 +391,17 @@ function Board({
               aria-current="true"
             >
               <td className="py-1.5 pl-1">{myEntry.position}</td>
-              <td className="py-1.5">{myEntry.displayName ?? 'Você'} (você)</td>
+              <td className="w-full max-w-0 py-1.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <RankingAvatar
+                    avatar={myEntry.avatar}
+                    name={myEntry.displayName ?? 'Você'}
+                  />
+                  <span className="min-w-0 truncate">
+                    {myEntry.displayName ?? 'Você'} (você)
+                  </span>
+                </span>
+              </td>
               <td className="py-1.5 pr-1 text-right tabular-nums">
                 {myEntry.points}
               </td>

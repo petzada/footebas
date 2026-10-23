@@ -1,4 +1,5 @@
 import {
+  coachAvatarSchema,
   myRankingReadModelSchema,
   rankingQuerySchema,
   rankingReadModelSchema,
@@ -25,7 +26,7 @@ import { AuthenticationError, type AuthPort, type Clock } from './ports.js';
 /** An achievement of the season close, before it is bound to a user. */
 export type SeasonAchievement = Omit<
   ValidatedAchievement,
-  'careerId' | 'userId' | 'displayName' | 'recordedAt'
+  'careerId' | 'userId' | 'displayName' | 'avatar' | 'recordedAt'
 >;
 
 export interface SeasonAchievementInput {
@@ -110,6 +111,16 @@ export function seasonAchievements(
 
 const ALL: RankingPeriod = 'all';
 
+/**
+ * Avatar of a snapshot row, only when it still satisfies the profile
+ * contract: a stale or unexpected value drops the avatar (the screen falls
+ * back to a pixel one) instead of failing the whole leaderboard.
+ */
+const rowAvatar = (avatar: string | undefined) =>
+  avatar !== undefined && coachAvatarSchema.safeParse(avatar).success
+    ? { avatar }
+    : {};
+
 /** Snapshot period of a scope at an instant. */
 export function rankingPeriodOf(scope: RankingScope, now: Date): string {
   return scope === 'monthly' ? rankingMonthOf(now.toISOString()) : ALL;
@@ -190,11 +201,14 @@ export class RankingService {
       period,
       ...(snapshot === undefined ? {} : { generatedAt: snapshot.generatedAt }),
       total: snapshot?.total ?? 0,
-      rows: (snapshot?.rows ?? []).map(({ position, displayName, points }) => ({
-        position,
-        displayName,
-        points,
-      })),
+      rows: (snapshot?.rows ?? []).map(
+        ({ position, displayName, avatar, points }) => ({
+          position,
+          displayName,
+          ...rowAvatar(avatar),
+          points,
+        }),
+      ),
     });
   }
 
@@ -225,6 +239,7 @@ export class RankingService {
                 position: row.position,
                 points: row.points,
                 displayName: row.displayName,
+                ...rowAvatar(row.avatar),
                 generatedAt: row.generatedAt,
               }),
         };

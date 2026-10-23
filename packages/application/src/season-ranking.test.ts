@@ -14,6 +14,9 @@ import {
   careerSaveRepository,
 } from './index.js';
 
+/** Coach picture on our CDN: the ranking shows it next to the name. */
+const AVATAR_URL = 'https://cdn.footebas.com.br/avatars/user_owner.png';
+
 const command = (
   type: string,
   commandId: string,
@@ -63,6 +66,11 @@ describe('temporada e ranking sobre a mesma carreira', () => {
         command('CreateCareer', 'command_create', 0, {
           managerName: 'Marcio',
           startDate: '2026-01-01',
+          coach: {
+            nationality: 'BR',
+            avatar: AVATAR_URL,
+            personality: 'estrategista',
+          },
         }),
       );
       const careerId = created.careerId;
@@ -195,6 +203,7 @@ describe('temporada e ranking sobre a mesma carreira', () => {
           careerId,
           userId: 'user_owner',
           displayName: 'Marcio',
+          avatar: AVATAR_URL,
           type: 'season_completed',
           season: 1,
           competitionId: leagueId,
@@ -258,6 +267,7 @@ describe('temporada e ranking sobre a mesma carreira', () => {
         {
           position: 1,
           displayName: 'Marcio',
+          avatar: AVATAR_URL,
           points: ledger.reduce((sum, { points }) => sum + points, 0),
         },
       ]);

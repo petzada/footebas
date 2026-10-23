@@ -68,6 +68,11 @@ export interface RankingLedgerEntry {
   readonly careerId: string;
   readonly userId: string;
   readonly displayName: string;
+  /**
+   * Coach avatar of the career when it was recorded: a pixel avatar id or
+   * the https URL of the coach's picture. Absent in older entries.
+   */
+  readonly avatar?: string;
   readonly type: RankedAchievementType;
   readonly season: number;
   readonly competitionId: string;
@@ -81,6 +86,8 @@ export interface CareerRankingTotal {
   readonly careerId: string;
   readonly userId: string;
   readonly displayName: string;
+  /** Latest avatar the career recorded, if any. */
+  readonly avatar?: string;
   readonly points: number;
   /** Instant the career reached its total (latest counted achievement). */
   readonly reachedAt: string;
@@ -91,6 +98,7 @@ export interface RankingRow {
   readonly userId: string;
   readonly careerId: string;
   readonly displayName: string;
+  readonly avatar?: string;
   readonly points: number;
 }
 
@@ -109,6 +117,9 @@ export function careerRankingTotals(
   period?: string,
 ): CareerRankingTotal[] {
   const totals = new Map<string, CareerRankingTotal>();
+  // Instant of the avatar kept per career: the avatar shown is the latest
+  // one recorded, whatever the order of the entries (mirrors the SQL stage).
+  const avatarAt = new Map<string, string>();
   for (const entry of entries) {
     if (scope === 'monthly' && rankingMonthOf(entry.recordedAt) !== period)
       continue;
@@ -117,11 +128,20 @@ export function careerRankingTotals(
     const current = totals.get(entry.careerId);
     const newer =
       current === undefined || entry.recordedAt >= current.reachedAt;
+    // Entries without an avatar (written before it was recorded) keep the
+    // one already known instead of erasing it.
+    const knownAt = avatarAt.get(entry.careerId);
+    const newerAvatar =
+      entry.avatar !== undefined &&
+      (knownAt === undefined || entry.recordedAt >= knownAt);
+    if (newerAvatar) avatarAt.set(entry.careerId, entry.recordedAt);
+    const avatar = newerAvatar ? entry.avatar : current?.avatar;
     totals.set(entry.careerId, {
       careerId: entry.careerId,
       userId: entry.userId,
       // The name shown is the latest one the career recorded.
       displayName: newer ? entry.displayName : current.displayName,
+      ...(avatar === undefined ? {} : { avatar }),
       points: (current?.points ?? 0) + value,
       reachedAt: newer ? entry.recordedAt : current.reachedAt,
     });
@@ -154,6 +174,7 @@ export function rankCareerTotals(
     userId: total.userId,
     careerId: total.careerId,
     displayName: total.displayName,
+    ...(total.avatar === undefined ? {} : { avatar: total.avatar }),
     points: total.points,
   }));
 }

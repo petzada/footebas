@@ -168,4 +168,71 @@ describe('ranking aggregation', () => {
     );
     expect(row).toMatchObject({ displayName: 'New', points: 10 });
   });
+
+  it('carries the latest avatar of the best career into the row', () => {
+    const rows = aggregateRanking(
+      [
+        entry({
+          careerId: 'career_a1',
+          userId: 'user_a',
+          avatar: 'avatar-03',
+          points: 100,
+        }),
+        entry({
+          careerId: 'career_a1',
+          userId: 'user_a',
+          avatar: 'https://cdn.footebas.com.br/avatars/user_a.png',
+          season: 2,
+          recordedAt: '2026-10-05T10:00:00.000Z',
+        }),
+        // A newer row without avatar does not erase the known one.
+        entry({
+          careerId: 'career_a1',
+          userId: 'user_a',
+          season: 3,
+          recordedAt: '2026-10-06T10:00:00.000Z',
+        }),
+        entry({
+          careerId: 'career_a2',
+          userId: 'user_a',
+          avatar: 'avatar-09',
+          points: 20,
+        }),
+        entry({ careerId: 'career_b', userId: 'user_b' }),
+      ],
+      'global',
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({
+        careerId: 'career_a1',
+        avatar: 'https://cdn.footebas.com.br/avatars/user_a.png',
+        points: 110,
+      }),
+      expect.objectContaining({ careerId: 'career_b' }),
+    ]);
+    expect(rows[1]).not.toHaveProperty('avatar');
+  });
+
+  it('keeps the most recent avatar whatever the order of the entries', () => {
+    const [row] = aggregateRanking(
+      [
+        entry({
+          careerId: 'career_a',
+          userId: 'user_a',
+          season: 3,
+          recordedAt: '2026-10-06T10:00:00.000Z',
+        }),
+        entry({ careerId: 'career_a', userId: 'user_a', avatar: 'avatar-01' }),
+        entry({
+          careerId: 'career_a',
+          userId: 'user_a',
+          avatar: 'avatar-07',
+          season: 2,
+          recordedAt: '2026-10-05T10:00:00.000Z',
+        }),
+      ],
+      'global',
+    );
+    expect(row).toMatchObject({ avatar: 'avatar-07', points: 15 });
+  });
 });

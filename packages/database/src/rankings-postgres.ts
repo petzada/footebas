@@ -24,11 +24,15 @@ const iso = (value: Date | string) =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 const day = (value: Date | string) =>
   value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
+/** Optional avatar column (null in rows written before it existed). */
+const withAvatar = (avatar: string | null | undefined) =>
+  avatar === null || avatar === undefined ? {} : { avatar };
 
 interface AchievementRow {
   career_id: string;
   user_id: string;
   display_name: string;
+  avatar: string | null;
   type: RankedAchievementType;
   season: number;
   competition_id: string;
@@ -49,12 +53,12 @@ export class PostgresAchievementLedger implements AchievementLedgerPort {
     for (const entry of entries)
       await this.sql`
         insert into footebas.validated_achievements
-          (career_id, user_id, display_name, type, season, competition_id,
-           club_id, club_reputation, game_date, points, rise_points,
-           rules_version, recorded_at)
+          (career_id, user_id, display_name, avatar, type, season,
+           competition_id, club_id, club_reputation, game_date, points,
+           rise_points, rules_version, recorded_at)
         values (
           ${entry.careerId}, ${entry.userId}, ${entry.displayName},
-          ${entry.type}, ${entry.season}, ${entry.competitionId},
+          ${entry.avatar ?? null}, ${entry.type}, ${entry.season}, ${entry.competitionId},
           ${entry.clubId}, ${entry.clubReputation}, ${entry.gameDate},
           ${entry.points}, ${entry.risePoints}, ${entry.rulesVersion},
           ${entry.recordedAt}
@@ -73,6 +77,7 @@ export class PostgresAchievementLedger implements AchievementLedgerPort {
       careerId: row.career_id,
       userId: row.user_id,
       displayName: row.display_name,
+      ...withAvatar(row.avatar),
       type: row.type,
       season: row.season,
       competitionId: row.competition_id,
@@ -91,6 +96,7 @@ interface TotalRow {
   career_id: string;
   user_id: string;
   display_name: string;
+  avatar: string | null;
   points: number;
   reached_at: Date | string;
 }
@@ -102,6 +108,7 @@ interface SnapshotRow {
   user_id: string;
   career_id: string;
   display_name: string;
+  avatar: string | null;
   points: number;
   generated_at: Date | string;
 }
@@ -111,6 +118,7 @@ const toRankingRow = (row: SnapshotRow): RankingRow => ({
   userId: row.user_id,
   careerId: row.career_id,
   displayName: row.display_name,
+  ...withAvatar(row.avatar),
   points: row.points,
 });
 
@@ -142,6 +150,8 @@ export class PostgresRankingStore implements RankingStorePort {
       select career_id, user_id,
         (array_agg(display_name order by recorded_at desc, id desc))[1]
           as display_name,
+        (array_agg(avatar order by recorded_at desc, id desc)
+          filter (where avatar is not null))[1] as avatar,
         sum(${points})::int as points,
         max(recorded_at) as reached_at
       from footebas.validated_achievements
@@ -152,6 +162,7 @@ export class PostgresRankingStore implements RankingStorePort {
         careerId: row.career_id,
         userId: row.user_id,
         displayName: row.display_name,
+        ...withAvatar(row.avatar),
         points: row.points,
         reachedAt: iso(row.reached_at),
       })),
@@ -178,6 +189,7 @@ export class PostgresRankingStore implements RankingStorePort {
             user_id: row.userId,
             career_id: row.careerId,
             display_name: row.displayName,
+            avatar: row.avatar ?? null,
             points: row.points,
             generated_at: generatedAt,
           }));
