@@ -81,6 +81,8 @@ export function evaluateRenewal(
   proposal: RenewalProposal,
   player: Pick<Player, 'age' | 'strength' | 'hidden'>,
   clubReputation: number,
+  /** Coach negotiation factor (ADR 0007); 1 is neutral. */
+  priceFactor = 1,
 ): 'accept' | 'refuse' {
   if (contract.status === 'terminated' || contract.status === 'expired')
     return 'refuse';
@@ -88,9 +90,10 @@ export function evaluateRenewal(
   const ageFactor = player.age >= 34 ? 0.88 : player.age <= 22 ? 1.05 : 1;
   const ambition = 0.72 + Number(player.hidden.professionalism) / 250;
   const expected = Math.floor(
-    Number(contract.wage) * ageFactor * ambition +
+    (Number(contract.wage) * ageFactor * ambition +
       Number(player.strength) * 100 +
-      (100 - clubReputation) * 20,
+      (100 - clubReputation) * 20) *
+      priceFactor,
   );
   return proposal.wage >= expected ? 'accept' : 'refuse';
 }
@@ -406,6 +409,8 @@ export function decideClubOffer(
   seller: ClubTransferProfile | undefined,
   buyerSquad: readonly Player[],
   sellerSquad: readonly Player[],
+  /** Coach negotiation factor (ADR 0007); 1 is neutral. */
+  priceFactor = 1,
 ): 'accept' | 'counter' | 'reject' {
   if (offer.toClubId !== buyer.clubId || offer.status !== 'pending')
     return 'reject';
@@ -423,7 +428,10 @@ export function decideClubOffer(
   if (seller !== undefined && sellerSquad.length <= seller.minimumSquadSize)
     return 'reject';
   const fairValue =
-    Number(player.value) * (needed ? 1.15 : 1) * (player.age <= 23 ? 1.1 : 1);
+    Number(player.value) *
+    (needed ? 1.15 : 1) *
+    (player.age <= 23 ? 1.1 : 1) *
+    priceFactor;
   if (offer.fee >= Math.floor(fairValue * 0.92)) return 'accept';
   return offer.fee >= Math.floor(fairValue * 0.65) ? 'counter' : 'reject';
 }
