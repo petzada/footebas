@@ -5,17 +5,18 @@ import {
   type Entitlements,
   type EntitlementsPort,
 } from '@footebas/database';
-import type {
-  BillingEffect,
-  BillingRepository,
-  ChargeAttachment,
-  License,
-  NewOrder,
-  Order,
-  RefundAttachment,
-  WebhookEventRecord,
-  WebhookOutcome,
-  WebhookResult,
+import {
+  EFFECTIVE_OUTCOMES,
+  type BillingEffect,
+  type BillingRepository,
+  type ChargeAttachment,
+  type License,
+  type NewOrder,
+  type Order,
+  type RefundAttachment,
+  type WebhookEventRecord,
+  type WebhookOutcome,
+  type WebhookResult,
 } from './billing-repository.js';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
@@ -79,9 +80,13 @@ export class InMemoryBillingRepository implements BillingRepository {
     return Promise.resolve(order ? { ...order } : undefined);
   }
 
-  public async createPendingOrder(input: NewOrder, now: Date): Promise<Order> {
-    const existing = await this.pendingOrder(input.userId);
-    if (existing) return existing;
+  public createPendingOrder(input: NewOrder, now: Date): Promise<Order> {
+    // Synchronous check-and-insert, like the partial unique index: two
+    // concurrent checkouts can never open two pending orders.
+    const existing = [...this.#orders.values()].find(
+      (item) => item.userId === input.userId && item.status === 'pending',
+    );
+    if (existing) return Promise.resolve({ ...existing });
     const instant = now.toISOString();
     const order: Mutable<Order> = {
       ...input,
@@ -92,7 +97,7 @@ export class InMemoryBillingRepository implements BillingRepository {
       updatedAt: instant,
     };
     this.#orders.set(order.id, order);
-    return { ...order };
+    return Promise.resolve({ ...order });
   }
 
   #require(orderId: string): Mutable<Order> {
@@ -107,10 +112,38 @@ export class InMemoryBillingRepository implements BillingRepository {
     now: Date,
   ): Promise<Order> {
     const order = this.#require(orderId);
+    // Single-flight: a second provider charge never replaces the first.
+    if (
+      order.providerChargeId !== undefined &&
+      charge.providerChargeId !== undefined &&
+      order.providerChargeId !== charge.providerChargeId
+    )
+      return Promise.resolve({ ...order });
     const { payload, ...fields } = charge;
     Object.assign(order, fields, { updatedAt: now.toISOString() });
     this.#charges.set(orderId, payload);
     return Promise.resolve({ ...order });
+  }
+
+  public ordersToReconcile(
+    since: Date,
+    limit: number,
+  ): Promise<readonly Order[]> {
+    const from = since.toISOString();
+    return Promise.resolve(
+      [...this.#orders.values()]
+        .filter(
+          (order) =>
+            order.providerChargeId !== undefined &&
+            order.createdAt >= from &&
+            (order.status === 'pending' ||
+              order.status === 'expired' ||
+              (order.status === 'paid' && order.refundStatus === 'requested')),
+        )
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .slice(0, limit)
+        .map((order) => ({ ...order })),
+    );
   }
 
   public expireOrder(orderId: string, now: Date): Promise<void> {
@@ -157,6 +190,13 @@ export class InMemoryBillingRepository implements BillingRepository {
     effect: Extract<BillingEffect, { endToEndIds: readonly string[] }>,
   ): Mutable<Order> | undefined {
     if (effect.orderId !== undefined) return this.#orders.get(effect.orderId);
+    const charges = new Set(effect.providerChargeIds ?? []);
+    const byCharge = [...this.#orders.values()].find(
+      (order) =>
+        order.providerChargeId !== undefined &&
+        charges.has(order.providerChargeId),
+    );
+    if (byCharge) return byCharge;
     const ids = new Set(effect.endToEndIds);
     return [...this.#orders.values()].find(
       (order) =>
@@ -166,67 +206,130 @@ export class InMemoryBillingRepository implements BillingRepository {
     );
   }
 
-  #apply(effect: BillingEffect, now: Date): WebhookOutcome {
+  #paidTarget(
+    effect: Extract<BillingEffect, { kind: 'paid' }>,
+  ): Mutable<Order> | undefined {
+    const orders = [...this.#orders.values()];
+    return (
+      (effect.providerChargeId === undefined
+        ? undefined
+        : orders.find(
+            (item) => item.providerChargeId === effect.providerChargeId,
+          )) ??
+      (effect.correlationId === undefined
+        ? undefined
+        : orders.find((item) => item.correlationId === effect.correlationId))
+    );
+  }
+
+  /**
+   * The order behind the license stopped counting (refund, dispute): the
+   * license moves to another paid order of the user (paid twice) or is
+   * revoked.
+   */
+  #release(order: Mutable<Order>, instant: string): void {
+    const license = this.#licenses.get(order.userId);
+    if (license?.orderId !== order.id || license.status !== 'active') return;
+    const other = [...this.#orders.values()]
+      .filter(
+        (item) =>
+          item.userId === order.userId &&
+          item.id !== order.id &&
+          item.status === 'paid' &&
+          item.refundStatus !== 'confirmed' &&
+          item.refundStatus !== 'disputed',
+      )
+      .sort((a, b) => (a.paidAt ?? '').localeCompare(b.paidAt ?? ''))[0];
+    if (other) {
+      license.orderId = other.id;
+      return;
+    }
+    license.status = 'revoked';
+    license.revokedAt = instant;
+  }
+
+  #apply(effect: BillingEffect, now: Date): Omit<WebhookResult, 'duplicate'> {
     const instant = now.toISOString();
     switch (effect.kind) {
       case 'ignored':
-        return 'ignored';
+        return { outcome: 'ignored' };
       case 'expired': {
-        const order = [...this.#orders.values()].find(
-          (item) => item.correlationId === effect.correlationId,
-        );
-        if (!order) return 'unknown_order';
-        if (order.status !== 'pending') return 'ignored';
+        const order =
+          effect.orderId === undefined
+            ? [...this.#orders.values()].find(
+                (item) => item.correlationId === effect.correlationId,
+              )
+            : this.#orders.get(effect.orderId);
+        if (!order) return { outcome: 'unknown_order' };
+        if (order.status !== 'pending')
+          return { outcome: 'ignored', orderId: order.id };
         order.status = 'expired';
         order.updatedAt = instant;
-        return 'expired';
+        return { outcome: 'expired', orderId: order.id };
       }
       case 'paid': {
-        const order = [...this.#orders.values()].find(
-          (item) => item.correlationId === effect.correlationId,
-        );
-        if (!order) return 'unknown_order';
-        if (effect.amountCents !== order.amountCents) return 'amount_mismatch';
-        if (order.status === 'refunded') return 'ignored';
+        const order = this.#paidTarget(effect);
+        if (!order) return { outcome: 'unknown_order' };
+        if (
+          effect.amountCents !== undefined &&
+          effect.amountCents !== order.amountCents
+        )
+          return { outcome: 'amount_mismatch', orderId: order.id };
+        if (order.status === 'refunded' || order.refundStatus === 'disputed')
+          return { outcome: 'ignored', orderId: order.id };
         order.status = 'paid';
         order.paidAt ??= effect.paidAt;
+        if (effect.providerChargeId !== undefined)
+          order.providerChargeId = effect.providerChargeId;
         if (effect.pixEndToEndId !== undefined)
           order.pixEndToEndId ??= effect.pixEndToEndId;
         if (effect.charge !== undefined)
           this.#charges.set(order.id, effect.charge);
         order.updatedAt = instant;
         const license = this.#licenses.get(order.userId);
-        if (license?.status !== 'active')
+        if (license?.status !== 'active') {
           this.#licenses.set(order.userId, {
             userId: order.userId,
             orderId: order.id,
             status: 'active',
             grantedAt: instant,
           });
-        return 'paid';
+          return { outcome: 'paid', orderId: order.id };
+        }
+        return {
+          outcome: 'paid',
+          orderId: order.id,
+          ...(license.orderId === order.id ? {} : { doublePayment: true }),
+        };
       }
       case 'refund_confirmed': {
         const order = this.#refundTarget(effect);
-        if (!order) return 'unknown_order';
+        if (!order) return { outcome: 'unknown_order' };
         order.status = 'refunded';
         order.refundStatus = 'confirmed';
         order.refundedAt ??= instant;
         order.updatedAt = instant;
-        const license = this.#licenses.get(order.userId);
-        if (license?.orderId === order.id && license.status === 'active') {
-          license.status = 'revoked';
-          license.revokedAt = instant;
-        }
-        return 'refunded';
+        this.#release(order, instant);
+        return { outcome: 'refunded', orderId: order.id };
+      }
+      case 'disputed': {
+        const order = this.#refundTarget(effect);
+        if (!order) return { outcome: 'unknown_order' };
+        if (order.status === 'refunded')
+          return { outcome: 'ignored', orderId: order.id };
+        order.refundStatus = 'disputed';
+        order.updatedAt = instant;
+        this.#release(order, instant);
+        return { outcome: 'disputed', orderId: order.id };
       }
       case 'refund_rejected': {
         const order = this.#refundTarget(effect);
-        if (!order) return 'unknown_order';
-        if (order.status === 'paid') {
+        if (!order) return { outcome: 'unknown_order' };
+        if (order.status === 'paid' && order.refundStatus === 'requested') {
           order.refundStatus = 'rejected';
           order.updatedAt = instant;
         }
-        return 'refund_rejected';
+        return { outcome: 'refund_rejected', orderId: order.id };
       }
     }
   }
@@ -239,12 +342,13 @@ export class InMemoryBillingRepository implements BillingRepository {
     const seen = this.#events.get(event.id);
     if (seen)
       return Promise.resolve({ duplicate: true, outcome: seen.outcome });
-    const outcome = this.#apply(effect, now);
-    this.#events.set(event.id, {
-      ...event,
-      outcome,
-      processedAt: now.toISOString(),
-    });
-    return Promise.resolve({ duplicate: false, outcome });
+    const result = this.#apply(effect, now);
+    if (event.persist !== 'on_effect' || EFFECTIVE_OUTCOMES.has(result.outcome))
+      this.#events.set(event.id, {
+        ...event,
+        outcome: result.outcome,
+        processedAt: now.toISOString(),
+      });
+    return Promise.resolve({ duplicate: false, ...result });
   }
 }

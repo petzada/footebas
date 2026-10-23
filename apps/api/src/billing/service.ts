@@ -4,19 +4,25 @@
 import { ApplicationError, AuthenticationError } from '@footebas/application';
 import type { FakeAuthIdentity } from '@footebas/contracts';
 import type { Entitlements, EntitlementsPort } from '@footebas/database';
+import { consoleLogSink, type LogSink } from '../observability.js';
 import type {
   BillingEffect,
   BillingRepository,
   License,
   Order,
   RefundStatus,
+  WebhookEventRecord,
   WebhookResult,
 } from './billing-repository.js';
 import {
   interpretAbacateWebhook,
   verifyAbacateWebhook,
 } from './abacatepay-webhook.js';
-import { interpretWooviWebhook } from './webhook-events.js';
+import {
+  CHARGE_PAID_EVENTS,
+  interpretWooviWebhook,
+  type InterpretedWebhook,
+} from './webhook-events.js';
 import {
   verifyWithSource,
   WOOVI_SIGNATURE_HEADER,
@@ -62,7 +68,23 @@ export interface BillingServiceDependencies {
   readonly config?: Partial<BillingConfig>;
   readonly now?: () => Date;
   readonly newId?: () => string;
+  /** Structured log sink (Workers Logs); defaults to JSON on the console. */
+  readonly log?: LogSink;
 }
+
+/** Result of one scheduled reconciliation run. */
+export interface ReconcileRun {
+  readonly checked: number;
+  readonly paid: number;
+  readonly refunded: number;
+  readonly disputed: number;
+  readonly expired: number;
+  readonly failed: number;
+}
+
+/** Window and batch size of the scheduled reconciliation. */
+export const RECONCILE_WINDOW_HOURS = 48;
+export const RECONCILE_BATCH = 50;
 
 export interface CheckoutView {
   readonly orderId: string;
@@ -110,6 +132,7 @@ export interface RefundView {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 /** A pending QR code this close to expiry is replaced instead of reused. */
 const REUSE_MARGIN_MS = 60 * 1000;
 
@@ -163,6 +186,8 @@ export class BillingService {
   readonly #config: BillingConfig;
   readonly #now: () => Date;
   readonly #newId: () => string;
+  readonly #log: LogSink;
+  readonly #provider: 'woovi' | 'abacatepay';
 
   public constructor(deps: BillingServiceDependencies) {
     this.#deps = deps;
@@ -174,6 +199,30 @@ export class BillingService {
       throw new RangeError('license price must be a positive integer (cents)');
     this.#now = deps.now ?? (() => new Date());
     this.#newId = deps.newId ?? (() => crypto.randomUUID().replaceAll('-', ''));
+    this.#log = deps.log ?? consoleLogSink;
+    this.#provider = deps.webhookProvider ?? 'woovi';
+  }
+
+  /** Applies a reconciliation effect; the event is kept only if it acted. */
+  async #applyRead(
+    source: string,
+    key: string,
+    status: string,
+    effect: BillingEffect,
+  ): Promise<WebhookResult> {
+    const result = await this.#deps.repository.applyWebhook(
+      {
+        id: `${source}:${key}:${status}`,
+        type: `${source}:${status}`,
+        payload: { chargeId: key, status },
+        provider: this.#provider,
+        persist: 'on_effect',
+      },
+      effect,
+      this.#now(),
+    );
+    this.#report(`${source}:${status}`, effect, result, { chargeId: key });
+    return result;
   }
 
   async #paidEffect(
@@ -181,21 +230,134 @@ export class BillingService {
     charge: WooviCharge,
     source: string,
   ): Promise<WebhookResult> {
+    const providerChargeId = charge.globalID ?? order.providerChargeId;
+    // We created this charge with the order's amount; when the provider
+    // does not report one (AbacatePay `/transparents/check`), trust ours.
     const effect: BillingEffect = {
       kind: 'paid',
+      ...(providerChargeId === undefined ? {} : { providerChargeId }),
       correlationId: order.correlationId,
-      amountCents: charge.value,
+      ...(charge.value === undefined ? {} : { amountCents: charge.value }),
       paidAt: charge.paidAt ?? this.#now().toISOString(),
     };
-    return this.#deps.repository.applyWebhook(
-      {
-        id: `${source}:${order.correlationId}:COMPLETED`,
-        type: `${source}:COMPLETED`,
-        payload: { correlationID: order.correlationId, status: charge.status },
-      },
+    return this.#applyRead(
+      source,
+      providerChargeId ?? order.correlationId,
+      'COMPLETED',
       effect,
-      this.#now(),
     );
+  }
+
+  /**
+   * Reads the order's charge at the provider and applies what happened
+   * there (paid, refunded, disputed, expired) idempotently. Throws when the
+   * provider is unreachable.
+   */
+  async #settle(order: Order, source: string): Promise<WebhookResult | null> {
+    const charge = await this.#deps.woovi.getCharge(
+      order.correlationId,
+      order.providerChargeId,
+    );
+    if (charge === undefined) return null;
+    const key =
+      charge.globalID ?? order.providerChargeId ?? order.correlationId;
+    switch (charge.status) {
+      case 'COMPLETED':
+        // A paid order only needs the post-payment states.
+        return order.status === 'paid'
+          ? null
+          : this.#paidEffect(order, charge, source);
+      case 'REFUNDED':
+        return this.#applyRead(source, key, 'REFUNDED', {
+          kind: 'refund_confirmed',
+          orderId: order.id,
+          endToEndIds: [],
+        });
+      case 'DISPUTED':
+        return this.#applyRead(source, key, 'DISPUTED', {
+          kind: 'disputed',
+          orderId: order.id,
+          endToEndIds: [],
+        });
+      case 'EXPIRED':
+        return order.status === 'pending'
+          ? this.#applyRead(source, key, 'EXPIRED', {
+              kind: 'expired',
+              correlationId: order.correlationId,
+              orderId: order.id,
+            })
+          : null;
+      case 'ACTIVE':
+        return null;
+    }
+  }
+
+  /**
+   * Warns (Workers Logs) whenever money may have arrived without becoming a
+   * license, and when a user paid twice.
+   */
+  #report(
+    type: string,
+    effect: BillingEffect,
+    result: WebhookResult,
+    extra: Readonly<Record<string, string | undefined>> = {},
+  ): void {
+    const completed =
+      effect.kind === 'paid' ||
+      type === 'transparent.completed' ||
+      CHARGE_PAID_EVENTS.has(type);
+    const fields = {
+      type: 'billing',
+      provider: this.#provider,
+      eventType: type,
+      outcome: result.outcome,
+      duplicate: result.duplicate,
+      ...(result.orderId === undefined ? {} : { orderId: result.orderId }),
+      ...(effect.kind === 'paid'
+        ? {
+            ...(effect.providerChargeId === undefined
+              ? {}
+              : { chargeId: effect.providerChargeId }),
+            ...(effect.correlationId === undefined
+              ? {}
+              : { correlationId: effect.correlationId }),
+          }
+        : {}),
+      ...Object.fromEntries(
+        Object.entries(extra).filter(([, value]) => value !== undefined),
+      ),
+    };
+    if (completed && result.outcome !== 'paid')
+      this.#log({
+        ...fields,
+        level: 'warn',
+        event: 'billing.completed_not_paid',
+      });
+    if (result.doublePayment === true)
+      this.#log({ ...fields, level: 'warn', event: 'billing.double_payment' });
+  }
+
+  async #applyWebhookEvent(
+    event: InterpretedWebhook,
+    now: Date,
+    extra: Readonly<Record<string, string | undefined>> = {},
+  ): Promise<WebhookResult> {
+    const record: WebhookEventRecord = {
+      id: event.id,
+      type: event.type,
+      payload: event.payload,
+      provider: this.#provider,
+    };
+    const result = await this.#deps.repository.applyWebhook(
+      record,
+      event.effect,
+      now,
+    );
+    this.#report(event.type, event.effect, result, {
+      eventId: event.id,
+      ...extra,
+    });
+    return result;
   }
 
   /** Creates (or reuses) the user's pending PIX charge for the license. */
@@ -210,7 +372,14 @@ export class BillingService {
         order?.expiresAt !== undefined &&
         Date.parse(order.expiresAt) - REUSE_MARGIN_MS <= now.getTime()
       ) {
-        await repository.expireOrder(order.id, now);
+        // Ask the provider before giving the old QR code up: a payment whose
+        // webhook was lost must become the license, not a second PIX.
+        if (order.providerChargeId !== undefined || order.brCode !== undefined)
+          await this.#settle(order, 'checkout');
+        const settled = (await repository.order(order.id)) ?? order;
+        if (settled.status === 'paid') return checkoutView(settled);
+        if (settled.status === 'pending')
+          await repository.expireOrder(order.id, now);
         order = undefined;
       }
       if (order?.brCode !== undefined) return checkoutView(order);
@@ -258,6 +427,24 @@ export class BillingService {
         },
         now,
       );
+      if (
+        charge.globalID !== undefined &&
+        attached.providerChargeId !== undefined &&
+        attached.providerChargeId !== charge.globalID
+      ) {
+        // Lost the race (double click, two tabs): the order keeps the first
+        // charge; this one is never shown and simply expires unpaid.
+        this.#log({
+          type: 'billing',
+          level: 'info',
+          event: 'billing.charge_race_lost',
+          provider: this.#provider,
+          orderId: order.id,
+          chargeId: charge.globalID,
+          winnerChargeId: attached.providerChargeId,
+        });
+        return checkoutView(attached);
+      }
       if (charge.status === 'COMPLETED') {
         await this.#paidEffect(attached, charge, 'checkout');
         return checkoutView((await repository.order(order.id)) ?? attached);
@@ -270,35 +457,66 @@ export class BillingService {
     );
   }
 
-  /** Owner-only order read; reconciles a pending charge with Woovi. */
+  /**
+   * Owner-only order read; reconciles a pending (or locally expired) charge
+   * with the provider, so a payment whose webhook was lost still lands.
+   */
   public async order(userId: string, orderId: string): Promise<OrderView> {
-    const { repository, woovi } = this.#deps;
+    const { repository } = this.#deps;
     const order = await repository.order(orderId);
     if (order?.userId !== userId)
       throw new ApplicationError('NOT_FOUND', 'order not found');
-    if (order.status !== 'pending' || order.brCode === undefined)
+    if (
+      (order.status !== 'pending' && order.status !== 'expired') ||
+      (order.brCode === undefined && order.providerChargeId === undefined)
+    )
       return orderView(order);
     try {
-      const charge = await woovi.getCharge(
-        order.correlationId,
-        order.providerChargeId,
-      );
-      if (charge?.status === 'COMPLETED')
-        await this.#paidEffect(order, charge, 'reconcile');
-      else if (charge?.status === 'EXPIRED')
-        await repository.applyWebhook(
-          {
-            id: `reconcile:${order.correlationId}:EXPIRED`,
-            type: 'reconcile:EXPIRED',
-            payload: { correlationID: order.correlationId },
-          },
-          { kind: 'expired', correlationId: order.correlationId },
-          this.#now(),
-        );
+      await this.#settle(order, 'reconcile');
     } catch {
-      // Woovi unavailable: the webhook remains the source of truth.
+      // Provider unavailable: the webhook and the cron remain the fallback.
     }
     return orderView((await repository.order(orderId)) ?? order);
+  }
+
+  /**
+   * Scheduled reconciliation (Worker cron): recent orders whose provider
+   * state may have changed without a webhook reaching us are read from the
+   * provider and their effects applied idempotently.
+   */
+  public async reconcile(
+    options: { readonly windowHours?: number; readonly limit?: number } = {},
+  ): Promise<ReconcileRun> {
+    const now = this.#now();
+    const since = new Date(
+      now.getTime() - (options.windowHours ?? RECONCILE_WINDOW_HOURS) * HOUR_MS,
+    );
+    const orders = await this.#deps.repository.ordersToReconcile(
+      since,
+      options.limit ?? RECONCILE_BATCH,
+    );
+    const run = {
+      checked: 0,
+      paid: 0,
+      refunded: 0,
+      disputed: 0,
+      expired: 0,
+      failed: 0,
+    };
+    for (const order of orders) {
+      run.checked += 1;
+      try {
+        const result = await this.#settle(order, 'cron');
+        if (result === null || result.duplicate) continue;
+        if (result.outcome === 'paid') run.paid += 1;
+        else if (result.outcome === 'refunded') run.refunded += 1;
+        else if (result.outcome === 'disputed') run.disputed += 1;
+        else if (result.outcome === 'expired') run.expired += 1;
+      } catch {
+        run.failed += 1;
+      }
+    }
+    return run;
   }
 
   /** Provider webhook: authenticity, idempotency and effect in one place. */
@@ -324,12 +542,8 @@ export class BillingService {
         throw new ApplicationError('VALIDATION_ERROR', 'invalid webhook body');
       }
       const now = this.#now();
-      const event = interpretAbacateWebhook(parsed, now);
-      return this.#deps.repository.applyWebhook(
-        { id: event.id, type: event.type, payload: event.payload },
-        event.effect,
-        now,
-      );
+      const event = await interpretAbacateWebhook(parsed, now, rawBody);
+      return this.#applyWebhookEvent(event, now);
     }
     const secret = this.#deps.webhookSecret;
     if (
@@ -354,19 +568,30 @@ export class BillingService {
     }
     const now = this.#now();
     const event = await interpretWooviWebhook(body, rawBody, now);
-    return this.#deps.repository.applyWebhook(
-      { id: event.id, type: event.type, payload: event.payload },
-      event.effect,
-      now,
-    );
+    return this.#applyWebhookEvent(event, now);
   }
 
   /** Requests the full refund of the paid license within the CDC window. */
   public async refund(userId: string): Promise<RefundView> {
     const { repository, woovi } = this.#deps;
-    const paid = await repository.latestPaidOrder(userId);
+    // The order behind the active license is the one to refund (a user who
+    // paid twice keeps the license through the other order).
+    const license = await repository.license(userId);
+    const licensed =
+      license?.status === 'active'
+        ? await repository.order(license.orderId)
+        : undefined;
+    const paid =
+      licensed?.status === 'paid'
+        ? licensed
+        : await repository.latestPaidOrder(userId);
     if (paid === undefined)
       throw new ApplicationError('NOT_FOUND', 'no paid order to refund');
+    if (paid.refundStatus === 'disputed')
+      throw new ApplicationError(
+        'FORBIDDEN',
+        'payment is under dispute at the bank; the license is already suspended',
+      );
     const view = (order: Order): RefundView => ({
       orderId: order.id,
       amountCents: order.amountCents,
@@ -421,6 +646,7 @@ export class BillingService {
           id: `refund-response:${order.refundCorrelationId}:${status}`,
           type: `refund-response:${status}`,
           payload: { refund: refund.raw },
+          provider: this.#provider,
         },
         {
           kind: status === 'CONFIRMED' ? 'refund_confirmed' : 'refund_rejected',

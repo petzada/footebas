@@ -88,12 +88,12 @@ export function billingRoutes(deps: BillingRouteDependencies): ApiRoute[] {
       async handler(request) {
         if (request.rawBody === undefined)
           throw new ApplicationError('VALIDATION_ERROR', 'raw body required');
-        const result = await service.webhook(
+        const { duplicate, outcome } = await service.webhook(
           request.rawBody,
           request.headers,
           request.query,
         );
-        return json({ ok: true, ...result });
+        return json({ ok: true, duplicate, outcome });
       },
     },
   ];

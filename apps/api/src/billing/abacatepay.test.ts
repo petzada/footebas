@@ -90,11 +90,27 @@ describe('AbacatePay · cliente PIX transparente', () => {
     ).toBe('CONFIRMED');
   });
 
-  it('mapeia os estados da cobrança', () => {
+  it('mapeia os estados da cobrança; reembolso e disputa nunca contam como pago', () => {
     expect(chargeStatusOf('PENDING')).toBe('ACTIVE');
     expect(chargeStatusOf('PAID')).toBe('COMPLETED');
+    expect(chargeStatusOf('APPROVED')).toBe('COMPLETED');
+    expect(chargeStatusOf('REDEEMED')).toBe('COMPLETED');
+    expect(chargeStatusOf('REFUNDED')).toBe('REFUNDED');
+    expect(chargeStatusOf('UNDER_DISPUTE')).toBe('DISPUTED');
     expect(chargeStatusOf('EXPIRED')).toBe('EXPIRED');
     expect(chargeStatusOf('CANCELLED')).toBe('EXPIRED');
+    expect(chargeStatusOf('FAILED')).toBe('EXPIRED');
+  });
+
+  it('consulta sem amount deixa o valor indefinido (nunca 0)', async () => {
+    const client = new AbacatePayClient({
+      apiKey: 'k',
+      fetch: async () =>
+        ok({ id: 'pix_char_1', status: 'PAID', expiresAt: '2026-10-23' }),
+    });
+    const charge = await client.getCharge('corr', 'pix_char_1');
+    expect(charge?.status).toBe('COMPLETED');
+    expect(charge?.value).toBeUndefined();
   });
 });
 
@@ -153,22 +169,23 @@ describe('AbacatePay · webhook', () => {
     expect(await verifyAbacateWebhook(body, {}, {}, '')).toBe(false);
   });
 
-  it('pagamento vira efeito "paid" idempotente pelo id do evento e sem dados pessoais', () => {
-    const event = interpretAbacateWebhook(
+  it('pagamento vira efeito "paid" idempotente pelo id do evento e sem dados pessoais', async () => {
+    const event = await interpretAbacateWebhook(
       JSON.parse(body),
       new Date('2026-10-23T12:00:06Z'),
     );
     expect(event.id).toBe('log_1');
     expect(event.effect).toMatchObject({
       kind: 'paid',
+      providerChargeId: 'pix_char_1',
       correlationId: 'footebas_license_x',
       amountCents: 4990,
     });
     expect(JSON.stringify(event.payload)).not.toContain('529.');
   });
 
-  it('reembolso confirma pelo id da cobrança original; outros eventos são ignorados', () => {
-    const refunded = interpretAbacateWebhook(
+  it('reembolso confirma pelo id da cobrança original; outros eventos são ignorados', async () => {
+    const refunded = await interpretAbacateWebhook(
       {
         id: 'log_2',
         event: 'transparent.refunded',
@@ -178,14 +195,76 @@ describe('AbacatePay · webhook', () => {
     );
     expect(refunded.effect).toEqual({
       kind: 'refund_confirmed',
+      providerChargeIds: ['pix_char_1'],
       endToEndIds: ['pix_char_1'],
     });
     expect(
-      interpretAbacateWebhook(
-        { id: 'log_3', event: 'payout.completed' },
-        new Date(),
+      (
+        await interpretAbacateWebhook(
+          { id: 'log_3', event: 'payout.completed' },
+          new Date(),
+        )
       ).effect.kind,
     ).toBe('ignored');
+  });
+
+  it('aceita o id da cobrança em outros lugares, sem externalId/metadata nem amount', async () => {
+    // Shape observed in production: nothing of ours is echoed back.
+    for (const data of [
+      { transparent: { id: 'pix_char_2', status: 'PAID', metadata: {} } },
+      { pixQrCode: { id: 'pix_char_2', status: 'PAID' } },
+      { id: 'pix_char_2', status: 'PAID' },
+    ]) {
+      const event = await interpretAbacateWebhook(
+        { id: 'log_x', event: 'transparent.completed', data },
+        new Date('2026-10-23T12:00:06Z'),
+      );
+      expect(event.effect).toEqual({
+        kind: 'paid',
+        providerChargeId: 'pix_char_2',
+        paidAt: '2026-10-23T12:00:06.000Z',
+        charge: expect.any(Object) as unknown,
+      });
+    }
+  });
+
+  it('status que não é pago e disputa: completed ignorado, disputed revoga', async () => {
+    const late = await interpretAbacateWebhook(
+      {
+        id: 'log_4',
+        event: 'transparent.completed',
+        data: { transparent: { id: 'pix_char_3', status: 'REFUNDED' } },
+      },
+      new Date(),
+    );
+    expect(late.effect.kind).toBe('ignored');
+    const disputed = await interpretAbacateWebhook(
+      {
+        id: 'log_5',
+        event: 'transparent.disputed',
+        data: { transparent: { id: 'pix_char_3' } },
+      },
+      new Date(),
+    );
+    expect(disputed.effect).toMatchObject({
+      kind: 'disputed',
+      providerChargeIds: ['pix_char_3'],
+    });
+  });
+
+  it('sem id no evento a chave é estável (nunca o relógio)', async () => {
+    const event = {
+      event: 'transparent.completed',
+      data: { transparent: { id: 'pix_char_4', status: 'PAID' } },
+    };
+    const first = await interpretAbacateWebhook(event, new Date(1));
+    const retry = await interpretAbacateWebhook(event, new Date(2));
+    expect(first.id).toBe('transparent.completed:pix_char_4');
+    expect(retry.id).toBe(first.id);
+    const anonymous = { event: 'something.else', data: {} };
+    expect((await interpretAbacateWebhook(anonymous, new Date(1))).id).toBe(
+      (await interpretAbacateWebhook(anonymous, new Date(2))).id,
+    );
   });
 });
 

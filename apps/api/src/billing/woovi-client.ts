@@ -3,12 +3,22 @@
 //   Production: https://api.woovi.com   Sandbox: https://api.woovi-sandbox.com
 //   Auth: `Authorization: <AppID>` (raw AppID, no "Bearer").
 
-export type WooviChargeStatus = 'ACTIVE' | 'COMPLETED' | 'EXPIRED';
+/**
+ * Provider-neutral charge status. `REFUNDED` and `DISPUTED` only come from
+ * AbacatePay (`REFUNDED`, `UNDER_DISPUTE`): money that is no longer ours.
+ */
+export type WooviChargeStatus =
+  'ACTIVE' | 'COMPLETED' | 'EXPIRED' | 'REFUNDED' | 'DISPUTED';
 
 export interface WooviCharge {
   readonly correlationID: string;
   readonly status: WooviChargeStatus;
-  readonly value: number;
+  /**
+   * Amount in cents, when the provider reports it. AbacatePay's
+   * `/transparents/check` omits it; the service then trusts the order's own
+   * amount (it created the charge with it).
+   */
+  readonly value?: number;
   readonly brCode?: string;
   readonly qrCodeImage?: string;
   readonly paymentLinkUrl?: string;
