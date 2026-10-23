@@ -1,4 +1,10 @@
-import type { CanonicalValue } from '@footebas/domain';
+import type {
+  CanonicalValue,
+  RankedAchievementType,
+  RankingLedgerEntry,
+  RankingRow,
+  RankingScope,
+} from '@footebas/domain';
 import type { GameSave, NewGameSave, SaveUpdate } from './model.js';
 
 export class SaveNotFoundError extends Error {}
@@ -55,9 +61,72 @@ export interface CommandRepository {
   save<T extends CanonicalValue>(receipt: CommandReceipt<T>): Promise<void>;
 }
 
+/** A server-validated achievement of one career (ADR 0013). */
+export interface ValidatedAchievement extends RankingLedgerEntry {
+  readonly type: RankedAchievementType;
+  readonly clubId: string;
+  readonly clubReputation: number;
+  /** In-game date of the achievement (`YYYY-MM-DD`). */
+  readonly gameDate: string;
+  readonly rulesVersion: string;
+}
+
+/**
+ * Ledger of validated achievements. It is written inside the career's
+ * transaction, so an achievement exists only if the save that produced it
+ * was committed. Recording is idempotent per career, type, season and
+ * competition.
+ */
+export interface AchievementLedgerPort {
+  record(entries: readonly ValidatedAchievement[]): Promise<void>;
+  /** Every achievement of a career, oldest first. */
+  listByCareer(careerId: string): Promise<readonly ValidatedAchievement[]>;
+}
+
 export interface TransactionContext {
   readonly saves: GameSaveRepository;
   readonly commands: CommandRepository;
+  readonly achievements: AchievementLedgerPort;
+}
+
+/** `all` for the all-time scopes, `YYYY-MM` for the monthly one. */
+export type RankingPeriod = string;
+
+export interface RankingSnapshotRow extends RankingRow {
+  readonly scope: RankingScope;
+  readonly period: RankingPeriod;
+  readonly generatedAt: string;
+}
+
+export interface RankingSnapshot {
+  readonly scope: RankingScope;
+  readonly period: RankingPeriod;
+  readonly generatedAt: string;
+  readonly total: number;
+  readonly rows: readonly RankingRow[];
+}
+
+/** Snapshots of the leaderboards, served with cache (ADR 0005, ADR 0013). */
+export interface RankingStorePort {
+  /** Ranked rows (best career per user) computed from the ledger. */
+  aggregate(scope: RankingScope, period?: string): Promise<RankingRow[]>;
+  /** Replaces the snapshot of a scope and period atomically. */
+  replaceSnapshot(
+    scope: RankingScope,
+    period: RankingPeriod,
+    rows: readonly RankingRow[],
+    generatedAt: string,
+  ): Promise<void>;
+  snapshot(
+    scope: RankingScope,
+    period: RankingPeriod,
+    limit: number,
+  ): Promise<RankingSnapshot | undefined>;
+  /** The user's row in the given snapshots, when ranked. */
+  positionsOf(
+    userId: string,
+    snapshots: readonly { scope: RankingScope; period: RankingPeriod }[],
+  ): Promise<readonly RankingSnapshotRow[]>;
 }
 
 export interface UnitOfWork {
