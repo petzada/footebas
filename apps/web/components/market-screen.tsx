@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import {
   ArrowsLeftRight,
   Check,
@@ -71,6 +77,14 @@ export function MarketScreen({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [target, setTarget] = useState<MarketResultView | null>(null);
+  const targetPanel = useRef<HTMLDivElement>(null);
+  // Offers waiting for the manager come first (docs/09: proposals matter most).
+  const byUrgency = <T extends { awaiting?: string }>(offers: readonly T[]) =>
+    [...offers].sort(
+      (left, right) =>
+        Number(right.awaiting === 'manager') -
+        Number(left.awaiting === 'manager'),
+    );
 
   const load = useCallback(
     async (next: MarketQuery) => {
@@ -220,145 +234,161 @@ export function MarketScreen({
         </p>
       )}
 
-      <Tabs defaultValue="search">
+      <Tabs defaultValue="offers">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="search">Buscar</TabsTrigger>
           <TabsTrigger value="offers">
             Propostas{awaitingMe > 0 && ` (${String(awaitingMe)})`}
           </TabsTrigger>
+          <TabsTrigger value="search">Buscar</TabsTrigger>
           <TabsTrigger value="mine">Meu elenco</TabsTrigger>
         </TabsList>
 
         <TabsContent value="search">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,.7fr)]">
-            <div className="flex flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-2">
               <form
-                className="panel grid gap-2 p-3 sm:grid-cols-2"
+                className="panel grid gap-2 p-3"
                 onSubmit={search}
                 aria-label="Filtros de busca"
               >
-                <label className="grid gap-1 text-xs sm:col-span-2">
-                  Nome
-                  <Input
-                    value={query.text ?? ''}
-                    onChange={(event) =>
-                      setQuery({ ...query, text: event.target.value })
-                    }
-                    placeholder="Buscar atleta"
-                  />
-                </label>
-                <label className="grid gap-1 text-xs">
-                  Posição
-                  <select
-                    className="min-h-10 border-2 border-ink bg-popover px-2 text-sm"
-                    value={query.position ?? ''}
-                    onChange={(event) =>
-                      setQuery({
-                        ...query,
-                        position: (event.target.value || undefined) as
-                          PositionCode | undefined,
-                      })
-                    }
+                <div className="flex items-end gap-2">
+                  <label className="grid min-w-0 flex-1 gap-1 text-xs">
+                    Nome
+                    <Input
+                      value={query.text ?? ''}
+                      onChange={(event) =>
+                        setQuery({ ...query, text: event.target.value })
+                      }
+                      placeholder="Buscar atleta"
+                    />
+                  </label>
+                  <Button
+                    type="submit"
+                    className="min-h-10"
+                    aria-label="Buscar"
                   >
-                    <option value="">Todas</option>
-                    {POSITIONS.map((position) => (
-                      <option key={position} value={position}>
-                        {position}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1 text-xs">
-                  Força mínima
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={query.minStrength ?? ''}
-                    onChange={(event) =>
-                      setQuery({
-                        ...query,
-                        minStrength: event.target.value
-                          ? Number(event.target.value)
-                          : undefined,
-                      })
-                    }
-                  />
-                </label>
-                <label className="grid gap-1 text-xs">
-                  Idade máxima
-                  <Input
-                    type="number"
-                    min={15}
-                    max={45}
-                    value={query.maxAge ?? ''}
-                    onChange={(event) =>
-                      setQuery({
-                        ...query,
-                        maxAge: event.target.value
-                          ? Number(event.target.value)
-                          : undefined,
-                      })
-                    }
-                  />
-                </label>
-                <label className="grid gap-1 text-xs">
-                  Valor máximo (R$)
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={query.maxValue ?? ''}
-                    onChange={(event) =>
-                      setQuery({
-                        ...query,
-                        maxValue: event.target.value
-                          ? Number(event.target.value)
-                          : undefined,
-                      })
-                    }
-                  />
-                </label>
-                <div className="grid gap-1 text-xs sm:col-span-2">
-                  <span id="origem">Origem</span>
-                  <ToggleGroup
-                    type="single"
-                    aria-labelledby="origem"
-                    value={query.origin ?? 'all'}
-                    onValueChange={(value) =>
-                      value &&
-                      setQuery({ ...query, origin: value as MarketOrigin })
-                    }
-                    className="grid grid-cols-3"
-                  >
-                    <ToggleGroupItem value="all" className="min-h-10">
-                      Todos
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="national" className="min-h-10">
-                      Nacionais
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="foreign" className="min-h-10">
-                      Estrangeiros
-                    </ToggleGroupItem>
-                  </ToggleGroup>
+                    <MagnifyingGlass />
+                  </Button>
                 </div>
-                <label className="flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={query.freeAgentsOnly ?? false}
-                    onChange={(event) =>
-                      setQuery({
-                        ...query,
-                        freeAgentsOnly: event.target.checked,
-                      })
-                    }
-                  />
-                  Só agentes livres
-                </label>
-                <Button type="submit" className="min-h-10">
-                  <MagnifyingGlass data-icon="inline-start" />
-                  Buscar
-                </Button>
+                <details className="group">
+                  <summary className="cursor-pointer font-pixel text-[.55rem]">
+                    Mais filtros
+                  </summary>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <label className="grid gap-1 text-xs">
+                      Posição
+                      <select
+                        className="min-h-10 border-2 border-ink bg-popover px-2 text-sm"
+                        value={query.position ?? ''}
+                        onChange={(event) =>
+                          setQuery({
+                            ...query,
+                            position: (event.target.value || undefined) as
+                              PositionCode | undefined,
+                          })
+                        }
+                      >
+                        <option value="">Todas</option>
+                        {POSITIONS.map((position) => (
+                          <option key={position} value={position}>
+                            {position}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs">
+                      Força mínima
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={query.minStrength ?? ''}
+                        onChange={(event) =>
+                          setQuery({
+                            ...query,
+                            minStrength: event.target.value
+                              ? Number(event.target.value)
+                              : undefined,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs">
+                      Idade máxima
+                      <Input
+                        type="number"
+                        min={15}
+                        max={45}
+                        value={query.maxAge ?? ''}
+                        onChange={(event) =>
+                          setQuery({
+                            ...query,
+                            maxAge: event.target.value
+                              ? Number(event.target.value)
+                              : undefined,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs">
+                      Valor máximo (R$)
+                      <Input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={query.maxValue ?? ''}
+                        onChange={(event) =>
+                          setQuery({
+                            ...query,
+                            maxValue: event.target.value
+                              ? Number(event.target.value)
+                              : undefined,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="grid gap-1 text-xs sm:col-span-2">
+                      <span id="origem">Origem</span>
+                      <ToggleGroup
+                        type="single"
+                        aria-labelledby="origem"
+                        value={query.origin ?? 'all'}
+                        onValueChange={(value) =>
+                          value &&
+                          setQuery({ ...query, origin: value as MarketOrigin })
+                        }
+                        className="grid grid-cols-3"
+                      >
+                        <ToggleGroupItem value="all" className="min-h-10">
+                          Todos
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="national" className="min-h-10">
+                          Nacionais
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="foreign" className="min-h-10">
+                          Estrangeiros
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={query.freeAgentsOnly ?? false}
+                        onChange={(event) =>
+                          setQuery({
+                            ...query,
+                            freeAgentsOnly: event.target.checked,
+                          })
+                        }
+                      />
+                      Só agentes livres
+                    </label>
+                    <Button type="submit" className="min-h-10">
+                      <MagnifyingGlass data-icon="inline-start" />
+                      Aplicar filtros
+                    </Button>
+                  </div>
+                </details>
               </form>
               <p className="px-1 text-xs text-chalk">
                 {market.search.total} atleta(s) encontrados.
@@ -376,6 +406,12 @@ export function MarketScreen({
                       onClick={() => {
                         setTarget(result);
                         play('click');
+                        // The chosen athlete's card opens at the top (docs/09).
+                        requestAnimationFrame(() =>
+                          targetPanel.current?.scrollIntoView({
+                            block: 'start',
+                          }),
+                        );
                       }}
                       className={cn(
                         'sticker grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 p-2 text-left',
@@ -423,33 +459,38 @@ export function MarketScreen({
                 ))}
               </ul>
             </div>
-            {target ? (
-              <OfferForm
-                key={target.id}
-                target={target}
-                market={market}
-                busy={busy}
-                blocked={
-                  !target.freeAgent && !windowOpen
-                    ? closedMessage
-                    : squadFull
-                      ? (marketRefusalMessage('SQUAD_LIMIT_REACHED') ?? '')
-                      : ''
-                }
-                onSubmit={(input) =>
-                  run(
-                    'Proposta enviada. O clube respondeu na hora: veja em Propostas.',
-                    () => api.submitMarketOffer(input),
-                    true,
-                  )
-                }
-                onClose={() => setTarget(null)}
-              />
-            ) : (
-              <p className="panel p-3 text-sm text-muted-foreground">
-                Toque num atleta para propor compra ou empréstimo.
-              </p>
-            )}
+            <div
+              ref={targetPanel}
+              className="order-first scroll-mt-20 lg:order-none lg:sticky lg:top-20 lg:self-start"
+            >
+              {target ? (
+                <OfferForm
+                  key={target.id}
+                  target={target}
+                  market={market}
+                  busy={busy}
+                  blocked={
+                    !target.freeAgent && !windowOpen
+                      ? closedMessage
+                      : squadFull
+                        ? (marketRefusalMessage('SQUAD_LIMIT_REACHED') ?? '')
+                        : ''
+                  }
+                  onSubmit={(input) =>
+                    run(
+                      'Proposta enviada. O clube respondeu na hora: veja em Propostas.',
+                      () => api.submitMarketOffer(input),
+                      true,
+                    )
+                  }
+                  onClose={() => setTarget(null)}
+                />
+              ) : (
+                <p className="panel p-3 text-sm text-muted-foreground">
+                  Toque num atleta para propor compra ou empréstimo.
+                </p>
+              )}
+            </div>
           </div>
         </TabsContent>
 
@@ -457,7 +498,7 @@ export function MarketScreen({
           <div className="grid gap-3 lg:grid-cols-2">
             <OfferList
               title="Recebidas"
-              offers={market.offersReceived}
+              offers={byUrgency(market.offersReceived)}
               busy={busy}
               windowOpen={windowOpen}
               closedMessage={closedMessage}
@@ -480,7 +521,7 @@ export function MarketScreen({
             />
             <OfferList
               title="Enviadas"
-              offers={market.offersSent}
+              offers={byUrgency(market.offersSent)}
               busy={busy}
               windowOpen={windowOpen}
               closedMessage={closedMessage}

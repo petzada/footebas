@@ -27,6 +27,9 @@ async function setup(startDate?: string) {
       reportError={reportError}
     />,
   );
+  // Proposals open first; the search lives behind its own tab.
+  await screen.findByRole('tab', { name: /propostas/i, selected: true });
+  await selectTab(/^buscar$/i);
   await screen.findByText(/atleta\(s\) encontrados/i);
   return { api, onCareerChange, reportError };
 }
