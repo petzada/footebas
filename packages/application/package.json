@@ -20,7 +20,8 @@
     "@footebas/database": "workspace:*",
     "@footebas/domain": "workspace:*",
     "@footebas/engine": "workspace:*",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@footebas/content": "workspace:*"
   },
   "devDependencies": {
     "vitest": "4.1.10"

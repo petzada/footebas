@@ -84,6 +84,13 @@ export interface ContentCatalog {
   readonly notes: readonly CatalogNote[];
 }
 
+const GOALKEEPER_TRAITS = new Set<string>([
+  'positioning',
+  'aerial_command',
+  'reflexes',
+  'penalty_saving',
+]);
+
 const fail = (message: string): never => {
   throw new Error(`invalid content catalog: ${message}`);
 };
@@ -109,6 +116,11 @@ export function parseCatalog(value: unknown): ContentCatalog {
     if (!clubIds.has(player.clubId))
       fail(`player ${player.id} references unknown club ${player.clubId}`);
     byClub.set(player.clubId, (byClub.get(player.clubId) ?? 0) + 1);
+    if (
+      player.position !== 'GK' &&
+      player.derived.traits.some((trait) => GOALKEEPER_TRAITS.has(trait))
+    )
+      fail(`outfield player ${player.id} has a goalkeeper trait`);
     if (player.position === 'GK')
       goalkeepers.set(player.clubId, (goalkeepers.get(player.clubId) ?? 0) + 1);
   }

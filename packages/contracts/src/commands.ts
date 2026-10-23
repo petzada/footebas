@@ -92,7 +92,7 @@ const tacticSchema = z.strictObject({
   defensiveLine: defensiveLineSchema.optional(),
   markingStyle: markingStyleSchema.optional(),
 });
-const matchInstructionSchema = z.discriminatedUnion('type', [
+export const matchInstructionSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('substitution'),
     minute: z.union([

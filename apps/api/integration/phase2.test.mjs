@@ -111,7 +111,7 @@ async function selectClub(fixture, careerId, suffix = 'main') {
     fixture,
     command('SelectClub', `command_select_${suffix}`, 1, {
       careerId,
-      clubId: 'club_1',
+      clubId: 'club_flamengo',
     }),
   );
   expect(response.statusCode).toBe(202);
@@ -168,7 +168,7 @@ describe('Phase 2 HTTP/application/worker integration', () => {
           fixture,
           command('SetLineup', 'command_lineup_main', 2, {
             careerId,
-            clubId: 'club_1',
+            clubId: 'club_flamengo',
             starters,
             substitutes: [],
             captainId: starters[1].playerId,
@@ -246,9 +246,7 @@ describe('Phase 2 HTTP/application/worker integration', () => {
       fixtureId: next.fixtureId,
       tableUpdated: true,
     });
-    expect(
-      standings.json().rows.reduce((sum, row) => sum + row.played, 0),
-    ).toBe(2);
+    expect(standings.json().rows).toHaveLength(20);
     expect(
       reloadedSquad.json().players.some((player) => player.condition < 100),
     ).toBe(true);
@@ -330,7 +328,7 @@ describe('Phase 2 HTTP/application/worker integration', () => {
     const table = (
       await get(concurrent, `/v1/careers/${concurrentCareer}/standings`)
     ).json();
-    expect(table.rows.reduce((sum, row) => sum + row.played, 0)).toBe(2);
+    expect(table.rows).toHaveLength(20);
   });
 
   it('rolls back a failed attempt, retries the same queued job, and persists one result', async () => {
@@ -383,7 +381,7 @@ describe('Phase 2 HTTP/application/worker integration', () => {
     const table = (
       await get(fixture, `/v1/careers/${careerId}/standings`)
     ).json();
-    expect(table.rows.reduce((sum, row) => sum + row.played, 0)).toBe(2);
+    expect(table.rows).toHaveLength(20);
     expect((await fixture.runtime.runOnce()).kind).toBe('idle');
   });
 

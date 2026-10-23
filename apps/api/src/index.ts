@@ -33,6 +33,7 @@ import {
   nextSeasonTransitionReadModelSchema,
   phaseFiveCommandSchema,
   phaseFiveReceiptSchema,
+  postMatchReadModelSchema,
   type ApiError,
   type JobSseEvent,
   type JobStatus,
@@ -187,6 +188,34 @@ export async function buildApi(
       },
     );
   }
+
+  app.post(
+    '/v1/careers/:id/match-preview',
+    {
+      schema: {
+        ...commonSchema,
+        summary:
+          'Simulate the next managed match with tentative instructions without committing',
+        params: paramsSchema,
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { instructions: { type: 'array', maxItems: 12 } },
+        },
+      },
+    },
+    async (request) => {
+      const { id } = paramsSchemaParse(request.params);
+      const body = request.body as { instructions?: unknown } | undefined;
+      return postMatchReadModelSchema.parse(
+        await deps.application.previewMatch(
+          bearer(request),
+          id,
+          body?.instructions ?? [],
+        ),
+      );
+    },
+  );
 
   if (deps.phaseFour !== undefined) {
     const phaseFour = deps.phaseFour;

@@ -69,16 +69,16 @@ const POSITIONS: readonly Readonly<{
 ];
 
 const TRAIT_POOLS: Readonly<Record<Position, readonly PlayerTrait[]>> = {
-  GK: ['reflexes', 'aerial_command', 'penalty_saving'],
+  GK: ['reflexes', 'positioning', 'aerial_command', 'penalty_saving'],
   CB: ['marking', 'tackling', 'heading'],
   LB: ['pace', 'crossing', 'tackling'],
   RB: ['pace', 'crossing', 'tackling'],
-  DM: ['tackling', 'passing', 'positioning', 'marking'],
-  CM: ['passing', 'playmaking', 'positioning'],
+  DM: ['tackling', 'passing', 'marking'],
+  CM: ['passing', 'playmaking', 'crossing'],
   AM: ['playmaking', 'passing', 'finishing'],
   LW: ['pace', 'crossing', 'finishing'],
   RW: ['pace', 'crossing', 'finishing'],
-  ST: ['finishing', 'heading', 'positioning', 'pace'],
+  ST: ['finishing', 'heading', 'pace'],
 };
 
 const GROUP: Readonly<Record<Position, 'GK' | 'DEF' | 'MID' | 'FWD'>> = {
