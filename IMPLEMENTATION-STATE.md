@@ -24,18 +24,18 @@ disjuntos, em três trilhas: **servidor** (`packages/*`, serializada), **web** (
 
 Etapas (as marcadas com ★ entraram com o ADR 0010 — apresentação premium e Phaser):
 
-| Etapa | Conteúdo                                                                                                                                                                                    | Estado    |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| 1     | Nuvem: login Supabase, web via OpenNext, domínios, fumaça na nuvem                                                                                                                          | concluída |
-| 2A    | Telas de entrada: Início, Carregar, Central, Mapa, emblemas                                                                                                                                 | concluída |
-| 2B    | Visual ISOPOP (ADR 0009), Mapa isométrico, Nova Carreira em etapas com treinador                                                                                                            | em curso  |
-| 2C ★  | Partida em Phaser sob demanda sobre a timeline oficial, campo 2D como fallback                                                                                                              | pendente  |
-| 2D ★  | Apresentação premium: movimento, feedback, sons com mudo, celebração de gol, avatares gerados                                                                                               | pendente  |
-| 2E    | Telas restantes sobre 2D: Elenco (campo arrastável, presets), Mercado, Escritório, Temporada, Ranking                                                                                       | pendente  |
-| 3     | Servidor: personalidade e limites ✔, mercado/janelas/IA ✔, escritório (patrocínio, sócio-torcedor) + entrosamento ★, e-mails com decisões, estatísticas de temporada, ranking com snapshots | em curso  |
-| 4     | Licença Woovi PIX ✔ (sandbox aguarda AppID), perfil, termos e privacidade                                                                                                                   | em curso  |
-| 5     | Save enxuto (catálogo por versão + deltas), observabilidade ✔, rate limit ✔, backups ✔, E2E no CI ✔                                                                                         | em curso  |
-| 6     | Landing arcade isométrica                                                                                                                                                                   | pendente  |
+| Etapa | Conteúdo                                                                                                                                                                                                                          | Estado    |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 1     | Nuvem: login Supabase, web via OpenNext, domínios, fumaça na nuvem                                                                                                                                                                | concluída |
+| 2A    | Telas de entrada: Início, Carregar, Central, Mapa, emblemas                                                                                                                                                                       | concluída |
+| 2B    | Visual ISOPOP (ADR 0009), Mapa isométrico, Nova Carreira em etapas com treinador                                                                                                                                                  | em curso  |
+| 2C ★  | Partida em Phaser sob demanda sobre a timeline oficial, campo 2D como fallback                                                                                                                                                    | pendente  |
+| 2D ★  | Apresentação premium: movimento, feedback, sons com mudo, celebração de gol, avatares gerados                                                                                                                                     | pendente  |
+| 2E    | Telas restantes sobre 2D: Elenco (campo arrastável, presets), Mercado, Escritório, Temporada, Ranking                                                                                                                             | pendente  |
+| 3     | Servidor: personalidade e limites ✔, mercado/janelas/IA ✔, escritório + entrosamento ✔, e-mails com decisões, estatísticas de temporada, ranking com snapshots; variância do motor e pausas só no intervalo e no fim (decisão 18) | em curso  |
+| 4     | Licença Woovi PIX ✔ (sandbox aguarda AppID), perfil, termos e privacidade                                                                                                                                                         | em curso  |
+| 5     | ADR 0014: Durable Object por carreira, save enxuto (< 200 KB), endpoint único da Central, TanStack Query + Zustand no cliente; observabilidade ✔, rate limit ✔, backups ✔, E2E no CI ✔                                            | pendente  |
+| 6     | Landing arcade isométrica                                                                                                                                                                                                         | pendente  |
 
 ### Estado da nuvem
 
