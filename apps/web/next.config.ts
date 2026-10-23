@@ -62,6 +62,14 @@ const nextConfig: NextConfig = {
           has: [host(LANDING_HOST)],
           destination: '/landing',
         },
+        // A first deploy sent apex/www/game to a literal "/:path*" with a
+        // permanent (browser-cached) 308; serve the landing there too. A
+        // rewrite, not a redirect: lp "/" itself was cached as → "/:path*".
+        {
+          source: '/\\:path\\*',
+          has: [host(LANDING_HOST)],
+          destination: '/landing',
+        },
       ],
       afterFiles: [],
       fallback: [],
