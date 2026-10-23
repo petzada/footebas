@@ -11,6 +11,7 @@
   "scripts": {
     "build": "turbo run build",
     "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm smoke",
+    "e2e": "pnpm --filter @footebas/e2e e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",

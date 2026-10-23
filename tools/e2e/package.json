@@ -1,0 +1,17 @@
+{
+  "name": "@footebas/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:list": "playwright test --list",
+    "e2e:install": "playwright install --with-deps chromium",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.64.0"
+  }
+}
