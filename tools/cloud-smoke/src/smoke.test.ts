@@ -46,6 +46,8 @@ function fakeApi(
           currentDate: '2026-01-01',
         })),
       });
+    if (path.endsWith('/market')) return reply(200, { window: { open: true } });
+    if (path.endsWith('/office')) return reply(200, { version: 1 });
     if (path === '/v1/commands') {
       const body = JSON.parse(init?.body as string) as {
         type: string;

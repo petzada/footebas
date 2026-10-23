@@ -430,6 +430,19 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
       );
     });
 
+    await stage('abrir mercado e escritório', async () => {
+      const id = career();
+      const market = await ok<{ window?: unknown }>(
+        'GET',
+        `/v1/careers/${id}/market`,
+      );
+      check(
+        market.window !== undefined,
+        'mercado sem janela de transferências',
+      );
+      await ok<unknown>('GET', `/v1/careers/${id}/office`);
+    });
+
     await stage('listar carreiras', async () => {
       const after = await ok<CareerList>('GET', '/v1/careers');
       const listed = after.careers.find(({ careerId: id }) => id === careerId);
