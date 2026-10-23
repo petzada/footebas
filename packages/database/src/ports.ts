@@ -8,6 +8,8 @@ export class SaveOwnershipError extends Error {}
 export interface GameSaveRepository {
   create(input: NewGameSave): Promise<GameSave>;
   load(id: string, userId: string): Promise<GameSave | undefined>;
+  /** Loads without an ownership check; callers must authorize the owner. */
+  peek(id: string): Promise<GameSave | undefined>;
   update(
     id: string,
     userId: string,

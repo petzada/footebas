@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- lookups follow explicit guards and content invariants */
 import {
   commandAcceptedSchema,
+  careerWorldReadModelSchema,
   commandSchema,
   homeReadModelSchema,
   matchInstructionSchema,
@@ -9,6 +10,7 @@ import {
   squadReadModelSchema,
   standingsReadModelSchema,
   type Command,
+  type CareerWorldReadModel,
   type CommandAccepted,
   type HomeReadModel,
   type JobStatus,
@@ -29,6 +31,7 @@ import {
 import {
   FORMATION_POSITIONS,
   DomainError,
+  clubCashBalance,
   createLineup,
   createMatchInput,
   createTactic,
@@ -66,6 +69,15 @@ import {
   type MvpDivisionId,
 } from '@footebas/engine';
 import {
+  closeSeasonWorld,
+  createCareerWorld,
+  employManager,
+  recordGate,
+  settleMonths,
+  type CareerWorldState,
+  type WorldContext,
+} from './career-world-rules.js';
+import {
   catalogCareerContent,
   type CareerContent,
   type CareerContentPort,
@@ -88,11 +100,11 @@ const RULES_VERSION = CAREER_SEASON_VERSION;
 const KEPT_MANAGED_MATCHES = 10;
 const asCanonical = (value: unknown): CanonicalValue => value as CanonicalValue;
 
-interface ManagedMatch {
+export interface ManagedMatch {
   fixture: CompetitionCalendarFixture;
   result: MatchResult;
 }
-interface SeasonSummary {
+export interface SeasonSummary {
   season: number;
   champions: {
     competitionId: string;
@@ -101,7 +113,7 @@ interface SeasonSummary {
   }[];
 }
 /** The single career aggregate: world, competitions and matchday in one save. */
-interface Snapshot {
+export interface CareerSnapshot {
   managerName: string;
   currentDate: string;
   season: number;
@@ -114,7 +126,23 @@ interface Snapshot {
   tactic?: Tactic;
   matches: ManagedMatch[];
   history: SeasonSummary[];
+  world: CareerWorldState;
   pendingJobId?: string;
+}
+
+type Snapshot = CareerSnapshot;
+
+/** Runs world rules over the snapshot and writes the results back. */
+function withWorld(snapshot: Snapshot, work: (context: WorldContext) => void) {
+  const context: WorldContext = {
+    clubs: snapshot.clubs,
+    players: snapshot.players,
+    world: snapshot.world,
+  };
+  work(context);
+  snapshot.clubs = context.clubs;
+  snapshot.players = context.players;
+  snapshot.world = context.world;
 }
 
 export interface ApplicationDependencies {
@@ -236,6 +264,12 @@ export class FootebasApplication {
           }),
           matches: [],
           history: [],
+          world: createCareerWorld(
+            content.clubs,
+            content.players,
+            command.payload.startDate,
+            `manager_${careerId.slice('career_'.length)}`,
+          ),
         };
         const save = await tx.saves.create({
           id: careerId,
@@ -280,6 +314,34 @@ export class FootebasApplication {
             );
             if (!club)
               throw new ApplicationError('NOT_FOUND', 'club not found');
+            const manager = snapshot.world.manager;
+            if (
+              manager.employmentStatus === 'employed' &&
+              manager.currentClubId !== club.id
+            )
+              throw new ApplicationError(
+                'FORBIDDEN',
+                'career already manages a club; accept a job proposal to move',
+              );
+            const division = divisionOf(snapshot, club.id);
+            const rank =
+              [...snapshot.competition.divisions[division]]
+                .map((id) => snapshot.clubs.find((item) => item.id === id)!)
+                .sort(
+                  (left, right) =>
+                    Number(right.reputation) - Number(left.reputation),
+                )
+                .findIndex(({ id }) => id === club.id) + 1;
+            if (manager.employmentStatus !== 'employed')
+              withWorld(snapshot, (context) =>
+                employManager(
+                  context,
+                  club.id,
+                  snapshot.currentDate,
+                  division,
+                  rank,
+                ),
+              );
             snapshot.selectedClubId = club.id;
             snapshot.lineup = autoSelectLineup({
               club,
@@ -472,7 +534,7 @@ export class FootebasApplication {
           job.instructions,
         );
         if (job.fixtureId === undefined)
-          rollSeason(snapshot, content.competitions);
+          rollSeason(snapshot, content.competitions, save.seed);
         delete snapshot.pendingJobId;
         this.deps.failPoint?.('before-persist-result', job);
         await tx.saves.update(job.careerId, job.userId, save.version, {
@@ -517,11 +579,17 @@ export class FootebasApplication {
     if (targetId !== undefined && !target)
       throw new ApplicationError('NOT_FOUND', 'fixture not found');
     let managed: ManagedMatch | undefined;
+    const tiers = new Map(
+      careerSeasonSystem(config, snapshot.competition).definitions.map(
+        (definition) => [definition.id, definition.tier],
+      ),
+    );
     for (
       let date = nextMatchDate(snapshot.competition);
       date !== undefined && (target === undefined || date <= target.date);
       date = nextMatchDate(snapshot.competition)
     ) {
+      withWorld(snapshot, (context) => settleMonths(context, date));
       const today = fixturesOn(snapshot.competition, date);
       const scores: CompetitionMatchResult[] = [];
       const playing = new Set<string>();
@@ -536,6 +604,9 @@ export class FootebasApplication {
           ),
         );
         applyPerformances(snapshot, fixture, result);
+        withWorld(snapshot, (context) =>
+          recordGate(context, fixture, tiers.get(fixture.competitionId)!),
+        );
         playing.add(fixture.homeClubId).add(fixture.awayClubId);
         scores.push({
           fixtureId: fixture.id,
@@ -835,6 +906,165 @@ export class FootebasApplication {
       return postMatchModel(save, s, played, now, true);
     });
   }
+  public async careerWorld(
+    bearer: string,
+    careerId: string,
+  ): Promise<CareerWorldReadModel> {
+    return this.query(bearer, careerId, (save, s, now) => {
+      const content = this.loadContent(s.contentVersion);
+      const { world } = s;
+      const names = new Map(s.clubs.map(({ id, name }) => [id, name]));
+      const playerNames = new Map(s.players.map(({ id, name }) => [id, name]));
+      const competitions = new Map(
+        careerSeasonSystem(content.competitions, s.competition).definitions.map(
+          ({ id, name }) => [id, name],
+        ),
+      );
+      const clubId = world.manager.currentClubId;
+      const club = s.clubs.find(({ id }) => id === clubId);
+      const stadium = world.stadiums.find((item) => item.clubId === clubId);
+      const cashAccount = `club:${clubId ?? ''}:cash`;
+      const ledger = world.ledger.entries
+        .flatMap((entry) => {
+          const posting = entry.postings.find(
+            ({ account }) => account === cashAccount,
+          );
+          if (!posting) return [];
+          const source = entry.source;
+          const label =
+            source.type === 'wages'
+              ? `Folha salarial · ${source.period}`
+              : source.type === 'gate'
+                ? `Bilheteria · ${source.matchId.replace('month_', '')}`
+                : source.type === 'sponsor'
+                  ? `Patrocínio · ${source.period}`
+                  : source.type === 'prize'
+                    ? `Premiação · ${competitions.get(source.competitionId as CompetitionId) ?? source.competitionId}`
+                    : source.type === 'transfer'
+                      ? `Transferência · ${playerNames.get(source.playerId as Player['id']) ?? source.playerId}`
+                      : 'Estádio';
+          return [
+            {
+              id: entry.id,
+              occurredAt: entry.occurredAt,
+              kind: source.type,
+              amount: Number(posting.amount),
+              label,
+            },
+          ];
+        })
+        .reverse()
+        .slice(0, 200);
+      return careerWorldReadModelSchema.parse({
+        ...base(save, now),
+        season: s.season,
+        currentDate: s.currentDate,
+        manager: {
+          managerId: world.manager.managerId,
+          employmentStatus: world.manager.employmentStatus,
+          ...(clubId === undefined ? {} : { clubId }),
+          boardConfidence: world.manager.boardConfidence,
+          fanConfidence: world.manager.fanConfidence,
+          prestige: world.manager.prestige,
+          seasons: world.manager.seasons,
+        },
+        ...(club && stadium
+          ? {
+              club: {
+                id: club.id,
+                name: club.name,
+                cash: Number(
+                  clubCashBalance(world.ledger, club.id, club.balance),
+                ),
+                openingBalance: Number(club.balance),
+                monthlyWageBill: world.contracts
+                  .filter(
+                    (contract) =>
+                      contract.clubId === club.id &&
+                      (contract.status === 'active' ||
+                        contract.status === 'expiring'),
+                  )
+                  .reduce((sum, { wage }) => sum + Number(wage), 0),
+                stadium: {
+                  capacity: stadium.capacity,
+                  ticketPrice: Number(stadium.ticketPrice),
+                  maintenance: Number(stadium.maintenance),
+                  quality: stadium.quality,
+                  ...(stadium.expansion
+                    ? {
+                        expansion: {
+                          addedCapacity: stadium.expansion.addedCapacity,
+                          cost: Number(stadium.expansion.cost),
+                          completesOn: stadium.expansion.completesOn,
+                        },
+                      }
+                    : {}),
+                },
+              },
+            }
+          : {}),
+        ledger,
+        objectives: world.objectives.map(
+          ({ id, metric, target, progress, status }) => ({
+            id,
+            metric,
+            target,
+            progress,
+            status,
+          }),
+        ),
+        jobProposals: world.jobProposals.map((proposal) => ({
+          id: proposal.id,
+          clubId: proposal.clubId,
+          clubName: names.get(proposal.clubId) ?? proposal.clubId,
+          expiresOn: proposal.expiresOn,
+          minimumPrestige: proposal.minimumPrestige,
+          status: proposal.status,
+        })),
+        contracts: world.contracts
+          .filter((contract) => contract.clubId === clubId)
+          .map((contract) => ({
+            contractId: contract.id,
+            playerId: contract.playerId,
+            playerName: playerNames.get(contract.playerId) ?? contract.playerId,
+            endsOn: contract.endsOn,
+            wage: Number(contract.wage),
+            status: contract.status,
+          })),
+        youth: world.youth
+          .filter(({ player }) => player.clubId === clubId)
+          .map(({ player, estimate, status }) => ({
+            playerId: player.id,
+            name: player.name,
+            position: player.position,
+            age: player.age,
+            estimate,
+            status,
+          })),
+        history: world.history
+          .slice(-200)
+          .reverse()
+          .map((event) => ({
+            id: event.id,
+            type: event.type,
+            season: event.season,
+            occurredOn: event.occurredOn,
+            ...(event.clubId === undefined
+              ? {}
+              : { clubName: names.get(event.clubId) ?? event.clubId }),
+            ...(event.competitionId === undefined
+              ? {}
+              : { competitionId: event.competitionId }),
+            ...(event.playerId === undefined
+              ? {}
+              : {
+                  playerName: playerNames.get(event.playerId) ?? event.playerId,
+                }),
+          })),
+      });
+    });
+  }
+
   public async checksum(bearer: string, careerId: string): Promise<string> {
     const user = await this.identity(bearer);
     const save = await this.deps.unitOfWork.withCareerLock(careerId, (tx) =>
@@ -966,10 +1196,25 @@ function competitionName(
     )?.name ?? competitionId
   );
 }
-/** Closes a finished season and opens the next one with the same world. */
-function rollSeason(snapshot: Snapshot, config: MvpCompetitionConfig): void {
+function divisionOf(snapshot: Snapshot, clubId: string): MvpDivisionId {
+  const division = (
+    Object.keys(snapshot.competition.divisions) as MvpDivisionId[]
+  ).find((key) =>
+    snapshot.competition.divisions[key].some((id) => id === clubId),
+  );
+  if (division === undefined)
+    throw new ApplicationError('NOT_FOUND', 'club is outside the pyramid');
+  return division;
+}
+/** Closes a finished season, runs the world's season end and opens the next. */
+function rollSeason(
+  snapshot: Snapshot,
+  config: MvpCompetitionConfig,
+  seed: string,
+): void {
   if (!isSeasonComplete(snapshot.competition)) return;
   const closure = closeCareerSeason(config, snapshot.competition);
+  const system = careerSeasonSystem(config, snapshot.competition);
   snapshot.history = [
     ...snapshot.history,
     {
@@ -983,19 +1228,69 @@ function rollSeason(snapshot: Snapshot, config: MvpCompetitionConfig): void {
       })),
     },
   ];
+  const managedForm = snapshot.matches.slice(-5).map(({ fixture, result }) => {
+    const home = fixture.homeClubId === snapshot.selectedClubId;
+    const goalsFor = home ? result.homeGoals : result.awayGoals;
+    const goalsAgainst = home ? result.awayGoals : result.homeGoals;
+    return goalsFor > goalsAgainst
+      ? ('W' as const)
+      : goalsFor < goalsAgainst
+        ? ('L' as const)
+        : ('D' as const);
+  });
+  withWorld(snapshot, (context) =>
+    closeSeasonWorld(context, {
+      season: snapshot.season,
+      year: snapshot.competition.year,
+      seed,
+      outcomes: closure.outcomes,
+      definitions: system.definitions,
+      generation: closure.generation,
+      divisionCompetitionIds: system.ids.divisions,
+      managedForm,
+    }),
+  );
   snapshot.competition = createCareerSeason(config, closure.next);
   snapshot.season = closure.next.season;
   snapshot.currentDate = `${String(closure.next.year)}-01-01`;
-  snapshot.players = snapshot.players.map(
-    (player) =>
-      ({
-        ...player,
-        age: player.age + 1,
-        condition: 100,
-        injuryRounds: 0,
-        suspensionRounds: 0,
-      }) as Player,
-  );
+  syncManagedClub(snapshot);
+}
+/** Keeps the matchday club aligned with the manager after firings or moves. */
+export function syncManagedClub(snapshot: Snapshot): void {
+  const clubId = snapshot.world.manager.currentClubId;
+  if (clubId === snapshot.selectedClubId) {
+    if (snapshot.lineup && clubId !== undefined) {
+      const club = snapshot.clubs.find(({ id }) => id === clubId)!;
+      const squad = new Set<string>(club.squad);
+      const lineup = snapshot.lineup;
+      const ids = [
+        ...lineup.starters.map(({ playerId }) => playerId),
+        ...lineup.substitutes,
+      ];
+      if (ids.some((id) => !squad.has(id)))
+        snapshot.lineup = autoSelectLineup({
+          club,
+          players: snapshot.players,
+          formation: snapshot.tactic?.formation ?? '4-4-2',
+          mode: 'best',
+        });
+    }
+    return;
+  }
+  if (clubId === undefined) {
+    delete snapshot.selectedClubId;
+    delete snapshot.lineup;
+    return;
+  }
+  const club = snapshot.clubs.find(({ id }) => id === clubId)!;
+  snapshot.selectedClubId = clubId;
+  snapshot.tactic = snapshot.tactic ?? defaultTactic();
+  snapshot.lineup = autoSelectLineup({
+    club,
+    players: snapshot.players,
+    formation: snapshot.tactic.formation,
+    mode: 'best',
+  });
 }
 function postMatchModel(
   save: GameSave,

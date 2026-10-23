@@ -51,6 +51,10 @@ class MemorySaveRepository implements GameSaveRepository {
       throw new SaveOwnershipError(`save ${id} does not belong to user`);
     return Promise.resolve(clone(save));
   }
+  peek(id: string): Promise<GameSave | undefined> {
+    const save = this.state.saves.get(id);
+    return Promise.resolve(save === undefined ? undefined : clone(save));
+  }
   update(
     id: string,
     userId: string,
