@@ -15,3 +15,6 @@ export * from './unified-phase-four.js';
 export * from './career-competitions.js';
 export * from './entitlements.js';
 export * from './coach-personality.js';
+export * from './career-office.js';
+export * from './career-chemistry.js';
+export * from './office-read.js';

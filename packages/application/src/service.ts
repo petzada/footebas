@@ -6,6 +6,7 @@ import {
   careerMarketQuerySchema,
   publicStatsSchema,
   careerWorldReadModelSchema,
+  careerOfficeReadModelSchema,
   commandSchema,
   homeReadModelSchema,
   matchInstructionSchema,
@@ -20,6 +21,7 @@ import {
   type CareerListReadModel,
   type CareerMarketReadModel,
   type CareerWorldReadModel,
+  type CareerOfficeReadModel,
   type CommandAccepted,
   type HomeReadModel,
   type JobStatus,
@@ -101,6 +103,21 @@ import {
   type WorldContext,
 } from './career-world-rules.js';
 import { runMarketDay } from './career-market.js';
+import {
+  OfficeRuleError,
+  configureMembership,
+  counterSponsorOffer,
+  decideSponsorOffer,
+  runOfficeDay,
+} from './career-office.js';
+import {
+  chemistryFactor,
+  chemistryOf,
+  chemistryView,
+  recordChemistry,
+  withStrengthFactor,
+} from './career-chemistry.js';
+import { projectCareerOffice, sponsorOfferMessages } from './office-read.js';
 import { projectCareerMarket, transferOfferMessages } from './market-read.js';
 import {
   catalogCareerContent,
@@ -167,14 +184,35 @@ function snapshotOf(save: GameSave): Snapshot {
   return withProfile(save.snapshot as unknown as Snapshot);
 }
 
-/** Runs world rules over the snapshot and writes the results back. */
-function withWorld(snapshot: Snapshot, work: (context: WorldContext) => void) {
-  const context: WorldContext = {
+/** Results of the last five managed matches, oldest first. */
+export function recentManagedForm(snapshot: Snapshot): ('W' | 'D' | 'L')[] {
+  return snapshot.matches.slice(-5).map(({ fixture, result }) => {
+    const home = fixture.homeClubId === snapshot.selectedClubId;
+    const goalsFor = home ? result.homeGoals : result.awayGoals;
+    const goalsAgainst = home ? result.awayGoals : result.homeGoals;
+    return goalsFor > goalsAgainst
+      ? ('W' as const)
+      : goalsFor < goalsAgainst
+        ? ('L' as const)
+        : ('D' as const);
+  });
+}
+
+/** World context of a snapshot (reads must not mutate it). */
+export function worldContextOf(snapshot: Snapshot): WorldContext {
+  return {
     clubs: snapshot.clubs,
     players: snapshot.players,
     world: snapshot.world,
     personality: careerProfileOf(snapshot).coach.personality,
+    divisions: snapshot.competition.divisions,
+    managedForm: recentManagedForm(snapshot),
   };
+}
+
+/** Runs world rules over the snapshot and writes the results back. */
+function withWorld(snapshot: Snapshot, work: (context: WorldContext) => void) {
+  const context = worldContextOf(snapshot);
   work(context);
   snapshot.clubs = context.clubs;
   snapshot.players = context.players;
@@ -461,8 +499,41 @@ export class FootebasApplication {
               mode: 'best',
             });
             snapshot.tactic = defaultTactic();
+            withWorld(snapshot, (context) =>
+              runOfficeDay(
+                context,
+                snapshot.currentDate,
+                save.seed,
+                snapshot.season,
+              ),
+            );
             break;
           }
+          case 'DecideSponsorshipOffer':
+            decideSponsorOffer(
+              snapshot.world,
+              command.payload.offerId,
+              command.payload.decision,
+              snapshot.currentDate,
+            );
+            break;
+          case 'CounterSponsorshipOffer':
+            counterSponsorOffer(
+              snapshot.world,
+              command.payload.offerId,
+              command.payload.monthlyValue,
+              snapshot.currentDate,
+              save.seed,
+            );
+            break;
+          case 'ConfigureFanMembership':
+            withWorld(snapshot, (context) =>
+              configureMembership(context, {
+                monthlyPrice: command.payload.monthlyPrice,
+                tier: command.payload.tier,
+              }),
+            );
+            break;
           case 'SetLineup': {
             const club = this.managedClub(snapshot, command.payload.clubId);
             const memberIds = new Set(club.squad);
@@ -723,6 +794,7 @@ export class FootebasApplication {
     ) {
       withWorld(snapshot, (context) => {
         settleMonths(context, date);
+        runOfficeDay(context, date, seed, snapshot.season);
         runMarketDay(context, date, seed);
       });
       syncManagedClub(snapshot);
@@ -740,6 +812,16 @@ export class FootebasApplication {
           ),
         );
         applyPerformances(snapshot, fixture, result);
+        if (
+          snapshot.lineup !== undefined &&
+          (fixture.homeClubId === snapshot.selectedClubId ||
+            fixture.awayClubId === snapshot.selectedClubId)
+        )
+          recordChemistry(
+            snapshot.world,
+            snapshot.selectedClubId,
+            snapshot.lineup.starters.map(({ playerId }) => playerId),
+          );
         withWorld(snapshot, (context) =>
           recordGate(context, fixture, tiers.get(fixture.competitionId)!),
         );
@@ -789,9 +871,20 @@ export class FootebasApplication {
           snapshot.tactic!.mentality,
           opponentStrength(snapshot, clubId, opponentId),
         );
-      const matchPlayers = planned
-        ? withMatchPlanStrength(players, personality)
-        : players;
+      // Chemistry (ADR 0011): up to +3% for the managed club, same path.
+      const chemistry = managed
+        ? chemistryFactor(chemistryOf(snapshot.world, clubId).value)
+        : 1;
+      const matchPlayers =
+        chemistry !== 1
+          ? withStrengthFactor(
+              players,
+              (planned ? coachEffects(personality).matchPlanStrength : 1) *
+                chemistry,
+            )
+          : planned
+            ? withMatchPlanStrength(players, personality)
+            : players;
       return {
         club,
         lineup: managed
@@ -895,6 +988,9 @@ export class FootebasApplication {
         careerName: s.careerName,
         coach: s.coach,
         inbox: coachInbox(s),
+        ...(s.selectedClubId === undefined
+          ? {}
+          : { chemistry: managedChemistry(s, s.selectedClubId) }),
         club: clubSummary(s, s.selectedClubId),
         currentDate: s.currentDate,
         season: s.season,
@@ -985,6 +1081,7 @@ export class FootebasApplication {
                 reserves: s.lineup.reserves ?? [],
               }
             : undefined,
+        chemistry: managedChemistry(s, club.id),
       });
     });
   }
@@ -1158,7 +1255,11 @@ export class FootebasApplication {
                     ? `Premiação · ${competitions.get(source.competitionId as CompetitionId) ?? source.competitionId}`
                     : source.type === 'transfer'
                       ? `Transferência · ${playerNames.get(source.playerId as Player['id']) ?? source.playerId}`
-                      : 'Estádio';
+                      : source.type === 'membership'
+                        ? `${Number(posting.amount) < 0 ? 'Benefícios do sócio-torcedor' : 'Sócio-torcedor'} · ${source.period}`
+                        : source.type === 'sponsor_termination'
+                          ? 'Multa rescisória de patrocínio'
+                          : 'Estádio';
           return [
             {
               id: entry.id,
@@ -1319,6 +1420,29 @@ export class FootebasApplication {
     );
   }
 
+  /**
+   * Office screen (docs/adr/0011): proposals (sponsorship, jobs, transfers),
+   * sponsorship contract, fan membership, finances by category from the
+   * ledger, player contracts and the coach career.
+   */
+  public async careerOffice(
+    bearer: string,
+    careerId: string,
+  ): Promise<CareerOfficeReadModel> {
+    return this.query(bearer, careerId, (save, snapshot, now) =>
+      careerOfficeReadModelSchema.parse(
+        projectCareerOffice({
+          careerId: save.id,
+          aggregateVersion: save.version,
+          projectedAt: now,
+          seed: save.seed,
+          snapshot,
+          context: worldContextOf(snapshot),
+        }),
+      ),
+    );
+  }
+
   private competitionView<T>(
     bearer: string,
     careerId: string,
@@ -1406,6 +1530,8 @@ export class FootebasApplication {
   }
   private translate(error: unknown): Error {
     if (error instanceof ApplicationError) return error;
+    if (error instanceof OfficeRuleError)
+      return new ApplicationError(error.code, error.message);
     if (error instanceof DomainError)
       return new ApplicationError('VALIDATION_ERROR', error.message);
     if (error instanceof SaveOwnershipError)
@@ -1539,16 +1665,7 @@ function rollSeason(
       })),
     },
   ];
-  const managedForm = snapshot.matches.slice(-5).map(({ fixture, result }) => {
-    const home = fixture.homeClubId === snapshot.selectedClubId;
-    const goalsFor = home ? result.homeGoals : result.awayGoals;
-    const goalsAgainst = home ? result.awayGoals : result.homeGoals;
-    return goalsFor > goalsAgainst
-      ? ('W' as const)
-      : goalsFor < goalsAgainst
-        ? ('L' as const)
-        : ('D' as const);
-  });
+  const managedForm = recentManagedForm(snapshot);
   withWorld(snapshot, (context) =>
     closeSeasonWorld(context, {
       season: snapshot.season,
@@ -1560,12 +1677,20 @@ function rollSeason(
       divisionCompetitionIds: system.ids.divisions,
       managedForm,
       pyramidClubIds: Object.values(closure.next.divisions).flat(),
+      continentalClubIds: [
+        ...closure.next.continentalDirect,
+        ...closure.next.continentalPreliminary,
+      ],
     }),
   );
   snapshot.competition = createCareerSeason(config, closure.next);
   snapshot.season = closure.next.season;
   snapshot.currentDate = `${String(closure.next.year)}-01-01`;
   syncManagedClub(snapshot);
+  // The new season's sponsorship proposals arrive on day one (ADR 0011).
+  withWorld(snapshot, (context) =>
+    runOfficeDay(context, snapshot.currentDate, seed, snapshot.season),
+  );
 }
 /** Keeps the matchday club aligned with the manager after firings or moves. */
 export function syncManagedClub(snapshot: Snapshot): void {
@@ -1849,13 +1974,24 @@ function managedOutcome(
  * transfer proposals that wait for a decision (docs/adr/0008).
  */
 function coachInbox(snapshot: Snapshot): CoachMessage[] {
-  return [...transferOfferMessages(snapshot), ...matchReports(snapshot)]
+  return [
+    ...transferOfferMessages(snapshot),
+    ...sponsorOfferMessages(snapshot),
+    ...matchReports(snapshot),
+  ]
     .sort(
       (left, right) =>
         right.occurredOn.localeCompare(left.occurredOn) ||
         left.id.localeCompare(right.id),
     )
     .slice(0, 10);
+}
+function managedChemistry(snapshot: Snapshot, clubId: string) {
+  return chemistryView(
+    snapshot.world,
+    clubId,
+    snapshot.lineup?.starters.map(({ playerId }) => playerId),
+  );
 }
 function matchReports(snapshot: Snapshot): CoachMessage[] {
   const clubName = (id: string) =>

@@ -19,6 +19,11 @@ import {
   versionSchema,
 } from './primitives.js';
 import { careerNameSchema, coachProfileSchema } from './coach.js';
+import {
+  configureFanMembershipCommandSchema,
+  counterSponsorshipOfferCommandSchema,
+  decideSponsorshipOfferCommandSchema,
+} from './office.js';
 
 const envelopeFields = {
   version: transportVersionSchema,
@@ -158,6 +163,9 @@ export const commandSchema = z.discriminatedUnion('type', [
   setTacticsCommandSchema,
   advanceDateCommandSchema,
   simulateMatchCommandSchema,
+  decideSponsorshipOfferCommandSchema,
+  counterSponsorshipOfferCommandSchema,
+  configureFanMembershipCommandSchema,
 ]);
 export const commandAcceptedSchema = z.strictObject({
   version: transportVersionSchema,

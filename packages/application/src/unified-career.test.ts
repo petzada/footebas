@@ -176,7 +176,8 @@ describe('carreira única: mundo, competições e partida no mesmo save', () => 
     }
     const world = await app.careerWorld(token, careerId);
     const kinds = new Set(world.ledger.map(({ kind }) => kind));
-    expect(kinds).toEqual(new Set(['gate', 'sponsor', 'wages']));
+    // Fan membership settles monthly too (docs/adr/0011).
+    expect(kinds).toEqual(new Set(['gate', 'sponsor', 'wages', 'membership']));
     const wages = world.ledger.find(({ kind }) => kind === 'wages')!;
     expect(wages.amount).toBe(-world.club!.monthlyWageBill);
     expect(wages.label).toBe('Folha salarial · 2026-01');

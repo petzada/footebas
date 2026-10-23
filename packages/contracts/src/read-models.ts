@@ -20,6 +20,7 @@ import {
   versionSchema,
 } from './primitives.js';
 import { careerNameSchema, coachProfileSchema } from './coach.js';
+import { chemistryReadModelSchema } from './office.js';
 
 const readBase = {
   version: transportVersionSchema,
@@ -37,9 +38,11 @@ const scoreSchema = z.strictObject({
   away: z.int().min(0).max(99),
 });
 /**
- * A decision the inbox item asks for. `accept`/`reject` resolve to
- * `DecideTransferOffer { offerId, decision }` and `counter` to
+ * A decision the inbox item asks for. On `transfer_offer`, `accept`/`reject`
+ * resolve to `DecideTransferOffer { offerId, decision }` and `counter` to
  * `CounterTransferOffer { offerId, fee, wage, expiresOn }` (docs/adr/0008).
+ * On `sponsor_offer`, to `DecideSponsorshipOffer { offerId, decision }` and
+ * `CounterSponsorshipOffer { offerId, monthlyValue }` (docs/adr/0011).
  */
 export const inboxDecisionSchema = z.strictObject({
   id: entityIdSchema,
@@ -52,7 +55,7 @@ export const inboxDecisionSchema = z.strictObject({
 });
 export const coachMessageSchema = z.strictObject({
   id: entityIdSchema,
-  kind: z.enum(['match_report', 'transfer_offer']),
+  kind: z.enum(['match_report', 'transfer_offer', 'sponsor_offer']),
   /** Present on match reports. */
   situation: z.enum(['win', 'draw', 'loss']).optional(),
   subject: z.string().min(1).max(160),
@@ -73,6 +76,8 @@ export const homeReadModelSchema = z.strictObject({
   pendingActions: z.array(z.string().min(1).max(120)).max(20),
   /** Recent e-mails written in the coach personality's tone, newest first. */
   inbox: z.array(coachMessageSchema).max(10),
+  /** Chemistry of the managed eleven (ADR 0011); absent without a club. */
+  chemistry: chemistryReadModelSchema.optional(),
 });
 const squadPlayerSchema = z.strictObject({
   id: entityIdSchema,
@@ -135,6 +140,8 @@ export const squadReadModelSchema = z.strictObject({
       reserves: z.array(entityIdSchema).max(100),
     })
     .optional(),
+  /** Chemistry of the managed eleven (ADR 0011). */
+  chemistry: chemistryReadModelSchema.optional(),
 });
 export const nextMatchReadModelSchema = z.strictObject({
   ...readBase,
