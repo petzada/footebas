@@ -44,6 +44,21 @@ import {
   type YouthCandidate,
 } from '@footebas/domain';
 import { createPrng, hashSeed, type SeasonGeneration } from '@footebas/engine';
+import {
+  closeSponsorMonth,
+  emptyOffice,
+  managedMembership,
+  membershipAttendanceBonus,
+  membershipContextOf,
+  membershipFanEffect,
+  membershipPlanOf,
+  paySponsorBonuses,
+  settleMembershipMonth,
+  sponsorshipForMonth,
+  type CareerOfficeState,
+  type Division,
+  type MatchForm,
+} from './career-office.js';
 
 export const WORLD_RULES_VERSION = 'career-world-rules-v1';
 
@@ -71,6 +86,8 @@ export interface CareerWorldState {
   sequence: number;
   /** Transfer list of the managed club (docs/adr/0008); absent in old saves. */
   market?: CareerMarketState;
+  /** Sponsorship, fan membership and chemistry (docs/adr/0011); absent in old saves. */
+  office?: CareerOfficeState;
 }
 
 export interface CareerMarketState {
@@ -83,13 +100,16 @@ export interface WorldContext {
   world: CareerWorldState;
   /** Coach personality of the career (ADR 0007); absent means the default. */
   personality?: CoachPersonality;
+  /** National divisions of the season (office rules, ADR 0011). */
+  divisions?: Readonly<Record<Division, readonly ClubId[]>>;
+  /** Recent managed results, oldest first (office rules, ADR 0011). */
+  managedForm?: readonly MatchForm[];
 }
 
 /** Development quality every club gets; the managed youth may get more. */
 export const BASE_DEVELOPMENT_QUALITY = 60;
 const YOUTH_DEVELOPMENT_MAX_AGE = 21;
 
-const SPONSOR_SHARE = 0.85;
 /** Prize money in BRL for the champion; lower places earn a decreasing share. */
 export const PRIZE_BY_TIER: Readonly<
   Record<CompetitionDefinition['tier'], number>
@@ -175,6 +195,7 @@ export function createCareerWorld(
     gate: {},
     sequence: 0,
     market: { listings: [] },
+    office: emptyOffice(),
   };
 }
 
@@ -253,9 +274,17 @@ export function recordGate(
             : 55,
     recentForm: 0,
   });
+  // Fan members fill a few more seats at the managed club (ADR 0011).
+  const members =
+    home.id === context.world.manager.currentClubId
+      ? (managedMembership(context)?.members ?? 0)
+      : 0;
+  const crowd = Math.min(
+    stadium.capacity,
+    attendance + membershipAttendanceBonus(members, stadium.capacity),
+  );
   context.world.gate[home.id] =
-    (context.world.gate[home.id] ?? 0) +
-    attendance * Number(stadium.ticketPrice);
+    (context.world.gate[home.id] ?? 0) + crowd * Number(stadium.ticketPrice);
 }
 
 /**
@@ -312,21 +341,24 @@ export function settleMonths(context: WorldContext, date: string): void {
             source: { type: 'gate', matchId: `month_${period}`, attendance: 0 },
           }),
         );
-      if (bill > 0) {
+      // Contract, one-off (managed club) or neutral sponsorship (ADR 0011).
+      const sponsor = sponsorshipForMonth(world, club.id, period, bill);
+      if (sponsor.amount > 0)
         world.ledger = appendLedgerEntry(
           world.ledger,
           createClubIncomeTransaction({
             id: nextId(world, 'ledger'),
             occurredAt,
             clubId: club.id,
-            amount: money(Math.round(bill * SPONSOR_SHARE)),
+            amount: money(sponsor.amount),
             source: {
               type: 'sponsor',
-              agreementId: `sponsor_${club.id}`,
+              agreementId: sponsor.agreementId,
               period,
             },
           }),
         );
+      if (bill > 0) {
         world.ledger = appendLedgerEntry(
           world.ledger,
           createWageTransaction({
@@ -339,6 +371,8 @@ export function settleMonths(context: WorldContext, date: string): void {
         );
       }
     }
+    settleMembershipMonth(context, period, occurredAt);
+    closeSponsorMonth(world, period);
     world.gate = {};
     world.openMonth = nextMonth(period);
   }
@@ -355,6 +389,29 @@ export interface SeasonEndInput {
   readonly managedForm: readonly ('W' | 'D' | 'L')[];
   /** Clubs of next season's national pyramid; only they can offer jobs. */
   readonly pyramidClubIds: readonly string[];
+  /** Clubs entering next season's continental cup (sponsor goals). */
+  readonly continentalClubIds?: readonly string[];
+}
+
+/** Sponsorship goal bonuses of the season (ADR 0011). */
+function paySponsorGoals(context: WorldContext, input: SeasonEndInput): void {
+  const titled = new Set(['national_league', 'national_cup', 'continental']);
+  paySponsorBonuses(context.world, {
+    season: input.season,
+    year: input.year,
+    titleClubIds: input.outcomes
+      .filter((outcome) =>
+        titled.has(
+          input.definitions.find(({ id }) => id === outcome.competitionId)
+            ?.tier ?? 'state',
+        ),
+      )
+      .map(({ championId }) => championId),
+    promotedClubIds: input.generation.events.flatMap((event) =>
+      event.type === 'ClubPromoted' ? [event.clubId] : [],
+    ),
+    continentalClubIds: input.continentalClubIds ?? [],
+  });
 }
 
 function payPrizes(context: WorldContext, input: SeasonEndInput): void {
@@ -523,15 +580,20 @@ function recordAchievements(
 function boardVerdict(context: WorldContext, input: SeasonEndInput): void {
   const { world } = context;
   const nextSeasonStart = `${String(input.year + 1)}-01-01`;
-  world.manager = {
-    ...applyPersonalityToConfidence(
+  const verdict = applyPersonalityToConfidence(
+    world.manager,
+    evaluateManagerConfidence(
       world.manager,
-      evaluateManagerConfidence(
-        world.manager,
-        world.objectives,
-        input.managedForm,
-      ),
-      context.personality,
+      world.objectives,
+      input.managedForm,
+    ),
+    context.personality,
+  );
+  world.manager = {
+    ...verdict,
+    fanConfidence: Math.max(
+      0,
+      Math.min(100, verdict.fanConfidence + membershipFanDelta(context)),
     ),
     prestige: calculateManagerPrestige(world.achievements),
     seasons: world.manager.seasons + 1,
@@ -569,6 +631,17 @@ function boardVerdict(context: WorldContext, input: SeasonEndInput): void {
       () => nextId(world, 'proposal'),
     ),
   ];
+}
+
+/** Fan membership value perception at the season verdict (±3, ADR 0011). */
+function membershipFanDelta(context: WorldContext): number {
+  const clubId = context.world.manager.currentClubId;
+  if (clubId === undefined) return 0;
+  const plan = membershipPlanOf(context, clubId);
+  const membership = membershipContextOf(context, clubId);
+  return plan === undefined || membership === undefined
+    ? 0
+    : membershipFanEffect(plan, membership.reputation);
 }
 
 function renewOrRelease(context: WorldContext, input: SeasonEndInput): void {
@@ -791,6 +864,7 @@ export function closeSeasonWorld(
       ? 0
       : Number(context.clubs.find(({ id }) => id === managed)!.balance);
   payPrizes(context, input);
+  paySponsorGoals(context, input);
   evaluateObjectives(context, input, opening);
   recordAchievements(context, input);
   boardVerdict(context, input);
