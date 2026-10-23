@@ -34,10 +34,14 @@ import { serverErrorMessage } from '@/lib/server-error-message';
 import { narrateMatch } from '@footebas/engine/narration';
 import type {
   ContractView,
+  ExpansionPlanId,
   LedgerEntryView,
+  MaintenancePlanId,
   MarketPlayerView,
   Phase4View,
+  StadiumView,
   TransferKind,
+  YouthReadiness,
 } from '@/lib/phase4-model';
 import {
   marketRefusalMessage,
@@ -325,11 +329,34 @@ interface WorldModel {
     name: string;
     cash: number;
     monthlyWageBill: number;
+    reputation?: number;
+    division?: string;
     stadium: {
       capacity: number;
+      maxCapacity?: number;
       ticketPrice: number;
+      referencePrice?: number;
       maintenance: number;
       quality: number;
+      lastMaintenanceOn?: string;
+      demand?: number;
+      expectedCrowd?: number;
+      homeMatches?: number;
+      averageCrowd?: number;
+      lastCrowd?: number;
+      expansion?: { addedCapacity: number; cost: number; completesOn: string };
+      expansionPlans?: {
+        id: ExpansionPlanId;
+        addedCapacity: number;
+        cost: number;
+        days: number;
+        completesOn: string;
+      }[];
+      maintenancePlans?: {
+        id: MaintenancePlanId;
+        qualityGain: number;
+        cost: number;
+      }[];
     };
   };
   ledger: {
@@ -345,6 +372,10 @@ interface WorldModel {
     clubName: string;
     minimumPrestige: number;
     status: string;
+    expiresOn?: string;
+    reputation?: number;
+    division?: string;
+    reason?: 'step_up' | 'lateral' | 'step_down' | 'reemployment';
   }[];
   contracts: {
     contractId: string;
@@ -369,7 +400,24 @@ interface WorldModel {
     age: number;
     estimate: string;
     status: 'academy' | 'promoted' | 'released';
+    strength?: number;
+    initialStrength?: number;
+    traits?: string[];
+    highlight?: boolean;
+    joinedOn?: string;
+    readiness?: YouthReadiness;
+    promotable?: boolean;
   }[];
+  academy?: {
+    prospects: number;
+    capacity: number;
+    nextIntakeOn: string;
+    squadSize: number;
+    maxSquadSize: number;
+    minPromotionAge: number;
+    maxAge: number;
+    needs: string[];
+  };
   history: {
     id: string;
     type: string;
@@ -425,6 +473,24 @@ const FORMATION_SLOTS: Readonly<Record<string, readonly string[]>> = {
 const SERVER_POSITION: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(POSITION_LABEL).map(([server, client]) => [client, server]),
 );
+const DIVISION_LABEL: Readonly<Record<string, string>> = {
+  'serie-a': 'Série A',
+  'serie-b': 'Série B',
+  'serie-c': 'Série C',
+};
+const JOB_REASON: Readonly<
+  Record<'step_up' | 'lateral' | 'step_down' | 'reemployment', string>
+> = {
+  step_up: 'Clube maior, atento ao seu bom trabalho',
+  lateral: 'Clube do mesmo porte quer apostar em você',
+  step_down: 'Clube menor que ainda aposta em você',
+  reemployment: 'Procura um treinador e lembrou do seu nome',
+};
+const POTENTIAL_LABEL: Readonly<Record<string, string>> = {
+  exceptional: 'joia',
+  promising: 'alto',
+  limited: 'limitado',
+};
 const MILESTONE_TAG: Readonly<Record<string, string>> = {
   title: 'Título',
   promotion: 'Acesso',
@@ -476,6 +542,46 @@ function worldNews(
 }
 
 const centsToBrl = (value: number) => Math.round(value / 100);
+
+/** Stadium of the club screen; money in reais (the server sends cents). */
+function stadiumOf(world: WorldModel): StadiumView {
+  const stadium = world.club?.stadium;
+  return {
+    name: `Estádio do ${world.club?.name ?? 'clube'}`,
+    capacity: stadium?.capacity ?? 0,
+    maxCapacity: stadium?.maxCapacity ?? 90_000,
+    averageCrowd: stadium?.averageCrowd ?? 0,
+    ...(stadium?.lastCrowd === undefined
+      ? {}
+      : { lastCrowd: stadium.lastCrowd }),
+    homeMatches: stadium?.homeMatches ?? 0,
+    demand: stadium?.demand ?? 0,
+    expectedCrowd: stadium?.expectedCrowd ?? 0,
+    ticketPrice: centsToBrl(stadium?.ticketPrice ?? 0),
+    referencePrice: centsToBrl(stadium?.referencePrice ?? 0),
+    quality: stadium?.quality ?? 0,
+    ...(stadium?.lastMaintenanceOn
+      ? { lastMaintenanceOn: stadium.lastMaintenanceOn }
+      : {}),
+    ...(stadium?.expansion
+      ? {
+          works: {
+            addedCapacity: stadium.expansion.addedCapacity,
+            completesOn: stadium.expansion.completesOn,
+            cost: centsToBrl(stadium.expansion.cost),
+          },
+        }
+      : {}),
+    expansionPlans: (stadium?.expansionPlans ?? []).map((plan) => ({
+      ...plan,
+      cost: centsToBrl(plan.cost),
+    })),
+    maintenancePlans: (stadium?.maintenancePlans ?? []).map((plan) => ({
+      ...plan,
+      cost: centsToBrl(plan.cost),
+    })),
+  };
+}
 const brlToCents = (value: number) => Math.round(value * 100);
 const moneyOf = <T extends Record<string, number>>(record: T): T =>
   Object.fromEntries(
@@ -1415,31 +1521,37 @@ export class HttpCareerApi implements CareerApiPort {
         sponsor: 'Cota mensal proporcional à folha',
         ledger,
       },
-      stadium: {
-        name: `Estádio do ${world.club?.name ?? 'clube'}`,
-        capacity: world.club?.stadium.capacity ?? 0,
-        averageCrowd: 0,
-        ticketPrice: centsToBrl(world.club?.stadium.ticketPrice ?? 0),
-        maintenance:
-          (world.club?.stadium.quality ?? 100) < 60 ? 'atenção' : 'em dia',
-        expansionCost: 15_000_000,
-      },
+      stadium: stadiumOf(world),
       youth: world.youth.map((youth) => ({
         id: youth.playerId,
         name: youth.name,
         position: POSITION_LABEL[youth.position] ?? youth.position,
         age: youth.age,
         generated: true as const,
-        strengthEstimate: 'a observar',
-        potentialEstimate:
-          youth.estimate === 'exceptional'
-            ? 'alto'
-            : youth.estimate === 'promising'
-              ? 'bom'
-              : 'limitado',
-        readiness: youth.status === 'academy' ? 'na base' : 'no elenco',
+        strength: youth.strength ?? 0,
+        ...(youth.initialStrength === undefined
+          ? {}
+          : { initialStrength: youth.initialStrength }),
+        potentialEstimate: POTENTIAL_LABEL[youth.estimate] ?? 'a observar',
+        traits: (youth.traits ?? []).map(
+          (trait) => TRAIT_LABEL[trait] ?? trait,
+        ),
+        highlight: youth.highlight === true,
+        readiness: youth.readiness ?? 'developing',
+        promotable: youth.promotable === true,
         status: youth.status,
+        ...(youth.joinedOn ? { joinedOn: youth.joinedOn } : {}),
       })),
+      ...(world.academy
+        ? {
+            academy: {
+              ...world.academy,
+              needs: world.academy.needs.map(
+                (position) => POSITION_LABEL[position] ?? position,
+              ),
+            },
+          }
+        : {}),
       board: {
         confidence: Math.round(world.manager.boardConfidence),
         fanConfidence: Math.round(world.manager.fanConfidence),
@@ -1458,13 +1570,28 @@ export class HttpCareerApi implements CareerApiPort {
               : 'baixo',
         proposals: world.jobProposals
           .filter(({ status }) => status === 'open')
-          .map((proposal) => ({
-            id: proposal.id,
-            club: proposal.clubName,
-            division: '',
-            objective: `Prestígio mínimo ${String(Math.round(proposal.minimumPrestige))}`,
-            salary: 0,
-          })),
+          .map((proposal) => {
+            const current = world.club?.reputation;
+            const comparison =
+              proposal.reputation === undefined || current === undefined
+                ? undefined
+                : proposal.reputation > current + 2
+                  ? ('bigger' as const)
+                  : proposal.reputation < current - 2
+                    ? ('smaller' as const)
+                    : ('similar' as const);
+            return {
+              id: proposal.id,
+              club: proposal.clubName,
+              division: DIVISION_LABEL[proposal.division ?? ''] ?? '',
+              objective: JOB_REASON[proposal.reason ?? 'lateral'],
+              ...(proposal.reputation === undefined
+                ? {}
+                : { reputation: proposal.reputation }),
+              ...(comparison === undefined ? {} : { comparison }),
+              ...(proposal.expiresOn ? { expiresOn: proposal.expiresOn } : {}),
+            };
+          }),
       },
       news: worldNews(home, world.history),
       history: {
@@ -1903,24 +2030,25 @@ export class HttpCareerApi implements CareerApiPort {
     return this.#view();
   }
 
-  async maintainStadium(): Promise<CareerView> {
-    throw new NotSupportedYetError('Manutenção avulsa do estádio');
-  }
-
-  async expandStadium() {
+  async maintainStadium(plan: MaintenancePlanId) {
     const world = await this.#worldState();
     if (!world.club) throw new Error('Clube indisponível.');
-    await this.#worldCommand('ExpandStadium', {
+    await this.#worldCommand('MaintainStadium', {
       clubId: world.club.id,
-      addedCapacity: 5_000,
-      cost: 1_500_000_000,
-      completesOn: addDays(world.currentDate, 180),
+      plan,
     });
     return this.#view();
   }
 
-  async developYouth(): Promise<CareerView> {
-    throw new NotSupportedYetError('Plano individual de desenvolvimento');
+  /** The server prices the works; the client only picks the plan. */
+  async expandStadium(plan: ExpansionPlanId) {
+    const world = await this.#worldState();
+    if (!world.club) throw new Error('Clube indisponível.');
+    await this.#worldCommand('ExpandStadium', {
+      clubId: world.club.id,
+      plan,
+    });
+    return this.#view();
   }
 
   async promoteYouth(playerId: string) {
@@ -1935,6 +2063,11 @@ export class HttpCareerApi implements CareerApiPort {
 
   async acceptJobProposal(proposalId: string) {
     await this.#worldCommand('AcceptJobProposal', { proposalId });
+    return this.#view();
+  }
+
+  async rejectJobProposal(proposalId: string) {
+    await this.#worldCommand('RejectJobProposal', { proposalId });
     return this.#view();
   }
 

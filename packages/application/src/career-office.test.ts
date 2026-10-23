@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- the launch catalog guarantees the clubs picked here */
 import {
   accountBalance,
+  money,
   type ClubId,
   type CompetitionCalendarFixture,
 } from '@footebas/domain';
@@ -393,6 +394,14 @@ describe('sócio-torcedor (ADR 0011)', () => {
       monthlyPrice: MEMBERSHIP_PRICE_MIN,
       tier: 'premium',
     });
+    // Members only add seats while the stadium has room: a full house (the
+    // demand of a big club at its usual price) stays full either way.
+    for (const context of [without, withMembers])
+      context.world.stadiums = context.world.stadiums.map((item) =>
+        item.clubId === MANAGED
+          ? { ...item, ticketPrice: money(20_000) }
+          : item,
+      );
     recordGate(without, fixture, 'national_league');
     recordGate(withMembers, fixture, 'national_league');
     const stadium = withMembers.world.stadiums.find(

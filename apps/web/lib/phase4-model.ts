@@ -45,24 +45,92 @@ export interface LedgerEntryView {
   balance: number;
 }
 
+export type YouthReadiness = 'ready' | 'close' | 'developing';
+
 export interface YouthPlayerView {
   id: string;
   name: string;
+  /** Short position label (GOL, ZAG, ATA...). */
   position: string;
   age: number;
   generated: true;
-  strengthEstimate: string;
+  /** Visible strength (potential stays an estimate). */
+  strength: number;
+  /** Strength when the kid joined the academy. */
+  initialStrength?: number;
   potentialEstimate: string;
-  readiness: string;
+  /** Characteristics in Portuguese (one or two). */
+  traits: readonly string[];
+  /** "Jovem destaque" of an intake. */
+  highlight: boolean;
+  readiness: YouthReadiness;
+  /** Old enough and there is room in the squad. */
+  promotable: boolean;
   status: 'academy' | 'promoted' | 'released';
+  joinedOn?: string;
 }
+
+export interface AcademyView {
+  prospects: number;
+  capacity: number;
+  nextIntakeOn: string;
+  squadSize: number;
+  maxSquadSize: number;
+  minPromotionAge: number;
+  maxAge: number;
+  /** Short position labels the first team is short of. */
+  needs: readonly string[];
+}
+
+/** How the calling club compares with the current one. */
+export type JobComparison = 'bigger' | 'similar' | 'smaller';
 
 export interface JobProposalView {
   id: string;
   club: string;
   division: string;
+  /** Why the club called, in Portuguese. */
   objective: string;
-  salary: number;
+  reputation?: number;
+  comparison?: JobComparison;
+  expiresOn?: string;
+}
+
+export type ExpansionPlanId = 'small' | 'medium' | 'large';
+export type MaintenancePlanId = 'repairs' | 'renovation' | 'modernization';
+
+export interface StadiumView {
+  name: string;
+  capacity: number;
+  maxCapacity: number;
+  /** Average home crowd of the season (0 before the first home match). */
+  averageCrowd: number;
+  lastCrowd?: number;
+  homeMatches: number;
+  /** Fans who want a ticket for an ordinary league match now. */
+  demand: number;
+  /** Crowd that fits (demand capped by the seats). */
+  expectedCrowd: number;
+  ticketPrice: number;
+  /** Price the crowd judges by; it grows with the size of the club. */
+  referencePrice: number;
+  /** Pitch, stands and facilities (0-100). */
+  quality: number;
+  lastMaintenanceOn?: string;
+  /** Works in progress. */
+  works?: { addedCapacity: number; completesOn: string; cost: number };
+  expansionPlans: readonly {
+    id: ExpansionPlanId;
+    addedCapacity: number;
+    cost: number;
+    days: number;
+    completesOn: string;
+  }[];
+  maintenancePlans: readonly {
+    id: MaintenancePlanId;
+    qualityGain: number;
+    cost: number;
+  }[];
 }
 
 export interface RankingRowView {
@@ -85,15 +153,9 @@ export interface Phase4View {
     sponsor: string;
     ledger: readonly LedgerEntryView[];
   };
-  stadium: {
-    name: string;
-    capacity: number;
-    averageCrowd: number;
-    ticketPrice: number;
-    maintenance: 'em dia' | 'atenção';
-    expansionCost: number;
-  };
+  stadium: StadiumView;
   youth: readonly YouthPlayerView[];
+  academy?: AcademyView;
   board: {
     confidence: number;
     fanConfidence: number;
@@ -292,10 +354,43 @@ export function createPhase4View(coach: string, club: string): Phase4View {
     stadium: {
       name: 'Maracanã',
       capacity: 78838,
+      maxCapacity: 90000,
       averageCrowd: 61240,
+      lastCrowd: 64410,
+      homeMatches: 6,
+      demand: 70200,
+      expectedCrowd: 70200,
       ticketPrice: 65,
-      maintenance: 'atenção',
-      expansionCost: 12500000,
+      referencePrice: 68,
+      quality: 58,
+      expansionPlans: [
+        {
+          id: 'small',
+          addedCapacity: 2000,
+          cost: 3000000,
+          days: 90,
+          completesOn: '2026-10-06',
+        },
+        {
+          id: 'medium',
+          addedCapacity: 5000,
+          cost: 9000000,
+          days: 150,
+          completesOn: '2026-12-05',
+        },
+        {
+          id: 'large',
+          addedCapacity: 10000,
+          cost: 22000000,
+          days: 240,
+          completesOn: '2027-03-05',
+        },
+      ],
+      maintenancePlans: [
+        { id: 'repairs', qualityGain: 10, cost: 1182570 },
+        { id: 'renovation', qualityGain: 25, cost: 2759330 },
+        { id: 'modernization', qualityGain: 42, cost: 5150855 },
+      ],
     },
     youth: [
       {
@@ -304,20 +399,28 @@ export function createPhase4View(coach: string, club: string): Phase4View {
         position: 'ATA',
         age: 18,
         generated: true,
-        strengthEstimate: 'entre 53 e 59',
-        potentialEstimate: 'alto, ainda incerto',
-        readiness: 'pede minutos controlados',
+        strength: 57,
+        initialStrength: 53,
+        potentialEstimate: 'alto',
+        traits: ['Finalização', 'Velocidade'],
+        highlight: true,
+        readiness: 'close',
+        promotable: true,
         status: 'academy',
       },
       {
         id: 'y-2',
         name: 'Ruan Teles',
         position: 'VOL',
-        age: 17,
+        age: 16,
         generated: true,
-        strengthEstimate: 'entre 47 e 54',
+        strength: 49,
+        initialStrength: 48,
         potentialEstimate: 'bom',
-        readiness: 'mais uma temporada de base',
+        traits: ['Marcação'],
+        highlight: false,
+        readiness: 'developing',
+        promotable: false,
         status: 'academy',
       },
       {
@@ -326,12 +429,26 @@ export function createPhase4View(coach: string, club: string): Phase4View {
         position: 'GOL',
         age: 19,
         generated: true,
-        strengthEstimate: 'entre 55 e 60',
-        potentialEstimate: 'bom, leitura estável',
-        readiness: 'pronto para compor elenco',
+        strength: 60,
+        initialStrength: 55,
+        potentialEstimate: 'bom',
+        traits: ['Reflexos', 'Colocação'],
+        highlight: false,
+        readiness: 'ready',
+        promotable: true,
         status: 'academy',
       },
     ],
+    academy: {
+      prospects: 3,
+      capacity: 14,
+      nextIntakeOn: '2026-08-01',
+      squadSize: 30,
+      maxSquadSize: 35,
+      minPromotionAge: 17,
+      maxAge: 20,
+      needs: ['GOL', 'LE'],
+    },
     board: {
       confidence: 72,
       fanConfidence: 81,
@@ -345,14 +462,18 @@ export function createPhase4View(coach: string, club: string): Phase4View {
           club: 'Bahia',
           division: 'Série A',
           objective: 'Disputar vaga continental',
-          salary: 480000,
+          reputation: 74,
+          comparison: 'similar',
+          expiresOn: '2026-07-29',
         },
         {
           id: 'job-athletico',
           club: 'Athletico Paranaense',
           division: 'Série A',
           objective: 'Reconstruir elenco jovem',
-          salary: 430000,
+          reputation: 72,
+          comparison: 'smaller',
+          expiresOn: '2026-07-29',
         },
       ],
     },

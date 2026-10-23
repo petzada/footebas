@@ -229,14 +229,23 @@ export function projectCareerOffice(
         .slice(-12)
         .reverse()
         .map((offer) => offerView(offer, snapshot.currentDate)),
-      jobs: world.jobProposals.map((proposal) => ({
-        id: proposal.id,
-        clubId: proposal.clubId,
-        clubName: clubName.get(proposal.clubId) ?? proposal.clubId,
-        expiresOn: proposal.expiresOn,
-        minimumPrestige: proposal.minimumPrestige,
-        status: proposal.status,
-      })),
+      jobs: world.jobProposals.map((proposal) => {
+        const caller = snapshot.clubs.find(({ id }) => id === proposal.clubId);
+        const callerDivision = divisionOfClub(context, proposal.clubId);
+        return {
+          id: proposal.id,
+          clubId: proposal.clubId,
+          clubName: clubName.get(proposal.clubId) ?? proposal.clubId,
+          expiresOn: proposal.expiresOn,
+          minimumPrestige: proposal.minimumPrestige,
+          status: proposal.status,
+          ...(caller === undefined
+            ? {}
+            : { reputation: Number(caller.reputation) }),
+          ...(callerDivision === undefined ? {} : { division: callerDivision }),
+          ...(proposal.reason === undefined ? {} : { reason: proposal.reason }),
+        };
+      }),
       transfers: world.offers
         .filter((offer) => awaitingTransfers.has(offer.id))
         .map((offer) => {

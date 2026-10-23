@@ -46,6 +46,24 @@ interface OfficeScreenProps {
  * contract, fan membership, finances by category, squad contracts and the
  * coach's career.
  */
+const DIVISION_LABEL: Readonly<Record<string, string>> = {
+  'serie-a': 'Série A',
+  'serie-b': 'Série B',
+  'serie-c': 'Série C',
+};
+const JOB_STATUS = {
+  open: 'Aberta',
+  accepted: 'Aceita',
+  rejected: 'Recusada',
+  expired: 'Expirada',
+} as const;
+const JOB_REASON = {
+  step_up: 'Clube maior, atento ao seu bom trabalho.',
+  lateral: 'Clube do mesmo porte quer apostar em você.',
+  step_down: 'Clube menor que ainda aposta em você.',
+  reemployment: 'Procura um treinador e lembrou do seu nome.',
+} as const;
+
 export function OfficeScreen({
   career,
   api,
@@ -223,22 +241,71 @@ export function OfficeScreen({
                   {office.proposals.jobs.map((job) => (
                     <li
                       key={job.id}
-                      className="flex items-center justify-between bg-muted p-2"
+                      className="flex flex-col gap-2 bg-muted p-2"
                     >
-                      <span>
-                        <strong>{job.clubName}</strong> · até{' '}
-                        {formatDate(job.expiresOn)}
+                      <span className="flex items-center justify-between gap-2">
+                        <span>
+                          <strong>{job.clubName}</strong>
+                          {job.division &&
+                            ` · ${DIVISION_LABEL[job.division] ?? job.division}`}{' '}
+                          · até {formatDate(job.expiresOn)}
+                        </span>
+                        <Badge
+                          variant={job.status === 'open' ? 'bulb' : 'secondary'}
+                        >
+                          {JOB_STATUS[job.status]}
+                        </Badge>
                       </span>
-                      <Badge
-                        variant={job.status === 'open' ? 'bulb' : 'secondary'}
-                      >
-                        {job.status === 'open' ? 'Aberta' : job.status}
-                      </Badge>
+                      {job.reason && (
+                        <span className="text-muted-foreground">
+                          {JOB_REASON[job.reason]}
+                        </span>
+                      )}
+                      {job.status === 'open' && (
+                        <span className="grid grid-cols-2 gap-2">
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(
+                                `Novo trabalho no ${job.clubName}; carreira preservada.`,
+                                async () => {
+                                  onCareerChange(
+                                    await api.acceptJobProposal(job.id),
+                                  );
+                                  return api.getOffice();
+                                },
+                              )
+                            }
+                          >
+                            Aceitar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(
+                                `Proposta do ${job.clubName} recusada.`,
+                                async () => {
+                                  onCareerChange(
+                                    await api.rejectJobProposal(job.id),
+                                  );
+                                  return api.getOffice();
+                                },
+                              )
+                            }
+                          >
+                            Recusar
+                          </Button>
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
                 <p className="mt-2 text-[.6rem] text-muted-foreground">
-                  Aceitar um convite fica na Diretoria (Estádio › Diretoria).
+                  Os clubes ligam durante a temporada conforme o seu trabalho:
+                  bom desempenho atrai clubes maiores; fase ruim, só menores.
                 </p>
               </section>
               <section aria-labelledby="por-atletas" className="panel p-3">

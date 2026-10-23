@@ -219,6 +219,12 @@ export const careerOfficeReadModelSchema = z.strictObject({
         expiresOn: gameDateSchema,
         minimumPrestige: z.number().min(0),
         status: z.enum(['open', 'accepted', 'rejected', 'expired']),
+        /** Size of the club that calls (club reputation, 0-100). */
+        reputation: z.int().min(0).max(100).optional(),
+        division: z.enum(['serie-a', 'serie-b', 'serie-c']).optional(),
+        reason: z
+          .enum(['step_up', 'lateral', 'step_down', 'reemployment'])
+          .optional(),
       }),
     ),
     /** Market proposals for the managed club's players awaiting the manager. */

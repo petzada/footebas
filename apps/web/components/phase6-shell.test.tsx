@@ -38,10 +38,10 @@ describe('Fase 6 · shell mobile-first', () => {
       'Calendário',
       'Táticas',
       'Classificação',
-      'Competições',
       'Estádio',
       'Finanças',
       'Histórico',
+      'Perfil',
       'Central',
     ]) {
       const button = within(nav).getByRole('button', {
@@ -188,7 +188,13 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(menu.getAttribute('aria-expanded')).toBe('true');
     const dialog = screen.getByRole('dialog', { name: /menu do jogo/i });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
-    for (const group of ['Clube', 'Futebol', 'Carreira', 'Sistema']) {
+    for (const group of [
+      'Principal',
+      'Clube',
+      'Futebol',
+      'Carreira',
+      'Sistema',
+    ]) {
       expect(within(dialog).getByRole('region', { name: group })).toBeTruthy();
     }
     expect(
@@ -202,7 +208,7 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(current.getAttribute('aria-current')).toBe('page');
     expect(document.activeElement).toBe(current);
     fireEvent.keyDown(dialog, { key: 'ArrowRight' });
-    expect(document.activeElement?.textContent).toBe('Elenco');
+    expect(document.activeElement?.textContent).toBe('Mapa');
     // Counters: unread mail badge, link to the legal pages, mute toggle.
     expect(
       within(dialog).getByRole('button', { name: /caixa de entrada \(\d+\)/i }),
@@ -239,7 +245,6 @@ describe('Fase 6 · shell mobile-first', () => {
       'Mercado',
       'Calendário',
       'Classificação',
-      'Competições',
       'Temporada',
       'Caixa de entrada',
       'Histórico',
@@ -292,16 +297,34 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(document.activeElement).toBe(menu);
   });
 
-  it('agrupa a barra lateral desktop pelos mesmos temas do menu', async () => {
+  it('organiza a barra lateral desktop: início, Clube, futebol e Carreira', async () => {
     await onboard();
     const nav = screen.getByRole('navigation', {
       name: /navegação principal desktop/i,
     });
+    const regions = within(nav).getAllByRole('region');
     expect(
-      within(nav)
-        .getAllByRole('region')
-        .map((region) => region.getAttribute('aria-labelledby')),
-    ).toEqual(['desktop-clube', 'desktop-futebol', 'desktop-carreira']);
+      regions.map((region) =>
+        within(region)
+          .getAllByRole('button')
+          .map((button) => button.textContent?.replace(/\(.*\)|\d+$/g, '')),
+      ),
+    ).toEqual([
+      ['Central', 'Mapa', 'Caixa de entrada'],
+      ['Elenco', 'Táticas', 'Finanças', 'Escritório', 'Estádio'],
+      ['Mercado', 'Classificação', 'Calendário', 'Temporada'],
+      ['Histórico', 'Ranking', 'Perfil'],
+    ]);
+    // Only Clube and Carreira carry a visible label; Competições is inside
+    // Calendário and no longer has a sidebar entry.
+    expect(
+      regions.map((region) => region.getAttribute('aria-labelledby')),
+    ).toEqual([null, 'desktop-clube', null, 'desktop-carreira']);
+    expect(within(nav).getByText('Clube')).toBeTruthy();
+    expect(within(nav).getByText('Carreira')).toBeTruthy();
+    expect(
+      within(nav).queryByRole('button', { name: /competições/i }),
+    ).toBeNull();
   });
 
   it('é só modo claro: sem botão de tema nem classe dark (ADR 0009)', async () => {
@@ -310,13 +333,13 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 
-  it('mostra avatar e personalidade do treinador na barra lateral', async () => {
+  it('não repete nome, estilo e imagem do treinador na barra lateral', async () => {
     await onboard();
     const sidebar = screen
       .getByRole('navigation', { name: /navegação principal desktop/i })
       .closest('aside')!;
-    expect(sidebar.querySelector('[data-avatar="avatar-01"]')).not.toBeNull();
-    expect(sidebar.textContent).toMatch(/estrategista/i);
+    expect(sidebar.querySelector('[data-avatar]')).toBeNull();
+    expect(sidebar.textContent).not.toMatch(/estrategista|treinador/i);
   });
 
   it('mostra estado offline e de reconexão sem bloquear a tela', async () => {

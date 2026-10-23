@@ -190,28 +190,31 @@ describe('Fase 4 · verticais de carreira longa', () => {
     );
   });
 
-  it('marca jovens como gerados e permite desenvolver e promover', async () => {
+  it('base mostra destaques, força, características e sobe só quem tem idade', async () => {
     const api = await onboard();
     navigate(/^estádio$/i);
     await screen.findByRole('tab', { name: /^base$/i });
     await selectTab(/^base$/i);
+    expect(await screen.findByText(/gerados pelo universo/i)).toBeTruthy();
+    expect(screen.getByText(/próxima peneira em 01\/08\/2026/i)).toBeTruthy();
+    const star = screen.getByText('Caio Nascimento').closest('.panel');
+    expect(within(star as HTMLElement).getByText('Destaque')).toBeTruthy();
+    expect(within(star as HTMLElement).getByText('Finalização')).toBeTruthy();
     expect(
-      (await screen.findByText(/todos os atletas abaixo são/i)).textContent,
-    ).toMatch(/gerados pelo universo/i);
-    expect(screen.getAllByText(/base · gerado/i)).toHaveLength(3);
-    const card = screen.getByText('Davi Lessa').closest('.panel');
-    expect(card).not.toBeNull();
+      within(star as HTMLElement).getByText(/\+4 desde a chegada/i),
+    ).toBeTruthy();
+    const young = screen.getByText('Ruan Teles').closest('.panel');
+    expect(
+      (
+        within(young as HTMLElement).getByRole('button', {
+          name: /promover/i,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    const keeper = screen.getByText('Davi Lessa').closest('.panel');
+    expect(within(keeper as HTMLElement).getByText('Carência')).toBeTruthy();
     fireEvent.click(
-      within(card as HTMLElement).getByRole('button', { name: /desenvolver/i }),
-    );
-    await waitFor(async () =>
-      expect(
-        (await api.getCareer())?.world.youth.find((item) => item.id === 'y-3')
-          ?.readiness,
-      ).toMatch(/plano individual/i),
-    );
-    fireEvent.click(
-      within(card as HTMLElement).getByRole('button', { name: /promover/i }),
+      within(keeper as HTMLElement).getByRole('button', { name: /promover/i }),
     );
     await waitFor(async () =>
       expect(
@@ -219,6 +222,31 @@ describe('Fase 4 · verticais de carreira longa', () => {
           ?.status,
       ).toBe('promoted'),
     );
+  });
+
+  it('estádio contrata obra com retorno e paga manutenção avulsa', async () => {
+    const api = await onboard();
+    navigate(/^estádio$/i);
+    await selectTab(/^estádio$/i);
+    fireEvent.click(
+      await screen.findByRole('button', { name: /^reparos por/i }),
+    );
+    await waitFor(async () =>
+      expect((await api.getCareer())?.world.stadium.quality).toBe(68),
+    );
+    expect(
+      (await api.getCareer())?.world.finances.ledger[0]?.sourceLabel,
+    ).toMatch(/estádio · manutenção/i);
+    fireEvent.click(
+      screen.getByRole('button', { name: /^arquibancada extra por/i }),
+    );
+    expect(
+      await screen.findByText(/obra em andamento/i, { exact: false }),
+    ).toBeTruthy();
+    expect((await api.getCareer())?.world.stadium.works).toMatchObject({
+      addedCapacity: 2000,
+      completesOn: '2026-10-06',
+    });
   });
 
   it('troca de clube preserva treinador, prestígio e histórico', async () => {

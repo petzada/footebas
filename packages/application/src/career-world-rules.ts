@@ -19,9 +19,10 @@ import {
   generateYouthCandidates,
   leaveClub,
   money,
+  jobMarketOffers,
   promoteYouth,
-  proposeJobs,
   shouldFireManager,
+  wearStadium,
   type BoardObjective,
   type Club,
   type CoachPersonality,
@@ -88,6 +89,40 @@ export interface CareerWorldState {
   market?: CareerMarketState;
   /** Sponsorship, fan membership and chemistry (docs/adr/0011); absent in old saves. */
   office?: CareerOfficeState;
+  /** Crowds of the managed club this season; absent in old saves. */
+  crowd?: CrowdState;
+  /** Academy intakes (peneiras) and training already run; absent in old saves. */
+  academy?: AcademyState;
+  /** Last month the coach job market ran; absent in old saves. */
+  jobMarket?: JobMarketState;
+}
+
+/** Home crowds of the managed club: season totals and the open month. */
+export interface CrowdState {
+  clubId: string;
+  year: number;
+  matches: number;
+  total: number;
+  last?: number;
+  monthMatches: number;
+  monthTotal: number;
+  monthCapacity: number;
+}
+
+export interface AcademyState {
+  /** Intake keys already generated (`club|year|half`, `club|first`). */
+  intakes: string[];
+  /** Last month the academy trained (`YYYY-MM`). */
+  trainedThrough: string;
+  /** Last season the prospects aged. */
+  agedThrough: number;
+}
+
+export interface JobMarketState {
+  /** Last month the market was checked (`YYYY-MM`). */
+  checkedThrough: string;
+  /** Latest managed league standing of a season, for in-season performance. */
+  league?: { position: number; rounds: number; season: number };
 }
 
 export interface CareerMarketState {
@@ -125,6 +160,8 @@ function nextId(world: CareerWorldState, kind: string): string {
   world.sequence += 1;
   return `${kind}_${String(world.sequence)}`;
 }
+/** Ids minted by any world rule share the same exact-replay sequence. */
+export const nextWorldId = nextId;
 
 function nextMonth(month: string): string {
   const [year, value] = month.split('-').map(Number) as [number, number];
@@ -135,6 +172,35 @@ function nextMonth(month: string): string {
 
 function addYears(date: string, years: number): string {
   return `${String(Number(date.slice(0, 4)) + years)}${date.slice(4)}`;
+}
+
+/** Ticket price the crowd of a club judges by (minor units). */
+export function referenceTicketPrice(reputation: number): number {
+  return 2_000 + reputation * 60;
+}
+
+/** Ticket prices the board accepts (R$ 10 to R$ 250, minor units). */
+export const TICKET_PRICE_MIN = 1_000;
+export const TICKET_PRICE_MAX = 25_000;
+
+/** Stakes of a match by competition tier (crowd appeal). */
+export const CROWD_IMPORTANCE: Readonly<
+  Record<CompetitionDefinition['tier'], number>
+> = {
+  continental: 90,
+  national_cup: 70,
+  national_league: 55,
+  state: 35,
+};
+
+/** Recent form as the crowd reads it: +3 per win, -3 per defeat. */
+export function crowdForm(form: readonly ('W' | 'D' | 'L')[]): number {
+  return form
+    .slice(-5)
+    .reduce(
+      (total, result) => total + (result === 'W' ? 3 : result === 'L' ? -3 : 0),
+      0,
+    );
 }
 
 function stadiumFor(club: Club): Stadium {
@@ -258,33 +324,96 @@ export function recordGate(
   const home = context.clubs.find(({ id }) => id === fixture.homeClubId);
   const away = context.clubs.find(({ id }) => id === fixture.awayClubId);
   if (!stadium || !home || !away) return;
+  const { world } = context;
+  const managed = home.id === world.manager.currentClubId;
+  // The managed crowd also reads form, fan mood and the stadium state; the
+  // other clubs keep a neutral context (their stadiums do not wear).
   const attendance = calculateAttendance({
     capacity: stadium.capacity,
     ticketPrice: stadium.ticketPrice,
-    referencePrice: money(2_000 + Number(home.reputation) * 60),
+    referencePrice: money(referenceTicketPrice(Number(home.reputation))),
     homeReputation: Number(home.reputation),
     awayReputation: Number(away.reputation),
-    importance:
-      tier === 'continental'
-        ? 90
-        : tier === 'national_cup'
-          ? 70
-          : tier === 'state'
-            ? 35
-            : 55,
-    recentForm: 0,
+    importance: CROWD_IMPORTANCE[tier],
+    recentForm: managed ? crowdForm(context.managedForm ?? []) : 0,
+    ...(managed
+      ? {
+          fanMood: world.manager.fanConfidence,
+          stadiumQuality: stadium.quality,
+        }
+      : {}),
   });
   // Fan members fill a few more seats at the managed club (ADR 0011).
-  const members =
-    home.id === context.world.manager.currentClubId
-      ? (managedMembership(context)?.members ?? 0)
-      : 0;
+  const members = managed ? (managedMembership(context)?.members ?? 0) : 0;
   const crowd = Math.min(
     stadium.capacity,
     attendance + membershipAttendanceBonus(members, stadium.capacity),
   );
-  context.world.gate[home.id] =
-    (context.world.gate[home.id] ?? 0) + crowd * Number(stadium.ticketPrice);
+  world.gate[home.id] =
+    (world.gate[home.id] ?? 0) + crowd * Number(stadium.ticketPrice);
+  if (!managed) return;
+  recordCrowd(world, home.id, fixture.date, crowd, stadium.capacity);
+  // Every home match wears pitch and stands a little.
+  world.stadiums = world.stadiums.map((item) =>
+    item.clubId === home.id ? wearStadium(item, 1) : item,
+  );
+}
+
+function recordCrowd(
+  world: CareerWorldState,
+  clubId: string,
+  date: string,
+  crowd: number,
+  capacity: number,
+): void {
+  const year = Number(date.slice(0, 4));
+  const current =
+    world.crowd?.clubId === clubId && world.crowd.year === year
+      ? world.crowd
+      : {
+          clubId,
+          year,
+          matches: 0,
+          total: 0,
+          monthMatches: 0,
+          monthTotal: 0,
+          monthCapacity: 0,
+        };
+  world.crowd = {
+    ...current,
+    matches: current.matches + 1,
+    total: current.total + crowd,
+    last: crowd,
+    monthMatches: current.monthMatches + 1,
+    monthTotal: current.monthTotal + crowd,
+    monthCapacity: current.monthCapacity + capacity,
+  };
+}
+
+/**
+ * A full stadium lifts the fans' mood, an empty one sours it (one point a
+ * month). This is how ticket prices reach the job security.
+ */
+function settleCrowdMonth(world: CareerWorldState): void {
+  const crowd = world.crowd;
+  if (crowd === undefined) return;
+  if (
+    crowd.monthMatches > 0 &&
+    crowd.monthCapacity > 0 &&
+    crowd.clubId === world.manager.currentClubId
+  ) {
+    const occupancy = crowd.monthTotal / crowd.monthCapacity;
+    const delta = occupancy >= 0.9 ? 1 : occupancy <= 0.35 ? -1 : 0;
+    if (delta !== 0)
+      world.manager = {
+        ...world.manager,
+        fanConfidence: Math.max(
+          0,
+          Math.min(100, world.manager.fanConfidence + delta),
+        ),
+      };
+  }
+  world.crowd = { ...crowd, monthMatches: 0, monthTotal: 0, monthCapacity: 0 };
 }
 
 /**
@@ -373,6 +502,7 @@ export function settleMonths(context: WorldContext, date: string): void {
     }
     settleMembershipMonth(context, period, occurredAt);
     closeSponsorMonth(world, period);
+    settleCrowdMonth(world);
     world.gate = {};
     world.openMonth = nextMonth(period);
   }
@@ -609,28 +739,159 @@ function boardVerdict(context: WorldContext, input: SeasonEndInput): void {
       clubId: firedFrom,
     });
   }
-  const pyramid = new Set(input.pyramidClubIds);
-  const vacancies = context.clubs
-    .filter((club) => club.id !== world.manager.currentClubId)
-    .filter((club) => pyramid.has(club.id))
-    .filter(
-      (club) =>
-        hashSeed(`${input.seed}|vacancy|${String(input.season)}|${club.id}`) %
-          6 ===
-        0,
-    );
+  const firedReputation = reputationOf(
+    context,
+    world.manager.appointments.at(-1)?.clubId,
+  );
+  const currentReputation = reputationOf(context, world.manager.currentClubId);
+  const employed = currentReputation !== undefined;
+  const performance = seasonPerformance(world.objectives, input.managedForm);
   world.jobProposals = [
-    ...proposeJobs(
-      world.manager,
-      vacancies.map((club) => ({
-        clubId: club.id,
-        reputation: Number(club.reputation),
-        hasVacancy: true,
-      })),
-      nextSeasonStart,
-      () => nextId(world, 'proposal'),
-    ),
+    ...keptProposals(world.jobProposals, nextSeasonStart),
+    ...jobMarketOffers({
+      career: world.manager,
+      ...(currentReputation !== undefined
+        ? { currentReputation }
+        : firedReputation === undefined
+          ? {}
+          : { lastReputation: firedReputation }),
+      performance,
+      clubs: jobMarketClubs(
+        context,
+        input.pyramidClubIds,
+        `${input.seed}|vacancy|${String(input.season)}`,
+      ),
+      excludedClubIds: openProposalClubIds(world.jobProposals),
+      onDate: nextSeasonStart,
+      maxOffers: !employed
+        ? 3
+        : performance >= 0.5
+          ? 3
+          : performance >= 0
+            ? 2
+            : 1,
+      nextId: () => nextId(world, 'proposal'),
+    }),
   ];
+}
+
+function reputationOf(
+  context: WorldContext,
+  clubId: string | undefined,
+): number | undefined {
+  const club =
+    clubId === undefined
+      ? undefined
+      : context.clubs.find(({ id }) => id === clubId);
+  return club === undefined ? undefined : Number(club.reputation);
+}
+
+/**
+ * Pyramid clubs as the coach job market sees them: about one in four has a
+ * vacancy each time the market runs (deterministic per `key`).
+ */
+export function jobMarketClubs(
+  context: WorldContext,
+  pyramidClubIds: readonly string[],
+  key: string,
+): { clubId: ClubId; reputation: number; interested: boolean }[] {
+  const pyramid = new Set(pyramidClubIds);
+  return context.clubs
+    .filter((club) => pyramid.has(club.id))
+    .map((club) => ({
+      clubId: club.id,
+      reputation: Number(club.reputation),
+      interested: hashSeed(`${key}|${club.id}`) % 4 === 0,
+    }));
+}
+
+/** Clubs that already have an open proposal on the table. */
+export function openProposalClubIds(
+  proposals: readonly JobProposal[],
+): ClubId[] {
+  return proposals
+    .filter(({ status }) => status === 'open')
+    .map(({ clubId }) => clubId);
+}
+
+/**
+ * Proposals kept in the save: open ones still valid on `date` plus the
+ * last answered ones (history for the screens).
+ */
+export function keptProposals(
+  proposals: readonly JobProposal[],
+  date: string,
+): JobProposal[] {
+  const updated = proposals.map((proposal) =>
+    proposal.status === 'open' && proposal.expiresOn < date
+      ? { ...proposal, status: 'expired' as const }
+      : proposal,
+  );
+  return [
+    ...updated.filter(({ status }) => status !== 'open').slice(-6),
+    ...updated.filter(({ status }) => status === 'open'),
+  ];
+}
+
+const clampUnit = (value: number) => Math.max(-1, Math.min(1, value));
+
+/** Recent results from -1 (five defeats) to 1 (five wins). */
+export function formScore(form: readonly ('W' | 'D' | 'L')[]): number {
+  const recent = form.slice(-5);
+  if (recent.length === 0) return 0;
+  const points = recent.reduce(
+    (total, result) => total + (result === 'W' ? 3 : result === 'D' ? 1 : 0),
+    0,
+  );
+  const expected = (recent.length * 7) / 5;
+  return clampUnit((points - expected) / expected);
+}
+
+/** Season verdict from -1 to 1: objectives met or failed, then form. */
+export function seasonPerformance(
+  objectives: readonly BoardObjective[],
+  form: readonly ('W' | 'D' | 'L')[],
+): number {
+  const weight = objectives.reduce((total, item) => total + item.weight, 0);
+  const score =
+    weight === 0
+      ? 0
+      : objectives.reduce(
+          (total, item) =>
+            total +
+            (item.status === 'met'
+              ? item.weight
+              : item.status === 'failed'
+                ? -item.weight
+                : 0),
+          0,
+        ) / weight;
+  return clampUnit(score * 0.7 + formScore(form) * 0.3);
+}
+
+/**
+ * In-season work from -1 to 1: league standing against the objective
+ * (after six rounds), recent form and board confidence.
+ */
+export function workPerformance(
+  manager: ManagerCareer,
+  objectives: readonly BoardObjective[],
+  form: readonly ('W' | 'D' | 'L')[],
+  league: { position: number; rounds: number } | undefined,
+): number {
+  const objective = objectives.find(
+    ({ status, metric }) =>
+      status === 'active' &&
+      (metric === 'league_position' ||
+        metric === 'avoid_relegation' ||
+        metric === 'promotion'),
+  );
+  const standing =
+    objective === undefined || league === undefined || league.rounds < 6
+      ? 0
+      : clampUnit((objective.target - league.position) / 6);
+  const board = clampUnit((manager.boardConfidence - 50) / 40);
+  return clampUnit(standing * 0.45 + formScore(form) * 0.35 + board * 0.2);
 }
 
 /** Fan membership value perception at the season verdict (±3, ADR 0011). */

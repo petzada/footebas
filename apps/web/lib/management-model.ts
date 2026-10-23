@@ -916,6 +916,10 @@ export interface OfficeView {
       expiresOn: string;
       minimumPrestige: number;
       status: 'open' | 'accepted' | 'rejected' | 'expired';
+      /** Size of the club that calls (reputation 0-100). */
+      reputation?: number;
+      division?: string;
+      reason?: 'step_up' | 'lateral' | 'step_down' | 'reemployment';
     }[];
     readonly transfers: readonly {
       id: string;

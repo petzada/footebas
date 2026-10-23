@@ -1,5 +1,7 @@
 import {
   createPhase4View,
+  type ExpansionPlanId,
+  type MaintenancePlanId,
   type Phase4View,
   type TransferKind,
 } from '@/lib/phase4-model';
@@ -313,12 +315,14 @@ export interface CareerApiPort {
   }): Promise<CareerView>;
   acceptTransferCounter(playerId: string): Promise<CareerView>;
   setTicketPrice(price: number): Promise<CareerView>;
-  maintainStadium(): Promise<CareerView>;
-  expandStadium(): Promise<CareerView>;
-  developYouth(playerId: string): Promise<CareerView>;
+  /** One-off maintenance (`MaintainStadium`), priced by the server. */
+  maintainStadium(plan: MaintenancePlanId): Promise<CareerView>;
+  /** Stadium works (`ExpandStadium`), priced by the server. */
+  expandStadium(plan: ExpansionPlanId): Promise<CareerView>;
   promoteYouth(playerId: string): Promise<CareerView>;
   releaseYouth(playerId: string): Promise<CareerView>;
   acceptJobProposal(proposalId: string): Promise<CareerView>;
+  rejectJobProposal(proposalId: string): Promise<CareerView>;
   finishMatch(): Promise<CareerView>;
   instantResult(): Promise<CareerView>;
   // --- management screens (docs/09: Elenco, Mercado, Escritório) ---------
@@ -1348,67 +1352,70 @@ export class InMemoryCareerApi implements CareerApiPort {
     });
   }
 
-  async maintainStadium() {
+  async maintainStadium(plan: MaintenancePlanId) {
     const current = this.#require();
-    const cost = 850000;
-    if (current.world.finances.cash < cost)
-      throw new Error('Caixa insuficiente para a manutenção.');
-    return this.#commitWorld(
-      this.#worldWithLedger(
-        {
-          ...current.world,
-          stadium: { ...current.world.stadium, maintenance: 'em dia' },
-        },
-        'Estádio · manutenção preventiva',
-        'stadium',
-        -cost,
-      ),
-    );
-  }
-
-  async expandStadium() {
-    const current = this.#require();
-    const cost = current.world.stadium.expansionCost;
-    if (
-      current.world.finances.cash - cost <
-      current.world.finances.transferGate
-    )
+    const stadium = current.world.stadium;
+    const work = stadium.maintenancePlans.find(({ id }) => id === plan);
+    if (!work)
       throw new Error(
-        'A diretoria bloqueou a obra: preserve a reserva mínima do clube.',
+        'O estádio já está em condição máxima; não há o que reformar.',
       );
+    if (current.world.finances.cash < work.cost)
+      throw new Error('Caixa insuficiente para a manutenção do estádio.');
+    const quality = Math.min(100, stadium.quality + work.qualityGain);
     return this.#commitWorld(
       this.#worldWithLedger(
         {
           ...current.world,
           stadium: {
-            ...current.world.stadium,
-            capacity: current.world.stadium.capacity + 5000,
-            expansionCost: Math.round(cost * 1.25),
+            ...stadium,
+            quality,
+            maintenancePlans: stadium.maintenancePlans
+              .map((item) => ({
+                ...item,
+                qualityGain: Math.min(item.qualityGain, 100 - quality),
+              }))
+              .filter(({ qualityGain }) => qualityGain > 0),
           },
         },
-        'Estádio · ampliação de 5.000 lugares',
+        'Estádio · manutenção',
         'stadium',
-        -cost,
+        -work.cost,
       ),
     );
   }
 
-  async developYouth(playerId: string) {
+  async expandStadium(plan: ExpansionPlanId) {
     const current = this.#require();
-    const youth = current.world.youth.find((item) => item.id === playerId);
-    if (!youth || youth.status !== 'academy')
-      throw new Error('Jovem indisponível para desenvolvimento.');
-    return this.#commitWorld({
-      ...current.world,
-      youth: current.world.youth.map((item) =>
-        item.id === playerId
-          ? {
-              ...item,
-              readiness: 'plano individual ativo · revisão em 4 rodadas',
-            }
-          : item,
+    const stadium = current.world.stadium;
+    if (stadium.works)
+      throw new Error(
+        `Já há uma obra em andamento no estádio (conclusão em ${stadium.works.completesOn}).`,
+      );
+    const work = stadium.expansionPlans.find(({ id }) => id === plan);
+    if (!work)
+      throw new Error('O estádio já está na capacidade máxima para essa obra.');
+    if (current.world.finances.cash < work.cost)
+      throw new Error('Caixa insuficiente para a ampliação do estádio.');
+    return this.#commitWorld(
+      this.#worldWithLedger(
+        {
+          ...current.world,
+          stadium: {
+            ...stadium,
+            works: {
+              addedCapacity: work.addedCapacity,
+              completesOn: work.completesOn,
+              cost: work.cost,
+            },
+            expansionPlans: [],
+          },
+        },
+        `Estádio · ampliação de ${work.addedCapacity.toLocaleString('pt-BR')} lugares`,
+        'stadium',
+        -work.cost,
       ),
-    });
+    );
   }
 
   async promoteYouth(playerId: string) {
@@ -1416,6 +1423,10 @@ export class InMemoryCareerApi implements CareerApiPort {
     const youth = current.world.youth.find((item) => item.id === playerId);
     if (!youth || youth.status !== 'academy')
       throw new Error('Jovem indisponível para promoção.');
+    if (!youth.promotable)
+      throw new Error(
+        `${youth.name} tem ${String(youth.age)} anos: a base sobe jogadores a partir dos 17.`,
+      );
     return this.#commitWorld({
       ...current.world,
       youth: current.world.youth.map((item) =>
@@ -1443,6 +1454,21 @@ export class InMemoryCareerApi implements CareerApiPort {
       youth: current.world.youth.map((item) =>
         item.id === playerId ? { ...item, status: 'released' as const } : item,
       ),
+    });
+  }
+
+  async rejectJobProposal(proposalId: string) {
+    const current = this.#require();
+    if (!current.world.board.proposals.some((item) => item.id === proposalId))
+      throw new Error('Proposta de trabalho indisponível.');
+    return this.#commitWorld({
+      ...current.world,
+      board: {
+        ...current.world.board,
+        proposals: current.world.board.proposals.filter(
+          (item) => item.id !== proposalId,
+        ),
+      },
     });
   }
 

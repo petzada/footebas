@@ -23,3 +23,4 @@ export * from './career-stats.js';
 export * from './career-inbox.js';
 export * from './career-inbox-voice.js';
 export * from './rankings.js';
+export * from './career-club.js';

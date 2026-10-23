@@ -37,7 +37,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RankingScreen } from '@/components/ranking-screen';
 import type { CareerApiPort, CareerView } from '@/lib/career-api';
 import { formatGameDate } from '@/lib/inbox-product';
-import type { MarketPlayerView, TransferKind } from '@/lib/phase4-model';
+import type {
+  ExpansionPlanId,
+  MaintenancePlanId,
+  MarketPlayerView,
+  Phase4View,
+  TransferKind,
+} from '@/lib/phase4-model';
 import { productPortsFor, type ProductPorts } from '@/lib/runtime-api';
 import { type SeasonPort, worldHistoryFromSeason } from '@/lib/season-product';
 
@@ -582,9 +588,6 @@ function ContractsPanel(
 
 export function ClubScreen(props: Phase4ScreenProps) {
   const { run, notice } = useCommand(props);
-  const [ticket, setTicket] = useState(
-    String(props.career.world.stadium.ticketPrice),
-  );
   return (
     <div>
       <SectionHeading
@@ -664,190 +667,445 @@ export function ClubScreen(props: Phase4ScreenProps) {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="stadium" className="mt-4 grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-base uppercase">
-                {props.career.world.stadium.name}
-              </CardTitle>
-              <CardDescription>
-                Público médio{' '}
-                {props.career.world.stadium.averageCrowd.toLocaleString(
-                  'pt-BR',
-                )}{' '}
-                · capacidade{' '}
-                {props.career.world.stadium.capacity.toLocaleString('pt-BR')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="ticket-price">
-                    Preço do ingresso
-                  </FieldLabel>
-                  <Input
-                    id="ticket-price"
-                    inputMode="numeric"
-                    value={ticket}
-                    onChange={(event) => setTicket(event.target.value)}
-                    aria-describedby="ticket-hint"
-                  />
-                  <p id="ticket-hint" className="text-xs text-muted-foreground">
-                    Entre R$ 10 e R$ 250. Preço maior tende a reduzir público.
-                  </p>
-                </Field>
-              </FieldGroup>
-              <div className="mt-4">
-                <div className="flex justify-between text-sm">
-                  <span>Ocupação média</span>
-                  <strong>
-                    {Math.round(
-                      (props.career.world.stadium.averageCrowd /
-                        props.career.world.stadium.capacity) *
-                        100,
-                    )}
-                    %
-                  </strong>
-                </div>
-                <Progress
-                  className="mt-2"
-                  value={
-                    (props.career.world.stadium.averageCrowd /
-                      props.career.world.stadium.capacity) *
-                    100
-                  }
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button
-                onClick={() =>
-                  void run(
-                    () => props.api.setTicketPrice(Number(ticket)),
-                    'Preço do ingresso atualizado para a próxima partida.',
-                  )
-                }
-              >
-                Salvar preço
-              </Button>
-            </CardFooter>
-          </Card>
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between gap-3">
-                <div>
-                  <CardTitle className="font-display text-base uppercase">
-                    Estrutura
-                  </CardTitle>
-                  <CardDescription>
-                    Manutenção {props.career.world.stadium.maintenance}
-                  </CardDescription>
-                </div>
-                <Buildings />
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <p className="text-sm">
-                Ampliação planejada: +5.000 lugares por{' '}
-                <strong>
-                  {money(props.career.world.stadium.expansionCost)}
-                </strong>
-                .
-              </p>
-              <p className="text-xs text-muted-foreground">
-                A obra é bloqueada se consumir a reserva financeira mínima.
-              </p>
-            </CardContent>
-            <CardFooter className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  void run(
-                    () => props.api.maintainStadium(),
-                    'Manutenção registrada no ledger.',
-                  )
-                }
-              >
-                Fazer manutenção
-              </Button>
-              <Button
-                onClick={() =>
-                  void run(
-                    () => props.api.expandStadium(),
-                    'Ampliação concluída e registrada no ledger.',
-                  )
-                }
-              >
-                Ampliar estádio
-              </Button>
-            </CardFooter>
-          </Card>
+        <TabsContent value="stadium" className="mt-4">
+          <StadiumTab {...props} run={run} />
         </TabsContent>
         <TabsContent value="youth" className="mt-4">
-          <div className="mb-3 rounded-md border bg-muted p-3 text-sm">
-            <strong>Identidade do conteúdo:</strong> todos os atletas abaixo são{' '}
-            <Badge variant="outline">gerados pelo universo</Badge>. Força e
-            dimensões ocultas aparecem apenas como estimativas textuais.
+          <YouthTab {...props} run={run} />
+        </TabsContent>
+        <TabsContent
+          value="board"
+          className="mt-4 grid gap-4 lg:grid-cols-[1fr_.8fr]"
+        >
+          <BoardTab {...props} run={run} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+type Run = ReturnType<typeof useCommand>['run'];
+type TabProps = Phase4ScreenProps & { run: Run };
+
+const fullDate = (date: string) =>
+  `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}`;
+const seats = (value: number) => value.toLocaleString('pt-BR');
+const percent = (part: number, whole: number) =>
+  whole <= 0 ? 0 : Math.min(100, Math.round((part / whole) * 100));
+
+const EXPANSION_LABEL: Readonly<Record<ExpansionPlanId, string>> = {
+  small: 'Arquibancada extra',
+  medium: 'Novo setor',
+  large: 'Grande reforma',
+};
+const MAINTENANCE_LABEL: Readonly<Record<MaintenancePlanId, string>> = {
+  repairs: 'Reparos',
+  renovation: 'Gramado e vestiários',
+  modernization: 'Modernização',
+};
+
+function qualityLabel(quality: number): string {
+  return quality >= 80
+    ? 'Excelente'
+    : quality >= 60
+      ? 'Boa'
+      : quality >= 40
+        ? 'Regular'
+        : 'Precária';
+}
+
+/** What the crowd numbers suggest about the ticket price. */
+function crowdAdvice(stadium: Phase4View['stadium']): string {
+  if (stadium.demand > stadium.capacity)
+    return `A procura (${seats(stadium.demand)}) passa da capacidade: o estádio lota. Dá para subir o ingresso ou ampliar.`;
+  if (percent(stadium.expectedCrowd, stadium.capacity) < 50)
+    return 'Sobra lugar: um ingresso mais barato atrai mais torcedores (e a torcida esfria com estádio vazio).';
+  return 'Público equilibrado com o preço atual.';
+}
+
+function StadiumTab(props: TabProps) {
+  const stadium = props.career.world.stadium;
+  const cash = props.career.world.finances.cash;
+  const [ticket, setTicket] = useState(String(stadium.ticketPrice));
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-base uppercase">
+            {stadium.name}
+          </CardTitle>
+          <CardDescription>
+            Capacidade {seats(stadium.capacity)} lugares
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground">Público médio</dt>
+              <dd className="font-medium">
+                {stadium.homeMatches > 0
+                  ? `${seats(stadium.averageCrowd)} · ${String(stadium.homeMatches)} jogo(s) em casa`
+                  : 'Sem jogos em casa ainda'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Último público</dt>
+              <dd className="font-medium">
+                {stadium.lastCrowd === undefined
+                  ? '—'
+                  : seats(stadium.lastCrowd)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">
+                Próximo jogo (estimativa)
+              </dt>
+              <dd className="font-medium">{seats(stadium.expectedCrowd)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Procura por ingressos</dt>
+              <dd className="font-medium">{seats(stadium.demand)}</dd>
+            </div>
+          </dl>
+          <div>
+            <div className="flex justify-between text-sm">
+              <span>Ocupação estimada</span>
+              <strong>
+                {percent(stadium.expectedCrowd, stadium.capacity)}%
+              </strong>
+            </div>
+            <Progress
+              className="mt-2"
+              value={percent(stadium.expectedCrowd, stadium.capacity)}
+              aria-label={`Ocupação estimada: ${String(percent(stadium.expectedCrowd, stadium.capacity))}%`}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              {crowdAdvice(stadium)}
+            </p>
+          </div>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="ticket-price">Preço do ingresso</FieldLabel>
+              <Input
+                id="ticket-price"
+                inputMode="numeric"
+                value={ticket}
+                onChange={(event) => setTicket(event.target.value)}
+                aria-describedby="ticket-hint"
+              />
+              <p id="ticket-hint" className="text-xs text-muted-foreground">
+                Entre R$ 10 e R$ 250. A torcida compara com{' '}
+                {money(stadium.referencePrice)}: acima disso o público cai.
+                Clube maior tem mais torcida e aguenta ingresso mais caro.
+              </p>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+        <CardFooter>
+          <Button
+            onClick={() =>
+              void props.run(
+                () => props.api.setTicketPrice(Number(ticket)),
+                'Preço do ingresso atualizado para a próxima partida.',
+              )
+            }
+          >
+            Salvar preço
+          </Button>
+        </CardFooter>
+      </Card>
+      <div className="flex flex-col gap-4">
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between gap-3">
+              <div>
+                <CardTitle className="font-display text-base uppercase">
+                  Estrutura
+                </CardTitle>
+                <CardDescription>
+                  {qualityLabel(stadium.quality)} · {stadium.quality}/100
+                  {stadium.lastMaintenanceOn &&
+                    ` · última manutenção em ${fullDate(stadium.lastMaintenanceOn)}`}
+                </CardDescription>
+              </div>
+              <Buildings aria-hidden="true" />
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Progress
+              value={stadium.quality}
+              aria-label={`Estrutura do estádio: ${String(stadium.quality)} de 100`}
+            />
+            <p className="text-xs text-muted-foreground">
+              Cada jogo em casa desgasta gramado e arquibancadas. Estrutura ruim
+              afasta torcedores; a manutenção sai do caixa do clube.
+            </p>
+            {stadium.maintenancePlans.length === 0 ? (
+              <p className="text-sm">Estádio em condição máxima.</p>
+            ) : (
+              <ul role="list" className="flex flex-col gap-2">
+                {stadium.maintenancePlans.map((plan) => (
+                  <li
+                    key={plan.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
+                  >
+                    <span>
+                      <strong>{MAINTENANCE_LABEL[plan.id]}</strong> · +
+                      {plan.qualityGain} de estrutura
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={cash < plan.cost}
+                      aria-label={`${MAINTENANCE_LABEL[plan.id]} por ${money(plan.cost)}`}
+                      onClick={() =>
+                        void props.run(
+                          () => props.api.maintainStadium(plan.id),
+                          `${MAINTENANCE_LABEL[plan.id]} concluída: estrutura +${String(plan.qualityGain)}.`,
+                        )
+                      }
+                    >
+                      Pagar {money(plan.cost)}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-display text-base uppercase">
+              Ampliação
+            </CardTitle>
+            <CardDescription>
+              Até {seats(stadium.maxCapacity)} lugares. A obra é paga na
+              contratação e os lugares abrem na data de conclusão.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {stadium.works ? (
+              <p role="status" className="rounded-md bg-muted p-3 text-sm">
+                <strong>Obra em andamento:</strong> +
+                {seats(stadium.works.addedCapacity)} lugares, conclusão em{' '}
+                {fullDate(stadium.works.completesOn)} (
+                {money(stadium.works.cost)} pagos).
+              </p>
+            ) : stadium.expansionPlans.length === 0 ? (
+              <p className="text-sm">O estádio já está no tamanho máximo.</p>
+            ) : (
+              <ul role="list" className="flex flex-col gap-2">
+                {stadium.expansionPlans.map((plan) => (
+                  <li
+                    key={plan.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
+                  >
+                    <span>
+                      <strong>{EXPANSION_LABEL[plan.id]}</strong> · +
+                      {seats(plan.addedCapacity)} lugares · {plan.days} dias
+                      (pronta em {fullDate(plan.completesOn)})
+                    </span>
+                    <Button
+                      size="sm"
+                      disabled={cash < plan.cost}
+                      aria-label={`${EXPANSION_LABEL[plan.id]} por ${money(plan.cost)}`}
+                      onClick={() =>
+                        void props.run(
+                          () => props.api.expandStadium(plan.id),
+                          `Obra contratada: +${seats(plan.addedCapacity)} lugares, conclusão em ${fullDate(plan.completesOn)}.`,
+                        )
+                      }
+                    >
+                      Contratar {money(plan.cost)}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!stadium.works && stadium.demand <= stadium.capacity && (
+              <p className="text-xs text-muted-foreground">
+                Hoje a procura cabe no estádio: ampliar só rende quando ele
+                lota.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+const READINESS_LABEL: Readonly<
+  Record<Phase4View['youth'][number]['readiness'], string>
+> = {
+  ready: 'Pronto para o profissional',
+  close: 'Quase pronto',
+  developing: 'Em formação',
+};
+
+type YouthSort = 'highlight' | 'strength' | 'potential' | 'age';
+const POTENTIAL_ORDER: Readonly<Record<string, number>> = {
+  joia: 3,
+  alto: 2,
+  limitado: 1,
+};
+
+function YouthTab(props: TabProps) {
+  const { youth, academy } = props.career.world;
+  const [position, setPosition] = useState('all');
+  const [sort, setSort] = useState<YouthSort>('highlight');
+  const prospects = youth.filter(({ status }) => status === 'academy');
+  const graduates = youth.filter(({ status }) => status === 'promoted');
+  const positions = [...new Set(prospects.map((item) => item.position))];
+  const needs = new Set(academy?.needs ?? []);
+  const shown = prospects
+    .filter((item) => position === 'all' || item.position === position)
+    .sort((left, right) =>
+      sort === 'strength'
+        ? right.strength - left.strength
+        : sort === 'potential'
+          ? (POTENTIAL_ORDER[right.potentialEstimate] ?? 0) -
+            (POTENTIAL_ORDER[left.potentialEstimate] ?? 0)
+          : sort === 'age'
+            ? right.age - left.age
+            : Number(right.highlight) - Number(left.highlight) ||
+              right.strength - left.strength,
+    );
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Summary
+          icon={Trophy}
+          label="Base"
+          value={`${String(prospects.length)}/${String(academy?.capacity ?? 14)} jovens`}
+          note={
+            academy
+              ? `Próxima peneira em ${fullDate(academy.nextIntakeOn)}`
+              : 'Peneiras em fevereiro e agosto'
+          }
+        />
+        <Summary
+          icon={ShieldCheck}
+          label="Elenco"
+          value={
+            academy
+              ? `${String(academy.squadSize)}/${String(academy.maxSquadSize)}`
+              : '—'
+          }
+          note={`Sobe ao profissional a partir dos ${String(academy?.minPromotionAge ?? 17)} anos`}
+        />
+        <Summary
+          icon={Binoculars}
+          label="Carência"
+          value={needs.size > 0 ? [...needs].join(', ') : 'Elenco completo'}
+          note="Posições em que o elenco tem menos jogadores"
+        />
+      </div>
+      <p className="rounded-md border bg-muted p-3 text-sm">
+        Os garotos treinam todo mês e ganham força até o potencial (estimado,
+        nunca exato). Quem passa dos {academy?.maxAge ?? 20} anos sem subir
+        deixa o clube na virada da temporada. Todos são{' '}
+        <Badge variant="outline">gerados pelo universo</Badge>.
+      </p>
+      {prospects.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          A base está vazia. A próxima peneira traz novos garotos.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              Posição
+              <select
+                className="rounded-md border bg-background px-2 py-1"
+                value={position}
+                onChange={(event) => setPosition(event.target.value)}
+              >
+                <option value="all">Todas</option>
+                {positions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              Ordenar por
+              <select
+                className="rounded-md border bg-background px-2 py-1"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as YouthSort)}
+              >
+                <option value="highlight">Destaques</option>
+                <option value="strength">Força</option>
+                <option value="potential">Potencial</option>
+                <option value="age">Idade</option>
+              </select>
+            </label>
           </div>
           <div className="grid gap-3 lg:grid-cols-3">
-            {props.career.world.youth.map((youth) => (
-              <Card key={youth.id}>
+            {shown.map((kid) => (
+              <Card
+                key={kid.id}
+                className={kid.highlight ? 'border-bulb' : undefined}
+              >
                 <CardHeader>
                   <div className="flex justify-between gap-2">
                     <div>
                       <CardTitle className="font-display text-sm uppercase">
-                        {youth.name}
+                        {kid.name}
                       </CardTitle>
                       <CardDescription>
-                        {youth.position} · {youth.age} anos
+                        {kid.position} · {kid.age} anos
                       </CardDescription>
                     </div>
-                    <Badge>
-                      {youth.status === 'academy'
-                        ? 'Base · gerado'
-                        : youth.status === 'promoted'
-                          ? 'Promovido'
-                          : 'Dispensado'}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      {kid.highlight && <Badge variant="bulb">Destaque</Badge>}
+                      {needs.has(kid.position) && (
+                        <Badge variant="outline">Carência</Badge>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2 text-sm">
                   <p>
-                    <span className="text-muted-foreground">
-                      Força estimada:
-                    </span>{' '}
-                    {youth.strengthEstimate}
+                    <span className="text-muted-foreground">Força:</span>{' '}
+                    <strong>{kid.strength}</strong>
+                    {kid.initialStrength !== undefined &&
+                      kid.strength > kid.initialStrength &&
+                      ` (+${String(kid.strength - kid.initialStrength)} desde a chegada)`}
                   </p>
                   <p>
                     <span className="text-muted-foreground">Potencial:</span>{' '}
-                    {youth.potentialEstimate}
+                    {kid.potentialEstimate}
                   </p>
+                  <div className="flex flex-wrap gap-1">
+                    {kid.traits.map((trait) => (
+                      <Badge key={trait} variant="secondary">
+                        {trait}
+                      </Badge>
+                    ))}
+                  </div>
                   <p>
                     <span className="text-muted-foreground">Prontidão:</span>{' '}
-                    {youth.readiness}
+                    {READINESS_LABEL[kid.readiness]}
                   </p>
                 </CardContent>
-                <CardFooter className="grid grid-cols-3 gap-2">
+                <CardFooter className="grid grid-cols-2 gap-2">
                   <Button
                     size="sm"
-                    variant="outline"
-                    disabled={youth.status !== 'academy'}
-                    onClick={() =>
-                      void run(
-                        () => props.api.developYouth(youth.id),
-                        `Plano de ${youth.name} atualizado.`,
-                      )
+                    disabled={!kid.promotable}
+                    title={
+                      kid.promotable
+                        ? undefined
+                        : kid.age < (academy?.minPromotionAge ?? 17)
+                          ? `Sobe a partir dos ${String(academy?.minPromotionAge ?? 17)} anos`
+                          : 'Elenco cheio'
                     }
-                  >
-                    Desenvolver
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={youth.status !== 'academy'}
                     onClick={() =>
-                      void run(
-                        () => props.api.promoteYouth(youth.id),
-                        `${youth.name} promovido ao principal.`,
+                      void props.run(
+                        () => props.api.promoteYouth(kid.id),
+                        `${kid.name} subiu ao profissional com contrato.`,
                       )
                     }
                   >
@@ -856,11 +1114,10 @@ export function ClubScreen(props: Phase4ScreenProps) {
                   <Button
                     size="sm"
                     variant="destructive"
-                    disabled={youth.status !== 'academy'}
                     onClick={() =>
-                      void run(
-                        () => props.api.releaseYouth(youth.id),
-                        `${youth.name} dispensado.`,
+                      void props.run(
+                        () => props.api.releaseYouth(kid.id),
+                        `${kid.name} dispensado.`,
                       )
                     }
                   >
@@ -870,83 +1127,133 @@ export function ClubScreen(props: Phase4ScreenProps) {
               </Card>
             ))}
           </div>
-        </TabsContent>
-        <TabsContent
-          value="board"
-          className="mt-4 grid gap-4 lg:grid-cols-[1fr_.8fr]"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-base uppercase">
-                Termômetro do trabalho
-              </CardTitle>
-              <CardDescription>
-                {props.career.world.board.status}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5">
-              <Confidence
-                label="Diretoria"
-                value={props.career.world.board.confidence}
-              />
-              <Confidence
-                label="Torcida"
-                value={props.career.world.board.fanConfidence}
-              />
-              <div className="rounded-md bg-muted p-3 text-sm">
-                <strong>Objetivo</strong>
-                <p className="mt-1">{props.career.world.board.objective}</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Risco de demissão: {props.career.world.board.firingRisk}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-base uppercase">
-                Propostas de trabalho
-              </CardTitle>
-              <CardDescription>
-                Trocar de clube preserva treinador, prestígio e história da
-                carreira.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              {props.career.world.board.proposals.length ? (
-                props.career.world.board.proposals.map((proposal) => (
-                  <div key={proposal.id} className="rounded-md border p-3">
-                    <div className="flex justify-between gap-2">
-                      <strong>{proposal.club}</strong>
-                      <Badge variant="outline">{proposal.division}</Badge>
-                    </div>
-                    <p className="mt-2 text-sm">{proposal.objective}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Salário: {money(proposal.salary)}/mês
-                    </p>
-                    <Button
-                      className="mt-3 w-full"
-                      onClick={() =>
-                        void run(
-                          () => props.api.acceptJobProposal(proposal.id),
-                          `Novo trabalho no ${proposal.club}; carreira preservada.`,
-                        )
-                      }
-                    >
-                      Aceitar e trocar de clube
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma proposta pendente.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </>
+      )}
+      {graduates.length > 0 && (
+        <section aria-labelledby="formados" className="panel p-3">
+          <h3 id="formados" className="font-pixel text-[.6rem] uppercase">
+            Formados na base
+          </h3>
+          <ul role="list" className="mt-2 flex flex-wrap gap-2 text-xs">
+            {graduates.map((kid) => (
+              <li key={kid.id} className="bg-muted p-2">
+                {kid.name} · {kid.position} · força {kid.strength}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
+  );
+}
+
+const COMPARISON_LABEL: Readonly<
+  Record<
+    NonNullable<Phase4View['board']['proposals'][number]['comparison']>,
+    string
+  >
+> = {
+  bigger: 'Clube maior',
+  similar: 'Mesmo porte',
+  smaller: 'Clube menor',
+};
+
+function BoardTab(props: TabProps) {
+  const board = props.career.world.board;
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-base uppercase">
+            Termômetro do trabalho
+          </CardTitle>
+          <CardDescription>{board.status}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <Confidence label="Diretoria" value={board.confidence} />
+          <Confidence label="Torcida" value={board.fanConfidence} />
+          <div className="rounded-md bg-muted p-3 text-sm">
+            <strong>Objetivo</strong>
+            <p className="mt-1">{board.objective}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Risco de demissão: {board.firingRisk}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-base uppercase">
+            Propostas de trabalho
+          </CardTitle>
+          <CardDescription>
+            Os clubes ligam durante a temporada conforme o seu trabalho: bom
+            desempenho atrai clubes maiores; fase ruim, só menores. Trocar de
+            clube preserva treinador, prestígio e história da carreira.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {board.proposals.length ? (
+            board.proposals.map((proposal) => (
+              <div key={proposal.id} className="rounded-md border p-3">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <strong>{proposal.club}</strong>
+                  <span className="flex gap-1">
+                    {proposal.division && (
+                      <Badge variant="outline">{proposal.division}</Badge>
+                    )}
+                    {proposal.comparison && (
+                      <Badge
+                        variant={
+                          proposal.comparison === 'bigger'
+                            ? 'bulb'
+                            : 'secondary'
+                        }
+                      >
+                        {COMPARISON_LABEL[proposal.comparison]}
+                      </Badge>
+                    )}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm">{proposal.objective}</p>
+                {proposal.expiresOn && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Responda até {fullDate(proposal.expiresOn)}
+                  </p>
+                )}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={() =>
+                      void props.run(
+                        () => props.api.acceptJobProposal(proposal.id),
+                        `Novo trabalho no ${proposal.club}; carreira preservada.`,
+                      )
+                    }
+                  >
+                    Aceitar e trocar de clube
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void props.run(
+                        () => props.api.rejectJobProposal(proposal.id),
+                        `Proposta do ${proposal.club} recusada.`,
+                      )
+                    }
+                  >
+                    Recusar
+                  </Button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma proposta pendente.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </>
   );
 }
 

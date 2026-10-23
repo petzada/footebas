@@ -685,6 +685,46 @@ export function runInboxDay(
   prune(inbox);
 }
 
+/**
+ * A notice from the club rules (stadium works, academy intakes, job
+ * offers), once per `key`. Needs a managed club, like every inbox message.
+ */
+export function postNotice(
+  snapshot: CareerSnapshot,
+  input: {
+    key: string;
+    topic: Extract<
+      InboxTopic,
+      'notice_job_offer' | 'notice_youth_intake' | 'notice_stadium'
+    >;
+    subject: string;
+    body: string;
+    date: string;
+    playerId?: string;
+  },
+): void {
+  const clubId = snapshot.world.manager.currentClubId;
+  if (clubId === undefined) return;
+  snapshot.inbox ??= emptyInbox();
+  const context: Context = {
+    snapshot,
+    inbox: snapshot.inbox,
+    date: input.date,
+    clubId,
+    clubName: snapshot.clubs.find(({ id }) => id === clubId)?.name ?? 'clube',
+  };
+  notice(
+    context,
+    input.key,
+    input.topic,
+    input.subject.slice(0, 160),
+    input.body.slice(0, 600),
+    undefined,
+    input.playerId,
+  );
+  prune(snapshot.inbox);
+}
+
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 
 function applyEffect(
