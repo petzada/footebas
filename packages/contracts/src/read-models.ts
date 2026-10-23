@@ -36,13 +36,29 @@ const scoreSchema = z.strictObject({
   home: z.int().min(0).max(99),
   away: z.int().min(0).max(99),
 });
+/**
+ * A decision the inbox item asks for. `accept`/`reject` resolve to
+ * `DecideTransferOffer { offerId, decision }` and `counter` to
+ * `CounterTransferOffer { offerId, fee, wage, expiresOn }` (docs/adr/0008).
+ */
+export const inboxDecisionSchema = z.strictObject({
+  id: entityIdSchema,
+  offerId: entityIdSchema,
+  options: z
+    .array(z.enum(['accept', 'reject', 'counter']))
+    .min(1)
+    .max(3),
+  expiresOn: gameDateSchema,
+});
 export const coachMessageSchema = z.strictObject({
   id: entityIdSchema,
-  kind: z.enum(['match_report']),
-  situation: z.enum(['win', 'draw', 'loss']),
+  kind: z.enum(['match_report', 'transfer_offer']),
+  /** Present on match reports. */
+  situation: z.enum(['win', 'draw', 'loss']).optional(),
   subject: z.string().min(1).max(160),
   body: z.string().min(1).max(600),
   occurredOn: gameDateSchema,
+  decision: inboxDecisionSchema.optional(),
 });
 export const homeReadModelSchema = z.strictObject({
   ...readBase,
@@ -244,6 +260,7 @@ export const postMatchReadModelSchema = z.strictObject({
 });
 export type HomeReadModel = z.infer<typeof homeReadModelSchema>;
 export type CoachMessage = z.infer<typeof coachMessageSchema>;
+export type InboxDecision = z.infer<typeof inboxDecisionSchema>;
 export type SquadReadModel = z.infer<typeof squadReadModelSchema>;
 export type NextMatchReadModel = z.infer<typeof nextMatchReadModelSchema>;
 export type StandingsReadModel = z.infer<typeof standingsReadModelSchema>;

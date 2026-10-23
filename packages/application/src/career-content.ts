@@ -22,6 +22,13 @@ export interface CareerContent {
   readonly divisions: Readonly<Record<MvpDivisionId, readonly ClubId[]>>;
   readonly continentalDirect: readonly ClubId[];
   readonly continentalPreliminary: readonly ClubId[];
+  /** Catalog origin of every club (market search: national vs foreign). */
+  readonly clubOrigins?: Readonly<
+    Record<
+      string,
+      { origin: 'national' | 'state' | 'foreign'; country: string }
+    >
+  >;
 }
 
 export interface CareerContentPort {
@@ -149,6 +156,12 @@ export function careerContentFromCatalog(
       catalog.competitions.continental.initialPreliminaryClubIds.map((id) =>
         entityId(id, 'club'),
       ),
+    clubOrigins: Object.fromEntries(
+      catalog.clubs.map(({ id, origin, country }) => [
+        entityId(id, 'club'),
+        { origin, country },
+      ]),
+    ),
   };
 }
 

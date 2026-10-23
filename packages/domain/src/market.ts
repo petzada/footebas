@@ -435,3 +435,227 @@ export function decideClubOffer(
   if (offer.fee >= Math.floor(fairValue * 0.92)) return 'accept';
   return offer.fee >= Math.floor(fairValue * 0.65) ? 'counter' : 'reject';
 }
+
+/** Catalog squad cap (docs/adr/0008): no transfer may push a squad above it. */
+export const MAX_SQUAD_SIZE = 35;
+/** AI clubs never sell below this squad size. */
+export const AI_MINIMUM_SQUAD_SIZE = 22;
+export const MARKET_AI_RULES_VERSION = 'market-ai-v1' as const;
+
+/** Fewest players per primary position a squad needs; below it the club buys. */
+export const POSITION_MINIMUMS: Readonly<Record<Position, number>> =
+  Object.freeze({
+    GK: 2,
+    RB: 1,
+    CB: 3,
+    LB: 1,
+    DM: 1,
+    CM: 2,
+    AM: 1,
+    RW: 1,
+    LW: 1,
+    ST: 2,
+  });
+/** Above this count a position is surplus and the club accepts selling. */
+export const POSITION_TARGETS: Readonly<Record<Position, number>> =
+  Object.freeze({
+    GK: 3,
+    RB: 2,
+    CB: 4,
+    LB: 2,
+    DM: 2,
+    CM: 3,
+    AM: 2,
+    RW: 2,
+    LW: 2,
+    ST: 3,
+  });
+
+export type TransferListing =
+  | Readonly<{
+      playerId: PlayerId;
+      clubId: ClubId;
+      mode: 'sale';
+      askingPrice: Money;
+      listedOn: string;
+    }>
+  | Readonly<{
+      playerId: PlayerId;
+      clubId: ClubId;
+      mode: 'loan';
+      durationMonths: number;
+      wageSharePercentage: number;
+      listedOn: string;
+    }>;
+
+export function createTransferListing(
+  listing: TransferListing,
+): TransferListing {
+  if (
+    listing.mode === 'sale' &&
+    (!Number.isSafeInteger(listing.askingPrice) || listing.askingPrice < 0)
+  )
+    throw new DomainError('INVALID_ENTITY', 'invalid asking price');
+  if (
+    listing.mode === 'loan' &&
+    (!Number.isInteger(listing.durationMonths) ||
+      listing.durationMonths < 1 ||
+      listing.durationMonths > 12 ||
+      !Number.isInteger(listing.wageSharePercentage) ||
+      listing.wageSharePercentage < 0 ||
+      listing.wageSharePercentage > 100)
+  )
+    throw new DomainError('INVALID_ENTITY', 'invalid loan listing');
+  return Object.freeze({ ...listing });
+}
+
+/** Position counts of a squad (primary positions only). */
+export function positionCounts(
+  squad: readonly Pick<Player, 'position'>[],
+): Readonly<Record<Position, number>> {
+  const counts: Record<Position, number> = {
+    GK: 0,
+    RB: 0,
+    CB: 0,
+    LB: 0,
+    DM: 0,
+    CM: 0,
+    AM: 0,
+    RW: 0,
+    LW: 0,
+    ST: 0,
+  };
+  for (const player of squad) counts[player.position] += 1;
+  return counts;
+}
+
+/** True when the player is among the 11 strongest of the squad. */
+export function isKeyPlayer(
+  player: Pick<Player, 'id' | 'strength'>,
+  squad: readonly Pick<Player, 'id' | 'strength'>[],
+): boolean {
+  const stronger = squad.filter(
+    (other) =>
+      other.id !== player.id &&
+      (Number(other.strength) > Number(player.strength) ||
+        (Number(other.strength) === Number(player.strength) &&
+          other.id < player.id)),
+  ).length;
+  return stronger < 11;
+}
+
+export interface SellerContext {
+  readonly player: Pick<
+    Player,
+    'id' | 'age' | 'position' | 'strength' | 'value'
+  >;
+  readonly sellerSquad: readonly Pick<Player, 'id' | 'position' | 'strength'>[];
+  readonly sellerReputation: number;
+  /** Contract end of the player at the seller; undefined counts as long. */
+  readonly contractEndsOn?: string | undefined;
+  readonly onDate: string;
+  /** Coach negotiation factor of the buyer (ADR 0007); 1 is neutral. */
+  readonly priceFactor?: number;
+}
+
+/**
+ * Price an AI seller asks for one of its players: value adjusted by age,
+ * contract length, the player's weight in the squad and positional need.
+ */
+export function sellerAskingPrice(context: SellerContext): Money {
+  const { player, sellerSquad } = context;
+  const needed =
+    positionCounts(sellerSquad)[player.position] <=
+    POSITION_MINIMUMS[player.position];
+  const key = isKeyPlayer(player, sellerSquad);
+  const age =
+    player.age <= 23
+      ? 1.15
+      : player.age >= 34
+        ? 0.75
+        : player.age >= 31
+          ? 0.9
+          : 1;
+  const months =
+    context.contractEndsOn === undefined
+      ? 36
+      : dayDistance(context.onDate, context.contractEndsOn) / 30;
+  const contract =
+    months <= 6 ? 0.7 : months <= 12 ? 0.85 : months >= 36 ? 1.1 : 1;
+  const star =
+    Number(player.strength) >= context.sellerReputation + 5 ? 1.1 : 1;
+  const price =
+    Number(player.value) *
+    age *
+    contract *
+    star *
+    (key ? 1.25 : 1) *
+    (needed ? 1.35 : 1) *
+    (context.priceFactor ?? 1);
+  return Math.max(0, Math.floor(price)) as Money;
+}
+
+export type SellerDecision =
+  | Readonly<{ decision: 'accept' }>
+  | Readonly<{ decision: 'reject'; reason: string }>
+  | Readonly<{ decision: 'counter'; fee: Money }>;
+
+/**
+ * How an AI club answers an offer for one of its players (docs/adr/0008):
+ * value, age, contract, strength and need. Pure and deterministic.
+ */
+export function decideSellerResponse(
+  offer: Pick<TransferOffer, 'kind' | 'fee' | 'loan'>,
+  context: SellerContext,
+): SellerDecision {
+  if (context.sellerSquad.length <= AI_MINIMUM_SQUAD_SIZE)
+    return Object.freeze({ decision: 'reject', reason: 'squad_too_small' });
+  const asking = Number(sellerAskingPrice(context));
+  const key = isKeyPlayer(context.player, context.sellerSquad);
+  const needed =
+    positionCounts(context.sellerSquad)[context.player.position] <=
+    POSITION_MINIMUMS[context.player.position];
+  if (offer.kind === 'loan') {
+    if (key || needed)
+      return Object.freeze({ decision: 'reject', reason: 'key_player' });
+    const share = offer.loan?.wageSharePercentage ?? 0;
+    const loanFee = Math.floor(asking * 0.08);
+    if (share >= 50 || offer.fee >= loanFee)
+      return Object.freeze({ decision: 'accept' });
+    return Object.freeze({
+      decision: 'counter',
+      fee: Math.max(offer.fee + 1, loanFee) as Money,
+    });
+  }
+  if (offer.fee >= asking) return Object.freeze({ decision: 'accept' });
+  if (offer.fee >= Math.floor(asking * 0.75))
+    return Object.freeze({
+      decision: 'counter',
+      fee: Math.max(offer.fee + 1, asking) as Money,
+    });
+  return Object.freeze({ decision: 'reject', reason: 'fee_too_low' });
+}
+
+/**
+ * Highest fee an AI buyer accepts after the seller counters its offer: 20%
+ * above its own bid, never more than 1.6x value nor its available cash. A
+ * loan bidder accepts a loan fee up to 10% of the player's value.
+ */
+export function buyerCounterLimit(
+  originalFee: Money,
+  playerValue: Money,
+  buyerCash: Money,
+  kind: TransferKind = 'buy',
+): Money {
+  const ceiling =
+    kind === 'loan'
+      ? Math.max(
+          Math.floor(Number(originalFee) * 1.2),
+          Math.floor(Number(playerValue) * 0.1),
+        )
+      : Math.min(
+          Math.floor(Number(originalFee) * 1.2),
+          Math.floor(Number(playerValue) * 1.6),
+        );
+  return Math.max(0, Math.min(ceiling, Number(buyerCash))) as Money;
+}

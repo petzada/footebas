@@ -213,9 +213,11 @@ describe('career profile', () => {
   it('writes the inbox in the personality tone after a match', async () => {
     const played = await playFirstMatch('disciplinador');
     const home = await played.app.home(played.token, played.careerId);
-    expect(home.inbox).toHaveLength(1);
-    expect(home.inbox[0]!.body).toContain('Marcio');
-    expect(home.inbox[0]!.situation).toBe(
+    // Transfer proposals of the window may share the inbox (docs/adr/0008).
+    const reports = home.inbox.filter(({ kind }) => kind === 'match_report');
+    expect(reports).toHaveLength(1);
+    expect(reports[0]!.body).toContain('Marcio');
+    expect(reports[0]!.situation).toBe(
       played.result === 'W' ? 'win' : played.result === 'L' ? 'loss' : 'draw',
     );
   });

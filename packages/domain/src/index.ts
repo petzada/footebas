@@ -87,3 +87,4 @@ export * from './development.js';
 export * from './career-world.js';
 export * from './competition.js';
 export * from './coach.js';
+export * from './transfer-window.js';
