@@ -188,10 +188,66 @@ Branch `worktree-agent-a54860b74fbeb7a3a`, sem push.
   - `legal-page.tsx`, `landing/landing-page.tsx`: links com área de toque de 44 px.
   - `phase4-screens.tsx`, `competition-screens.tsx`: cabeçalhos sobre o gramado em chalk; aviso da Base em ink.
 
-Verificação: `npx vitest related --run` nos arquivos tocados (16 arquivos de teste, 124 testes verdes) e `npx eslint`
-nos mesmos arquivos (limpo); `prettier --check --end-of-line auto` (o checkout Windows está em CRLF, por isso o
-`--end-of-line`). Visual: medições no DOM em 320 e 360 após as correções (abas 93×44 e 107×44 sem corte, decisões
-em largura total, valores do cabeçalho em duas linhas no máximo, overflow 0) e capturas de tela em 360.
+- **c163b1c** `feat(web): dismissible command errors, simulating pitch and retro skeletons` (escopo ampliado
+  pelo responsável, itens 1–5 abaixo)
+  - `career-game.tsx`: `InlineError` virou painel chalk com botão "Fechar aviso"; `changeScreen` limpa o erro ao
+    trocar de tela (barra inferior, menu, atalhos da Central/Mapa e "Preparar próxima rodada"); estado
+    `simulating` durante `instantResult`; `Standings` reescrita em teletexto com V/E/D/SG.
+  - `retro/match-simulation.tsx` (novo): campo pixel em CSS com bola quicando entre as metas, emblemas dos dois
+    clubes, `role=status`; só aparece enquanto o comando está em voo e some assim que o resultado chega.
+  - `retro/skeleton.tsx` (novo) + `globals.css`: `ScreenSkeleton` com placar apagado e barras piscando em
+    passos; usado em Mercado, Escritório, Temporada, Ranking, Perfil, Competições/Calendário e História.
+  - `globals.css` + `phase6-shell.tsx`: `.scrollbar-px` (trilho madeira, polegar grama com borda ink; Firefox com
+    `scrollbar-color`) na navegação lateral do desktop; teclado e roda do mouse seguem funcionando.
+  - Testes: `phase6-shell.test.tsx` (campo simulando só enquanto o resultado não chega; erro some ao fechar e ao
+    trocar de tela).
+
+Verificação: `npx vitest related --run` nos arquivos tocados (16 arquivos de teste, 124 testes verdes na primeira
+rodada; 14 arquivos, 104 testes verdes após o escopo ampliado) e `npx eslint` nos mesmos arquivos (limpo);
+`prettier --check --end-of-line auto` (o checkout Windows está em CRLF, por isso o `--end-of-line`). Visual:
+medições no DOM em 320 e 360 após as correções (abas 93×44 e 107×44 sem corte, decisões em largura total, valores
+do cabeçalho em duas linhas no máximo, overflow 0) e capturas de tela em 360. A barra de rolagem pixel, o campo
+simulando e os skeletons foram verificados só pelos testes (o servidor já estava desligado): conferir no
+navegador antes do merge.
+
+## Escopo ampliado (itens pedidos depois da primeira rodada)
+
+1. **Avisos e erros.** Causa do aviso preso: `error` em `CareerFlow` é global e era renderizado por `InlineError`
+   dentro do shell em toda tela, sem botão de fechar e sem limpeza ao navegar; só o ticker (letreiro no topo) some
+   sozinho em 5,2 s. Corrigido (c163b1c): fechável, limpo ao trocar de tela. Inventário dos demais avisos: ticker
+   (some sozinho, toque fecha), `notice` sr-only de Mercado/Escritório (só leitor de tela), `LiveNotice` da tela
+   Clube (`phase4-screens`, some ao trocar de aba porque o componente remonta), alertas de formulário (presos ao
+   campo), `PlanNotice`/erros de Carregar carreira (presos à tela). Nenhum vaza para outra tela além do caso
+   corrigido. Não mexi em `inbox-decisions.tsx` (outro agente).
+2. **Barra de rolagem da sidebar (desktop).** `.scrollbar-px` aplicada só à `nav` lateral; rolagem por teclado e
+   roda intacta (é a rolagem nativa). Se preferir esconder: trocar por `scrollbar-width: none` +
+   `::-webkit-scrollbar { display: none }` na mesma classe.
+3. **Resultado instantâneo.** `MatchSimulation` em CSS/SVG (classe `.pitch` já existente + `@keyframes
+sim-ball-run` em passos de 12, `steps()` como o resto do tema); sem Phaser/Three, sem atraso artificial, com
+   `prefers-reduced-motion` a bola fica parada (regra global de `globals.css`) e o texto "Bola rolando…" segue.
+4. **Carregamento entre telas.** `ScreenSkeleton` substitui as frases soltas; `InboxDecisions` ("Abrindo os
+   envelopes…") e o "Carregando calendário…" dos Próximos compromissos da Central ficaram como estavam porque o
+   primeiro é arquivo do outro agente e o segundo é uma linha dentro de um card já desenhado.
+5. **Classificação e tabelas.** Feito só o visual da liga (`Standings`): teletexto, V/E/D a partir de 414 px,
+   SG e Pts sempre, clube destacado com `aria-current`. Proposta por formato (sem tocar na lógica nem em
+   `competition-product.ts`):
+   - **Pontos corridos (Séries A/B/C):** a tabela acima, com faixas coloridas à esquerda das posições
+     (continental em bulb, acesso em grass, rebaixamento em card-red) quando o read model expuser as vagas
+     (`CompetitionProductView.divisions[].continentalSpots/relegationSpots` já existem na Pirâmide); na Central,
+     manter a janela de 5 linhas em volta do clube.
+   - **Mata‑mata (Copa do Brasil):** lista vertical de confrontos por fase (`<ol>`), cada card com os dois
+     emblemas, placar da ida e da volta e o vencedor em bulb; a fase atual aberta e as anteriores em `details`.
+     Chaveamento horizontal só a partir de `lg`.
+   - **Fase de grupos (Libertadores):** um painel teletexto por grupo (4 linhas, J/SG/Pts), com o grupo do
+     clube primeiro e os demais recolhidos; depois da fase de grupos, a lista de mata‑mata acima.
+   - **Estaduais:** mesma tabela de pontos corridos; o "classifica para a final/semi" como faixa bulb.
+   - Precisa no port (descrever ao outro agente): `standings` por competição e fase (`kind: 'league' | 'knockout'
+| 'groups'`, `zones`, `ties` com ida/volta) saindo de `competition-product.ts`/`http-products.ts`.
+6. **Ranking (aviso do responsável: dois escopos novos, ADR 0017).** Só o skeleton foi trocado aqui; abas e
+   layout intactos. Para 5 escopos (Geral, Ascensão, Mensal, Títulos, Melhor temporada) no celular, recomendo a
+   `TabsList` com rolagem horizontal (`flex overflow-x-auto snap-x`, sem `grid-cols-5`), aba ativa rolada para o
+   centro ao selecionar e um degradê de "continua" na borda; alternativa: `<select>` nativo (pixel) abaixo de
+   `sm` e abas a partir dele. Evitar duas linhas de abas e rótulos abaixo de `.5rem`.
 
 ## Decisões para o responsável
 
