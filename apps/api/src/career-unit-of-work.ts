@@ -174,6 +174,8 @@ class CareerTransaction {
           this.achievements.push(...entries);
           return Promise.resolve();
         },
+        // CreateCareer (the only enrollment) runs on the Worker, not here.
+        enroll: () => unsupported('enrolling a career on the ranking'),
         listByCareer: (careerId) =>
           this.deps.store().listAchievements(careerId),
       },

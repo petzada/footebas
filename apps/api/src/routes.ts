@@ -72,7 +72,7 @@ export interface ApiDependencies {
     application: PhaseFiveCompetitionService;
     auth: AuthPort;
   }>;
-  /** Global ranking snapshots (`GET /v1/rankings`, ADR 0013). */
+  /** Coach ranking, live (`GET /v1/rankings`, ADR 0013, ADR 0017). */
   readonly rankings?: RankingService;
   /** Licença única via Woovi/PIX and `GET /v1/me` (Fase 8). */
   readonly billing?: BillingRouteDependencies;
@@ -679,11 +679,21 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
         path: '/v1/rankings',
         schema: {
           summary:
-            'Global coach ranking snapshot (scope=global|rise|monthly, period=YYYY-MM)',
+            'Coach ranking, live (scope=general|titles|best_season|rise|monthly; global = general; period=YYYY-MM)',
           querystring: {
             type: 'object',
             properties: {
-              scope: { type: 'string', enum: ['global', 'rise', 'monthly'] },
+              scope: {
+                type: 'string',
+                enum: [
+                  'general',
+                  'titles',
+                  'best_season',
+                  'rise',
+                  'monthly',
+                  'global',
+                ],
+              },
               period: { type: 'string' },
               limit: { type: 'string' },
             },
@@ -697,11 +707,12 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
               limit: request.query.limit,
             }).filter(([, value]) => value !== undefined && value !== ''),
           );
-          // Snapshots change every 15 minutes (Cron Trigger); cache ~5 min.
+          // Live totals (ADR 0017): browsers and the Workers Cache keep the
+          // board for at most 30 s (src/public-cache.ts).
           return {
             status: 200,
             headers: {
-              'cache-control': 'public, max-age=300, s-maxage=300',
+              'cache-control': 'public, max-age=30, s-maxage=30',
             },
             body: rankingReadModelSchema.parse(
               await rankings.leaderboard(query),
@@ -714,7 +725,8 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
         path: '/v1/rankings/me',
         schema: {
           ...commonSchema,
-          summary: 'Position of the authenticated user in each ranking scope',
+          summary:
+            'Position of the authenticated user and participants in each ranking scope (computed on read)',
         },
         async handler(request) {
           return json(
