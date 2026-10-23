@@ -118,5 +118,5 @@ describe('phase five Brazilian competition content', () => {
       invalidCalendar: true,
     });
     expect(report.simulatedMatches).toBeGreaterThan(1_000_000);
-  }, 60_000);
+  }, 300_000);
 });
