@@ -29,7 +29,7 @@ describe('elenco e matchday mobile-first', () => {
     await onboard();
     fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
     fireEvent.click(
-      await screen.findByRole('button', { name: /pular resultado/i }),
+      await screen.findByRole('button', { name: /pular para o resultado/i }),
     );
     expect(await screen.findByText(/fim de jogo/i)).toBeTruthy();
     fireEvent.click(
@@ -88,7 +88,7 @@ describe('elenco e matchday mobile-first', () => {
       screen.getByRole('list', { name: /feed da partida/i }).textContent,
     ).toMatch(/bola rolando/i);
     expect(
-      screen.getByRole('button', { name: /pular resultado/i }),
+      screen.getByRole('button', { name: /pular para o resultado/i }),
     ).toBeTruthy();
   });
 
@@ -150,28 +150,34 @@ describe('CareerApiPort autoritativo', () => {
     );
   });
 
-  it('registra substituições e mudanças táticas em ponto discreto', async () => {
+  it('registra substituições e mudanças táticas em qualquer pausa até o apito final', async () => {
     const api = new InMemoryCareerApi();
     await api.login('a@b.com');
     await api.createCareer({ coach: 'Bia' });
     await api.selectClub('Flamengo');
-    await api.beginMatch();
+    const kickoff = await api.beginMatch();
+    expect(kickoff.replay?.timeline.length).toBeGreaterThan(0);
+    // Decision 18: a manual pause at any minute accepts changes.
+    await api.makeSubstitution({
+      outgoingId: 'fla-22',
+      incomingId: 'fla-13',
+      minute: 7,
+    });
+    const stops: number[] = [];
+    let update = kickoff;
+    while (!update.done) {
+      update = await api.nextMatchEvent();
+      if (update.decisionPoint) stops.push(update.minute);
+    }
+    // It stops by itself only at half time (and at the end).
+    expect(stops).toEqual([45]);
     await expect(
-      api.makeSubstitution({ outgoingId: 'fla-22', incomingId: 'fla-13' }),
-    ).rejects.toThrow(/pausas/i);
-    await api.nextMatchEvent();
-    await api.nextMatchEvent();
-    const pause = await api.nextMatchEvent();
-    expect(pause.decisionPoint).toBe(true);
-    await api.makeSubstitution({ outgoingId: 'fla-22', incomingId: 'fla-13' });
-    await api.changeMatchTactics({ mentality: 'attacking' });
+      api.changeMatchTactics({ mentality: 'attacking' }),
+    ).rejects.toThrow(/terminou/i);
     const finished = await api.finishMatch();
-    expect(finished.lastResult?.actions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'substitution' }),
-        expect.objectContaining({ type: 'tactics' }),
-      ]),
-    );
+    expect(finished.lastResult?.actions).toEqual([
+      expect.objectContaining({ type: 'substitution', minute: 7 }),
+    ]);
   });
 
   it('produz resultado instantâneo completo', async () => {

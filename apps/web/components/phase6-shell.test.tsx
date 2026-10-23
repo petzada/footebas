@@ -136,7 +136,7 @@ describe('Fase 6 · shell mobile-first', () => {
     const narrate = screen.getByRole('button', { name: /jogar partida/i });
     fireEvent.click(narrate);
     fireEvent.click(narrate);
-    await screen.findByRole('button', { name: /pular resultado/i });
+    await screen.findByRole('button', { name: /pular para o resultado/i });
     expect(begin).toHaveBeenCalledTimes(1);
   });
 

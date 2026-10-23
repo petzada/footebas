@@ -79,6 +79,7 @@ export function Phase6Shell({
   commandState,
   onSignOut,
   onHome,
+  immersive = false,
   children,
 }: {
   screen: Screen;
@@ -89,9 +90,30 @@ export function Phase6Shell({
   onSignOut?: () => void;
   /** Leaves the career for the Início screen (new or saved careers). */
   onHome?: () => void;
+  /**
+   * Live match (decision 19): the header stays pinned and the bottom bar
+   * hides until the player scrolls down or changes screen.
+   */
+  immersive?: boolean;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navRevealed, setNavRevealed] = useState(false);
+  const [revealKey, setRevealKey] = useState({ immersive, screen });
+  if (revealKey.immersive !== immersive || revealKey.screen !== screen) {
+    // Entering a match hides the bar again; changing screen brings it back.
+    setRevealKey({ immersive, screen });
+    setNavRevealed(revealKey.immersive === immersive);
+  }
+  useEffect(() => {
+    if (!immersive || navRevealed) return;
+    const onScroll = () => {
+      if ((globalThis.scrollY ?? 0) > 80) setNavRevealed(true);
+    };
+    globalThis.addEventListener?.('scroll', onScroll, { passive: true });
+    return () => globalThis.removeEventListener?.('scroll', onScroll);
+  }, [immersive, navRevealed]);
+  const navHidden = immersive && !navRevealed;
 
   // Central and Mapa already show the next match and the advance button.
   const showRail = screen !== 'central' && screen !== 'map';
@@ -115,7 +137,12 @@ export function Phase6Shell({
         aria-busy={commandState === 'pending'}
         className="min-w-0 px-4 py-4 sm:px-6 lg:px-8 lg:py-6"
       >
-        <header className="panel-board mb-5 flex min-h-14 items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
+        <header
+          className={cn(
+            'panel-board mb-5 flex min-h-14 items-center justify-between gap-3 px-3 py-2.5 sm:px-4',
+            immersive && 'sticky top-0 z-30 mb-3',
+          )}
+        >
           <div className="flex min-w-0 items-center gap-3">
             <ClubEmblem name={career.club} size={44} decorative />
             <div className="min-w-0">
@@ -157,6 +184,7 @@ export function Phase6Shell({
         open={menuOpen}
         setOpen={setMenuOpen}
         navigate={navigate}
+        hidden={navHidden}
       />
     </div>
   );
@@ -364,12 +392,15 @@ function MobileNavigation({
   open,
   setOpen,
   navigate,
+  hidden = false,
 }: {
   screen: Screen;
   open: boolean;
   setOpen(value: boolean): void;
   navigate(value: Screen): void;
+  hidden?: boolean;
 }) {
+  if (hidden) return null;
   return (
     <>
       {open && (

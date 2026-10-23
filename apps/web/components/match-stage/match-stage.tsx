@@ -106,6 +106,11 @@ export interface MatchStageProps {
   readonly canvasSupport?: CanvasSupport;
   /** Testable override; when omitted, cores and memory are probed. */
   readonly lowEndDevice?: boolean;
+  /**
+   * Live screen (decision 19): only the pitch, without the scoreboard,
+   * whistle board or caption drawn over it — the screen shows them above.
+   */
+  readonly bare?: boolean;
 }
 
 const scoreFont = { fontFamily: '"Courier New", Courier, monospace' };
@@ -120,6 +125,7 @@ export function MatchStage({
   fallback,
   canvasSupport: supportOverride,
   lowEndDevice: lowEndOverride,
+  bare = false,
 }: MatchStageProps) {
   // Server render and hydration see "unknown", then the client snapshot.
   const detected = useSyncExternalStore<CanvasSupport | undefined>(
@@ -262,22 +268,24 @@ export function MatchStage({
                 />
               </StageErrorBoundary>
             )}
-            <p
-              aria-hidden="true"
-              className="absolute left-1/2 top-[6%] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap border border-white/30 bg-black/75 px-2 py-0.5 text-xs font-bold text-white tabular-nums sm:text-sm"
-              data-testid="stage-scoreboard"
-              style={scoreFont}
-            >
-              <span>{match.home.abbreviation.slice(0, 3)}</span>
-              <span className="text-[#ffe14d]">
-                {frame.score.home}-{frame.score.away}
-              </span>
-              <span>{match.away.abbreviation.slice(0, 3)}</span>
-              <span className="border-l border-white/30 pl-2">
-                {minuteLabel}
-              </span>
-            </p>
-            {showStage && (frame.complete || halfTime) ? (
+            {bare ? null : (
+              <p
+                aria-hidden="true"
+                className="absolute left-1/2 top-[6%] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap border border-white/30 bg-black/75 px-2 py-0.5 text-xs font-bold text-white tabular-nums sm:text-sm"
+                data-testid="stage-scoreboard"
+                style={scoreFont}
+              >
+                <span>{match.home.abbreviation.slice(0, 3)}</span>
+                <span className="text-[#ffe14d]">
+                  {frame.score.home}-{frame.score.away}
+                </span>
+                <span>{match.away.abbreviation.slice(0, 3)}</span>
+                <span className="border-l border-white/30 pl-2">
+                  {minuteLabel}
+                </span>
+              </p>
+            )}
+            {!bare && showStage && (frame.complete || halfTime) ? (
               <p
                 aria-hidden="true"
                 className="px-rise pointer-events-none absolute inset-x-0 bottom-[8%] flex justify-center"
@@ -292,9 +300,11 @@ export function MatchStage({
               </p>
             ) : null}
           </div>
-          <figcaption className="flex min-h-11 items-center px-3 py-2 text-sm text-[#d7e7df]">
-            {frame.description}
-          </figcaption>
+          {bare ? null : (
+            <figcaption className="flex min-h-11 items-center px-3 py-2 text-sm text-[#d7e7df]">
+              {frame.description}
+            </figcaption>
+          )}
           <p className="sr-only">{textualReplayAlternative(match, frame)}</p>
         </figure>
       ) : null}
