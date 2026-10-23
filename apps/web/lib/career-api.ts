@@ -117,6 +117,11 @@ export interface StandingView {
   club: string;
   played: number;
   points: number;
+  /** Record and goal difference (absent on older read models). */
+  won?: number;
+  drawn?: number;
+  lost?: number;
+  goalDifference?: number;
 }
 
 export interface OpponentView {
@@ -1550,6 +1555,8 @@ export class InMemoryCareerApi implements CareerApiPort {
               ...row,
               played: row.played + 1,
               points: row.points + 3,
+              won: (row.won ?? 0) + 1,
+              goalDifference: (row.goalDifference ?? 0) + 1,
               position: 2,
             }
           : row,
@@ -1695,11 +1702,44 @@ function acceptedMarketPlayer(
 }
 
 const initialTable: StandingView[] = [
-  { position: 1, club: 'Palmeiras', played: 1, points: 3 },
-  { position: 2, club: 'Flamengo', played: 0, points: 0 },
-  { position: 3, club: 'Atlético Mineiro', played: 1, points: 1 },
-  { position: 4, club: 'Fluminense', played: 1, points: 0 },
+  {
+    position: 1,
+    club: 'Palmeiras',
+    played: 1,
+    points: 3,
+    ...record(1, 0, 0, 2),
+  },
+  {
+    position: 2,
+    club: 'Flamengo',
+    played: 0,
+    points: 0,
+    ...record(0, 0, 0, 0),
+  },
+  {
+    position: 3,
+    club: 'Atlético Mineiro',
+    played: 1,
+    points: 1,
+    ...record(0, 1, 0, 0),
+  },
+  {
+    position: 4,
+    club: 'Fluminense',
+    played: 1,
+    points: 0,
+    ...record(0, 0, 1, -2),
+  },
 ];
+
+function record(
+  won: number,
+  drawn: number,
+  lost: number,
+  goalDifference: number,
+) {
+  return { won, drawn, lost, goalDifference };
+}
 
 const opponents: readonly OpponentView[] = [
   {
