@@ -266,10 +266,14 @@ function positionsOf(stats: CareerStatsState, names: StatsNames): Positions[] {
 }
 
 function championsOf(
-  champions: readonly { competitionId: string; championId: string }[],
+  champions: readonly {
+    competitionId: string;
+    championId: string;
+    decidedOn?: string;
+  }[],
   names: StatsNames,
 ): Champion[] {
-  return champions.flatMap(({ competitionId, championId }) => {
+  return champions.flatMap(({ competitionId, championId, decidedOn }) => {
     const club = clubRef(names, championId);
     return club === undefined
       ? []
@@ -278,25 +282,38 @@ function championsOf(
             competitionId,
             competition: names.competitions.get(competitionId) ?? competitionId,
             club,
+            ...(decidedOn === undefined ? {} : { decidedOn }),
           },
         ];
   });
 }
 
-/** Champions already decided in the current season. */
+/**
+ * Champions already decided in the current season: only competitions whose
+ * last match was played (an outcome exists), with the deciding date.
+ */
 export function currentChampions(
   competition: CareerSeasonState,
-): { competitionId: string; championId: string }[] {
-  return competition.competitions.flatMap((item) =>
-    item.outcome === undefined
-      ? []
-      : [
-          {
-            competitionId: item.competitionId,
-            championId: item.outcome.championId,
-          },
-        ],
-  );
+): { competitionId: string; championId: string; decidedOn?: string }[] {
+  return competition.competitions.flatMap((item) => {
+    if (item.outcome === undefined) return [];
+    const decidedOn = competition.fixtures
+      .filter(
+        ({ id, competitionId }) =>
+          competitionId === item.competitionId &&
+          competition.results[id] !== undefined,
+      )
+      .map(({ date }) => date)
+      .sort()
+      .at(-1);
+    return [
+      {
+        competitionId: item.competitionId,
+        championId: item.outcome.championId,
+        ...(decidedOn === undefined ? {} : { decidedOn }),
+      },
+    ];
+  });
 }
 
 export interface SeasonProjectionInput {

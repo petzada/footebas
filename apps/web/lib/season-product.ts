@@ -43,6 +43,8 @@ export interface SeasonChampion {
   readonly competitionId: string;
   readonly competition: string;
   readonly club: SeasonClubRef;
+  /** Date of the deciding match (champions of the running season). */
+  readonly decidedOn?: string;
 }
 
 export type SeasonAwardKind = 'top_scorer' | 'top_assists' | 'best_rating';

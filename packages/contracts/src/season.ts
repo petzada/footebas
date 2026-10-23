@@ -50,6 +50,8 @@ const championSchema = z.strictObject({
   competitionId: entityIdSchema,
   competition: nonEmptyTextSchema,
   club: clubRefSchema,
+  /** Date of the deciding match (champions of the running season). */
+  decidedOn: gameDateSchema.optional(),
 });
 const awardSchema = z.strictObject({
   kind: z.enum(['top_scorer', 'top_assists', 'best_rating']),

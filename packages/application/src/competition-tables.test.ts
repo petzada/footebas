@@ -135,6 +135,17 @@ describe('tabelas por competição (GET /tables)', () => {
           }
       expectHonestChampions(tables, currentDate);
     }
+    // Champions this early are the small estaduais (4–5 clubs, single round
+    // robin from 3 January) whose every club already played every match.
+    const decided = (await app.tables(token, careerId)).competitions.filter(
+      ({ champion }) => champion !== undefined,
+    );
+    expect(decided.length).toBeGreaterThan(0);
+    for (const competition of decided) {
+      expect(competition.category).toBe('state');
+      const rows = competition.stages[0]!.groups[0]!.rows;
+      expect(rows.every(({ played }) => played === rows.length - 1)).toBe(true);
+    }
     // The old division-only read never showed this: it stayed at zero.
     const division = await app.standings(token, careerId);
     expect(division.rows.every(({ played }) => played === 0)).toBe(true);
@@ -162,6 +173,27 @@ describe('tabelas por competição (GET /tables)', () => {
       rowsOf(tables, 'carioca')[0]!.club.id,
     );
     expectHonestChampions(tables, currentDate);
+    // Temporada shows the same decided champions, with the deciding date.
+    const season = await app.careerSeason(token, careerId);
+    expect(
+      season.champions.map(({ competitionId, club, decidedOn }) => ({
+        competitionId,
+        clubId: club.id,
+        decidedOn,
+      })),
+    ).toEqual(
+      tables.competitions.flatMap(({ competitionId, champion }) =>
+        champion === undefined
+          ? []
+          : [
+              {
+                competitionId,
+                clubId: champion.club.id,
+                decidedOn: champion.decidedOn,
+              },
+            ],
+      ),
+    );
 
     const serieA = tableOf(tables, division).stages[0]!.groups[0]!;
     expect(serieA.rows).toHaveLength(20);
