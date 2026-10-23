@@ -214,7 +214,7 @@ export function InboxDecisions({
           ))}
         </ul>
       )}
-      {messages.length > limit && (
+      {messages.length > 0 && (
         <Button
           variant="ghost"
           className="mt-3 min-h-11 w-full justify-between"
