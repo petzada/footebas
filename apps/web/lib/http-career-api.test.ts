@@ -24,6 +24,8 @@ import {
   SessionExpiredError,
   type AccessTokenProvider,
 } from '@/lib/http-career-api';
+import { httpInboxPort, httpSeasonPort } from '@/lib/http-products';
+import { worldHistoryFromSeason } from '@/lib/season-product';
 
 const open: { close(): Promise<unknown> }[] = [];
 afterEach(async () => {
@@ -327,6 +329,39 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     });
     expect(configured.membership?.monthlyPrice).toBe(30);
     expect(configured.membership?.tier).toBe('premium');
+  });
+
+  it('leva a caixa de entrada da Central para Notícias e a temporada para o Histórico', async () => {
+    const { client } = await start();
+    const played = await client.instantResult();
+    const inbox = await httpInboxPort(client).load();
+    expect(inbox.messages.length).toBeGreaterThan(0);
+    // "Ver todas" lists every message the Central shows, same ids and texts.
+    const news = played.world.news;
+    for (const message of inbox.messages)
+      expect(news).toContainEqual(
+        expect.objectContaining({
+          id: message.id,
+          headline: message.subject,
+          detail: message.body,
+          date: message.occurredOn,
+        }),
+      );
+    expect(news.some(({ tag }) => tag === 'Relatório')).toBe(true);
+    const dates = news.flatMap(({ date }) => (date ? [date] : []));
+    expect(dates).toEqual([...dates].sort().reverse());
+
+    // Histórico: the season read model fills the season row and records.
+    const season = await httpSeasonPort(client).load();
+    const history = worldHistoryFromSeason(season, played.world.history);
+    expect(history.seasons[0]).toEqual(
+      expect.objectContaining({
+        season: String(season.year),
+        club: 'Flamengo',
+        finish: expect.stringMatching(/em andamento/),
+      }),
+    );
+    expect(history.seasons[0]!.finish).toMatch(/\dV \dE \dD/);
   });
 
   it('carrega pirâmide, calendário e transição para as telas de competição', async () => {

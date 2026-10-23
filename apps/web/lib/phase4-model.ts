@@ -107,6 +107,10 @@ export interface Phase4View {
     tag: string;
     headline: string;
     detail: string;
+    /** Game date (`YYYY-MM-DD`) when the server records it. */
+    date?: string;
+    /** Inbox message still waiting for a decision (answered in the Central). */
+    pending?: boolean;
   }[];
   history: {
     seasons: readonly {

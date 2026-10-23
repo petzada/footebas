@@ -10,7 +10,10 @@ import {
 import { describe, expect, it } from 'vitest';
 import { CareerGame } from '@/components/career-game';
 import { completeNewCareer } from '@/components/testing/complete-new-career';
-import { InMemoryCareerApi } from '@/lib/career-api';
+import { WorldScreen } from '@/components/phase4-screens';
+import { InMemoryCareerApi, type CareerView } from '@/lib/career-api';
+import { createFakeRankingPort } from '@/lib/ranking-product';
+import { createFakeSeasonPort } from '@/lib/season-product';
 
 async function onboard(api = new InMemoryCareerApi()) {
   render(<CareerGame api={api} />);
@@ -36,6 +39,105 @@ async function selectTab(name: RegExp) {
     await Promise.resolve();
   });
 }
+
+describe('Mundo · todas as telas leem os dados gravados', () => {
+  /** World as the HTTP adapter used to deliver it: no demo filler. */
+  async function serverLikeCareer() {
+    const api = new InMemoryCareerApi();
+    await api.login('ana@footebas.com');
+    await api.createCareer({ coach: 'Ana' });
+    await api.selectClub('Flamengo');
+    const view = (await api.getCareer())!;
+    const career: CareerView = {
+      ...view,
+      world: {
+        ...view.world,
+        news: [
+          {
+            id: 'mail_board',
+            tag: 'Diretoria',
+            headline: 'A diretoria quer saber do reforço',
+            detail: 'Buscar um meia agora ou poupar o caixa?',
+            date: '2026-02-09',
+            pending: true,
+          },
+          {
+            id: 'mail_report',
+            tag: 'Relatório',
+            headline: 'Vitória sobre o Bahia',
+            detail: '2 a 0 no Maracanã.',
+            date: '2026-02-07',
+          },
+        ],
+        history: { seasons: [], champions: [], records: [], idols: [] },
+        leaderboards: { global: [], underdog: [], monthly: [] },
+      },
+    };
+    return { api, career };
+  }
+
+  function renderWorld(
+    initialTab: string,
+    { api, career }: Awaited<ReturnType<typeof serverLikeCareer>>,
+  ) {
+    render(
+      <WorldScreen
+        career={career}
+        api={api}
+        onCareerChange={() => undefined}
+        reportError={() => undefined}
+        initialTab={initialTab}
+        ports={{
+          season: createFakeSeasonPort(),
+          ranking: createFakeRankingPort(),
+        }}
+      />,
+    );
+  }
+
+  it('Notícias lista as mensagens da caixa de entrada com data e pendência', async () => {
+    renderWorld('news', await serverLikeCareer());
+    const list = screen.getByRole('list', { name: /todas as mensagens/i });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(list).getByText(/diretoria quer saber/i)).toBeTruthy();
+    expect(within(list).getByText(/vitória sobre o bahia/i)).toBeTruthy();
+    expect(within(list).getByText(/decisão pendente/i)).toBeTruthy();
+    expect(within(list).getByText('09/02')).toBeTruthy();
+  });
+
+  it('Histórico mostra a temporada, campeões e recordes do read model', async () => {
+    renderWorld('history', await serverLikeCareer());
+    expect(await screen.findByText('2026 · Flamengo')).toBeTruthy();
+    expect(
+      screen.getByText(
+        /1º na série a · 7v 2e 1d · em andamento · pedro · 9 gols/i,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('2026 · Campeonato Carioca')).toBeTruthy();
+    expect(screen.getByText(/artilheiro 2026 \(parcial\)/i)).toBeTruthy();
+    expect(screen.getByText(/artilheiro do clube · 9 gols/i)).toBeTruthy();
+  });
+
+  it('Ranking usa os snapshots do servidor, não uma tabela vazia', async () => {
+    renderWorld('ranking', await serverLikeCareer());
+    expect(await screen.findByText('Tite da Várzea')).toBeTruthy();
+    expect(screen.getByText(/ranking de treinadores/i)).toBeTruthy();
+  });
+
+  it('Save lista as carreiras salvas e o que o save guarda', async () => {
+    const data = await serverLikeCareer();
+    renderWorld('save', data);
+    const saves = await screen.findByRole('list', {
+      name: /carreiras salvas/i,
+    });
+    expect(within(saves).getByText(/flamengo/i)).toBeTruthy();
+    expect(within(saves).getByText(/em uso/i)).toBeTruthy();
+    expect(screen.getByText(/o que este save guarda/i)).toBeTruthy();
+    expect(
+      screen.getByText(/decisões pendentes/i).parentElement?.textContent,
+    ).toMatch(/1$/);
+  });
+});
 
 describe('Fase 4 · verticais de carreira longa', () => {
   it('mostra alertas e renova um contrato pelo port autoritativo', async () => {

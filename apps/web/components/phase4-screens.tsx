@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Children, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   Bank,
@@ -34,13 +34,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RankingScreen } from '@/components/ranking-screen';
 import type { CareerApiPort, CareerView } from '@/lib/career-api';
-import type {
-  MarketPlayerView,
-  RankingRowView,
-  TransferKind,
-} from '@/lib/phase4-model';
-import { cn } from '@/lib/utils';
+import { formatGameDate } from '@/lib/inbox-product';
+import type { MarketPlayerView, TransferKind } from '@/lib/phase4-model';
+import { productPortsFor, type ProductPorts } from '@/lib/runtime-api';
+import { type SeasonPort, worldHistoryFromSeason } from '@/lib/season-product';
 
 interface Phase4ScreenProps {
   career: CareerView;
@@ -951,8 +950,20 @@ export function ClubScreen(props: Phase4ScreenProps) {
   );
 }
 
-export function WorldScreen(props: Phase4ScreenProps) {
+/** Ports the Mundo screen reads besides the career (shared with the Central). */
+export type WorldScreenPorts = Pick<ProductPorts, 'season' | 'ranking'>;
+
+/**
+ * Mundo (Caixa de entrada → "Ver todas", Histórico): every tab reads the
+ * same persisted data the rest of the game uses. Notícias lists the inbox
+ * the Central shows (plus career milestones), Histórico the season read
+ * model, Ranking the server snapshots and Save the stored careers.
+ */
+export function WorldScreen(
+  props: Phase4ScreenProps & { ports?: WorldScreenPorts },
+) {
   const world = props.career.world;
+  const ports = props.ports ?? productPortsFor(props.api);
   return (
     <div>
       <SectionHeading
@@ -967,54 +978,11 @@ export function WorldScreen(props: Phase4ScreenProps) {
           <TabsTrigger value="ranking">Ranking</TabsTrigger>
           <TabsTrigger value="save">Save</TabsTrigger>
         </TabsList>
-        <TabsContent value="news" className="mt-4 grid gap-3 lg:grid-cols-3">
-          {world.news.map((item) => (
-            <Card key={item.id}>
-              <CardHeader>
-                <Badge variant="outline" className="w-fit">
-                  {item.tag}
-                </Badge>
-                <CardTitle className="font-display text-sm uppercase">
-                  {item.headline}
-                </CardTitle>
-                <CardDescription>{item.detail}</CardDescription>
-              </CardHeader>
-            </Card>
-          ))}
+        <TabsContent value="news" className="mt-4">
+          <NewsList news={world.news} />
         </TabsContent>
-        <TabsContent value="history" className="mt-4 grid gap-4 lg:grid-cols-2">
-          <HistoryCard title="Temporadas">
-            {world.history.seasons.map((item) => (
-              <Row
-                key={`${item.season}-${item.club}`}
-                label={`${item.season} · ${item.club}`}
-                value={`${item.finish} · ${item.topScorer}`}
-              />
-            ))}
-          </HistoryCard>
-          <HistoryCard title="Campeões">
-            {world.history.champions.map((item) => (
-              <Row
-                key={`${item.season}-${item.competition}`}
-                label={`${item.season} · ${item.competition}`}
-                value={item.club}
-              />
-            ))}
-          </HistoryCard>
-          <HistoryCard title="Recordes">
-            {world.history.records.map((item) => (
-              <Row
-                key={item.label}
-                label={item.label}
-                value={`${item.value} · ${item.holder}`}
-              />
-            ))}
-          </HistoryCard>
-          <HistoryCard title="Ídolos">
-            {world.history.idols.map((item) => (
-              <Row key={item.name} label={item.name} value={item.reason} />
-            ))}
-          </HistoryCard>
+        <TabsContent value="history" className="mt-4">
+          <HistoryTab base={world.history} port={ports.season} />
         </TabsContent>
         <TabsContent value="ranking" className="mt-4 flex flex-col gap-4">
           <Card className="scoreboard">
@@ -1042,55 +1010,274 @@ export function WorldScreen(props: Phase4ScreenProps) {
               />
             </CardContent>
           </Card>
-          <Tabs defaultValue="global">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="global">Global</TabsTrigger>
-              <TabsTrigger value="underdog">Ascensão</TabsTrigger>
-              <TabsTrigger value="monthly">Do mês</TabsTrigger>
-            </TabsList>
-            <TabsContent value="global">
-              <RankingTable rows={world.leaderboards.global} />
-            </TabsContent>
-            <TabsContent value="underdog">
-              <RankingTable rows={world.leaderboards.underdog} />
-            </TabsContent>
-            <TabsContent value="monthly">
-              <RankingTable rows={world.leaderboards.monthly} />
-            </TabsContent>
-          </Tabs>
+          {/* Same snapshots as the Ranking screen (GET /v1/rankings). */}
+          <RankingScreen port={ports.ranking} />
         </TabsContent>
         <TabsContent value="save" className="mt-4">
-          <Card className="max-w-2xl">
-            <CardHeader>
-              <div className="flex justify-between gap-3">
-                <div>
-                  <CardTitle className="font-display text-base uppercase">
-                    Integridade do save
-                  </CardTitle>
-                  <CardDescription>
-                    Status visível de migração e arquivamento.
-                  </CardDescription>
-                </div>
-                <ShieldCheck className="text-primary" weight="fill" />
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <Row label="Versão" value={world.archive.saveVersion} />
-              <Row label="Migração" value={world.archive.migrationStatus} />
-              <Row label="Arquivo" value={world.archive.archiveStatus} />
-              <Row
-                label="Última compactação"
-                value={world.archive.lastCompaction}
-              />
-              <Row label="Checksum" value={world.archive.checksum} />
-              <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-                O cliente exibe este estado, mas não escreve no snapshot
-                canônico. Migrações explícitas são executadas pelo backend.
-              </p>
-            </CardContent>
-          </Card>
+          <SaveTab career={props.career} api={props.api} />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function NewsList({ news }: { news: CareerView['world']['news'] }) {
+  if (news.length === 0)
+    return (
+      <p className="panel p-4 text-sm text-muted-foreground">
+        Nenhuma mensagem ainda. Relatórios de jogo, recados da diretoria e
+        propostas chegam aqui assim que a rodada andar.
+      </p>
+    );
+  return (
+    <ul aria-label="Todas as mensagens" className="grid gap-3 lg:grid-cols-3">
+      {news.map((item) => (
+        <li key={item.id}>
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="w-fit">
+                  {item.tag}
+                </Badge>
+                {item.date && (
+                  <span className="font-pixel text-[.45rem] text-muted-foreground">
+                    {formatGameDate(item.date)}
+                  </span>
+                )}
+                {item.pending && (
+                  <Badge className="w-fit">Decisão pendente</Badge>
+                )}
+              </div>
+              <CardTitle className="font-display text-sm uppercase">
+                {item.headline}
+              </CardTitle>
+              <CardDescription>{item.detail}</CardDescription>
+              {item.pending && (
+                <p className="text-xs text-muted-foreground">
+                  Responda pela caixa de entrada da Central.
+                </p>
+              )}
+            </CardHeader>
+          </Card>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+type Loadable<T> =
+  | { status: 'loading' }
+  | { status: 'ready'; value: T }
+  | { status: 'error'; message: string };
+
+function useLoad<T>(load: () => Promise<T>, key: unknown): Loadable<T> {
+  const [state, setState] = useState<Loadable<T>>({ status: 'loading' });
+  useEffect(() => {
+    let active = true;
+    load()
+      .then((value) => active && setState({ status: 'ready', value }))
+      .catch(
+        (caught: unknown) =>
+          active &&
+          setState({
+            status: 'error',
+            message:
+              caught instanceof Error
+                ? caught.message
+                : 'Não foi possível carregar.',
+          }),
+      );
+    return () => {
+      active = false;
+    };
+    // `load` is rebuilt every render; `key` says when to fetch again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return state;
+}
+
+function HistoryTab({
+  base,
+  port,
+}: {
+  base: CareerView['world']['history'];
+  port: SeasonPort;
+}) {
+  const season = useLoad(() => port.load(), port);
+  const history =
+    season.status === 'ready'
+      ? worldHistoryFromSeason(season.value, base)
+      : base;
+  return (
+    <div className="grid gap-4">
+      {season.status === 'loading' && (
+        <p className="panel p-3 text-sm" role="status">
+          Abrindo o arquivo das temporadas…
+        </p>
+      )}
+      {season.status === 'error' && (
+        <p className="panel p-3 text-sm" role="alert">
+          {season.message}
+        </p>
+      )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <HistoryCard
+          title="Temporadas"
+          empty="A primeira temporada aparece aqui assim que o clube entrar em campo."
+        >
+          {history.seasons.map((item) => (
+            <Row
+              key={`${item.season}-${item.club}`}
+              label={`${item.season} · ${item.club}`}
+              value={`${item.finish} · ${item.topScorer}`}
+            />
+          ))}
+        </HistoryCard>
+        <HistoryCard
+          title="Campeões"
+          empty="Nenhuma competição decidida ainda nesta carreira."
+        >
+          {history.champions.map((item) => (
+            <Row
+              key={`${item.season}-${item.competition}`}
+              label={`${item.season} · ${item.competition}`}
+              value={item.club}
+            />
+          ))}
+        </HistoryCard>
+        <HistoryCard
+          title="Recordes"
+          empty="Artilharia, assistências e notas entram aqui com os jogos."
+        >
+          {history.records.map((item) => (
+            <Row
+              key={`${item.label}-${item.holder}`}
+              label={item.label}
+              value={`${item.value} · ${item.holder}`}
+            />
+          ))}
+        </HistoryCard>
+        <HistoryCard
+          title="Ídolos"
+          empty="Os goleadores do seu clube viram ídolos aqui."
+        >
+          {history.idols.map((item) => (
+            <Row key={item.name} label={item.name} value={item.reason} />
+          ))}
+        </HistoryCard>
+      </div>
+    </div>
+  );
+}
+
+function SaveTab({ career, api }: { career: CareerView; api: CareerApiPort }) {
+  const world = career.world;
+  const careers = useLoad(() => api.listCareers(), api);
+  return (
+    <div className="grid max-w-2xl gap-4">
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between gap-3">
+            <div>
+              <CardTitle className="font-display text-base uppercase">
+                Integridade do save
+              </CardTitle>
+              <CardDescription>
+                Status visível de migração e arquivamento.
+              </CardDescription>
+            </div>
+            <ShieldCheck className="text-primary" weight="fill" />
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Row label="Versão" value={world.archive.saveVersion} />
+          <Row label="Migração" value={world.archive.migrationStatus} />
+          <Row label="Arquivo" value={world.archive.archiveStatus} />
+          <Row
+            label="Última compactação"
+            value={world.archive.lastCompaction}
+          />
+          <Row label="Checksum" value={world.archive.checksum} />
+          <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+            O cliente exibe este estado, mas não escreve no snapshot canônico.
+            Migrações explícitas são executadas pelo backend.
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-sm uppercase">
+            O que este save guarda
+          </CardTitle>
+          <CardDescription>
+            Tudo abaixo está gravado no servidor e volta igual quando você
+            reabre a carreira.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Row label="Mensagens e notícias" value={String(world.news.length)} />
+          <Row
+            label="Decisões pendentes"
+            value={String(world.news.filter((item) => item.pending).length)}
+          />
+          <Row
+            label="Lançamentos no caixa"
+            value={String(world.finances.ledger.length)}
+          />
+          <Row label="Contratos" value={String(world.contracts.length)} />
+          <Row
+            label="Temporadas concluídas"
+            value={String(world.prestige.seasons)}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-sm uppercase">
+            Carreiras salvas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {careers.status === 'loading' ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              Conferindo os saves…
+            </p>
+          ) : careers.status === 'error' ? (
+            <p className="text-sm" role="alert">
+              {careers.message}
+            </p>
+          ) : careers.value.careers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma carreira salva.
+            </p>
+          ) : (
+            <ul aria-label="Carreiras salvas" className="flex flex-col gap-3">
+              {careers.value.careers.map((saved) => (
+                <li
+                  key={saved.id}
+                  className="flex flex-col justify-between gap-1 border-b pb-3 text-sm last:border-0 last:pb-0 sm:flex-row"
+                >
+                  <strong className="flex flex-wrap items-center gap-2">
+                    {saved.name ?? saved.coach}
+                    {saved.id === career.careerId && <Badge>Em uso</Badge>}
+                  </strong>
+                  <span className="text-muted-foreground sm:text-right">
+                    {[
+                      saved.clubName ?? 'Sem clube',
+                      saved.season ? `temporada ${String(saved.season)}` : '',
+                      saved.currentDate
+                        ? formatGameDate(saved.currentDate)
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1150,9 +1337,12 @@ function Confidence({ label, value }: { label: string; value: number }) {
 
 function HistoryCard({
   title,
+  empty,
   children,
 }: {
   title: string;
+  /** Shown while the card has nothing recorded yet. */
+  empty: string;
   children: React.ReactNode;
 }) {
   return (
@@ -1162,7 +1352,13 @@ function HistoryCard({
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">{children}</CardContent>
+      <CardContent className="flex flex-col gap-3">
+        {Children.count(children) === 0 ? (
+          <p className="text-sm text-muted-foreground">{empty}</p>
+        ) : (
+          children
+        )}
+      </CardContent>
     </Card>
   );
 }
@@ -1173,44 +1369,5 @@ function Row({ label, value }: { label: string; value: string }) {
       <strong>{label}</strong>
       <span className="text-muted-foreground sm:text-right">{value}</span>
     </div>
-  );
-}
-
-function RankingTable({ rows }: { rows: readonly RankingRowView[] }) {
-  return (
-    <Card className="mt-3">
-      <CardContent className="pt-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>#</TableHead>
-              <TableHead>Treinador</TableHead>
-              <TableHead>Clube</TableHead>
-              <TableHead className="text-right">Prestígio</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow
-                key={`${row.position}-${row.coach}`}
-                className={cn(row.highlight && 'bg-primary/10')}
-              >
-                <TableCell className="font-display text-xs font-bold">
-                  {row.position}
-                </TableCell>
-                <TableCell>
-                  {row.coach}
-                  {row.highlight && <Badge className="ml-2">Você</Badge>}
-                </TableCell>
-                <TableCell>{row.club}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {row.points.toLocaleString('pt-BR')}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
   );
 }

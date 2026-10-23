@@ -3,6 +3,8 @@
  * `careerSeasonReadModelSchema` (GET /v1/careers/:id/season); nothing here is
  * estimated on the client.
  */
+import type { Phase4View } from '@/lib/phase4-model';
+
 export interface SeasonClubRef {
   readonly id: string;
   readonly name: string;
@@ -184,6 +186,143 @@ export function demoSeasonView(
     ],
     history: [],
     ...overrides,
+  };
+}
+
+type WorldHistory = Phase4View['history'];
+
+function finishOf(
+  positions: readonly SeasonPositions[],
+  record: SeasonClubRecord | undefined,
+  current: boolean,
+): string {
+  const league = positions.find(({ rounds }) => rounds.length > 0);
+  const last = league?.rounds.at(-1);
+  const place = last
+    ? `${String(last.position)}º na ${league!.competition}`
+    : '';
+  const campaign =
+    record && record.played > 0
+      ? `${String(record.won)}V ${String(record.drawn)}E ${String(record.lost)}D`
+      : '';
+  const text = [place, campaign].filter(Boolean).join(' · ');
+  if (current)
+    return text ? `${text} · em andamento` : 'Em andamento · sem jogos';
+  return text || 'Temporada encerrada';
+}
+
+function scorerOf(
+  scorers: readonly SeasonLeader[],
+  clubId: string | undefined,
+): string {
+  const best = scorers.find((leader) => leader.club?.id === clubId);
+  if (!best || best.value <= 0) return 'Sem artilheiro';
+  return `${best.playerName} · ${String(best.value)} ${best.value === 1 ? 'gol' : 'gols'}`;
+}
+
+function awardValue(award: SeasonAward): string {
+  return award.kind === 'best_rating'
+    ? award.value.toLocaleString('pt-BR', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      })
+    : `${String(award.value)} ${award.kind === 'top_scorer' ? 'gols' : 'assist.'}`;
+}
+
+/**
+ * Histórico fed by the season read model (`GET /v1/careers/:id/season`):
+ * one row per season (current one included), champions and awards, merged
+ * with the career milestones the world read model already carries. The
+ * HTTP adapter left `seasons` empty, so the screen showed nothing until a
+ * title happened.
+ */
+export function worldHistoryFromSeason(
+  view: SeasonView,
+  base: WorldHistory,
+): WorldHistory {
+  const clubId = view.club?.club.id;
+  const entries = [
+    {
+      season: view.season,
+      year: view.year,
+      club: view.club,
+      champions: view.champions,
+      awards: view.awards,
+      topScorers: view.topScorers,
+      positions: view.positions,
+      current: true,
+    },
+    ...[...view.history]
+      .sort((left, right) => right.season - left.season)
+      .map((entry) => ({ ...entry, current: false })),
+  ];
+  const seasons = entries
+    .filter((entry) => entry.club || entry.positions.length > 0)
+    .map((entry) => ({
+      season: String(entry.year),
+      club: entry.club?.club.name ?? '—',
+      finish: finishOf(entry.positions, entry.club, entry.current),
+      topScorer: scorerOf(entry.topScorers, entry.club?.club.id ?? clubId),
+    }));
+  const known = new Set(seasons.map(({ season }) => season));
+  const champions = entries.flatMap((entry) =>
+    entry.champions.map((champion) => ({
+      key: `${String(entry.season)}|${champion.competitionId}`,
+      season: String(entry.year),
+      competition: champion.competition,
+      club: champion.club.name,
+    })),
+  );
+  const seen = new Set(champions.map(({ key }) => key));
+  const records = entries.flatMap((entry) =>
+    entry.awards.map((award) => ({
+      label: `${AWARD_LABEL[award.kind]} ${String(entry.year)}${entry.current ? ' (parcial)' : ''}`,
+      value: awardValue(award),
+      holder: award.club
+        ? `${award.playerName} (${award.club.name})`
+        : award.playerName,
+    })),
+  );
+  const goals = new Map<string, { name: string; goals: number }>();
+  for (const entry of entries)
+    for (const leader of entry.topScorers)
+      if (leader.club?.id === clubId && leader.value > 0) {
+        const total = goals.get(leader.playerId) ?? {
+          name: leader.playerName,
+          goals: 0,
+        };
+        total.goals += leader.value;
+        goals.set(leader.playerId, total);
+      }
+  const idols = [...goals.values()]
+    .sort((left, right) => right.goals - left.goals)
+    .slice(0, 3)
+    .map(({ name, goals: total }) => ({
+      name,
+      reason: `Artilheiro do clube · ${String(total)} ${total === 1 ? 'gol' : 'gols'}`,
+    }));
+  return {
+    seasons: [
+      ...seasons,
+      ...base.seasons.filter(({ season }) => !known.has(season)),
+    ],
+    champions: [
+      ...champions.map(({ season, competition, club }) => ({
+        season,
+        competition,
+        club,
+      })),
+      ...base.champions.filter(
+        ({ season, competition }) => !seen.has(`${season}|${competition}`),
+      ),
+    ],
+    records: [...records, ...base.records],
+    idols: [
+      ...idols,
+      ...base.idols.filter(
+        ({ name }) => !idols.some((idol) => idol.name === name),
+      ),
+    ],
   };
 }
 
