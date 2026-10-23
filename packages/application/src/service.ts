@@ -7,6 +7,7 @@ import {
   publicStatsSchema,
   careerWorldReadModelSchema,
   careerOfficeReadModelSchema,
+  careerSeasonReadModelSchema,
   commandSchema,
   homeReadModelSchema,
   matchInstructionSchema,
@@ -22,6 +23,7 @@ import {
   type CareerMarketReadModel,
   type CareerWorldReadModel,
   type CareerOfficeReadModel,
+  type CareerSeasonReadModel,
   type CommandAccepted,
   type HomeReadModel,
   type JobStatus,
@@ -56,6 +58,7 @@ import {
   type CanonicalValue,
   type Club,
   type CompetitionCalendarFixture,
+  type CompetitionDefinition,
   type CompetitionId,
   type CompetitionMatchResult,
   type Lineup,
@@ -125,6 +128,24 @@ import {
   type CareerContentPort,
 } from './career-content.js';
 import { defaultTactic } from './tactics.js';
+import {
+  LEAGUE_TIERS,
+  closeSeasonStats,
+  ensureStats,
+  projectSeason,
+  recordMatchStats,
+  recordRoundPosition,
+  type CareerStatsState,
+  type StatsNames,
+} from './career-stats.js';
+import {
+  InboxRuleError,
+  generatedMessages,
+  resolveInboxDecision,
+  runInboxDay,
+  type CareerInboxState,
+} from './career-inbox.js';
+import { seasonAchievements, type SeasonAchievement } from './rankings.js';
 import { careerProfileOf } from './coach-personality.js';
 import {
   InMemoryEntitlements,
@@ -172,6 +193,10 @@ export interface CareerSnapshot {
   history: SeasonSummary[];
   world: CareerWorldState;
   pendingJobId?: string;
+  /** Season statistics (Temporada); absent in saves created before them. */
+  stats?: CareerStatsState;
+  /** Generated inbox with decisions; absent in saves created before it. */
+  inbox?: CareerInboxState;
 }
 
 type Snapshot = CareerSnapshot;
@@ -526,6 +551,13 @@ export class FootebasApplication {
               save.seed,
             );
             break;
+          case 'ResolveInboxDecision':
+            resolveInboxDecision(
+              snapshot,
+              command.payload.messageId,
+              command.payload.optionId,
+            );
+            break;
           case 'ConfigureFanMembership':
             withWorld(snapshot, (context) =>
               configureMembership(context, {
@@ -728,9 +760,23 @@ export class FootebasApplication {
           job.fixtureId,
           job.instructions,
         );
-        if (job.fixtureId === undefined)
-          rollSeason(snapshot, content.competitions, save.seed);
+        const achievements =
+          job.fixtureId === undefined
+            ? rollSeason(snapshot, content.competitions, save.seed)
+            : [];
         delete snapshot.pendingJobId;
+        // Validated achievements commit with the save that produced them
+        // (ADR 0013): a rolled back transaction records none.
+        if (achievements.length > 0)
+          await tx.achievements.record(
+            achievements.map((achievement) => ({
+              ...achievement,
+              careerId: job.careerId,
+              userId: job.userId,
+              displayName: snapshot.managerName.slice(0, 80),
+              recordedAt: this.deps.clock.now().toISOString(),
+            })),
+          );
         this.deps.failPoint?.('before-persist-result', job);
         await tx.saves.update(job.careerId, job.userId, save.version, {
           snapshot: asCanonical(snapshot),
@@ -787,6 +833,13 @@ export class FootebasApplication {
         (definition) => [definition.id, definition.tier],
       ),
     );
+    const stats = ensureStats(
+      snapshot.stats,
+      snapshot.season,
+      snapshot.players,
+      Object.keys(snapshot.competition.results).length,
+    );
+    snapshot.stats = stats;
     for (
       let date = nextMatchDate(snapshot.competition);
       date !== undefined && (target === undefined || date <= target.date);
@@ -801,6 +854,7 @@ export class FootebasApplication {
       const today = fixturesOn(snapshot.competition, date);
       const scores: CompetitionMatchResult[] = [];
       const playing = new Set<string>();
+      let managedToday: ManagedMatch | undefined;
       for (const fixture of today) {
         const isTarget = fixture.id === target?.id;
         const result = simulateMatch(
@@ -812,6 +866,12 @@ export class FootebasApplication {
           ),
         );
         applyPerformances(snapshot, fixture, result);
+        recordMatchStats(stats, fixture, result);
+        if (
+          fixture.homeClubId === snapshot.selectedClubId ||
+          fixture.awayClubId === snapshot.selectedClubId
+        )
+          managedToday = { fixture, result };
         if (
           snapshot.lineup !== undefined &&
           (fixture.homeClubId === snapshot.selectedClubId ||
@@ -840,6 +900,17 @@ export class FootebasApplication {
         scores,
       );
       snapshot.currentDate = date;
+      const league =
+        managedToday === undefined
+          ? undefined
+          : this.recordPosition(snapshot, config, tiers, managedToday);
+      runInboxDay(snapshot, {
+        date,
+        ...(managedToday === undefined
+          ? {}
+          : { played: playedManagedMatch(snapshot, managedToday) }),
+        ...(league === undefined ? {} : { league }),
+      });
     }
     if (managed) {
       snapshot.matches = [...snapshot.matches, managed].slice(
@@ -847,6 +918,43 @@ export class FootebasApplication {
       );
     }
     return managed;
+  }
+
+  /**
+   * Managed club position after a league round (season statistics). Returns
+   * the national league standing the board judges objectives by.
+   */
+  private recordPosition(
+    snapshot: Snapshot,
+    config: MvpCompetitionConfig,
+    tiers: ReadonlyMap<string, CompetitionDefinition['tier']>,
+    played: ManagedMatch,
+  ): { position: number; rounds: number } | undefined {
+    const { fixture } = played;
+    const tier = tiers.get(fixture.competitionId);
+    if (
+      snapshot.stats === undefined ||
+      tier === undefined ||
+      !LEAGUE_TIERS.has(tier)
+    )
+      return undefined;
+    const index = liveStandings(
+      config,
+      snapshot.competition,
+      fixture.competitionId,
+    ).findIndex(({ clubId }) => clubId === snapshot.selectedClubId);
+    if (index < 0) return undefined;
+    recordRoundPosition(snapshot.stats, fixture.competitionId, {
+      round: fixture.round,
+      date: fixture.date,
+      position: index + 1,
+    });
+    return tier === 'national_league'
+      ? {
+          position: index + 1,
+          rounds: snapshot.stats.positions[fixture.competitionId]?.length ?? 0,
+        }
+      : undefined;
   }
 
   private matchInput(
@@ -1443,6 +1551,34 @@ export class FootebasApplication {
     );
   }
 
+  /**
+   * Season screen (Temporada): scorers, assists, ratings, managed position
+   * per league round, champions and awards, current and archived.
+   */
+  public async careerSeason(
+    bearer: string,
+    careerId: string,
+  ): Promise<CareerSeasonReadModel> {
+    return this.query(bearer, careerId, (save, s, now) => {
+      const content = this.loadContent(s.contentVersion);
+      return careerSeasonReadModelSchema.parse({
+        ...base(save, now),
+        currentDate: s.currentDate,
+        ...projectSeason({
+          stats: s.stats,
+          competition: s.competition,
+          ...(s.selectedClubId === undefined
+            ? {}
+            : { managedClubId: s.selectedClubId }),
+          names: statsNames(
+            s,
+            careerSeasonSystem(content.competitions, s.competition).definitions,
+          ),
+        }),
+      });
+    });
+  }
+
   private competitionView<T>(
     bearer: string,
     careerId: string,
@@ -1530,7 +1666,7 @@ export class FootebasApplication {
   }
   private translate(error: unknown): Error {
     if (error instanceof ApplicationError) return error;
-    if (error instanceof OfficeRuleError)
+    if (error instanceof OfficeRuleError || error instanceof InboxRuleError)
       return new ApplicationError(error.code, error.message);
     if (error instanceof DomainError)
       return new ApplicationError('VALIDATION_ERROR', error.message);
@@ -1621,10 +1757,55 @@ function rollSeason(
   snapshot: Snapshot,
   config: MvpCompetitionConfig,
   seed: string,
-): void {
-  if (!isSeasonComplete(snapshot.competition)) return;
+): SeasonAchievement[] {
+  if (!isSeasonComplete(snapshot.competition)) return [];
   const closure = closeCareerSeason(config, snapshot.competition);
   const system = careerSeasonSystem(config, snapshot.competition);
+  // Ranking and statistics read the season before retirements and moves.
+  const managedClubId = snapshot.world.manager.currentClubId;
+  const managedDivision =
+    managedClubId === undefined
+      ? undefined
+      : (Object.keys(snapshot.competition.divisions) as MvpDivisionId[]).find(
+          (key) =>
+            snapshot.competition.divisions[key].some(
+              (id) => id === managedClubId,
+            ),
+        );
+  const achievements = seasonAchievements({
+    season: snapshot.season,
+    year: snapshot.competition.year,
+    ...(managedClubId === undefined ? {} : { managedClubId }),
+    clubReputation: Number(
+      snapshot.clubs.find(({ id }) => id === managedClubId)?.reputation ?? 0,
+    ),
+    outcomes: closure.outcomes,
+    definitions: system.definitions,
+    divisionCompetitionIds: system.ids.divisions,
+    promotions: closure.generation.events.flatMap((event) =>
+      event.type === 'ClubPromoted'
+        ? [{ clubId: event.clubId, toCompetitionId: event.toCompetitionId }]
+        : [],
+    ),
+    ...(managedDivision === undefined
+      ? {}
+      : { leagueCompetitionId: system.ids.divisions[managedDivision] }),
+  });
+  snapshot.stats = closeSeasonStats(
+    ensureStats(
+      snapshot.stats,
+      snapshot.season,
+      snapshot.players,
+      Number.MAX_SAFE_INTEGER,
+    ),
+    {
+      competition: snapshot.competition,
+      ...(managedClubId === undefined ? {} : { managedClubId }),
+      champions: closure.outcomes,
+      names: statsNames(snapshot, system.definitions),
+    },
+    closure.next.season,
+  );
   snapshot.history = [
     ...snapshot.history,
     {
@@ -1691,6 +1872,38 @@ function rollSeason(
   withWorld(snapshot, (context) =>
     runOfficeDay(context, snapshot.currentDate, seed, snapshot.season),
   );
+  return achievements;
+}
+/** Names the season statistics resolve ids with. */
+function statsNames(
+  snapshot: Snapshot,
+  definitions: readonly { id: string; name: string }[],
+): StatsNames {
+  return {
+    clubs: new Map(snapshot.clubs.map(({ id, name }) => [id, name])),
+    players: new Map(snapshot.players.map(({ id, name }) => [id, name])),
+    competitions: new Map(definitions.map(({ id, name }) => [id, name])),
+  };
+}
+/** The managed match of a date as the inbox rules read it. */
+function playedManagedMatch(snapshot: Snapshot, played: ManagedMatch) {
+  const outcome = managedOutcome(snapshot, played);
+  const form = [
+    ...recentManagedForm(snapshot),
+    outcome?.situation === 'win'
+      ? ('W' as const)
+      : outcome?.situation === 'loss'
+        ? ('L' as const)
+        : ('D' as const),
+  ].slice(-5);
+  return {
+    fixture: played.fixture,
+    result: played.result,
+    form,
+    opponentName:
+      snapshot.clubs.find(({ id }) => id === outcome?.opponentId)?.name ??
+      'adversário',
+  };
 }
 /** Keeps the matchday club aligned with the manager after firings or moves. */
 export function syncManagedClub(snapshot: Snapshot): void {
@@ -1970,13 +2183,15 @@ function managedOutcome(
   };
 }
 /**
- * Inbox, newest first: match reports in the coach personality's tone and
- * transfer proposals that wait for a decision (docs/adr/0008).
+ * Inbox, newest first: match reports in the coach personality's tone,
+ * transfer and sponsorship proposals that wait for a decision (docs/adr/0008,
+ * 0011) and the generated board, athlete, press and notice messages.
  */
 function coachInbox(snapshot: Snapshot): CoachMessage[] {
   return [
     ...transferOfferMessages(snapshot),
     ...sponsorOfferMessages(snapshot),
+    ...generatedMessages(snapshot),
     ...matchReports(snapshot),
   ]
     .sort(
@@ -1984,7 +2199,7 @@ function coachInbox(snapshot: Snapshot): CoachMessage[] {
         right.occurredOn.localeCompare(left.occurredOn) ||
         left.id.localeCompare(right.id),
     )
-    .slice(0, 10);
+    .slice(0, 20);
 }
 function managedChemistry(snapshot: Snapshot, clubId: string) {
   return chemistryView(
