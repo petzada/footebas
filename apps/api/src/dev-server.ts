@@ -15,14 +15,18 @@ import {
 } from '@footebas/application';
 import { InMemoryUnitOfWork, SystemClock } from '@footebas/database';
 import { buildApi } from './index.js';
+import { withSmokeAuth } from './smoke-auth.js';
 
 const clock = new SystemClock();
 const auth = new FakeBearerAuth();
 const ids = new SequentialIdGenerator();
 const jobs = new InMemoryJobQueue();
 const unitOfWork = new InMemoryUnitOfWork(clock);
+// SMOKE_TOKEN (optional) lets tools/cloud-smoke run locally with the same
+// `smoke:<token>` bearer used against the cloud.
+const appAuth = withSmokeAuth(auth, process.env.SMOKE_TOKEN);
 const application = new FootebasApplication({
-  auth,
+  auth: appAuth,
   clock,
   ids,
   jobs,
@@ -41,8 +45,9 @@ const phaseFour = new PhaseFourApplicationService({
 const api = await buildApi({
   application,
   jobs,
-  phaseFour: { application: phaseFour, auth },
+  phaseFour: { application: phaseFour, auth: appAuth },
   devAuth: auth,
+  health: { version: 'dev' },
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(','),
 });
 

@@ -64,6 +64,81 @@ export interface ApiDependencies {
   readonly corsOrigins?: readonly string[];
   /** Serves /documentation (Swagger UI, Node only). */
   readonly documentation?: boolean;
+  /** Probe behind `GET /health` (no auth). */
+  readonly health?: Readonly<{
+    /** Deployed build identifier (e.g. Workers version id). */
+    version: string;
+    /** Lightweight database round trip such as `select 1`; absent in memory. */
+    database?: () => Promise<void>;
+    /** Upper bound for the database probe (default 2000 ms). */
+    timeoutMs?: number;
+  }>;
+}
+
+export type HealthDatabaseState =
+  'ok' | 'error' | 'timeout' | 'skipped' | 'in_memory';
+
+export interface HealthReport {
+  readonly ok: boolean;
+  readonly version: string;
+  readonly time: string;
+  readonly database: HealthDatabaseState;
+  readonly databaseMs?: number;
+}
+
+async function probeDatabase(
+  check: () => Promise<void>,
+  timeoutMs: number,
+): Promise<'ok' | 'error' | 'timeout'> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => {
+      resolve('timeout');
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([check().then(() => 'ok' as const), timeout]);
+  } catch {
+    return 'error';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function healthRoute(deps: ApiDependencies): ApiRoute {
+  return {
+    method: 'GET',
+    path: '/health',
+    schema: {
+      summary: 'Liveness probe; `deep=0` skips the database round trip',
+      querystring: {
+        type: 'object',
+        properties: { deep: { type: 'string' } },
+      },
+    },
+    async handler(request) {
+      const health = deps.health;
+      const time = (deps.now?.() ?? new Date()).toISOString();
+      const version = health?.version ?? 'unknown';
+      if (request.query.deep === '0')
+        return json({ ok: true, version, time, database: 'skipped' });
+      if (health?.database === undefined)
+        return json({ ok: true, version, time, database: 'in_memory' });
+      const started = Date.now();
+      const database = await probeDatabase(
+        health.database,
+        health.timeoutMs ?? 2000,
+      );
+      const report: HealthReport = {
+        ok: database === 'ok',
+        version,
+        time,
+        database,
+        databaseMs: Date.now() - started,
+      };
+      return json(report, report.ok ? 200 : 503);
+    },
+  };
 }
 
 export interface ApiRequest {
@@ -119,6 +194,7 @@ function idOf(request: ApiRequest): string {
 export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
   const app = deps.application;
   const routes: ApiRoute[] = [
+    healthRoute(deps),
     {
       method: 'POST',
       path: '/v1/commands',
