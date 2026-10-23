@@ -2,10 +2,10 @@
 
 Tudo roda em Cloudflare Workers (ADR 0005). Deploy em produção só com autorização do responsável.
 
-| Peça                       | Worker         | Domínio                                      | Config                                                    |
-| -------------------------- | -------------- | -------------------------------------------- | --------------------------------------------------------- |
+| Peça                       | Worker         | Domínio                                                                               | Config                                                    |
+| -------------------------- | -------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | Web (Next.js via OpenNext) | `footebas-web` | `game.footebas.com.br` (jogo), `lp.footebas.com.br` (landing), apex e `www` → landing | `apps/web/wrangler.jsonc`, `apps/web/open-next.config.ts` |
-| API                        | `footebas-api` | `api.footebas.com.br` (hoje `*.workers.dev`) | `apps/api/wrangler.jsonc`                                 |
+| API                        | `footebas-api` | `api.footebas.com.br` (hoje `*.workers.dev`)                                          | `apps/api/wrangler.jsonc`                                 |
 
 ## Pré-requisitos
 

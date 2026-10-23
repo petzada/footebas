@@ -204,7 +204,12 @@ const DEMO_MATCH: readonly Beat[] = [
   { minute: 31, text: 'Falta dura no meio. Cartão amarelo.', tone: 'card' },
   { minute: 45, text: 'Intervalo. Você ajusta a tática.' },
   { minute: 58, text: 'Substituição: entra o garoto da base.' },
-  { minute: 67, text: 'GOL! Contra-ataque em velocidade.', away: 1, tone: 'goal' },
+  {
+    minute: 67,
+    text: 'GOL! Contra-ataque em velocidade.',
+    away: 1,
+    tone: 'goal',
+  },
   { minute: 79, text: 'Chute de fora, a bola raspa a trave.' },
   { minute: 88, text: 'GOL! O garoto decide.', home: 2, tone: 'goal' },
   { minute: 90, text: 'Fim de jogo. Três pontos e a torcida canta.' },
@@ -333,7 +338,9 @@ function LiveMatch() {
               line.tone === 'goal' ? 'text-bulb' : 'text-chalk/85'
             }`}
           >
-            <span className="w-7 shrink-0 text-chalk/60">{line.minute}&apos;</span>
+            <span className="w-7 shrink-0 text-chalk/60">
+              {line.minute}&apos;
+            </span>
             {line.tone === 'card' && <PixelCard size={12} />}
             {line.tone === 'goal' && <PixelBall size={12} />}
             <span className="truncate">{line.text}</span>
@@ -351,13 +358,7 @@ function LiveMatch() {
 
 /* ---------- Sections ---------- */
 
-function Marquee({
-  ids,
-  dir,
-}: {
-  ids: readonly string[];
-  dir?: 'reverse';
-}) {
+function Marquee({ ids, dir }: { ids: readonly string[]; dir?: 'reverse' }) {
   const doubled = [...ids, ...ids];
   return (
     <div className="lp-marquee" data-dir={dir}>
@@ -482,8 +483,8 @@ export function LandingPage() {
           <p className="ticker block w-full max-w-full px-3 py-2 text-[.5rem] sm:text-[.55rem]">
             <span className="ticker-text">
               Manager de futebol brasileiro · grátis · direto no celular ·
-              Séries A, B e C com elencos de 2026 · Copa do Brasil · Libertadores
-              ·
+              Séries A, B e C com elencos de 2026 · Copa do Brasil ·
+              Libertadores ·
             </span>
           </p>
           <h1
@@ -593,10 +594,7 @@ export function LandingPage() {
       >
         <div className="lp-reveal panel-board grid gap-6 p-5 sm:p-8 lg:grid-cols-[1fr_1fr]">
           <div>
-            <h2
-              id="clube"
-              className="led text-sm leading-relaxed sm:text-base"
-            >
+            <h2 id="clube" className="led text-sm leading-relaxed sm:text-base">
               Seu clube, rodada a rodada
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-chalk/85 sm:text-base">
@@ -724,12 +722,17 @@ export function LandingPage() {
                   Grátis
                 </h2>
               </div>
-              <p className="led text-2xl text-ink" style={{ textShadow: 'none' }}>
+              <p
+                className="led text-2xl text-ink"
+                style={{ textShadow: 'none' }}
+              >
                 R$ 0
               </p>
               <ul className="flex flex-col gap-2 text-sm leading-relaxed text-ink/90">
                 <li>✔ Loop completo: elenco, mercado, escritório, temporada</li>
-                <li>✔ {FREE_ENTITLEMENTS.maxCareers} carreira ativa, com nome</li>
+                <li>
+                  ✔ {FREE_ENTITLEMENTS.maxCareers} carreira ativa, com nome
+                </li>
                 <li>✔ Começa na Série C e sobe no braço</li>
                 <li>✔ Partida ao vivo e ranking global</li>
                 <li>✔ Salvo na nuvem</li>
