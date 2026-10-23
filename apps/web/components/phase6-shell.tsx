@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { CareerView, Screen } from '@/lib/career-api';
 import { personalityLabel } from '@/lib/coach-profile';
+import { unreadCount } from '@/lib/inbox-product';
 import { cn } from '@/lib/utils';
 
 type CommandState = 'idle' | 'pending' | 'duplicate' | 'success';
@@ -346,7 +347,7 @@ function DesktopRail({
           onClick={() => navigate('inbox')}
         >
           Caixa de entrada
-          <Badge>{career.world.news.length}</Badge>
+          <Badge>{unreadCount(career.world.news)}</Badge>
         </Button>
         <Button
           variant="outline"

@@ -28,6 +28,7 @@ import {
   type AccessTokenProvider,
 } from '@/lib/http-career-api';
 import { httpInboxPort, httpSeasonPort } from '@/lib/http-products';
+import { unreadCount } from '@/lib/inbox-product';
 import { worldHistoryFromSeason } from '@/lib/season-product';
 
 const open: { close(): Promise<unknown> }[] = [];
@@ -471,6 +472,28 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
       }),
     );
     expect(history.seasons[0]!.finish).toMatch(/\dV \dE \dD/);
+  });
+
+  it('marca a caixa como lida e exclui mensagens no servidor', async () => {
+    const { client } = await start();
+    const played = await client.instantResult();
+    expect(unreadCount(played.world.news)).toBeGreaterThan(0);
+    const port = httpInboxPort(client);
+    const read = await port.markRead(played.world.news.map(({ id }) => id));
+    expect(read.messages.every((message) => message.read === true)).toBe(true);
+    const career = (await client.getCareer())!;
+    expect(unreadCount(career.world.news)).toBe(0);
+    // Nothing unread: no command is sent, the version stays.
+    await port.markRead(career.world.news.map(({ id }) => id));
+    const report = career.world.news.find(({ tag }) => tag === 'Relatório')!;
+    expect(report.deletable).toBe(true);
+    const after = await port.remove(report.id);
+    expect(after.messages.map(({ id }) => id)).not.toContain(report.id);
+    const pending = career.world.news.find(({ pending }) => pending);
+    if (pending) await expect(port.remove(pending.id)).rejects.toThrow();
+    expect(
+      (await client.getCareer())!.world.news.map(({ id }) => id),
+    ).not.toContain(report.id);
   });
 
   it('carrega pirâmide, calendário e transição para as telas de competição', async () => {

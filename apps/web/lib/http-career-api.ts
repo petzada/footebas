@@ -431,7 +431,11 @@ function worldNews(
     headline: message.subject,
     detail: message.body,
     date: message.occurredOn,
-    ...(isPending(message, home.currentDate) ? { pending: true } : {}),
+    ...(isPending(message, home.currentDate)
+      ? { pending: true }
+      : { deletable: true }),
+    // Older servers do not send `read`: everything counts as unread there.
+    ...(message.read === true ? {} : { unread: true }),
   }));
   const milestones = history.slice(0, 12).map((event) => ({
     id: event.id,

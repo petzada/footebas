@@ -28,6 +28,8 @@ export const MAX_CONFIDENCE_EFFECT = 5;
 export const MAX_MORALE_EFFECT = 10;
 const KEPT_MESSAGES = 40;
 const KEPT_KEYS = 400;
+/** Read and deleted ids kept (well above the 20 messages the home shows). */
+const KEPT_MARKS = 200;
 const NOTICE_DAYS = 30;
 const DAYS: Readonly<Record<string, number>> = {
   board: 14,
@@ -92,6 +94,10 @@ export interface CareerInboxState {
   messages: InboxMessageState[];
   /** Generation keys already used, so each trigger fires once. */
   keys: string[];
+  /** Inbox ids (any source) the coach has seen, newest last. */
+  read?: string[];
+  /** Ids of offers and match reports the coach removed, newest last. */
+  deleted?: string[];
 }
 
 export class InboxRuleError extends Error {
@@ -895,4 +901,96 @@ export function generatedMessages(snapshot: CareerSnapshot): CoachMessage[] {
           }),
     };
   });
+}
+
+/** Whether a projected message still waits for the coach's decision. */
+export function awaitsDecision(
+  message: CoachMessage,
+  currentDate: string,
+): boolean {
+  if (message.choice !== undefined)
+    return (
+      message.choice.status === 'pending' &&
+      message.choice.expiresOn >= currentDate
+    );
+  return (
+    message.decision !== undefined && message.decision.expiresOn >= currentDate
+  );
+}
+
+const remember = (list: string[] | undefined, ids: readonly string[]) =>
+  [...(list ?? []).filter((id) => !ids.includes(id)), ...ids].slice(
+    -KEPT_MARKS,
+  );
+
+/**
+ * Hides removed messages and flags what the coach has already read. Takes
+ * every projected message (all sources), newest first.
+ */
+export function withInboxMarks(
+  snapshot: CareerSnapshot,
+  messages: readonly CoachMessage[],
+): CoachMessage[] {
+  const deleted = new Set(snapshot.inbox?.deleted ?? []);
+  const read = new Set(snapshot.inbox?.read ?? []);
+  return messages
+    .filter(({ id }) => !deleted.has(id))
+    .map((message) => ({ ...message, read: read.has(message.id) }));
+}
+
+/**
+ * `MarkInboxRead`: remembers the ids that are in the inbox now; unknown or
+ * already read ids change nothing.
+ */
+export function markInboxRead(
+  snapshot: CareerSnapshot,
+  visible: readonly CoachMessage[],
+  messageIds: readonly string[],
+): 'applied' | 'unchanged' {
+  const known = new Set(visible.map(({ id }) => id));
+  const already = new Set(snapshot.inbox?.read ?? []);
+  const fresh = [...new Set(messageIds)].filter(
+    (id) => known.has(id) && !already.has(id),
+  );
+  if (fresh.length === 0) return 'unchanged';
+  snapshot.inbox ??= emptyInbox();
+  snapshot.inbox.read = remember(snapshot.inbox.read, fresh);
+  return 'applied';
+}
+
+/**
+ * `DeleteInboxMessage`: generated messages leave the save (their generation
+ * key stays, so they never come back); offers and match reports, projected
+ * from elsewhere, are remembered as deleted. Waiting decisions are refused.
+ */
+export function deleteInboxMessage(
+  snapshot: CareerSnapshot,
+  visible: readonly CoachMessage[],
+  messageId: string,
+): 'applied' | 'unchanged' {
+  if (snapshot.inbox?.deleted?.includes(messageId) === true) return 'unchanged';
+  const message = visible.find(({ id }) => id === messageId);
+  if (message === undefined) {
+    // A generated message already removed is gone from the projection too.
+    if (
+      snapshot.inbox?.keys.some(
+        (key) => `mail_${slug(key)}`.slice(0, 128) === messageId,
+      ) === true
+    )
+      return 'unchanged';
+    throw new InboxRuleError('NOT_FOUND', 'inbox message not found');
+  }
+  if (awaitsDecision(message, snapshot.currentDate))
+    throw new InboxRuleError(
+      'VALIDATION_ERROR',
+      'decide this message before deleting it',
+    );
+  snapshot.inbox ??= emptyInbox();
+  const inbox = snapshot.inbox;
+  const generated = inbox.messages.some(({ id }) => id === messageId);
+  if (generated)
+    inbox.messages = inbox.messages.filter(({ id }) => id !== messageId);
+  else inbox.deleted = remember(inbox.deleted, [messageId]);
+  inbox.read = remember(inbox.read, [messageId]);
+  return 'applied';
 }

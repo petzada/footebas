@@ -151,6 +151,30 @@ export const resolveInboxDecisionCommandSchema = z.strictObject({
     optionId: entityIdSchema,
   }),
 });
+/**
+ * Marks inbox messages as read (opening the inbox page). Idempotent: ids
+ * already read, or no longer in the inbox, change nothing.
+ */
+export const markInboxReadCommandSchema = z.strictObject({
+  ...envelopeFields,
+  type: z.literal('MarkInboxRead'),
+  payload: z.strictObject({
+    careerId: entityIdSchema,
+    messageIds: z.array(entityIdSchema).min(1).max(50),
+  }),
+});
+/**
+ * Removes a message from the inbox for good (and marks it read). A message
+ * still waiting for a decision cannot be removed; repeating it is a no-op.
+ */
+export const deleteInboxMessageCommandSchema = z.strictObject({
+  ...envelopeFields,
+  type: z.literal('DeleteInboxMessage'),
+  payload: z.strictObject({
+    careerId: entityIdSchema,
+    messageId: entityIdSchema,
+  }),
+});
 export const simulateMatchCommandSchema = z.strictObject({
   ...envelopeFields,
   type: z.literal('SimulateMatch'),
@@ -174,6 +198,8 @@ export const commandSchema = z.discriminatedUnion('type', [
   counterSponsorshipOfferCommandSchema,
   configureFanMembershipCommandSchema,
   resolveInboxDecisionCommandSchema,
+  markInboxReadCommandSchema,
+  deleteInboxMessageCommandSchema,
 ]);
 export const commandAcceptedSchema = z.strictObject({
   version: transportVersionSchema,
@@ -193,6 +219,10 @@ export type AdvanceDateCommand = z.infer<typeof advanceDateCommandSchema>;
 export type SimulateMatchCommand = z.infer<typeof simulateMatchCommandSchema>;
 export type ResolveInboxDecisionCommand = z.infer<
   typeof resolveInboxDecisionCommandSchema
+>;
+export type MarkInboxReadCommand = z.infer<typeof markInboxReadCommandSchema>;
+export type DeleteInboxMessageCommand = z.infer<
+  typeof deleteInboxMessageCommandSchema
 >;
 export type Command = z.infer<typeof commandSchema>;
 export type CommandAccepted = z.infer<typeof commandAcceptedSchema>;

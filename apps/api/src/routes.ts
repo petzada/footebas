@@ -264,6 +264,8 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
             'CounterSponsorshipOffer',
             'ConfigureFanMembership',
             'ResolveInboxDecision',
+            'MarkInboxRead',
+            'DeleteInboxMessage',
           ].map((type) => ({
             type: 'object',
             required: [
