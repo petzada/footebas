@@ -35,7 +35,10 @@ describe('coach personality rules', () => {
   });
 
   it('scales integer deltas deterministically with the exact expected value', () => {
-    const keys = Array.from({ length: 4_000 }, (_, index) => `k${String(index)}`);
+    const keys = Array.from(
+      { length: 4_000 },
+      (_, index) => `k${String(index)}`,
+    );
     const scaled = keys.map((key) => scaleIntegerDelta(3, 1.1, key));
     expect(scaled.every((value) => value === 3 || value === 4)).toBe(true);
     const mean = scaled.reduce((sum, value) => sum + value, 0) / keys.length;
@@ -100,7 +103,9 @@ describe('coach personality rules', () => {
       endsOn: '2028-12-31',
     };
     expect(evaluateRenewal(contract, proposal, player, 60)).toBe('refuse');
-    expect(evaluateRenewal(contract, proposal, player, 60, 0.95)).toBe('accept');
+    expect(evaluateRenewal(contract, proposal, player, 60, 0.95)).toBe(
+      'accept',
+    );
   });
 
   it('writes e-mails with a distinct Portuguese tone per personality', () => {

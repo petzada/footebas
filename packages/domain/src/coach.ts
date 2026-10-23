@@ -139,11 +139,7 @@ export function applyPersonalityToConfidence(
 }
 
 export type ApproximateStrength =
-  | 'much_weaker'
-  | 'weaker'
-  | 'similar'
-  | 'stronger'
-  | 'much_stronger';
+  'much_weaker' | 'weaker' | 'similar' | 'stronger' | 'much_stronger';
 
 /** Game plan suggested by the opponent analysis (opponent relative to us). */
 export function recommendedMentality(opponent: ApproximateStrength): Mentality {
@@ -195,7 +191,10 @@ export interface CoachVoiceTemplate {
  * {club}, {opponent}, {score}, {competition}, {coach}.
  */
 export const COACH_VOICE: Readonly<
-  Record<CoachPersonality, Readonly<Record<CoachVoiceSituation, CoachVoiceTemplate>>>
+  Record<
+    CoachPersonality,
+    Readonly<Record<CoachVoiceSituation, CoachVoiceTemplate>>
+  >
 > = Object.freeze({
   motivador: Object.freeze({
     win: {
