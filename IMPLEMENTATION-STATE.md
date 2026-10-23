@@ -16,20 +16,26 @@
 Hospedagem de produção: Cloudflare nativo (ADR 0005), Supabase para Postgres/Auth/Storage, domínio
 `footebas.com.br`.
 
-## Entrega final (objetivo de 2026-10-22)
+## Entrega final (objetivo de 2026-10-22, reestruturado em 2026-10-23)
 
-Branch de integração: `mvp/fase-6-9`. Ordem das etapas: 1 nuvem → 2 telas (`docs/09`) → 3 sistemas no servidor →
-4 licença PIX (Fase 8) → 5 endurecimento (Fase 9) → 6 landing. Até três subagentes em paralelo, cada um em worktree
-próprio e com arquivos disjuntos. Para não ter dois agentes no mesmo arquivo, o trabalho corre em três trilhas:
+Branch de integração: `mvp/fase-6-9`. Até três subagentes em paralelo, cada um em worktree próprio e com arquivos
+disjuntos, em três trilhas: **servidor** (`packages/*`, serializada), **web** (`apps/web`, serializada por área) e
+**infraestrutura** (`apps/api`, migrations, CI, ferramentas).
 
-- **Trilha servidor** (serializada): `packages/domain`, `packages/engine`, `packages/application`, `packages/contracts`.
-- **Trilha web** (serializada por área): `apps/web`.
-- **Trilha infraestrutura**: `apps/api` (rotas novas), `packages/database`, `supabase/migrations`, CI, ferramentas.
+Etapas (as marcadas com ★ entraram com o ADR 0010 — apresentação premium e Phaser):
 
-| Onda | Fatias                                                                | Estado    |
-| ---- | --------------------------------------------------------------------- | --------- |
-| 1    | login Supabase no web; web via OpenNext; API em `api.` + fumaça nuvem | concluída |
-| 2    | treinador/limites (servidor); telas de entrada (web); licença Woovi   | em curso  |
+| Etapa | Conteúdo                                                                                                                                                                                    | Estado    |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 1     | Nuvem: login Supabase, web via OpenNext, domínios, fumaça na nuvem                                                                                                                          | concluída |
+| 2A    | Telas de entrada: Início, Carregar, Central, Mapa, emblemas                                                                                                                                 | concluída |
+| 2B    | Visual ISOPOP (ADR 0009), Mapa isométrico, Nova Carreira em etapas com treinador                                                                                                            | em curso  |
+| 2C ★  | Partida em Phaser sob demanda sobre a timeline oficial, campo 2D como fallback                                                                                                              | pendente  |
+| 2D ★  | Apresentação premium: movimento, feedback, sons com mudo, celebração de gol, avatares gerados                                                                                               | pendente  |
+| 2E    | Telas restantes sobre 2D: Elenco (campo arrastável, presets), Mercado, Escritório, Temporada, Ranking                                                                                       | pendente  |
+| 3     | Servidor: personalidade e limites ✔, mercado/janelas/IA ✔, escritório (patrocínio, sócio-torcedor) + entrosamento ★, e-mails com decisões, estatísticas de temporada, ranking com snapshots | em curso  |
+| 4     | Licença Woovi PIX ✔ (sandbox aguarda AppID), perfil, termos e privacidade                                                                                                                   | em curso  |
+| 5     | Save enxuto (catálogo por versão + deltas), observabilidade ✔, rate limit ✔, backups ✔, E2E no CI ✔                                                                                         | em curso  |
+| 6     | Landing arcade isométrica                                                                                                                                                                   | pendente  |
 
 ### Estado da nuvem
 

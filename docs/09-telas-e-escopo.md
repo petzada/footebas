@@ -18,6 +18,12 @@ complementa `docs/08-mvp-fonte-de-verdade.md`; em conflito sobre telas, vale est
 | 9   | Contadores da tela Início  | Treinadores, clubes e atletas vindos do banco, com **cache de ~5 minutos** no edge.                                                                                                                                              |
 | 10  | Ranking global             | **Fica, com tela própria** (global, ascensão e mensal), só com conquistas validadas pelo servidor.                                                                                                                               |
 | 11  | Ordem de trabalho          | **Nuvem primeiro** (Hyperdrive, deploy, login Supabase em footebas.com.br), depois o redesenho das telas e os sistemas novos, landing por último.                                                                                |
+| 12  | Partida em Phaser          | **Cena Phaser só na partida** (carregada sob demanda) sobre a timeline oficial; coreografia é apresentação e nunca muda o resultado; campo 2D atual vira fallback. ADR 0010.                                                     |
+| 13  | Apresentação premium       | Transições, animações de entrada, celebração de gol, sons com mudo e feedback em toda ação; respeita movimento reduzido. ADR 0010.                                                                                               |
+| 14  | Cards de atleta            | **Avatares gerados** por atleta, sem fotos reais (direito de imagem).                                                                                                                                                            |
+| 15  | Potencial e atributos      | Força, condição e moral em barras; **potencial só como faixa estimada** com incerteza.                                                                                                                                           |
+| 16  | Entrosamento               | **Nas regras do mundo** (bônus pequeno de força efetiva antes do motor); motor de partida intacto.                                                                                                                               |
+| 17  | Direção visual             | ISOPOP adaptado, **só modo claro**, vidro 50%, verde-gramado nas ações e coral em destaque. ADR 0009.                                                                                                                            |
 
 ## Mapa de telas do MVP
 
