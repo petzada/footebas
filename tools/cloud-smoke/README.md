@@ -22,7 +22,7 @@ runtime.
 
 Saída em português; código de saída `0` (ok), `1` (fumaça falhou) ou `2`
 (configuração inválida). Cada execução cria uma carreira nova para o usuário
-de fumaça (`smoke-user`).
+de fumaça (`smoke_user`).
 
 ## Uso
 
@@ -70,4 +70,4 @@ pnpm --filter @footebas/api exec wrangler secret delete SMOKE_TOKEN
 ```
 
 Comparação em tempo constante (SHA-256 dos dois lados). O usuário autenticado
-é fixo: `smoke-user` / `smoke@footebas.invalid` / "Fumaça".
+é fixo: `smoke_user` / `smoke@footebas.invalid` / "Fumaça".

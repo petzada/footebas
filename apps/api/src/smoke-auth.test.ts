@@ -27,7 +27,7 @@ describe('auth de fumaça', () => {
       SMOKE_IDENTITY,
     );
     await expect(auth.authenticate(`smoke:${secret}`)).resolves.toMatchObject({
-      userId: 'smoke-user',
+      userId: 'smoke_user',
       email: 'smoke@footebas.invalid',
       displayName: 'Fumaça',
     });

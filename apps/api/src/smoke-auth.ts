@@ -4,7 +4,7 @@ import type { FakeAuthIdentity } from '@footebas/contracts';
 /** Fixed identity owned by the cloud smoke test (`tools/cloud-smoke`). */
 export const SMOKE_IDENTITY: FakeAuthIdentity = Object.freeze({
   version: 1,
-  userId: 'smoke-user',
+  userId: 'smoke_user',
   email: 'smoke@footebas.invalid',
   displayName: 'Fumaça',
 });
