@@ -251,6 +251,20 @@ describe('mercado de treinadores', () => {
     });
     expect(result).toHaveLength(3);
     expect(result.every(({ reason }) => reason === 'reemployment')).toBe(true);
+    // The club that just let the coach go never calls back.
+    const firedBy52 = jobMarketOffers({
+      career: {
+        ...unemployed,
+        appointments: [{ clubId: clubId('club_52'), joinedOn: '2026-01-01' }],
+      },
+      lastReputation: 52,
+      performance: 0,
+      clubs,
+      onDate: '2027-01-01',
+      maxOffers: 3,
+      nextId: () => `proposal_${String(++sequence)}`,
+    });
+    expect(firedBy52.map(({ clubId: id }) => id)).not.toContain('club_52');
     expect(offers(0, false).length).toBeGreaterThan(0);
   });
 });

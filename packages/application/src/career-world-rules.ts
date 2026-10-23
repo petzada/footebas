@@ -879,12 +879,14 @@ export function workPerformance(
   form: readonly ('W' | 'D' | 'L')[],
   league: { position: number; rounds: number } | undefined,
 ): number {
+  // Objectives are set when the coach takes the club and only re-judged at
+  // each season end, so from the second season they read met/failed: the
+  // target still holds for the season being played.
   const objective = objectives.find(
-    ({ status, metric }) =>
-      status === 'active' &&
-      (metric === 'league_position' ||
-        metric === 'avoid_relegation' ||
-        metric === 'promotion'),
+    ({ metric }) =>
+      metric === 'league_position' ||
+      metric === 'avoid_relegation' ||
+      metric === 'promotion',
   );
   const standing =
     objective === undefined || league === undefined || league.rounds < 6

@@ -17,6 +17,7 @@ import {
   careerSaveRepository,
   catalogCareerContent,
   runClubDay,
+  workPerformance,
   type CareerSnapshot,
 } from './index.js';
 
@@ -310,5 +311,34 @@ describe('propostas de emprego durante a temporada', () => {
     expect(
       moved.jobProposals.filter(({ status }) => status === 'open'),
     ).toEqual([]);
+  });
+});
+
+describe('desempenho que guia as propostas', () => {
+  it('a meta da temporada vale mesmo depois de julgada (2ª temporada em diante)', () => {
+    const manager = {
+      managerId: 'manager_1',
+      employmentStatus: 'employed' as const,
+      boardConfidence: 50,
+      fanConfidence: 50,
+      prestige: 0,
+      seasons: 1,
+      appointments: [],
+    };
+    const objective = {
+      id: 'objective_1',
+      metric: 'league_position' as const,
+      target: 10,
+      progress: 12,
+      weight: 15,
+      status: 'failed' as const,
+    };
+    const league = { position: 2, rounds: 12 };
+    expect(workPerformance(manager, [objective], [], league)).toBeGreaterThan(
+      0.4,
+    );
+    expect(
+      workPerformance(manager, [objective], [], { position: 19, rounds: 12 }),
+    ).toBeLessThan(-0.4);
   });
 });

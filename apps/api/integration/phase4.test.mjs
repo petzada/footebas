@@ -374,11 +374,22 @@ describe('Phase 4 server-authoritative HTTP vertical', () => {
       (
         await post(
           f,
+          // The server prices the works (the client only picks a plan): the
+          // smallest one costs more than this club's cash and is refused.
           command('ExpandStadium', 'command_stadium', 3, {
             clubId: f.managed,
-            addedCapacity: 500,
-            cost: 100_000,
-            completesOn: '2027-01-01',
+            plan: 'small',
+          }),
+        )
+      ).statusCode,
+    ).toBe(409);
+    expect(
+      (
+        await post(
+          f,
+          command('MaintainStadium', 'command_maintenance', 3, {
+            clubId: f.managed,
+            plan: 'repairs',
           }),
         )
       ).statusCode,

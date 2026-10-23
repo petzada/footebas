@@ -157,11 +157,14 @@ export function jobMarketOffers(input: JobMarketInput): readonly JobProposal[] {
     Math.min(6, Math.max(0, input.career.prestige) / 30);
   const low = employed ? center - 6 : center - 12;
   const high = employed ? center + 6 : center + 4;
+  // Never the current club, nor (out of work) the club that just let go.
+  const lastClubId = input.career.appointments.at(-1)?.clubId;
   const excluded = new Set<string>([
     ...(input.excludedClubIds ?? []),
     ...(input.career.currentClubId === undefined
       ? []
       : [input.career.currentClubId]),
+    ...(!employed && lastClubId !== undefined ? [lastClubId] : []),
   ]);
   const distance = (reputation: number) => Math.abs(reputation - center);
   const eligible = input.clubs
