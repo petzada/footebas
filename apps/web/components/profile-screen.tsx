@@ -7,6 +7,7 @@ import {
   LicenseCheckout,
   countdown,
 } from '@/components/license-checkout';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { PlayerAvatar, type PlayerIdentity } from '@/components/start-screens';
 import { PixelCoin, PixelStar } from '@/components/retro/sprites';
 import { Badge } from '@/components/ui/badge';
@@ -92,12 +93,7 @@ export function ProfileScreen({
         {error}
       </p>
     );
-  if (!profile)
-    return (
-      <p className="panel p-3 text-sm" role="status">
-        Abrindo sua ficha…
-      </p>
-    );
+  if (!profile) return <ScreenSkeleton label="Abrindo sua ficha…" rows={3} />;
 
   const licensed = profile.plan === 'licensed';
   const used = careers?.careers.length;

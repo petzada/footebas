@@ -182,6 +182,32 @@ export function ClubMapScreen({
             />
           )}
         </nav>
+        {/* docs/09 decision 2: the same destinations as a plain list, for
+            who prefers reading to tapping a drawing (D4). */}
+        <nav
+          aria-label="Áreas do clube em lista"
+          className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {CLUB_AREAS.flatMap((area) =>
+            area.links.map(([screen, label]) => (
+              <Button
+                key={`${area.id}-${screen}`}
+                variant="outline"
+                className="min-h-11 justify-start text-left"
+                onClick={() => go(screen, null)}
+              >
+                <area.icon
+                  weight="fill"
+                  data-icon="inline-start"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 truncate">
+                  {area.name} · {label}
+                </span>
+              </Button>
+            )),
+          )}
+        </nav>
       </section>
     </div>
   );

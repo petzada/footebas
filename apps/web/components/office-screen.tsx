@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowsLeftRight, Check, X } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { CoachAvatar } from '@/components/coach-avatar';
 import { ContractsScreen } from '@/components/phase4-screens';
 import { PixelCoin, PixelTrophy } from '@/components/retro/sprites';
@@ -123,12 +124,7 @@ export function OfficeScreen({
     }
   };
 
-  if (!office)
-    return (
-      <p className="panel p-3 text-sm" role="status">
-        Abrindo o escritório…
-      </p>
-    );
+  if (!office) return <ScreenSkeleton label="Abrindo o escritório…" />;
 
   const pending = office.proposals.sponsorship.filter(
     (offer) => offer.status === 'pending',
@@ -139,36 +135,41 @@ export function OfficeScreen({
       <p className="sr-only" role="status" aria-live="polite">
         {notice}
       </p>
+      {/* Pixel digits shrink on phones and wrap only at the space ("R$ 38,6"
+          / "mi"); "Patrocínio/mês" (14 glyphs) may break after the word so
+          it never runs into the next column. */}
       <header className="panel-board grid grid-cols-3 gap-2 p-3 text-center">
-        <div>
+        <div className="min-w-0">
           <p className="font-pixel text-[.5rem] uppercase text-chalk/80">
             Caixa
           </p>
           <p
             className={cn(
-              'led text-base',
+              'led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base',
               (office.club?.cash ?? 0) < 0 && 'text-destructive',
             )}
           >
             {formatBrl(office.club?.cash ?? 0)}
           </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="font-pixel text-[.5rem] uppercase text-chalk/80">
-            Patrocínio/mês
+            Patrocínio
+            <wbr />
+            /mês
           </p>
-          <p className="led text-base">
+          <p className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
             {formatBrl(
               office.sponsorship.contract?.monthlyValue ??
                 office.sponsorship.fallbackMonthly,
             )}
           </p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="font-pixel text-[.5rem] uppercase text-chalk/80">
             Sócios
           </p>
-          <p className="led text-base">
+          <p className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
             {(office.membership?.members ?? 0).toLocaleString('pt-BR')}
           </p>
         </div>
@@ -517,10 +518,14 @@ function SponsorOfferCard({
         </p>
       )}
       {open && (
-        <div className="grid grid-cols-3 gap-1">
+        // Three pixel-font labels never fit side by side on a phone: stacked
+        // there, one row from `sm` up. Names carry the sponsor so three
+        // cards never announce three identical "Aceitar" buttons.
+        <div className="grid gap-1 sm:grid-cols-3">
           <Button
             size="sm"
             disabled={busy}
+            aria-label={`Aceitar proposta de ${offer.sponsorName}`}
             onClick={() => void onDecide('accept')}
           >
             <Check data-icon="inline-start" />
@@ -530,6 +535,7 @@ function SponsorOfferCard({
             size="sm"
             variant="destructive"
             disabled={busy}
+            aria-label={`Recusar proposta de ${offer.sponsorName}`}
             onClick={() => void onDecide('reject')}
           >
             <X data-icon="inline-start" />
@@ -540,6 +546,7 @@ function SponsorOfferCard({
             variant="secondary"
             disabled={busy || !canCounter}
             aria-expanded={countering}
+            aria-label={`Contrapropor a ${offer.sponsorName}`}
             onClick={() => setCountering((current) => !current)}
             title={
               !canCounter

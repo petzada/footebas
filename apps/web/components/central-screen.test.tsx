@@ -131,6 +131,24 @@ describe('Central', () => {
     expect(await screen.findByText('Ida da terceira fase')).toBeTruthy();
   });
 
+  it('no celular o Próximo jogo vem antes do card do clube (D3)', async () => {
+    const view = await career();
+    render(
+      <CentralScreen
+        career={view}
+        onNarrate={() => undefined}
+        onInstant={() => undefined}
+        navigate={() => undefined}
+      />,
+    );
+    const next = screen.getByTestId('central-next-match');
+    const club = screen.getByRole('region', { name: view.club });
+    expect(
+      next.compareDocumentPosition(club) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(next.className).toMatch(/order-1 lg:order-3/);
+  });
+
   it('resume tabela, compromissos, caixa de entrada e notícias com dados reais', async () => {
     const navigate = vi.fn();
     const view = await career();

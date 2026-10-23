@@ -3,15 +3,13 @@
 import { Children, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  Bank,
   Binoculars,
   Buildings,
-  ChartLineUp,
   CheckCircle,
-  CurrencyCircleDollar,
   ShieldCheck,
   Trophy,
 } from '@phosphor-icons/react';
+import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -90,16 +88,16 @@ function SectionHeading({
   description: string;
 }) {
   return (
-    <header className="mb-4">
-      <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">
+    // Sits on the grass, not on a panel: chalk tones keep AA contrast
+    // (primary green and the muted ink would be below 2:1 here).
+    <header className="mb-4 text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
+      <p className="text-xs font-bold uppercase tracking-[.18em] text-chalk/90">
         {eyebrow}
       </p>
       <h2 className="font-display text-xs font-bold uppercase sm:text-sm">
         {title}
       </h2>
-      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-        {description}
-      </p>
+      <p className="mt-1 max-w-2xl text-sm">{description}</p>
     </header>
   );
 }
@@ -596,77 +594,13 @@ export function ClubScreen(props: Phase4ScreenProps) {
         description="Caixa, patrimônio, base e confiança se encontram aqui — cada ação deixa uma origem rastreável."
       />
       <LiveNotice>{notice}</LiveNotice>
-      <Tabs defaultValue={props.initialTab ?? 'finance'}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="finance">Finanças</TabsTrigger>
+      {/* Finanças lives in the Escritório only (D5). */}
+      <Tabs defaultValue={props.initialTab ?? 'stadium'}>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="stadium">Estádio</TabsTrigger>
           <TabsTrigger value="youth">Base</TabsTrigger>
           <TabsTrigger value="board">Diretoria</TabsTrigger>
         </TabsList>
-        <TabsContent value="finance" className="mt-4 flex flex-col gap-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Summary
-              icon={CurrencyCircleDollar}
-              label="Caixa"
-              value={money(props.career.world.finances.cash)}
-              note={`Reserva mínima: ${money(props.career.world.finances.transferGate)}`}
-            />
-            <Summary
-              icon={Bank}
-              label="Folha por rodada"
-              value={money(props.career.world.finances.wageBill)}
-              note={`Teto: ${money(props.career.world.finances.wageBudget)}`}
-            />
-            <Summary
-              icon={ChartLineUp}
-              label="Patrocínio"
-              value={props.career.world.finances.sponsor}
-              note="Receita contratual identificada"
-            />
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-sm uppercase">
-                Ledger imutável
-              </CardTitle>
-              <CardDescription>
-                Histórico somente leitura. Cada valor nasce de uma fonte
-                nomeada.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Origem</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-right">Saldo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {props.career.world.finances.ledger.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{entry.date}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="mr-2">
-                          {entry.category}
-                        </Badge>
-                        {entry.sourceLabel}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {money(entry.amount)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {money(entry.balance)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
         <TabsContent value="stadium" className="mt-4">
           <StadiumTab {...props} run={run} />
         </TabsContent>
@@ -1001,7 +935,7 @@ function YouthTab(props: TabProps) {
           note="Posições em que o elenco tem menos jogadores"
         />
       </div>
-      <p className="rounded-md border bg-muted p-3 text-sm">
+      <p className="rounded-md border bg-muted p-3 text-sm text-ink">
         Os garotos treinam todo mês e ganham força até o potencial (estimado,
         nunca exato). Quem passa dos {academy?.maxAge ?? 20} anos sem subir
         deixa o clube na virada da temporada. Todos são{' '}
@@ -1091,7 +1025,7 @@ function YouthTab(props: TabProps) {
                     {READINESS_LABEL[kid.readiness]}
                   </p>
                 </CardContent>
-                <CardFooter className="grid grid-cols-2 gap-2">
+                <CardFooter className="grid gap-2 min-[400px]:grid-cols-2">
                   <Button
                     size="sm"
                     disabled={!kid.promotable}
@@ -1418,9 +1352,7 @@ function HistoryTab({
   return (
     <div className="grid gap-4">
       {season.status === 'loading' && (
-        <p className="panel p-3 text-sm" role="status">
-          Abrindo o arquivo das temporadas…
-        </p>
+        <ScreenSkeleton label="Abrindo o arquivo das temporadas…" />
       )}
       {season.status === 'error' && (
         <p className="panel p-3 text-sm" role="alert">
@@ -1606,7 +1538,7 @@ function Summary({
   value,
   note,
 }: {
-  icon: typeof Bank;
+  icon: typeof Trophy;
   label: string;
   value: string;
   note: string;
@@ -1616,7 +1548,7 @@ function Summary({
       <CardHeader>
         <div className="flex items-center justify-between">
           <Badge variant="outline">{label}</Badge>
-          <Icon />
+          <Icon aria-hidden="true" />
         </div>
         <CardTitle className="font-display text-base uppercase">
           {value}
