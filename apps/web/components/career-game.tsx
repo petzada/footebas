@@ -80,6 +80,10 @@ import { CompetitionScreens } from '@/components/competition-screens';
 import { Phase6Shell, PwaRuntime } from '@/components/phase6-shell';
 import { MatchReplayViewer } from '@/components/match-replay-viewer';
 import { ClubEmblem } from '@/components/club-emblem';
+import { AthleteCard } from '@/components/athlete-card';
+import { PixelAvatar } from '@/components/retro/pixel-avatar';
+import { TickerProvider, useTicker } from '@/components/retro/ticker';
+import { useSound } from '@/lib/retro/use-sound';
 import { CentralScreen } from '@/components/central-screen';
 import { ClubMapScreen } from '@/components/club-map';
 import {
@@ -125,8 +129,15 @@ export function CareerGame({
       ? { api: provided ?? new InMemoryCareerApi(), auth: providedAuth ?? null }
       : createCareerRuntime(),
   );
-  if (!runtime.auth) return <CareerFlow api={runtime.api} />;
-  return <AuthGate auth={runtime.auth} api={runtime.api} />;
+  return (
+    <TickerProvider>
+      {runtime.auth ? (
+        <AuthGate auth={runtime.auth} api={runtime.api} />
+      ) : (
+        <CareerFlow api={runtime.api} />
+      )}
+    </TickerProvider>
+  );
 }
 
 type GateState =
@@ -210,6 +221,8 @@ function CareerFlow({
   // Set once CreateCareer succeeds, so retrying a failed SelectClub never
   // creates a second career.
   const createdCareer = useRef(false);
+  const ticker = useTicker();
+  const { play } = useSound();
 
   const attempt = async <T,>(key: string, action: () => Promise<T>) => {
     if (inFlight.current.has(key)) {
@@ -222,6 +235,7 @@ function CareerFlow({
       setError('');
       const result = await action();
       setCommandState('success');
+      play('confirm');
       return result;
     } catch (caught) {
       setCommandState('idle');
@@ -229,7 +243,10 @@ function CareerFlow({
         onSessionExpired();
         return undefined;
       }
-      setError(caught instanceof Error ? caught.message : 'Tente novamente.');
+      const message =
+        caught instanceof Error ? caught.message : 'Tente novamente.';
+      setError(message);
+      ticker.announce(message, 'error');
       return undefined;
     } finally {
       inFlight.current.delete(key);
@@ -630,7 +647,7 @@ function Onboarding(props: {
           {props.stage === 'login' && props.signedIn ? (
             <>
               <CardHeader>
-                <CardTitle className="font-display text-3xl uppercase">
+                <CardTitle className="font-display text-xs uppercase">
                   Abrindo o vestiário
                 </CardTitle>
               </CardHeader>
@@ -658,7 +675,7 @@ function Onboarding(props: {
             <>
               <CardHeader>
                 <Badge className="w-fit">Acesso local</Badge>
-                <CardTitle className="font-display text-3xl uppercase">
+                <CardTitle className="font-display text-xs uppercase">
                   Volte para a beira do campo
                 </CardTitle>
                 <CardDescription>
@@ -691,7 +708,7 @@ function Onboarding(props: {
                 <Badge variant="secondary" className="w-fit">
                   Falta o clube
                 </Badge>
-                <CardTitle className="font-display text-3xl uppercase">
+                <CardTitle className="font-display text-xs uppercase">
                   Escolha seu desafio
                 </CardTitle>
                 <CardDescription>
@@ -768,7 +785,7 @@ function Squad({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <h2 className="font-display text-3xl font-bold uppercase">
+          <h2 className="font-display text-xs font-bold uppercase">
             Vestiário
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -797,7 +814,7 @@ function Squad({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(19rem,.8fr)]">
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl uppercase">
+            <CardTitle className="font-display text-sm uppercase">
               Grupos do elenco
             </CardTitle>
             <CardDescription>
@@ -842,10 +859,13 @@ function Squad({
           </CardContent>
         </Card>
         {selected && (
-          <PlayerDetail
-            player={selected}
-            onMove={(role) => onMove(selected.id, role)}
-          />
+          <div className="grid content-start gap-4">
+            <AthleteCard player={selected} club={{ name: career.club }} />
+            <PlayerDetail
+              player={selected}
+              onMove={(role) => onMove(selected.id, role)}
+            />
+          </div>
         )}
       </div>
     </div>
@@ -866,18 +886,19 @@ function PlayerRow({
     <button
       aria-pressed={selected}
       className={cn(
-        'grid min-h-16 w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-md border p-3 text-left transition-colors',
-        selected
-          ? 'border-primary bg-primary/10'
-          : 'bg-background/35 hover:bg-muted',
+        'grid min-h-16 w-full grid-cols-[auto_1fr_auto] items-center gap-3 border-2 border-ink p-3 text-left',
+        selected ? 'bg-bulb/40 outline outline-4 outline-bulb' : 'bg-popover',
       )}
       onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') onSelect();
       }}
     >
-      <span className="grid size-10 place-items-center rounded-md bg-secondary font-display text-lg font-bold">
-        {player.shirt}
+      <span className="relative">
+        <PixelAvatar seed={`atleta-${player.id}`} size={40} />
+        <span className="absolute -bottom-1 -right-1 bg-ink px-0.5 font-pixel text-[.45rem] text-chalk">
+          {player.shirt}
+        </span>
       </span>
       <span className="min-w-0">
         <strong className="block truncate text-sm">{player.name}</strong>
@@ -891,7 +912,7 @@ function PlayerRow({
         )}
       </span>
       <span
-        className="font-display text-2xl font-bold text-primary"
+        className="led bg-board px-1.5 py-1 text-base"
         aria-label={`Força ${player.strength}`}
       >
         {player.strength}
@@ -912,14 +933,14 @@ function PlayerDetail({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="font-display text-2xl uppercase">
+            <CardTitle className="font-display text-base uppercase">
               {player.name}
             </CardTitle>
             <CardDescription>
               #{player.shirt} · {player.age} anos · {player.nationality}
             </CardDescription>
           </div>
-          <span className="font-display text-5xl font-bold text-primary">
+          <span className="font-display text-base font-bold text-primary">
             {player.strength}
           </span>
         </div>
@@ -1085,7 +1106,7 @@ function Tactics({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)]">
       <Card>
         <CardHeader>
-          <CardTitle className="font-display text-2xl uppercase">
+          <CardTitle className="font-display text-base uppercase">
             Prancheta compacta
           </CardTitle>
           <CardDescription>
@@ -1222,7 +1243,7 @@ function Pitch({
   return (
     <Card className="xl:sticky xl:top-6 xl:self-start">
       <CardHeader>
-        <CardTitle className="font-display text-xl uppercase">
+        <CardTitle className="font-display text-sm uppercase">
           {formation} em campo
         </CardTitle>
         <CardDescription>Os nomes refletem os 11 titulares.</CardDescription>
@@ -1379,7 +1400,7 @@ function Matchday(props: {
               className="mx-auto mb-3 size-7 text-primary"
               weight="fill"
             />
-            <p className="font-display text-xl font-bold uppercase">
+            <p className="font-display text-sm font-bold uppercase">
               {props.update.message}
             </p>
           </div>
@@ -1414,7 +1435,7 @@ function Matchday(props: {
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl uppercase">
+            <CardTitle className="font-display text-sm uppercase">
               Intervenções
             </CardTitle>
             <CardDescription>
@@ -1514,7 +1535,7 @@ function Matchday(props: {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="font-display text-xl uppercase">
+            <CardTitle className="font-display text-sm uppercase">
               Narração
             </CardTitle>
           </CardHeader>
@@ -1582,7 +1603,7 @@ function Result({
         </CardHeader>
         <CardContent className="flex flex-col gap-4 text-center">
           <div>
-            <h2 className="font-display text-2xl font-bold uppercase">
+            <h2 className="font-display text-base font-bold uppercase">
               {result.headline}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -1620,7 +1641,7 @@ function Standings({ career }: { career: CareerView }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-display text-2xl uppercase">
+        <CardTitle className="font-display text-base uppercase">
           Classificação
         </CardTitle>
         <CardDescription>
@@ -1643,7 +1664,7 @@ function Standings({ career }: { career: CareerView }) {
               .sort((a, b) => b.points - a.points)
               .map((row, index) => (
                 <TableRow key={row.club}>
-                  <TableCell className="font-display text-lg font-bold">
+                  <TableCell className="font-display text-xs font-bold">
                     {index + 1}
                   </TableCell>
                   <TableCell
@@ -1657,7 +1678,7 @@ function Standings({ career }: { career: CareerView }) {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">{row.played}</TableCell>
-                  <TableCell className="text-right font-display text-lg font-bold">
+                  <TableCell className="text-right font-display text-xs font-bold">
                     {row.points}
                   </TableCell>
                 </TableRow>
@@ -1684,7 +1705,7 @@ function SeasonScreen({
     <div className="flex flex-col gap-4">
       <section
         aria-labelledby="temporada-em-construcao"
-        className="glass flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between"
+        className="panel flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex items-start gap-3">
           <ChartLineUp
@@ -1695,7 +1716,7 @@ function SeasonScreen({
           <div>
             <h2
               id="temporada-em-construcao"
-              className="font-display text-2xl font-bold uppercase"
+              className="font-display text-base font-bold uppercase"
             >
               Em construção
             </h2>

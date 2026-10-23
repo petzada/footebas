@@ -89,7 +89,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
     navigate(/^mercado$/i);
     await selectTab(/^contratos$/i);
     expect(screen.getByText(/pode assinar pré-contrato/i)).toBeTruthy();
-    const contract = screen.getByText('Bruno Henrique').closest('.rounded-xl');
+    const contract = screen.getByText('Bruno Henrique').closest('.panel');
     expect(contract).not.toBeNull();
     fireEvent.click(
       within(contract as HTMLElement).getByRole('button', {
@@ -131,7 +131,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
       (await screen.findByText(/todos os atletas abaixo são/i)).textContent,
     ).toMatch(/gerados pelo universo/i);
     expect(screen.getAllByText(/base · gerado/i)).toHaveLength(3);
-    const card = screen.getByText('Davi Lessa').closest('.rounded-xl');
+    const card = screen.getByText('Davi Lessa').closest('.panel');
     expect(card).not.toBeNull();
     fireEvent.click(
       within(card as HTMLElement).getByRole('button', { name: /desenvolver/i }),

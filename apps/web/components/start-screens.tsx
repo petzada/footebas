@@ -12,8 +12,17 @@ import {
   WarningCircle,
 } from '@phosphor-icons/react';
 import { Brand } from '@/components/brand';
-import { ClubEmblem, stableHash } from '@/components/club-emblem';
+import { ClubEmblem } from '@/components/club-emblem';
 import { CoachAvatar } from '@/components/coach-avatar';
+import { MuteButton } from '@/components/retro/mute-button';
+import { PixelAvatar } from '@/components/retro/pixel-avatar';
+import { ScreenTransition } from '@/components/retro/screen-transition';
+import {
+  PixelArrow,
+  PixelBall,
+  PixelFlag,
+  PixelTrophy,
+} from '@/components/retro/sprites';
 import { Button } from '@/components/ui/button';
 import {
   FREE_CAREER_LIMIT,
@@ -23,6 +32,7 @@ import {
   type PublicStats,
 } from '@/lib/career-api';
 import { personalityLabel } from '@/lib/coach-profile';
+import { useSound } from '@/lib/retro/use-sound';
 import { cn } from '@/lib/utils';
 
 export interface PlayerIdentity {
@@ -32,17 +42,7 @@ export interface PlayerIdentity {
 
 const numberFormat = new Intl.NumberFormat('pt-BR');
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  return (
-    parts.length === 1
-      ? parts[0]!.slice(0, 2)
-      : parts[0]![0]! + parts.at(-1)![0]!
-  ).toUpperCase();
-}
-
-/** Big coach avatar: the provider picture or deterministic initials. */
+/** Big coach portrait: the provider picture or a deterministic pixel face. */
 export function PlayerAvatar({
   player,
   size = 'lg',
@@ -50,13 +50,13 @@ export function PlayerAvatar({
   player: PlayerIdentity;
   size?: 'md' | 'lg';
 }) {
-  const hue = stableHash(player.name.toLowerCase()) % 360;
-  const box = size === 'lg' ? 'size-36 sm:size-44' : 'size-14';
+  const pixels = size === 'lg' ? 128 : 56;
   return (
     <span
-      className={cn('avatar-ring inline-grid rounded-full p-1.5', box)}
+      className="px-border inline-grid bg-chalk"
       role="img"
       aria-label={`Avatar de ${player.name}`}
+      style={{ width: pixels, height: pixels }}
     >
       {player.avatarUrl ? (
         // Provider avatars come from arbitrary hosts; next/image would need
@@ -66,22 +66,13 @@ export function PlayerAvatar({
           src={player.avatarUrl}
           alt=""
           referrerPolicy="no-referrer"
-          className="size-full rounded-full border-4 border-background object-cover"
+          className="pixelated size-full object-cover"
         />
       ) : (
-        <span
-          aria-hidden="true"
-          className={cn(
-            'grid size-full place-items-center rounded-full border-4 border-background font-display font-bold uppercase text-white',
-            size === 'lg' ? 'text-6xl sm:text-7xl' : 'text-xl',
-          )}
-          // Deterministic per-player artwork color (not a UI token).
-          style={{
-            background: `linear-gradient(140deg, hsl(${hue} 55% 38%), hsl(${(hue + 40) % 360} 60% 22%))`,
-          }}
-        >
-          {initialsOf(player.name)}
-        </span>
+        <PixelAvatar
+          seed={`jogador-${player.name.toLowerCase()}`}
+          size={pixels}
+        />
       )}
     </span>
   );
@@ -98,19 +89,22 @@ function StartFrame({
     <main className="min-h-dvh px-4 pb-10 pt-4 sm:px-6">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
         <Brand />
-        {onSignOut && (
-          <Button variant="ghost" className="min-h-11" onClick={onSignOut}>
-            <SignOut data-icon="inline-start" />
-            Sair
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <MuteButton />
+          {onSignOut && (
+            <Button variant="outline" className="min-h-10" onClick={onSignOut}>
+              <SignOut data-icon="inline-start" />
+              Sair
+            </Button>
+          )}
+        </div>
       </div>
       {children}
     </main>
   );
 }
 
-/** Início: after sign-in, before entering a career. */
+/** Início: the game's title screen, after sign-in and before a career. */
 export function StartScreen({
   player,
   loadStats,
@@ -133,6 +127,7 @@ export function StartScreen({
 }) {
   const [stats, setStats] = useState<PublicStats | null>(null);
   const [latest, setLatest] = useState<CareerSummary | null>(null);
+  const { play } = useSound();
   useEffect(() => {
     if (!loadCareers) return;
     let active = true;
@@ -155,52 +150,86 @@ export function StartScreen({
 
   return (
     <StartFrame onSignOut={onSignOut}>
-      <div className="mx-auto mt-8 grid max-w-5xl items-center gap-10 lg:mt-16 lg:grid-cols-[1.1fr_.9fr]">
+      <ScreenTransition
+        id="inicio"
+        className="mx-auto mt-6 grid max-w-5xl items-start gap-6 lg:mt-12 lg:grid-cols-[1.1fr_.9fr]"
+      >
         <section
           aria-labelledby="inicio-titulo"
-          className="glass-strong flex flex-col items-center rounded-[2rem] px-5 pb-6 pt-8 text-center sm:px-8 lg:items-start lg:text-left"
+          className="panel-board relative overflow-hidden px-4 pb-6 pt-6 text-center sm:px-8"
         >
-          <PlayerAvatar player={player} />
-          <p className="mt-6 text-xs font-bold uppercase tracking-[.24em] text-primary">
-            Beira do campo
+          <TitleMarquee />
+          <p className="led mt-4 text-[.55rem] tracking-[.3em] sm:text-xs">
+            Modo carreira
           </p>
-          <h1
-            id="inicio-titulo"
-            className="mt-1 font-display text-4xl font-bold uppercase leading-none sm:text-6xl"
+          <h2
+            aria-hidden="true"
+            className="led mt-2 text-3xl leading-none sm:text-6xl"
           >
-            E aí, {player.name}!
-          </h1>
-          <p className="mt-3 max-w-md text-sm text-muted-foreground sm:text-base">
-            Monte seu time, sobreviva à diretoria e escreva sua história. A
-            rodada cabe no intervalo.
-          </p>
+            Footebas
+          </h2>
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <PlayerAvatar player={player} />
+            <h1
+              id="inicio-titulo"
+              className="font-pixel text-sm leading-relaxed sm:text-xl"
+            >
+              E aí, {player.name}!
+            </h1>
+            <p className="max-w-md text-sm text-chalk/80 sm:text-base">
+              Monte seu time, sobreviva à diretoria e escreva sua história. A
+              rodada cabe no intervalo.
+            </p>
+          </div>
           {error && (
             <p
               role="alert"
-              className="mt-4 flex items-center gap-2 rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm"
+              className="mx-auto mt-4 flex max-w-md items-center gap-2 border-2 border-destructive bg-chalk px-3 py-2 text-left text-sm text-ink"
             >
               <WarningCircle className="text-destructive" weight="fill" />
               {error}
             </p>
           )}
-          <div className="mt-8 grid w-full max-w-md gap-3">
+          <p
+            aria-hidden="true"
+            className="mt-7 flex items-center justify-center gap-3 font-pixel text-[.6rem] text-chalk sm:text-xs"
+          >
+            <PixelArrow size={14} className="blink" />
+            Press start
+            <PixelArrow size={14} className="blink -scale-x-100" />
+          </p>
+          <div className="mx-auto mt-3 grid w-full max-w-sm gap-4">
             <button
               type="button"
-              className="play-button flex min-h-16 items-center justify-center gap-3 px-6 font-display text-2xl font-bold uppercase tracking-wide"
-              onClick={onNewCareer}
+              className="btn-px btn-play flex min-h-16 items-center justify-center gap-3 px-6 text-sm sm:text-base"
+              onClick={() => {
+                play('confirm');
+                onNewCareer();
+              }}
             >
-              <Plus weight="bold" className="size-6" aria-hidden="true" />
+              <Plus weight="bold" className="size-5" aria-hidden="true" />
               Nova carreira
             </button>
-            <Button
-              variant="outline"
-              className="min-h-14 font-display text-xl font-bold uppercase tracking-wide"
-              onClick={onLoadCareer}
+            <button
+              type="button"
+              className="btn-px btn-chalk flex min-h-14 items-center justify-center gap-3 px-6 text-xs sm:text-sm"
+              onClick={() => {
+                play('click');
+                onLoadCareer();
+              }}
             >
-              <FolderOpen data-icon="inline-start" weight="duotone" />
+              <FolderOpen weight="fill" className="size-5" aria-hidden="true" />
               Carregar carreira
-            </Button>
+            </button>
           </div>
+          <PixelBall
+            size={28}
+            className="px-bounce absolute bottom-4 left-4 hidden sm:block"
+          />
+          <PixelFlag
+            size={28}
+            className="absolute right-4 top-4 hidden sm:block"
+          />
         </section>
         <div className="grid gap-6">
           {latest && (
@@ -211,8 +240,23 @@ export function StartScreen({
           )}
           {stats && <Counters stats={stats} />}
         </div>
-      </div>
+      </ScreenTransition>
     </StartFrame>
+  );
+}
+
+/** Scrolling stadium ad board on top of the title. */
+function TitleMarquee() {
+  return (
+    <div
+      aria-hidden="true"
+      className="-mx-4 -mt-6 overflow-hidden border-b-4 border-wood-deep bg-wood py-1 font-pixel text-[.55rem] text-chalk sm:-mx-8"
+    >
+      <span className="ticker-text">
+        Bem-vindo ao estádio · Temporada aberta · Monte seu elenco · Pule para o
+        resultado quando quiser · Som opcional ·
+      </span>
+    </div>
   );
 }
 
@@ -226,13 +270,11 @@ function LatestCareer({
 }) {
   const title = careerTitle(career);
   const profile = career.coachProfile;
+  const { play } = useSound();
   return (
-    <section
-      aria-labelledby="ultima-carreira"
-      className="glass grid gap-3 rounded-2xl p-4"
-    >
-      <p className="text-xs font-bold uppercase tracking-[.2em] text-muted-foreground">
-        Última carreira
+    <section aria-labelledby="ultima-carreira" className="panel grid gap-3 p-4">
+      <p className="font-pixel text-[.55rem] text-muted-foreground">
+        Continuar?
       </p>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
         {profile ? (
@@ -249,7 +291,10 @@ function LatestCareer({
           />
         )}
         <div className="min-w-0">
-          <h2 id="ultima-carreira" className="truncate text-xl font-extrabold">
+          <h2
+            id="ultima-carreira"
+            className="truncate font-pixel text-xs sm:text-sm"
+          >
             {title}
           </h2>
           <p className="truncate text-sm">
@@ -268,7 +313,13 @@ function LatestCareer({
         </div>
       </div>
       {onContinue && (
-        <Button className="min-h-11" onClick={onContinue}>
+        <Button
+          className="min-h-11"
+          onClick={() => {
+            play('confirm');
+            onContinue();
+          }}
+        >
           <Play data-icon="inline-start" weight="fill" />
           Continuar<span className="sr-only"> {title}</span>
         </Button>
@@ -284,23 +335,24 @@ function Counters({ stats }: { stats: PublicStats }) {
     [stats.athletes === 1 ? 'atleta' : 'atletas', stats.athletes],
   ] as const;
   return (
-    <section aria-labelledby="contadores-titulo" className="w-full">
+    <section aria-labelledby="contadores-titulo" className="panel-board p-4">
       <h2
         id="contadores-titulo"
-        className="mb-3 text-center text-xs font-bold uppercase tracking-[.24em] text-muted-foreground lg:text-left"
+        className="mb-3 flex items-center gap-2 font-pixel text-[.6rem] text-chalk"
       >
+        <PixelTrophy size={14} />
         No gramado agora
       </h2>
-      <dl className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-1">
+      <dl className="grid grid-cols-3 gap-2 sm:gap-3">
         {items.map(([label, value]) => (
           <div
             key={label}
-            className="glass flex flex-col items-center rounded-2xl px-2 py-4 lg:flex-row lg:justify-between lg:px-5"
+            className="flex flex-col items-center border-2 border-wood-deep px-1 py-3"
           >
-            <dt className="order-2 text-[.7rem] font-bold uppercase tracking-wider text-muted-foreground lg:order-1 lg:text-sm">
+            <dt className="order-2 mt-1 font-pixel text-[.5rem] text-chalk/80">
               {label}
             </dt>
-            <dd className="order-1 text-3xl font-extrabold tabular-nums text-foreground sm:text-4xl lg:order-2 lg:text-5xl">
+            <dd className="led order-1 text-lg sm:text-2xl">
               {numberFormat.format(value)}
             </dd>
           </div>
@@ -333,7 +385,7 @@ type ListState =
   | { status: 'error'; message: string }
   | { status: 'ready'; list: CareerList };
 
-/** Carregar Carreira: the player's careers, open or delete, plan limit. */
+/** Carregar Carreira: save slots, open or delete, plan limit. */
 export function LoadCareerScreen({
   load,
   remove,
@@ -358,6 +410,7 @@ export function LoadCareerScreen({
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+  const { play } = useSound();
 
   const refresh = useCallback(async () => {
     try {
@@ -399,8 +452,10 @@ export function LoadCareerScreen({
       await remove(career.id);
       setConfirming(null);
       setAnnouncement(`${careerTitle(career)} foi excluída.`);
+      play('whistle');
       await refresh();
     } catch (caught) {
+      play('error');
       setAnnouncement(
         caught instanceof Error
           ? caught.message
@@ -416,98 +471,107 @@ export function LoadCareerScreen({
 
   return (
     <StartFrame onSignOut={onSignOut}>
-      <section
-        aria-labelledby="carregar-titulo"
-        className="mx-auto mt-6 max-w-3xl"
-      >
-        <Button variant="ghost" className="-ml-2 min-h-11" onClick={onBack}>
-          <ArrowLeft data-icon="inline-start" />
-          Voltar ao início
-        </Button>
-        <div className="mt-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.24em] text-primary">
-              Vestiário
-            </p>
-            <h1
-              id="carregar-titulo"
-              className="font-display text-4xl font-bold uppercase leading-none sm:text-5xl"
-            >
-              Carregar carreira
-            </h1>
-          </div>
-          <Button className="min-h-11" onClick={onNewCareer}>
-            <Plus data-icon="inline-start" weight="bold" />
-            Nova carreira
+      <ScreenTransition id="carregar" className="mx-auto mt-6 max-w-3xl">
+        <section aria-labelledby="carregar-titulo">
+          <Button variant="ghost" className="-ml-2 min-h-11" onClick={onBack}>
+            <ArrowLeft data-icon="inline-start" />
+            Voltar ao início
           </Button>
-        </div>
-
-        <PlanNotice used={careers.length} limit={limit} notice={notice} />
-        {error && (
-          <p
-            role="alert"
-            className="mt-3 rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm"
-          >
-            {error}
-          </p>
-        )}
-        <p aria-live="polite" role="status" className="sr-only">
-          {announcement}
-        </p>
-
-        {state.status === 'loading' ? (
-          <p
-            role="status"
-            aria-live="polite"
-            className="mt-6 flex items-center gap-2 text-sm text-muted-foreground"
-          >
-            <CircleNotch className="size-5 animate-spin text-primary" />
-            Buscando suas carreiras…
-          </p>
-        ) : state.status === 'error' ? (
-          <div role="alert" className="mt-6 rounded-xl border p-5">
-            <p className="text-sm">{state.message}</p>
-            <Button
-              variant="outline"
-              className="mt-3 min-h-11"
-              onClick={() => {
-                setState({ status: 'loading' });
-                void refresh();
-              }}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        ) : careers.length === 0 ? (
-          <div className="glass mt-6 rounded-2xl p-8 text-center">
-            <p className="font-display text-2xl font-bold uppercase">
-              Nenhuma carreira salva
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Escolha um clube e comece sua primeira temporada.
-            </p>
-            <Button className="mt-5 min-h-11" onClick={onNewCareer}>
+          <div className="panel-board mt-2 flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-end">
+            <div>
+              <p className="led text-[.55rem] tracking-[.3em]">Vestiário</p>
+              <h1
+                id="carregar-titulo"
+                className="mt-1 font-pixel text-base leading-relaxed sm:text-2xl"
+              >
+                Carregar carreira
+              </h1>
+            </div>
+            <Button variant="play" className="min-h-11" onClick={onNewCareer}>
               <Plus data-icon="inline-start" weight="bold" />
-              Começar nova carreira
+              Nova carreira
             </Button>
           </div>
-        ) : (
-          <ul aria-label="Suas carreiras" className="mt-6 flex flex-col gap-3">
-            {careers.map((career) => (
-              <CareerRow
-                key={career.id}
-                career={career}
-                confirming={confirming === career.id}
-                deleting={deleting && confirming === career.id}
-                onOpen={() => onOpen(career)}
-                onAskDelete={() => setConfirming(career.id)}
-                onCancelDelete={() => setConfirming(null)}
-                onConfirmDelete={() => void confirmDelete(career)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+
+          <PlanNotice used={careers.length} limit={limit} notice={notice} />
+          {error && (
+            <p
+              role="alert"
+              className="mt-3 border-2 border-destructive bg-chalk px-3 py-2 text-sm text-ink"
+            >
+              {error}
+            </p>
+          )}
+          <p aria-live="polite" role="status" className="sr-only">
+            {announcement}
+          </p>
+
+          {state.status === 'loading' ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-6 flex items-center gap-2 font-pixel text-[.6rem]"
+            >
+              <CircleNotch className="size-5 animate-spin text-bulb" />
+              Buscando suas carreiras…
+            </p>
+          ) : state.status === 'error' ? (
+            <div role="alert" className="panel mt-6 p-5">
+              <p className="text-sm">{state.message}</p>
+              <Button
+                variant="outline"
+                className="mt-3 min-h-11"
+                onClick={() => {
+                  setState({ status: 'loading' });
+                  void refresh();
+                }}
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          ) : careers.length === 0 ? (
+            <div className="panel mt-6 p-8 text-center">
+              <PixelBall size={32} className="mx-auto px-bounce" />
+              <p className="mt-3 font-pixel text-xs sm:text-sm">
+                Nenhuma carreira salva
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Escolha um clube e comece sua primeira temporada.
+              </p>
+              <Button
+                variant="play"
+                className="mt-5 min-h-11"
+                onClick={onNewCareer}
+              >
+                <Plus data-icon="inline-start" weight="bold" />
+                Começar nova carreira
+              </Button>
+            </div>
+          ) : (
+            <ul
+              aria-label="Suas carreiras"
+              className="mt-6 flex flex-col gap-4"
+            >
+              {careers.map((career, index) => (
+                <CareerRow
+                  key={career.id}
+                  slot={index + 1}
+                  career={career}
+                  confirming={confirming === career.id}
+                  deleting={deleting && confirming === career.id}
+                  onOpen={() => {
+                    play('confirm');
+                    onOpen(career);
+                  }}
+                  onAskDelete={() => setConfirming(career.id)}
+                  onCancelDelete={() => setConfirming(null)}
+                  onConfirmDelete={() => void confirmDelete(career)}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      </ScreenTransition>
     </StartFrame>
   );
 }
@@ -524,8 +588,8 @@ function PlanNotice({
   return (
     <div
       className={cn(
-        'mt-5 rounded-xl border px-4 py-3 text-sm',
-        notice ? 'border-accent/60 bg-popover' : 'surface',
+        'panel mt-5 px-4 py-3 text-sm',
+        notice && 'outline outline-4 outline-bulb',
       )}
     >
       {notice && (
@@ -539,7 +603,7 @@ function PlanNotice({
       )}
       <p className="text-muted-foreground">
         {limit !== undefined && (
-          <strong className="text-foreground">
+          <strong className="font-pixel text-[.6rem] text-ink">
             {used} de {limit} {limit === 1 ? 'carreira' : 'carreiras'} ·{' '}
           </strong>
         )}
@@ -550,7 +614,9 @@ function PlanNotice({
   );
 }
 
+/** One save slot. */
 function CareerRow({
+  slot,
   career,
   confirming,
   deleting,
@@ -559,6 +625,7 @@ function CareerRow({
   onCancelDelete,
   onConfirmDelete,
 }: {
+  slot: number;
   career: CareerSummary;
   confirming: boolean;
   deleting: boolean;
@@ -587,7 +654,11 @@ function CareerRow({
   ].filter(Boolean);
 
   return (
-    <li className="surface overflow-hidden rounded-2xl">
+    <li className="panel overflow-hidden">
+      <div className="flex items-center justify-between border-b-2 border-ink bg-board px-3 py-1 font-pixel text-[.55rem] text-bulb">
+        <span>Save {String(slot).padStart(2, '0')}</span>
+        {career.updatedAt && <span>{formatUpdated(career.updatedAt)}</span>}
+      </div>
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4 sm:grid-cols-[auto_1fr_auto]">
         <span className="relative">
           <ClubEmblem
@@ -599,12 +670,12 @@ function CareerRow({
             <CoachAvatar
               avatar={career.coachProfile.avatar}
               size={28}
-              className="absolute -bottom-1 -right-2 ring-2 ring-popover"
+              className="absolute -bottom-1 -right-2"
             />
           )}
         </span>
         <div className="min-w-0">
-          <h2 className="truncate font-display text-2xl font-bold uppercase leading-tight">
+          <h2 className="truncate font-pixel text-xs leading-relaxed sm:text-sm">
             {title}
           </h2>
           <p className="truncate text-sm font-medium">
@@ -622,7 +693,7 @@ function CareerRow({
             )}
           </p>
         </div>
-        <div className="col-span-2 grid grid-cols-[1fr_auto] gap-2 sm:col-span-1">
+        <div className="col-span-2 grid grid-cols-[1fr_auto] gap-3 sm:col-span-1">
           <Button
             className="min-h-11"
             onClick={onOpen}
@@ -651,22 +722,19 @@ function CareerRow({
           role="alertdialog"
           aria-labelledby={dialogTitle}
           aria-describedby={dialogText}
-          className="border-t border-destructive/50 bg-popover p-4"
+          className="border-t-4 border-destructive bg-popover p-4"
           onKeyDown={(event) => {
             if (event.key === 'Escape') onCancelDelete();
           }}
         >
-          <p
-            id={dialogTitle}
-            className="font-display text-lg font-bold uppercase"
-          >
+          <p id={dialogTitle} className="font-pixel text-xs">
             Excluir carreira?
           </p>
-          <p id={dialogText} className="text-sm">
+          <p id={dialogText} className="mt-1 text-sm">
             {title} será apagada para sempre, com elenco, títulos e histórico.
             Essa ação não pode ser desfeita.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-3">
             <Button
               ref={cancel}
               variant="outline"
@@ -678,7 +746,7 @@ function CareerRow({
             </Button>
             <Button
               variant="destructive"
-              className="min-h-11 text-white"
+              className="min-h-11"
               onClick={onConfirmDelete}
               disabled={deleting}
             >

@@ -8,16 +8,16 @@ import {
   HouseLine,
   Lightning,
   Megaphone,
-  Play,
   SoccerBall,
 } from '@phosphor-icons/react';
 import { ClubEmblem } from '@/components/club-emblem';
+import { PixelBall } from '@/components/retro/sprites';
 import { Button } from '@/components/ui/button';
-import { Glass } from '@/components/ui/glass';
 import type { CareerView, Screen } from '@/lib/career-api';
+import { useSound } from '@/lib/retro/use-sound';
 
-/** Isometric block on the club grid (10 × 10 tiles): x, y, width, depth, height. */
-type Block = readonly [x: number, y: number, w: number, d: number, h: number];
+/** Rectangle on the 160 × 120 pixel map: x, y, width, height. */
+type Rect = readonly [x: number, y: number, w: number, h: number];
 
 export interface ClubArea {
   readonly id: string;
@@ -26,14 +26,13 @@ export interface ClubArea {
   readonly icon: typeof Barbell;
   /** First link is where the map building itself leads. */
   readonly links: readonly (readonly [Screen, string])[];
-  /** Main block of the building and the anchor of its label. */
-  readonly block: Block;
-  readonly label: readonly [x: number, y: number, z: number];
+  /** Footprint of the building (hit area and focus ring). */
+  readonly rect: Rect;
   /** Shorter text for the drawing, when the name does not fit. */
   readonly short?: string;
 }
 
-/** Buildings of the isometric club illustration, in focus order. */
+/** Buildings of the top-down pixel club, in focus order. */
 export const CLUB_AREAS: readonly ClubArea[] = [
   {
     id: 'ct',
@@ -44,8 +43,7 @@ export const CLUB_AREAS: readonly ClubArea[] = [
       ['squad', 'Elenco'],
       ['tactics', 'Táticas'],
     ],
-    block: [0.6, 0.6, 3.4, 3.4, 0.25],
-    label: [2.3, 2.3, 0.6],
+    rect: [6, 6, 60, 44],
   },
   {
     id: 'stadium',
@@ -56,8 +54,7 @@ export const CLUB_AREAS: readonly ClubArea[] = [
       ['stadium', 'Estádio'],
       ['central', 'Partida'],
     ],
-    block: [6, 0.6, 3.4, 3.4, 1.6],
-    label: [7.7, 2.3, 2.2],
+    rect: [86, 4, 68, 48],
   },
   {
     id: 'hq',
@@ -68,8 +65,7 @@ export const CLUB_AREAS: readonly ClubArea[] = [
       ['office', 'Escritório'],
       ['finance', 'Finanças'],
     ],
-    block: [0.8, 6, 2.8, 3, 2.6],
-    label: [2.2, 7.5, 3],
+    rect: [6, 70, 38, 44],
   },
   {
     id: 'press',
@@ -77,8 +73,7 @@ export const CLUB_AREAS: readonly ClubArea[] = [
     description: 'Sala de imprensa: manchetes e repercussão.',
     icon: Megaphone,
     links: [['inbox', 'Notícias']],
-    block: [5.6, 5.8, 1.8, 1.6, 1.2],
-    label: [6.5, 6.6, 2.3],
+    rect: [48, 72, 20, 24],
   },
   {
     id: 'parking',
@@ -86,8 +81,8 @@ export const CLUB_AREAS: readonly ClubArea[] = [
     description: 'Onde chegam e partem os reforços: mercado.',
     icon: Car,
     links: [['market', 'Mercado']],
-    block: [5.8, 8.4, 3.6, 1.3, 0.05],
-    label: [7.4, 9.2, 0.2],
+    rect: [86, 70, 68, 18],
+    short: 'Mercado',
   },
   {
     id: 'home',
@@ -95,8 +90,7 @@ export const CLUB_AREAS: readonly ClubArea[] = [
     description: 'Sua carreira, temporadas e conquistas.',
     icon: HouseLine,
     links: [['history', 'Carreira e histórico']],
-    block: [8.1, 5.6, 1.4, 1.6, 0.9],
-    label: [8.8, 6.4, 1.9],
+    rect: [100, 94, 26, 20],
     short: 'Casa',
   },
 ];
@@ -105,7 +99,7 @@ export function areaLabel(area: ClubArea): string {
   return `${area.name}: ${area.links.map(([, label]) => label).join(' e ')}`;
 }
 
-/** Mapa do clube: isometric clickable illustration plus an equivalent list. */
+/** Mapa do clube: top-down pixel illustration plus an equivalent list. */
 export function ClubMapScreen({
   career,
   navigate,
@@ -117,19 +111,20 @@ export function ClubMapScreen({
   onNarrate(): void;
   onInstant(): void;
 }) {
+  const { play } = useSound();
+  const go = (screen: Screen) => {
+    play('click');
+    navigate(screen);
+  };
   return (
     <div className="grid gap-4">
       <AdvanceBar career={career} onNarrate={onNarrate} onInstant={onInstant} />
-      <Glass
-        as="section"
-        aria-labelledby="mapa-ilustrado"
-        className="p-3 sm:p-5"
-      >
+      <section aria-labelledby="mapa-ilustrado" className="panel p-3 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="mapa-ilustrado" className="text-lg font-extrabold">
+          <h2 id="mapa-ilustrado" className="font-pixel text-[.65rem]">
             Seu clube
           </h2>
-          <span className="rounded-full border border-glass-line bg-popover/80 px-3 py-1 text-xs font-bold">
+          <span className="border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.5rem]">
             Toque num prédio
           </span>
         </div>
@@ -138,12 +133,12 @@ export function ClubMapScreen({
         </p>
         <nav
           aria-label="Áreas do mapa"
-          className="-mx-2 mt-2 sm:mx-auto sm:max-w-2xl"
+          className="px-border mt-3 bg-grass-deep sm:mx-auto sm:max-w-2xl"
         >
-          <IsometricClub club={career.club} navigate={navigate} />
+          <PixelClub club={career.club} navigate={go} />
         </nav>
-      </Glass>
-      <AreaList navigate={navigate} />
+      </section>
+      <AreaList navigate={go} />
     </div>
   );
 }
@@ -158,31 +153,29 @@ function AdvanceBar({
   onInstant(): void;
 }) {
   return (
-    <Glass
-      as="section"
-      strong
+    <section
       aria-label="Avançar no calendário"
-      className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+      className="panel-board grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
     >
       <div className="flex min-w-0 items-center gap-3">
         <ClubEmblem name={career.opponent.club} size={40} decorative />
         <p className="min-w-0 text-sm">
-          <span className="block text-[.65rem] font-bold uppercase tracking-wider text-primary">
+          <span className="led block text-[.5rem] tracking-[.2em]">
             Próximo jogo
           </span>
-          <strong className="block truncate text-lg font-extrabold">
+          <strong className="block truncate font-pixel text-[.65rem] leading-relaxed sm:text-xs">
             {career.club} × {career.opponent.club}
           </strong>
         </p>
       </div>
       {career.fixture && (
-        <div className="grid grid-cols-2 gap-2 sm:flex">
+        <div className="grid grid-cols-2 gap-3 sm:flex">
           <button
             type="button"
-            className="play-button flex min-h-11 items-center justify-center gap-2 whitespace-nowrap px-3 text-base font-extrabold sm:px-4"
+            className="btn-px btn-play flex min-h-11 items-center justify-center gap-2 whitespace-nowrap px-3 text-[.65rem] sm:px-4"
             onClick={onNarrate}
           >
-            <Play weight="fill" aria-hidden="true" />
+            <PixelBall size={16} />
             Jogar partida
           </button>
           <Button
@@ -195,29 +188,27 @@ function AdvanceBar({
           </Button>
         </div>
       )}
-    </Glass>
+    </section>
   );
 }
 
 function AreaList({ navigate }: { navigate(value: Screen): void }) {
   return (
     <nav aria-label="Áreas do clube em lista">
-      <h2 className="mb-2 text-lg font-extrabold">Ou escolha na lista</h2>
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <h2 className="mb-2 font-pixel text-[.65rem] text-chalk">
+        Ou escolha na lista
+      </h2>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {CLUB_AREAS.map((area) => {
           const Icon = area.icon;
           return (
-            <li key={area.id} className="surface grid gap-2 rounded-2xl p-3">
+            <li key={area.id} className="panel grid gap-2 p-3">
               <div className="flex items-start gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-primary">
-                  <Icon
-                    weight="duotone"
-                    className="size-5"
-                    aria-hidden="true"
-                  />
+                <span className="grid size-10 shrink-0 place-items-center border-2 border-ink bg-board text-bulb">
+                  <Icon weight="fill" className="size-5" aria-hidden="true" />
                 </span>
                 <div>
-                  <h3 className="text-base font-extrabold leading-tight">
+                  <h3 className="font-pixel text-[.6rem] leading-relaxed">
                     {area.name}
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -225,7 +216,7 @@ function AreaList({ navigate }: { navigate(value: Screen): void }) {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {area.links.map(([screen, label]) => (
                   <Button
                     key={screen}
@@ -246,277 +237,224 @@ function AreaList({ navigate }: { navigate(value: Screen): void }) {
   );
 }
 
-// --- isometric drawing -------------------------------------------------------
-
-const ORIGIN_X = 140;
-const ORIGIN_Y = 60;
-const TILE = 15;
-
-type Point = readonly [number, number];
-
-/** Grid (x, y, z) to SVG coordinates (2:1 isometric). */
-function project(x: number, y: number, z: number): Point {
-  return [
-    ORIGIN_X + (x - y) * TILE * 0.87,
-    ORIGIN_Y + (x + y) * TILE * 0.5 - z * TILE,
-  ];
-}
-
-const points = (list: readonly Point[]) =>
-  list.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+// --- pixel drawing (top-down, 160 × 120) -------------------------------------
 
 /*
- * Illustration palette: the design.md pastels plus darker shades for the
- * isometric side faces. Artwork colors, not UI tokens.
+ * Illustration palette: artwork colors, not UI tokens. Everything is drawn
+ * with axis-aligned rects on a 2px grid and crisp edges.
  */
-const SHADE = {
-  grass: ['#57c285', '#3e9e67', '#46ae73'],
-  sky: ['#bee3f0', '#8fc3d8', '#a6d3e5'],
-  sand: ['#fdf1e3', '#e9cfb2', '#f3dec5'],
-  rose: ['#f9e2e7', '#e5bcc6', '#efcbd3'],
-  mist: ['#e4eef7', '#bccadb', '#cfdbe9'],
-  asphalt: ['#c9d3df', '#aeb9c7', '#bcc6d3'],
-  coral: ['#ff9473', '#e8553a', '#f0603e'],
+const ART = {
+  grassA: '#3a9447',
+  grassB: '#2f7d3a',
+  grassDeep: '#246630',
+  chalk: '#f4efe2',
+  ink: '#15201a',
+  road: '#5a5e63',
+  roadLine: '#d8d2c0',
+  stand: '#8f949b',
+  standDeep: '#6b7078',
+  wallA: '#e6dcc3',
+  wallB: '#c9b995',
+  roof: '#c8322b',
+  roofDeep: '#8f1f1a',
+  window: '#7cc4ea',
+  wood: '#a0672f',
+  woodDeep: '#6b4119',
+  bulb: '#ffd23f',
+  carA: '#c8322b',
+  carB: '#7cc4ea',
+  carC: '#ffd23f',
+  leaf: '#1f5a2a',
+  leafLight: '#2f7d3a',
 } as const;
 
-type Shade = keyof typeof SHADE;
-
-function Box({
-  block: [x, y, w, d, h],
-  shade,
-}: {
-  block: Block;
-  shade: Shade;
-}) {
-  const [top, left, right] = SHADE[shade];
-  return (
-    <g>
-      <polygon
-        points={points([
-          project(x, y + d, 0),
-          project(x + w, y + d, 0),
-          project(x + w, y + d, h),
-          project(x, y + d, h),
-        ])}
-        fill={left}
-      />
-      <polygon
-        points={points([
-          project(x + w, y, 0),
-          project(x + w, y + d, 0),
-          project(x + w, y + d, h),
-          project(x + w, y, h),
-        ])}
-        fill={right}
-      />
-      <polygon
-        points={points([
-          project(x, y, h),
-          project(x + w, y, h),
-          project(x + w, y + d, h),
-          project(x, y + d, h),
-        ])}
-        fill={top}
-      />
-    </g>
-  );
-}
-
-function Tile({
+function Px({
   x,
   y,
   w,
-  d,
+  h,
   fill,
 }: {
   x: number;
   y: number;
   w: number;
-  d: number;
+  h: number;
   fill: string;
 }) {
+  return <rect x={x} y={y} width={w} height={h} fill={fill} />;
+}
+
+/** Outlined box with a 2px ink border. */
+function Box({ rect: [x, y, w, h], fill }: { rect: Rect; fill: string }) {
   return (
-    <polygon
-      points={points([
-        project(x, y, 0),
-        project(x + w, y, 0),
-        project(x + w, y + d, 0),
-        project(x, y + d, 0),
-      ])}
-      fill={fill}
-    />
+    <>
+      <Px x={x} y={y} w={w} h={h} fill={ART.ink} />
+      <Px x={x + 2} y={y + 2} w={w - 4} h={h - 4} fill={fill} />
+    </>
   );
 }
 
-/** Outline of a block as seen on screen (focus and hover ring). */
-function silhouette([x, y, w, d, h]: Block): string {
-  return points([
-    project(x, y, h),
-    project(x + w, y, h),
-    project(x + w, y, 0),
-    project(x + w, y + d, 0),
-    project(x, y + d, 0),
-    project(x, y + d, h),
-  ]);
-}
-
-function Label({ at, text }: { at: ClubArea['label']; text: string }) {
-  const [cx, cy] = project(...at);
-  const width = text.length * 5.6 + 14;
+/** Chalk pitch lines inside a rect. */
+function PitchLines({ rect: [x, y, w, h] }: { rect: Rect }) {
+  const midX = x + Math.floor(w / 2 / 2) * 2;
   return (
-    <g aria-hidden="true">
-      <rect
-        className="iso-label-bg"
-        x={cx - width / 2}
-        y={cy - 23}
-        width={width}
-        height={17}
-        rx={8.5}
-        fill="#ffffff"
-        fillOpacity={0.92}
-        stroke="#ffffff"
-      />
-      <text
-        x={cx}
-        y={cy - 11.2}
-        textAnchor="middle"
-        fontSize={9.5}
-        fontWeight={800}
-        fill="#17263a"
-        fontFamily="system-ui, sans-serif"
-      >
-        {text}
-      </text>
+    <g fill={ART.chalk}>
+      <Px x={x} y={y} w={w} h={2} fill={ART.chalk} />
+      <Px x={x} y={y + h - 2} w={w} h={2} fill={ART.chalk} />
+      <Px x={x} y={y} w={2} h={h} fill={ART.chalk} />
+      <Px x={x + w - 2} y={y} w={2} h={h} fill={ART.chalk} />
+      <Px x={midX} y={y} w={2} h={h} fill={ART.chalk} />
+      <Px x={x} y={y + 8} w={8} h={2} fill={ART.chalk} />
+      <Px x={x} y={y + h - 10} w={8} h={2} fill={ART.chalk} />
+      <Px x={x + 8} y={y + 8} w={2} h={h - 16} fill={ART.chalk} />
+      <Px x={x + w - 8} y={y + 8} w={8} h={2} fill={ART.chalk} />
+      <Px x={x + w - 8} y={y + h - 10} w={8} h={2} fill={ART.chalk} />
+      <Px x={x + w - 10} y={y + 8} w={2} h={h - 16} fill={ART.chalk} />
+      <Px x={midX - 2} y={y + h / 2 - 2} w={6} h={4} fill={ART.chalk} />
     </g>
   );
 }
 
-function BuildingDetails({ id }: { id: string }) {
-  switch (id) {
-    case 'ct': {
-      // Pitch lines on the training ground.
-      const z = 0.26;
+function Tree({ x, y }: { x: number; y: number }) {
+  return (
+    <g aria-hidden="true">
+      <Px x={x + 2} y={y + 6} w={2} h={4} fill={ART.woodDeep} />
+      <Px x={x} y={y} w={6} h={6} fill={ART.leaf} />
+      <Px x={x + 1} y={y + 1} w={2} h={2} fill={ART.leafLight} />
+    </g>
+  );
+}
+
+function BuildingArt({ area }: { area: ClubArea }) {
+  const [x, y, w, h] = area.rect;
+  switch (area.id) {
+    case 'ct':
       return (
-        <g fill="none" stroke="#ffffff" strokeOpacity={0.85} strokeWidth={1}>
-          <polygon
-            points={points([
-              project(0.85, 0.85, z),
-              project(3.75, 0.85, z),
-              project(3.75, 3.75, z),
-              project(0.85, 3.75, z),
-            ])}
-          />
-          <polyline
-            points={points([project(2.3, 0.85, z), project(2.3, 3.75, z)])}
-          />
+        <g>
+          <Box rect={area.rect} fill={ART.grassDeep} />
+          <PitchLines rect={[x + 6, y + 8, w - 12, h - 14]} />
+          {/* cones */}
+          <Px x={x + 4} y={y + 4} w={2} h={2} fill={ART.bulb} />
+          <Px x={x + 10} y={y + 4} w={2} h={2} fill={ART.bulb} />
+          <Px x={x + 16} y={y + 4} w={2} h={2} fill={ART.bulb} />
         </g>
       );
-    }
     case 'stadium':
       return (
         <g>
-          <Box block={[6.35, 0.95, 2.7, 2.7, 1.62]} shade="grass" />
-          <polyline
-            points={points([
-              project(7.7, 0.95, 1.63),
-              project(7.7, 3.65, 1.63),
-            ])}
-            stroke="#ffffff"
-            strokeOpacity={0.85}
-            fill="none"
-          />
+          <Box rect={area.rect} fill={ART.stand} />
+          {/* stand rows */}
+          <Px x={x + 2} y={y + 2} w={w - 4} h={2} fill={ART.standDeep} />
+          <Px x={x + 2} y={y + h - 4} w={w - 4} h={2} fill={ART.standDeep} />
+          <Px x={x + 2} y={y + 2} w={2} h={h - 4} fill={ART.standDeep} />
+          <Px x={x + w - 4} y={y + 2} w={2} h={h - 4} fill={ART.standDeep} />
+          <Px x={x + 8} y={y + 8} w={w - 16} h={h - 16} fill={ART.grassB} />
+          <Px x={x + 8} y={y + 8} w={w - 16} h={4} fill={ART.grassA} />
+          <Px x={x + 8} y={y + 16} w={w - 16} h={4} fill={ART.grassA} />
+          <Px x={x + 8} y={y + 24} w={w - 16} h={4} fill={ART.grassA} />
+          <PitchLines rect={[x + 10, y + 10, w - 20, h - 20]} />
+          {/* floodlights */}
+          <Px x={x - 2} y={y - 2} w={4} h={4} fill={ART.bulb} />
+          <Px x={x + w - 2} y={y - 2} w={4} h={4} fill={ART.bulb} />
+          <Px x={x - 2} y={y + h - 2} w={4} h={4} fill={ART.bulb} />
+          <Px x={x + w - 2} y={y + h - 2} w={4} h={4} fill={ART.bulb} />
         </g>
       );
     case 'hq':
       return (
-        <g fill="#7ea6c4" fillOpacity={0.8}>
-          {[0.6, 1.3, 2].map((z) =>
-            [1.1, 1.9, 2.7].map((x) => (
-              <polygon
-                key={`${x}-${z}`}
-                points={points([
-                  project(x, 9, z),
-                  project(x + 0.45, 9, z),
-                  project(x + 0.45, 9, z + 0.35),
-                  project(x, 9, z + 0.35),
-                ])}
+        <g>
+          <Box rect={area.rect} fill={ART.wallA} />
+          <Px x={x + 2} y={y + 2} w={w - 4} h={6} fill={ART.wallB} />
+          {[0, 1, 2, 3].map((row) =>
+            [0, 1, 2].map((col) => (
+              <Px
+                key={`${row}-${col}`}
+                x={x + 6 + col * 10}
+                y={y + 12 + row * 8}
+                w={6}
+                h={4}
+                fill={ART.window}
               />
             )),
           )}
+          <Px x={x + w / 2 - 3} y={y + h - 8} w={6} h={6} fill={ART.woodDeep} />
         </g>
       );
-    case 'press': {
-      const [ax, ay] = project(6.9, 6.3, 1.2);
+    case 'press':
       return (
-        <g stroke="#4a5b70" strokeWidth={1.5} fill="none">
-          <line x1={ax} y1={ay} x2={ax} y2={ay - 14} />
-          <circle cx={ax} cy={ay - 16} r={2.5} fill="#ff9473" stroke="none" />
+        <g>
+          <Box rect={area.rect} fill={ART.wallB} />
+          <Px x={x + 4} y={y + 6} w={4} h={4} fill={ART.window} />
+          <Px x={x + 12} y={y + 6} w={4} h={4} fill={ART.window} />
+          <Px x={x + 8} y={y + h - 8} w={4} h={6} fill={ART.woodDeep} />
+          {/* antenna */}
+          <Px x={x + w - 6} y={y - 10} w={2} h={12} fill={ART.ink} />
+          <Px x={x + w - 8} y={y - 12} w={6} h={2} fill={ART.roof} />
         </g>
       );
-    }
     case 'parking':
       return (
         <g>
-          <Box block={[6.2, 8.65, 0.5, 0.8, 0.35]} shade="coral" />
-          <Box block={[7.2, 8.65, 0.5, 0.8, 0.35]} shade="sky" />
-          <Box block={[8.4, 8.65, 0.5, 0.8, 0.35]} shade="grass" />
+          <Box rect={area.rect} fill={ART.road} />
+          {[0, 1, 2, 3, 4, 5].map((slot) => (
+            <Px
+              key={slot}
+              x={x + 6 + slot * 10}
+              y={y + 4}
+              w={2}
+              h={h - 8}
+              fill={ART.roadLine}
+            />
+          ))}
+          <Px x={x + 10} y={y + 6} w={6} h={8} fill={ART.carA} />
+          <Px x={x + 30} y={y + 6} w={6} h={8} fill={ART.carB} />
+          <Px x={x + 50} y={y + 6} w={6} h={8} fill={ART.carC} />
         </g>
       );
-    case 'home': {
-      // Pyramid roof.
-      const [x, y, w, d, h] = [8.1, 5.6, 1.4, 1.6, 0.9];
-      const apex = project(x + w / 2, y + d / 2, h + 0.7);
+    case 'home':
       return (
         <g>
-          <polygon
-            points={points([
-              project(x, y + d, h),
-              project(x + w, y + d, h),
-              apex,
-            ])}
-            fill="#e8553a"
-          />
-          <polygon
-            points={points([
-              project(x + w, y, h),
-              project(x + w, y + d, h),
-              apex,
-            ])}
-            fill="#f0603e"
-          />
+          <Box rect={[x, y + 8, w, h - 8]} fill={ART.wallA} />
+          {/* stepped roof */}
+          <Px x={x + 2} y={y + 6} w={w - 4} h={2} fill={ART.roofDeep} />
+          <Px x={x + 4} y={y + 2} w={w - 8} h={4} fill={ART.roof} />
+          <Px x={x + 8} y={y} w={w - 16} h={2} fill={ART.roof} />
+          <Px x={x + 4} y={y + 14} w={4} h={4} fill={ART.window} />
+          <Px x={x + w - 8} y={y + 14} w={4} h={4} fill={ART.window} />
+          <Px x={x + w / 2 - 2} y={y + h - 8} w={4} h={6} fill={ART.woodDeep} />
         </g>
       );
-    }
     default:
-      return null;
+      return <Box rect={area.rect} fill={ART.wallA} />;
   }
 }
 
-const AREA_SHADE: Record<string, Shade> = {
-  ct: 'grass',
-  stadium: 'sky',
-  hq: 'sand',
-  press: 'rose',
-  parking: 'asphalt',
-  home: 'mist',
-};
-
-const TREES: readonly Point[] = [
-  [4.6, 0.4],
-  [5.3, 2.6],
-  [0.4, 4.9],
-  [3.9, 9.4],
-  [9.6, 4.6],
-  [5.2, 7.6],
-];
-
-function Tree({ at: [x, y] }: { at: Point }) {
-  const [bx, by] = project(x, y, 0);
+function Label({ area }: { area: ClubArea }) {
+  const text = area.short ?? area.name;
+  const [x, y, w, h] = area.rect;
+  const width = text.length * 5 + 6;
+  const left = Math.max(2, Math.min(160 - width - 2, x + w / 2 - width / 2));
+  const top = y + h - 10;
   return (
     <g aria-hidden="true">
-      <rect x={bx - 1} y={by - 6} width={2} height={6} fill="#8d6e55" />
-      <circle cx={bx} cy={by - 10} r={5.5} fill="#3e9e67" />
-      <circle cx={bx - 1.5} cy={by - 12} r={3} fill="#57c285" />
+      <rect
+        x={left}
+        y={top}
+        width={width}
+        height={9}
+        fill={ART.ink}
+        className="map-label-bg"
+      />
+      <text
+        x={left + width / 2}
+        y={top + 6.6}
+        textAnchor="middle"
+        fontSize={5}
+        fontFamily="'Press Start 2P', monospace"
+        fill={ART.bulb}
+      >
+        {text.toUpperCase()}
+      </text>
     </g>
   );
 }
@@ -535,29 +473,47 @@ function Building({
       go();
     }
   };
+  const [x, y, w, h] = area.rect;
   return (
     <g
       role="button"
       tabIndex={0}
       aria-label={areaLabel(area)}
-      className="iso-building"
+      className="map-building"
       data-area={area.id}
       onClick={go}
       onKeyDown={onKeyDown}
     >
       <title>{areaLabel(area)}</title>
-      <g className="iso-lift">
-        <Box block={area.block} shade={AREA_SHADE[area.id] ?? 'mist'} />
-        <BuildingDetails id={area.id} />
-        <polygon className="iso-focus" points={silhouette(area.block)} />
-        <Label at={area.label} text={area.short ?? area.name} />
+      <g className="map-lift">
+        <BuildingArt area={area} />
+        <rect
+          className="map-focus"
+          x={x - 2}
+          y={y - 2}
+          width={w + 4}
+          height={h + 4}
+        />
+        <Label area={area} />
       </g>
     </g>
   );
 }
 
-/** Isometric club (SVG). Every building is a focusable button. */
-function IsometricClub({
+const TREES: readonly (readonly [number, number])[] = [
+  [70, 36],
+  [70, 44],
+  [48, 100],
+  [56, 104],
+  [66, 100],
+  [140, 100],
+  [148, 106],
+  [132, 110],
+  [90, 110],
+];
+
+/** Top-down pixel club (SVG). Every building is a focusable button. */
+function PixelClub({
   club,
   navigate,
 }: {
@@ -566,45 +522,49 @@ function IsometricClub({
 }) {
   return (
     <svg
-      viewBox="0 30 280 196"
+      viewBox="0 0 160 120"
       role="group"
-      aria-label={`Mapa isométrico do ${club}`}
-      className="block h-auto w-full select-none"
+      aria-label={`Mapa pixel do ${club}`}
+      shapeRendering="crispEdges"
+      className="pixelated block h-auto w-full select-none"
     >
       <g aria-hidden="true">
-        <g className="iso-float">
-          <ellipse
-            cx="46"
-            cy="52"
-            rx="18"
-            ry="6"
-            fill="#ffffff"
-            opacity="0.8"
+        {/* mowed grass */}
+        {Array.from({ length: 15 }, (_, row) => (
+          <Px
+            key={row}
+            x={0}
+            y={row * 8}
+            w={160}
+            h={8}
+            fill={row % 2 ? ART.grassB : ART.grassA}
           />
-          <ellipse
-            cx="58"
-            cy="48"
-            rx="12"
-            ry="6"
-            fill="#ffffff"
-            opacity="0.8"
+        ))}
+        {/* roads */}
+        <Px x={0} y={56} w={160} h={10} fill={ART.road} />
+        <Px x={72} y={0} w={10} h={120} fill={ART.road} />
+        {Array.from({ length: 10 }, (_, i) => (
+          <Px
+            key={`h${i}`}
+            x={i * 16 + 2}
+            y={60}
+            w={8}
+            h={2}
+            fill={ART.roadLine}
           />
-          <ellipse
-            cx="236"
-            cy="58"
-            rx="16"
-            ry="5"
-            fill="#ffffff"
-            opacity="0.7"
+        ))}
+        {Array.from({ length: 8 }, (_, i) => (
+          <Px
+            key={`v${i}`}
+            x={76}
+            y={i * 16 + 2}
+            w={2}
+            h={8}
+            fill={ART.roadLine}
           />
-        </g>
-        <Tile x={-0.3} y={-0.3} w={10.6} d={10.6} fill="#ffffff" />
-        <Tile x={0} y={0} w={10} d={10} fill="#dff3f1" />
-        <Tile x={0.3} y={0.3} w={9.4} d={9.4} fill="#cdebe6" />
-        <Tile x={4.5} y={0} w={1} d={10} fill="#f3e6d3" />
-        <Tile x={0} y={4.5} w={10} d={1} fill="#f3e6d3" />
-        {TREES.map((tree) => (
-          <Tree key={tree.join('-')} at={tree} />
+        ))}
+        {TREES.map(([x, y]) => (
+          <Tree key={`${x}-${y}`} x={x} y={y} />
         ))}
       </g>
       {CLUB_AREAS.map((area) => (

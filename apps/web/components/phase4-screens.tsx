@@ -89,7 +89,7 @@ function SectionHeading({
       <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">
         {eyebrow}
       </p>
-      <h2 className="font-display text-3xl font-bold uppercase sm:text-4xl">
+      <h2 className="font-display text-xs font-bold uppercase sm:text-sm">
         {title}
       </h2>
       <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -164,7 +164,7 @@ export function MarketScreen(props: Phase4ScreenProps) {
         <TabsContent value="search" className="mt-4 flex flex-col gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-xl uppercase">
+              <CardTitle className="font-display text-sm uppercase">
                 Radar de atletas
               </CardTitle>
               <CardDescription>
@@ -222,7 +222,7 @@ export function MarketScreen(props: Phase4ScreenProps) {
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle className="font-display text-xl uppercase">
+                      <CardTitle className="font-display text-sm uppercase">
                         {player.name}
                       </CardTitle>
                       <CardDescription>
@@ -298,7 +298,7 @@ export function MarketScreen(props: Phase4ScreenProps) {
           {compared.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="font-display text-xl uppercase">
+                <CardTitle className="font-display text-sm uppercase">
                   Comparação ({compared.length}/2)
                 </CardTitle>
                 <CardDescription>
@@ -337,7 +337,7 @@ export function MarketScreen(props: Phase4ScreenProps) {
         <TabsContent value="offer" className="mt-4">
           <Card className="max-w-2xl">
             <CardHeader>
-              <CardTitle className="font-display text-2xl uppercase">
+              <CardTitle className="font-display text-base uppercase">
                 Mesa de negociação
               </CardTitle>
               <CardDescription>
@@ -472,7 +472,7 @@ function ContractsPanel(
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <CardTitle className="font-display text-xl uppercase">
+                <CardTitle className="font-display text-sm uppercase">
                   {contract.playerName}
                 </CardTitle>
                 <CardDescription>
@@ -613,7 +613,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-xl uppercase">
+              <CardTitle className="font-display text-sm uppercase">
                 Ledger imutável
               </CardTitle>
               <CardDescription>
@@ -657,7 +657,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
         <TabsContent value="stadium" className="mt-4 grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-2xl uppercase">
+              <CardTitle className="font-display text-base uppercase">
                 {props.career.world.stadium.name}
               </CardTitle>
               <CardDescription>
@@ -726,7 +726,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
             <CardHeader>
               <div className="flex justify-between gap-3">
                 <div>
-                  <CardTitle className="font-display text-2xl uppercase">
+                  <CardTitle className="font-display text-base uppercase">
                     Estrutura
                   </CardTitle>
                   <CardDescription>
@@ -785,7 +785,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
                 <CardHeader>
                   <div className="flex justify-between gap-2">
                     <div>
-                      <CardTitle className="font-display text-xl uppercase">
+                      <CardTitle className="font-display text-sm uppercase">
                         {youth.name}
                       </CardTitle>
                       <CardDescription>
@@ -867,7 +867,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
         >
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-2xl uppercase">
+              <CardTitle className="font-display text-base uppercase">
                 Termômetro do trabalho
               </CardTitle>
               <CardDescription>
@@ -894,7 +894,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-2xl uppercase">
+              <CardTitle className="font-display text-base uppercase">
                 Propostas de trabalho
               </CardTitle>
               <CardDescription>
@@ -963,7 +963,7 @@ export function WorldScreen(props: Phase4ScreenProps) {
                 <Badge variant="outline" className="w-fit">
                   {item.tag}
                 </Badge>
-                <CardTitle className="font-display text-xl uppercase">
+                <CardTitle className="font-display text-sm uppercase">
                   {item.headline}
                 </CardTitle>
                 <CardDescription>{item.detail}</CardDescription>
@@ -1011,7 +1011,7 @@ export function WorldScreen(props: Phase4ScreenProps) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <Badge>Prestígio</Badge>
-                  <CardTitle className="font-display text-5xl uppercase">
+                  <CardTitle className="font-display text-base uppercase">
                     {world.prestige.points.toLocaleString('pt-BR')}
                   </CardTitle>
                   <CardDescription>{world.prestige.level}</CardDescription>
@@ -1053,7 +1053,7 @@ export function WorldScreen(props: Phase4ScreenProps) {
             <CardHeader>
               <div className="flex justify-between gap-3">
                 <div>
-                  <CardTitle className="font-display text-2xl uppercase">
+                  <CardTitle className="font-display text-base uppercase">
                     Integridade do save
                   </CardTitle>
                   <CardDescription>
@@ -1090,7 +1090,7 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="text-[.65rem] font-bold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 font-display text-lg font-bold uppercase">{value}</p>
+      <p className="mt-1 font-display text-xs font-bold uppercase">{value}</p>
     </div>
   );
 }
@@ -1113,7 +1113,7 @@ function Summary({
           <Badge variant="outline">{label}</Badge>
           <Icon />
         </div>
-        <CardTitle className="font-display text-2xl uppercase">
+        <CardTitle className="font-display text-base uppercase">
           {value}
         </CardTitle>
         <CardDescription>{note}</CardDescription>
@@ -1147,7 +1147,7 @@ function HistoryCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-display text-xl uppercase">
+        <CardTitle className="font-display text-sm uppercase">
           {title}
         </CardTitle>
       </CardHeader>
@@ -1184,7 +1184,7 @@ function RankingTable({ rows }: { rows: readonly RankingRowView[] }) {
                 key={`${row.position}-${row.coach}`}
                 className={cn(row.highlight && 'bg-primary/10')}
               >
-                <TableCell className="font-display text-lg font-bold">
+                <TableCell className="font-display text-xs font-bold">
                   {row.position}
                 </TableCell>
                 <TableCell>

@@ -1,12 +1,13 @@
-import { SoccerBall } from '@phosphor-icons/react';
+import { PixelBall } from '@/components/retro/sprites';
 
+/** Pixel wordmark: ball sprite on a scoreboard tile plus the name. */
 export function Brand() {
   return (
     <div className="flex items-center gap-2">
-      <span className="btn-grass grid size-9 place-items-center rounded-xl">
-        <SoccerBall weight="fill" />
+      <span className="px-border grid size-9 place-items-center bg-board">
+        <PixelBall size={22} />
       </span>
-      <span className="font-display text-2xl font-bold uppercase tracking-tight">
+      <span className="font-pixel text-sm text-chalk sm:text-base">
         Footebas
       </span>
     </div>

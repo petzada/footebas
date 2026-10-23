@@ -1,3 +1,4 @@
+import '@fontsource/press-start-2p/latin-400.css';
 import './globals.css';
 
 export const metadata = {
@@ -6,8 +7,8 @@ export const metadata = {
   manifest: '/manifest.webmanifest',
 };
 
-// ISOPOP is light-only (ADR 0009): the browser chrome matches the pastel sky.
-export const viewport = { themeColor: '#bee3f0', colorScheme: 'light' };
+// One retro theme (ADR 0012): the browser chrome matches the grass.
+export const viewport = { themeColor: '#2f7d3a', colorScheme: 'light' };
 
 export default function RootLayout({
   children,

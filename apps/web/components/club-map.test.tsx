@@ -42,7 +42,7 @@ describe('Mapa do clube', () => {
     }
   });
 
-  it('desenha o clube em SVG isométrico e cada prédio responde ao teclado', async () => {
+  it('desenha o clube em pixel art vista de cima e cada prédio responde ao teclado', async () => {
     const navigate = vi.fn();
     render(
       <ClubMapScreen
@@ -53,7 +53,7 @@ describe('Mapa do clube', () => {
       />,
     );
     const drawing = screen.getByRole('group', {
-      name: /mapa isométrico do flamengo/i,
+      name: /mapa pixel do flamengo/i,
     });
     expect(drawing.tagName.toLowerCase()).toBe('svg');
     const buildings = within(drawing).getAllByRole('button');

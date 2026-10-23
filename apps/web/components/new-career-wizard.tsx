@@ -18,8 +18,10 @@ import { Brand } from '@/components/brand';
 import { ClubEmblem } from '@/components/club-emblem';
 import { CoachAvatar, avatarNumber } from '@/components/coach-avatar';
 import { Badge } from '@/components/ui/badge';
+import { MuteButton } from '@/components/retro/mute-button';
+import { ScreenTransition } from '@/components/retro/screen-transition';
+import { PixelStar } from '@/components/retro/sprites';
 import { Button } from '@/components/ui/button';
-import { Glass } from '@/components/ui/glass';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -43,6 +45,7 @@ import {
   type CoachPersonality,
   type CoachProfile,
 } from '@/lib/coach-profile';
+import { useSound } from '@/lib/retro/use-sound';
 import { cn } from '@/lib/utils';
 
 export interface NewCareerSubmission {
@@ -97,6 +100,7 @@ export function NewCareerWizard({
   const [errors, setErrors] = useState<Errors>({});
   const heading = useRef<HTMLHeadingElement>(null);
   const moved = useRef(false);
+  const { play } = useSound();
 
   useEffect(() => {
     // Moves focus to the new step title; skipped on the first render.
@@ -133,13 +137,18 @@ export function NewCareerWizard({
   const advance = () => {
     const found = validate();
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0) {
+      play('error');
+      return;
+    }
     if (!last) {
+      play('click');
       if (STEPS[step + 1]!.id === 'name' && !careerNameTouched)
         setCareerName(defaultCareerName(coach));
       goTo(step + 1);
       return;
     }
+    play('whistle');
     onSubmit({
       club,
       coach: coach.trim(),
@@ -158,14 +167,20 @@ export function NewCareerWizard({
     <main className="min-h-dvh px-4 pb-10 pt-4 sm:px-6">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
         <Brand />
-        {onSignOut && (
-          <Button variant="ghost" className="min-h-11" onClick={onSignOut}>
-            <SignOut data-icon="inline-start" />
-            Sair
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <MuteButton />
+          {onSignOut && (
+            <Button variant="outline" className="min-h-10" onClick={onSignOut}>
+              <SignOut data-icon="inline-start" />
+              Sair
+            </Button>
+          )}
+        </div>
       </div>
-      <div className="mx-auto mt-6 grid max-w-5xl gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
+      <ScreenTransition
+        id={`nova-carreira-${current.id}`}
+        className="mx-auto mt-6 grid max-w-5xl gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]"
+      >
         <nav aria-label="Etapas da nova carreira" className="hidden lg:block">
           <ol className="grid gap-2">
             {STEPS.map((item, index) => (
@@ -173,20 +188,18 @@ export function NewCareerWizard({
                 key={item.id}
                 aria-current={index === step ? 'step' : undefined}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold',
-                  index === step
-                    ? 'glass-strong text-foreground'
-                    : 'text-muted-foreground',
+                  'flex items-center gap-3 px-3 py-2 font-pixel text-[.6rem]',
+                  index === step ? 'panel text-ink' : 'text-chalk/80',
                 )}
               >
                 <span
                   className={cn(
-                    'grid size-7 place-items-center rounded-full text-xs font-bold',
+                    'grid size-7 place-items-center border-2 border-ink text-[.6rem]',
                     index < step
                       ? 'bg-primary text-primary-foreground'
                       : index === step
-                        ? 'bg-coral text-coral-foreground'
-                        : 'bg-popover/70',
+                        ? 'bg-bulb text-bulb-foreground'
+                        : 'bg-chalk text-ink',
                   )}
                   aria-hidden="true"
                 >
@@ -198,14 +211,12 @@ export function NewCareerWizard({
           </ol>
         </nav>
 
-        <Glass
-          as="section"
-          strong
+        <section
           aria-labelledby="nova-carreira-titulo"
-          className="grid gap-5 p-4 sm:p-6"
+          className="panel grid gap-5 p-4 sm:p-6"
         >
           <div className="grid gap-2">
-            <div className="flex items-center justify-between gap-3 text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">
+            <div className="flex items-center justify-between gap-3 font-pixel text-[.55rem] text-muted-foreground">
               <span>
                 Nova carreira · {step + 1} de {STEPS.length}
               </span>
@@ -220,7 +231,7 @@ export function NewCareerWizard({
             id="nova-carreira-titulo"
             ref={heading}
             tabIndex={-1}
-            className="text-2xl font-extrabold leading-tight sm:text-3xl"
+            className="font-pixel text-sm leading-relaxed sm:text-lg"
           >
             {current.title}
           </h1>
@@ -283,7 +294,7 @@ export function NewCareerWizard({
             {error && last && (
               <p
                 role="alert"
-                className="flex items-start gap-2 rounded-xl border border-destructive/50 bg-popover px-3 py-2 text-sm"
+                className="flex items-start gap-2 border-2 border-destructive bg-popover px-3 py-2 text-sm"
               >
                 <WarningCircle
                   className="mt-0.5 shrink-0 text-destructive"
@@ -322,8 +333,8 @@ export function NewCareerWizard({
               )}
             </div>
           </form>
-        </Glass>
-      </div>
+        </section>
+      </ScreenTransition>
     </main>
   );
 }
@@ -350,10 +361,9 @@ function OptionCard({
   return (
     <label
       className={cn(
-        'surface relative grid cursor-pointer gap-1 rounded-2xl p-4 transition-shadow has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
-        checked && 'ring-2 ring-primary',
-        disabled &&
-          'cursor-not-allowed border-dashed border-input bg-muted/80 shadow-none',
+        'panel relative grid cursor-pointer gap-1 p-4 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+        checked && 'outline outline-4 outline-bulb',
+        disabled && 'cursor-not-allowed bg-muted opacity-80',
         className,
       )}
     >
@@ -374,6 +384,7 @@ function OptionCard({
           className="absolute right-3 top-3 size-5 text-primary"
         />
       )}
+      {checked && <PixelStar size={14} className="absolute -left-2 -top-2" />}
       {children}
     </label>
   );
@@ -480,14 +491,25 @@ function ClubStep({
             value={item.name}
             checked={value === item.name}
             onChange={() => onChange(item.name)}
+            className="text-center"
           >
-            <span className="flex items-center gap-3 pr-5">
-              <ClubEmblem name={item.name} size={48} decorative />
-              <strong className="text-lg leading-tight">{item.name}</strong>
+            <span className="flex flex-col items-center gap-2 pt-1">
+              <ClubEmblem name={item.name} size={72} decorative />
+              <strong className="font-pixel text-[.65rem] leading-relaxed">
+                {item.name}
+              </strong>
             </span>
-            <span className="text-sm text-muted-foreground">{item.note}</span>
-            <span className="text-sm font-semibold">
-              Força {item.strength} · {item.squadSize} atletas
+            <span className="text-xs text-muted-foreground">{item.note}</span>
+            <span className="mx-auto mt-1 flex items-center gap-2 bg-board px-2 py-1 font-pixel text-[.55rem] text-chalk">
+              <span className="sr-only">Força </span>
+              <span className="led text-sm" aria-hidden="true">
+                {item.strength}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                <span className="sr-only">{item.strength} · </span>
+                {item.squadSize} atletas
+              </span>
             </span>
           </OptionCard>
         ))}
@@ -502,15 +524,15 @@ function SquadPreview({ club }: { club: ClubPreview }) {
   return (
     <section
       aria-labelledby="elenco-previa"
-      className="surface grid gap-3 rounded-2xl p-4"
+      className="panel-board grid gap-3 p-4"
     >
-      <h2 id="elenco-previa" className="text-lg font-extrabold">
+      <h2 id="elenco-previa" className="font-pixel text-[.65rem] text-bulb">
         Elenco do {club.name}
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
         {club.groups.map((group) => (
           <div key={group.group} className="grid gap-1">
-            <h3 className="flex items-baseline justify-between text-xs font-bold uppercase tracking-[.14em] text-muted-foreground">
+            <h3 className="flex items-baseline justify-between font-pixel text-[.5rem] text-chalk/70">
               {POSITION_GROUP_LABEL[group.group]}
               <span>{group.count}</span>
             </h3>
@@ -518,10 +540,10 @@ function SquadPreview({ club }: { club: ClubPreview }) {
               {group.highlights.map((player) => (
                 <li
                   key={player.name}
-                  className="flex items-center justify-between gap-2 rounded-lg bg-popover/70 px-2 py-1.5 text-sm"
+                  className="flex items-center justify-between gap-2 border-b border-wood-deep px-1 py-1.5 text-sm"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="w-9 shrink-0 text-xs font-bold text-muted-foreground">
+                    <span className="w-9 shrink-0 font-pixel text-[.5rem] text-chalk/70">
                       {positionLabel(player.position)}
                     </span>
                     <span className="truncate font-semibold">
@@ -543,7 +565,7 @@ function SquadPreview({ club }: { club: ClubPreview }) {
                       </Badge>
                     )}
                   </span>
-                  <span className="shrink-0 font-bold">
+                  <span className="led shrink-0 text-xs">
                     <span className="sr-only">Força </span>
                     {player.strength}
                   </span>
@@ -609,8 +631,8 @@ function CoachStep({
             <label
               key={id}
               className={cn(
-                'relative grid cursor-pointer place-items-center rounded-2xl bg-popover/70 p-1.5 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
-                avatar === id && 'ring-3 ring-primary',
+                'relative grid cursor-pointer place-items-center bg-chalk-deep p-2 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+                avatar === id && 'outline outline-4 outline-bulb',
               )}
             >
               <input
@@ -622,7 +644,7 @@ function CoachStep({
                 className="sr-only"
               />
               <span className="sr-only">Avatar {avatarNumber(id)}</span>
-              <CoachAvatar avatar={id} size={60} className="w-full h-auto" />
+              <CoachAvatar avatar={id} size={56} />
             </label>
           ))}
         </div>
@@ -739,7 +761,7 @@ function NationalityPicker({
         size={6}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl border border-input bg-popover p-1 text-base text-foreground"
+        className="w-full border-2 border-ink bg-popover p-1 text-base text-popover-foreground"
       >
         {options.map((country) => (
           <option key={country.code} value={country.code}>
@@ -798,20 +820,20 @@ function NameStep({
       </div>
       <section
         aria-labelledby="resumo-carreira"
-        className="surface grid gap-3 rounded-2xl p-4"
+        className="panel-board grid gap-3 p-4"
       >
-        <h2 id="resumo-carreira" className="text-lg font-extrabold">
+        <h2 id="resumo-carreira" className="font-pixel text-[.65rem] text-bulb">
           Resumo
         </h2>
         <div className="grid grid-cols-[auto_1fr] items-center gap-4">
           <CoachAvatar avatar={summary.avatar} size={72} />
-          <dl className="grid gap-1 text-sm">
+          <dl className="grid gap-1 text-sm [&_dt]:text-chalk/70">
             <div className="flex gap-2">
-              <dt className="text-muted-foreground">Treinador</dt>
+              <dt>Treinador</dt>
               <dd className="font-bold">{summary.coach}</dd>
             </div>
             <div className="flex gap-2">
-              <dt className="text-muted-foreground">Nacionalidade</dt>
+              <dt>Nacionalidade</dt>
               <dd className="font-bold">
                 <span aria-hidden="true">
                   {flagEmoji(summary.nationality)}{' '}
@@ -820,20 +842,20 @@ function NameStep({
               </dd>
             </div>
             <div className="flex gap-2">
-              <dt className="text-muted-foreground">Personalidade</dt>
+              <dt>Personalidade</dt>
               <dd className="font-bold">
                 {personalityLabel(summary.personality)}
               </dd>
             </div>
             <div className="flex items-center gap-2">
-              <dt className="text-muted-foreground">Clube</dt>
+              <dt>Clube</dt>
               <dd className="flex items-center gap-1.5 font-bold">
                 <ClubEmblem name={summary.club} size={20} decorative />
                 {summary.club}
               </dd>
             </div>
             <div className="flex gap-2">
-              <dt className="text-muted-foreground">Universo</dt>
+              <dt>Universo</dt>
               <dd className="font-bold">Só Brasil</dd>
             </div>
           </dl>
