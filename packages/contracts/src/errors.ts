@@ -83,6 +83,13 @@ export const squadLimitReachedErrorSchema = z.strictObject({
   clubId: entityIdSchema.optional(),
   maxSquadSize: z.int().min(1).optional(),
 });
+/** Too many requests for this player or address; retry after the given delay. */
+export const rateLimitedErrorSchema = z.strictObject({
+  ...base,
+  code: z.literal('RATE_LIMITED'),
+  message: z.string().min(1).max(500),
+  retryAfterSeconds: z.int().min(0).optional(),
+});
 export const internalErrorSchema = z.strictObject({
   ...base,
   code: z.literal('INTERNAL_ERROR'),
@@ -99,6 +106,7 @@ export const apiErrorSchema = z.discriminatedUnion('code', [
   careerLimitReachedErrorSchema,
   transferWindowClosedErrorSchema,
   squadLimitReachedErrorSchema,
+  rateLimitedErrorSchema,
   internalErrorSchema,
 ]);
 export type ApiError = z.infer<typeof apiErrorSchema>;

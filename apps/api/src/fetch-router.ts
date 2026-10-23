@@ -116,11 +116,14 @@ export function createFetchHandler(
       );
       if (decision && !decision.allowed) {
         headers.set('retry-after', String(decision.retryAfterSeconds));
-        return respond(
-          429,
-          // Contract has no RATE_LIMITED code yet; FORBIDDEN is the closest.
-          errorBody(requestId, 'FORBIDDEN', 'rate limit exceeded; retry later'),
-        );
+        return respond(429, {
+          ...errorBody(
+            requestId,
+            'RATE_LIMITED',
+            'rate limit exceeded; retry later',
+          ),
+          retryAfterSeconds: decision.retryAfterSeconds,
+        });
       }
       if (found) {
         const { compiled, match } = found;

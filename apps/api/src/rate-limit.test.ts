@@ -156,8 +156,9 @@ describe('fetch router com rate limit', () => {
     expect(await limited.json()).toEqual({
       version: 1,
       requestId: 'request_test',
-      code: 'FORBIDDEN',
+      code: 'RATE_LIMITED',
       message: 'rate limit exceeded; retry later',
+      retryAfterSeconds: Number(limited.headers.get('retry-after')),
     });
   });
 

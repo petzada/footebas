@@ -10,6 +10,7 @@ import {
   PhaseFiveAuthorizationError,
   PhaseFiveConflictError,
   PhaseFiveNotFoundError,
+  TransferMarketError,
   type AuthPort,
   type FakeBearerAuth,
   type FootebasApplication,
@@ -332,6 +333,39 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
         return json(await query(bearer(request), idOf(request)));
       },
     });
+
+  routes.push({
+    method: 'GET',
+    path: '/v1/careers/:id/market',
+    schema: {
+      ...withId,
+      summary:
+        'Market screen: cash, transfer window, listings, offers, loans and search',
+    },
+    async handler(request) {
+      const raw = request.query;
+      const numeric = (value?: string) =>
+        value === undefined || value === '' ? undefined : Number(value);
+      const flag = (value?: string) =>
+        value === undefined ? undefined : value === 'true';
+      const query = Object.fromEntries(
+        Object.entries({
+          text: raw.text === '' ? undefined : raw.text,
+          position: raw.position,
+          minStrength: numeric(raw.minStrength),
+          maxAge: numeric(raw.maxAge),
+          maxValue: numeric(raw.maxValue),
+          freeAgentsOnly: flag(raw.freeAgentsOnly),
+          origin: raw.origin,
+          includeOwnSquad: flag(raw.includeOwnSquad),
+          limit: numeric(raw.limit),
+        }).filter(([, value]) => value !== undefined),
+      );
+      return json(
+        await app.careerMarket(bearer(request), idOf(request), query),
+      );
+    },
+  });
 
   routes.push({
     method: 'POST',
@@ -735,6 +769,8 @@ export function mapError(
       status: 404,
       body: errorBody(requestId, 'NOT_FOUND', error.message),
     };
+  if (error instanceof TransferMarketError)
+    return { status: 409, body: error.toApiError(requestId) };
   if (
     error instanceof PhaseFourConflictError ||
     error instanceof PhaseFiveConflictError
