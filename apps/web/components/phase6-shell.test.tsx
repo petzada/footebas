@@ -70,9 +70,20 @@ describe('Fase 6 · shell mobile-first', () => {
     ]);
     for (const button of buttons) {
       expect(button.className).toMatch(/min-h-14/);
-      expect(button.className).toMatch(/min-w-0/);
+      expect(button.className).toMatch(/whitespace-nowrap/);
+      expect(button.className).toMatch(/text-\[\.4rem\]/);
     }
-    expect(bottom.className).toMatch(/grid-cols-5/);
+    expect(bottom.className).toMatch(
+      /grid-cols-\[repeat\(5,minmax\(min-content,1fr\)\)\]/,
+    );
+    // Press Start 2P is 1em per glyph: at 320px (bar inset 12px, padding
+    // 6px, four 4px gaps) the labels at .4rem plus 2px padding a side fit.
+    const glyph = 0.4 * 16;
+    const needed = buttons.reduce(
+      (sum, button) => sum + (button.textContent ?? '').length * glyph + 4,
+      0,
+    );
+    expect(needed).toBeLessThanOrEqual(320 - 2 * 12 - 2 * 6 - 4 * 4);
     fireEvent.click(within(bottom).getByRole('button', { name: 'Elenco' }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Elenco' }),
