@@ -44,24 +44,80 @@ class MemorySaveRepository implements GameSaveRepository {
     this.state.saves.set(save.id, save);
     return Promise.resolve(clone(save));
   }
-  load(id: string, userId: string): Promise<GameSave | undefined> {
+  private active(id: string): GameSave | undefined {
     const save = this.state.saves.get(id);
+    return save?.archivedAt === undefined ? save : undefined;
+  }
+  private owned(id: string, userId: string): GameSave {
+    const save = this.active(id);
+    if (!save) throw new SaveNotFoundError(`save ${id} not found`);
+    if (save.userId !== userId)
+      throw new SaveOwnershipError(`save ${id} does not belong to user`);
+    return save;
+  }
+  load(id: string, userId: string): Promise<GameSave | undefined> {
+    const save = this.active(id);
     if (!save) return Promise.resolve(undefined);
     if (save.userId !== userId)
       throw new SaveOwnershipError(`save ${id} does not belong to user`);
     return Promise.resolve(clone(save));
   }
   peek(id: string): Promise<GameSave | undefined> {
-    const save = this.state.saves.get(id);
+    const save = this.active(id);
     return Promise.resolve(save === undefined ? undefined : clone(save));
+  }
+  private activeSaves(): GameSave[] {
+    return [...this.state.saves.values()].filter(
+      (save) => save.archivedAt === undefined,
+    );
   }
   listByUser(userId: string): Promise<readonly GameSave[]> {
     return Promise.resolve(
-      [...this.state.saves.values()]
+      this.activeSaves()
         .filter((save) => save.userId === userId)
         .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
         .map(clone),
     );
+  }
+  countActiveByUser(userId: string): Promise<number> {
+    return Promise.resolve(
+      this.activeSaves().filter((save) => save.userId === userId).length,
+    );
+  }
+  countActiveUsers(): Promise<number> {
+    return Promise.resolve(
+      new Set(this.activeSaves().map(({ userId }) => userId)).size,
+    );
+  }
+  archive(
+    id: string,
+    userId: string,
+    expectedVersion: number,
+  ): Promise<GameSave> {
+    const current = this.owned(id, userId);
+    if (current.version !== expectedVersion)
+      throw new SaveConflictError(
+        `expected version ${String(expectedVersion)}, found ${String(current.version)}`,
+      );
+    const instant = this.clock.now().toISOString();
+    const archived: GameSave = {
+      ...current,
+      version: current.version + 1,
+      updatedAt: instant,
+      archivedAt: instant,
+    };
+    this.state.saves.set(id, archived);
+    return Promise.resolve(clone(archived));
+  }
+  delete(id: string, userId: string): Promise<void> {
+    const save = this.state.saves.get(id);
+    if (!save) throw new SaveNotFoundError(`save ${id} not found`);
+    if (save.userId !== userId)
+      throw new SaveOwnershipError(`save ${id} does not belong to user`);
+    this.state.saves.delete(id);
+    for (const key of [...this.state.commands.keys()])
+      if (key.startsWith(`${id}:`)) this.state.commands.delete(key);
+    return Promise.resolve();
   }
   update(
     id: string,
@@ -70,10 +126,7 @@ class MemorySaveRepository implements GameSaveRepository {
     update: SaveUpdate,
   ): Promise<GameSave> {
     assertRequiredMetadata(update.seed, update.versions);
-    const current = this.state.saves.get(id);
-    if (!current) throw new SaveNotFoundError(`save ${id} not found`);
-    if (current.userId !== userId)
-      throw new SaveOwnershipError(`save ${id} does not belong to user`);
+    const current = this.owned(id, userId);
     if (current.version !== expectedVersion)
       throw new SaveConflictError(
         `expected version ${String(expectedVersion)}, found ${String(current.version)}`,

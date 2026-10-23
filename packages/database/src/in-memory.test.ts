@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   InMemoryUnitOfWork,
   SaveConflictError,
+  SaveNotFoundError,
+  SaveOwnershipError,
   checksumSnapshot,
   verifyChecksum,
   type Clock,
@@ -27,6 +29,10 @@ const input = (
   seed: 'seed-1',
   versions: { engine: '1', rules: '1', content: '2026.1', schema: '1' },
 });
+
+/** Adapters may throw synchronously; normalize to a rejected promise. */
+const attempt = <T>(work: () => Promise<T>): Promise<T> =>
+  Promise.resolve().then(work);
 
 describe('in-memory persistence contract', () => {
   it('creates, reloads and updates a canonical checksummed save using injected instants', async () => {
@@ -113,6 +119,65 @@ describe('in-memory persistence contract', () => {
     expect(
       await uow.repositories().commands.load('career-1', 'broken'),
     ).toBeUndefined();
+  });
+
+  it('archives owned saves, hides them and frees the active counts', async () => {
+    const clock = new FakeClock();
+    const uow = new InMemoryUnitOfWork(clock);
+    const repos = uow.repositories();
+    await repos.saves.create(input());
+    await repos.saves.create({ ...input(), id: 'career-2' });
+    await repos.saves.create({ ...input(), id: 'career-3', userId: 'user-2' });
+    expect(await repos.saves.countActiveByUser('user-1')).toBe(2);
+    expect(await repos.saves.countActiveUsers()).toBe(2);
+    await expect(
+      attempt(() => repos.saves.archive('career-1', 'user-2', 1)),
+    ).rejects.toBeInstanceOf(SaveOwnershipError);
+    await expect(
+      attempt(() => repos.saves.archive('career-1', 'user-1', 7)),
+    ).rejects.toBeInstanceOf(SaveConflictError);
+    clock.advance();
+    const archived = await repos.saves.archive('career-1', 'user-1', 1);
+    expect(archived.version).toBe(2);
+    expect(archived.archivedAt).toBe('2026-07-21T12:00:01.000Z');
+    expect(await repos.saves.load('career-1', 'user-1')).toBeUndefined();
+    expect(await repos.saves.peek('career-1')).toBeUndefined();
+    expect(
+      (await repos.saves.listByUser('user-1')).map(({ id }) => id),
+    ).toEqual(['career-2']);
+    expect(await repos.saves.countActiveByUser('user-1')).toBe(1);
+    await expect(
+      attempt(() =>
+        repos.saves.update('career-1', 'user-1', 2, {
+          snapshot: { round: 1 },
+          seed: 'seed-1',
+          versions: input().versions,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(SaveNotFoundError);
+    await expect(
+      attempt(() => repos.saves.create(input())),
+    ).rejects.toBeInstanceOf(SaveConflictError);
+    await repos.saves.archive('career-2', 'user-1', 1);
+    expect(await repos.saves.countActiveUsers()).toBe(1);
+  });
+
+  it('hard-deletes an owned save with its receipts', async () => {
+    const uow = new InMemoryUnitOfWork(new FakeClock());
+    await uow.repositories().saves.create(input());
+    await uow.executeIdempotent('career-1', 'cmd-1', () =>
+      Promise.resolve({ ok: true }),
+    );
+    const repos = uow.repositories();
+    await expect(
+      attempt(() => repos.saves.delete('career-1', 'user-2')),
+    ).rejects.toBeInstanceOf(SaveOwnershipError);
+    await repos.saves.delete('career-1', 'user-1');
+    expect(await repos.saves.peek('career-1')).toBeUndefined();
+    expect(await repos.commands.load('career-1', 'cmd-1')).toBeUndefined();
+    await expect(
+      attempt(() => repos.saves.delete('career-1', 'user-1')),
+    ).rejects.toBeInstanceOf(SaveNotFoundError);
   });
 
   it('checksums canonical JSON independently of object key order (property)', () => {
