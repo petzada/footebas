@@ -10,10 +10,15 @@ import {
   Mulberry32RandomFactory,
   NoopTelemetry,
   PhaseFourApplicationService,
+  RankingService,
   SequentialIdGenerator,
   UnifiedPhaseFourRepository,
 } from '@footebas/application';
-import { InMemoryUnitOfWork, SystemClock } from '@footebas/database';
+import {
+  InMemoryRankingStore,
+  InMemoryUnitOfWork,
+  SystemClock,
+} from '@footebas/database';
 import { InMemoryBillingRepository } from './billing/billing-repository-memory.js';
 import { BillingService } from './billing/service.js';
 import {
@@ -51,6 +56,17 @@ const phaseFour = new PhaseFourApplicationService({
   random: new Mulberry32RandomFactory(),
 });
 
+// Ranking snapshots over the in-memory ledger, regenerated every minute here
+// (the Worker uses a 15-minute Cron Trigger).
+const rankings = new RankingService({
+  store: new InMemoryRankingStore(() => unitOfWork.achievements()),
+  clock,
+  auth: appAuth,
+});
+setInterval(() => {
+  void rankings.generateSnapshots();
+}, 60_000);
+
 // Billing: offline fake by default; WOOVI_APP_ID (sandbox) switches to the
 // real Woovi API so the PIX flow can be exercised end to end locally.
 const wooviUrl = process.env.WOOVI_API_URL ?? WOOVI_SANDBOX_URL;
@@ -79,6 +95,7 @@ const api = await buildApi({
   application,
   jobs,
   phaseFour: { application: phaseFour, auth: appAuth },
+  rankings,
   billing: { service: billing, auth: appAuth },
   devAuth: auth,
   health: { version: 'dev' },
