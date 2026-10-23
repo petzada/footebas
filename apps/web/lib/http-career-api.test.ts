@@ -14,11 +14,14 @@ import {
   UnifiedPhaseFourRepository,
 } from '@footebas/application';
 import { InMemoryUnitOfWork } from '@footebas/database';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FakeAuth } from '@/lib/fake-auth';
 import {
   HttpCareerApi,
   httpCompetitionPort,
   NotSupportedYetError,
+  SessionExpiredError,
+  type AccessTokenProvider,
 } from '@/lib/http-career-api';
 
 const open: { close(): Promise<unknown> }[] = [];
@@ -27,7 +30,9 @@ afterEach(async () => {
 });
 
 /** The real API in-process; fetch goes through Fastify inject. */
-async function server() {
+async function server(
+  session: 'dev' | ((auth: FakeBearerAuth) => AccessTokenProvider) = 'dev',
+) {
   const clock = new FakeClock();
   const auth = new FakeBearerAuth();
   const ids = new SequentialIdGenerator();
@@ -75,6 +80,9 @@ async function server() {
     baseUrl: 'http://api.test',
     fetch: fetchVia,
     jobPollMs: 0,
+    ...(session === 'dev'
+      ? { devSession: true }
+      : { getAccessToken: session(auth) }),
   });
 }
 
@@ -155,5 +163,81 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     );
     expect(view.calendar.entries.length).toBeGreaterThan(38);
     expect(view.nextSeason.status).toBe('pending');
+  });
+});
+
+describe('HttpCareerApi com provedor de token', () => {
+  it('usa o bearer do provedor contra a API real', async () => {
+    const client = await server((auth) => {
+      const token = auth.issue({
+        userId: 'user_supabase',
+        email: 'ana@footebas.com',
+        displayName: 'Ana',
+      });
+      return async () => token;
+    });
+    await client.login('ignorado');
+    await client.createCareer({ coach: 'Ana' });
+    await client.selectClub('Flamengo');
+    expect((await client.getCareer())?.club).toBe('Flamengo');
+  }, 60_000);
+
+  it('envia o bearer em toda chamada e renova uma vez após 401', async () => {
+    const auth = new FakeAuth({
+      user: { id: 'u1', email: 'a@b.com' },
+      token: 'token-velho',
+    });
+    const seen: (string | null)[] = [];
+    const fetchMock: typeof fetch = async (_input, init) => {
+      const header = new Headers(init?.headers).get('authorization');
+      seen.push(header);
+      if (header === 'Bearer token-velho') {
+        auth.signIn({ id: 'u1', email: 'a@b.com' }, 'token-novo');
+        return new Response(JSON.stringify({ code: 'UNAUTHORIZED' }), {
+          status: 401,
+        });
+      }
+      return new Response(JSON.stringify({ careers: [] }), { status: 200 });
+    };
+    const client = new HttpCareerApi({
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+      getAccessToken: (options) => auth.getAccessToken(options),
+    });
+    expect(await client.getCareer()).toBeNull();
+    expect(seen).toEqual(['Bearer token-velho', 'Bearer token-novo']);
+    expect(auth.calls.refreshes).toBe(1);
+  });
+
+  it('sinaliza sessão expirada quando a renovação também falha', async () => {
+    const onSessionExpired = vi.fn();
+    const provider = vi.fn<AccessTokenProvider>(async () => 'token-recusado');
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response('', { status: 401 }),
+    );
+    const client = new HttpCareerApi({
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+      getAccessToken: provider,
+      onSessionExpired,
+    });
+    await expect(client.getCareer()).rejects.toBeInstanceOf(
+      SessionExpiredError,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(provider).toHaveBeenLastCalledWith({ forceRefresh: true });
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it('só oferece a sessão dev quando habilitada', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const client = new HttpCareerApi({
+      baseUrl: 'http://api.test',
+      fetch: fetchMock,
+    });
+    await expect(client.login('a@b.com')).rejects.toThrow(
+      /entre com sua conta/i,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
