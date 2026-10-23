@@ -4,7 +4,7 @@ Tudo roda em Cloudflare Workers (ADR 0005). Deploy em produção só com autoriz
 
 | Peça                       | Worker         | Domínio                                      | Config                                                    |
 | -------------------------- | -------------- | -------------------------------------------- | --------------------------------------------------------- |
-| Web (Next.js via OpenNext) | `footebas-web` | `footebas.com.br` (+ `www` → apex)           | `apps/web/wrangler.jsonc`, `apps/web/open-next.config.ts` |
+| Web (Next.js via OpenNext) | `footebas-web` | `game.footebas.com.br` (jogo), `lp.footebas.com.br` (landing), apex e `www` → landing | `apps/web/wrangler.jsonc`, `apps/web/open-next.config.ts` |
 | API                        | `footebas-api` | `api.footebas.com.br` (hoje `*.workers.dev`) | `apps/api/wrangler.jsonc`                                 |
 
 ## Pré-requisitos
@@ -43,12 +43,15 @@ Tudo roda em Cloudflare Workers (ADR 0005). Deploy em produção só com autoriz
    pnpm --filter @footebas/web cf:deploy
    ```
 
-   O deploy cria os Custom Domains `footebas.com.br` e `www.footebas.com.br` (DNS e certificado automáticos).
+   O deploy cria os Custom Domains `lp.footebas.com.br`, `game.footebas.com.br`, `footebas.com.br` e
+   `www.footebas.com.br` (DNS e certificado automáticos).
    Se já existir registro A/AAAA/CNAME para esses nomes na zona, apague antes, ou o Wrangler recusa o domínio.
 
 ### www → apex
 
-`apps/web/next.config.ts` responde `308` de `https://www.footebas.com.br/*` para `https://footebas.com.br/*`.
+`apps/web/next.config.ts` separa os hosts: `lp` reescreve `/` para `app/landing`, `game` serve o jogo, apex e
+`www` respondem `308` para `https://lp.footebas.com.br/*` (exceto `/auth/*`, que vai para `game`). O Supabase
+precisa ter `https://game.footebas.com.br/auth/callback` nas Redirect URLs.
 Arquivos estáticos (`/_next/static`, `/sw.js`, ícones) são servidos pelos static assets antes do código do
 Worker, então em `www` eles não redirecionam. Para redirecionar tudo na borda, crie também uma Redirect Rule
 na zona (Rules → Redirect Rules): quando `http.host eq "www.footebas.com.br"`, URL dinâmica
@@ -101,7 +104,8 @@ O que muda no deploy da API:
 ## Checagem pós-deploy
 
 ```sh
-curl -sI https://footebas.com.br/ | head -1                    # 200
-curl -sI https://www.footebas.com.br/ | grep -i location       # https://footebas.com.br/
+curl -sI https://game.footebas.com.br/ | head -1               # 200
+curl -sI https://lp.footebas.com.br/ | head -1                 # 200 (landing)
+curl -sI https://footebas.com.br/ | grep -i location           # https://lp.footebas.com.br/
 curl -sI https://footebas.com.br/sw.js | grep -i cache-control  # no-cache
 ```

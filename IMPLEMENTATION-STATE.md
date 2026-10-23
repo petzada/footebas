@@ -39,8 +39,10 @@ Etapas (as marcadas com ★ entraram com o ADR 0010 — apresentação premium e
 
 ### Estado da nuvem
 
-- Web `footebas-web` em `https://footebas.com.br` (www → apex 308), bundle OpenNext gerado no workflow
-  `deploy-web` (Linux) e publicado com wrangler; tela de entrada com Google e link mágico.
+- Web `footebas-web` em um só Worker com quatro hosts (2026-10-23): jogo em `https://game.footebas.com.br`,
+  landing em `https://lp.footebas.com.br` (rota `app/landing`), apex e www → 308 para a landing. Bundle OpenNext
+  gerado no workflow `deploy-web` (Linux) e publicado com wrangler; tela de entrada com Google e link mágico.
+  Pendente no Supabase: incluir `https://game.footebas.com.br/auth/callback` nas Redirect URLs.
 - API `footebas-api` em `https://api.footebas.com.br` (e workers.dev); `/health` com checagem do banco.
 - Supabase: migrations aplicadas; Auth com Site URL `https://footebas.com.br` e callbacks `/auth/callback`; Google
   OAuth ativo (validação com conta real pendente no checklist).

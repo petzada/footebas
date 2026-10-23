@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import { Brand } from '@/components/brand';
 import {
   PixelArrow,
@@ -26,6 +25,10 @@ import { crestFor } from '@/lib/club-crests';
  * and licensed entitlements (lib/account-product), the default price
  * (apps/api/src/billing/service.ts: R$ 49,90) and the screens that exist.
  */
+
+/** The game lives on its own host (next.config.ts); the landing on lp. */
+const GAME_URL =
+  process.env['NEXT_PUBLIC_GAME_URL'] ?? 'https://game.footebas.com.br/';
 
 /** Default licence price; the checkout always shows the server's value. */
 const LICENSE_PRICE_CENTS = 4990;
@@ -452,12 +455,12 @@ export function LandingPage() {
           >
             Licença
           </a>
-          <Link
-            href="/"
+          <a
+            href={GAME_URL}
             className="btn-px btn-chalk inline-flex min-h-10 items-center px-3 text-[.55rem]"
           >
             Entrar
-          </Link>
+          </a>
         </nav>
       </header>
 
@@ -506,15 +509,15 @@ export function LandingPage() {
             a cara dos managers que você jogava na lan house.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Link
-              href="/"
+            <a
+              href={GAME_URL}
               className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-6 text-[.7rem] sm:text-xs"
             >
               <span className="lp-nudge inline-flex">
                 <PixelArrow size={18} />
               </span>
               Começar carreira grátis
-            </Link>
+            </a>
             <a
               href="#licenca"
               className="btn-px btn-board inline-flex min-h-12 items-center justify-center gap-2 px-5 text-[.6rem]"
@@ -731,12 +734,12 @@ export function LandingPage() {
                 <li>✔ Partida ao vivo e ranking global</li>
                 <li>✔ Salvo na nuvem</li>
               </ul>
-              <Link
-                href="/"
+              <a
+                href={GAME_URL}
                 className="btn-px btn-grass mt-auto inline-flex min-h-12 items-center justify-center px-4 text-[.6rem]"
               >
                 Jogar de graça
-              </Link>
+              </a>
             </div>
 
             <div className="panel-board relative flex flex-col gap-4 p-5 sm:p-6">
@@ -778,13 +781,13 @@ export function LandingPage() {
                   Arrependeu? Reembolso integral em até 7 dias
                 </li>
               </ul>
-              <Link
-                href="/"
+              <a
+                href={GAME_URL}
                 className="play-button mt-auto inline-flex min-h-14 items-center justify-center gap-3 px-5 text-[.65rem]"
               >
                 <PixelCoin size={18} />
                 Entrar e pagar com PIX
-              </Link>
+              </a>
               <p className="text-xs text-chalk/70">
                 O valor e o QR Code aparecem no seu perfil, dentro do jogo.
               </p>
@@ -810,13 +813,13 @@ export function LandingPage() {
             A carreira começa em um minuto e fica salva na nuvem. Primeiro jogo
             hoje.
           </p>
-          <Link
-            href="/"
+          <a
+            href={GAME_URL}
             className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-8 text-[.7rem] sm:text-xs"
           >
             <PixelArrow size={18} />
             Começar carreira
-          </Link>
+          </a>
         </div>
       </section>
 

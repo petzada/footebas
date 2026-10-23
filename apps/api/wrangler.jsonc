@@ -16,7 +16,7 @@
   // 0016; see src/billing/README.md). Woovi secrets only if PAYMENT_PROVIDER=woovi.
   "vars": {
     "SUPABASE_URL": "https://wjisqiiwsuykfbmqglfb.supabase.co",
-    "CORS_ORIGINS": "https://footebas.com.br,https://www.footebas.com.br,http://localhost:3000",
+    "CORS_ORIGINS": "https://game.footebas.com.br,https://lp.footebas.com.br,https://footebas.com.br,https://www.footebas.com.br,http://localhost:3000",
     // AbacatePay: the API key decides dev mode vs production (same URL).
     "PAYMENT_PROVIDER": "abacatepay",
     // Public base of the avatars bucket (custom domain on R2).
