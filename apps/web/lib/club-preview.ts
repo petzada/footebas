@@ -12,8 +12,21 @@ export interface ClubPreviewPlayer {
   readonly level?: 'craque' | 'destaque';
 }
 
+export type ClubDivision = 'serie-a' | 'serie-b' | 'serie-c';
+
+export const DIVISION_LABEL: Record<ClubDivision, string> = {
+  'serie-a': 'Série A',
+  'serie-b': 'Série B',
+  'serie-c': 'Série C',
+};
+
+/** Free plan starts at the bottom (docs/05 §5): only Série C clubs. */
+export const FREE_PLAN_DIVISION: ClubDivision = 'serie-c';
+
 export interface ClubPreview {
+  readonly id: string;
   readonly name: string;
+  readonly division: ClubDivision;
   readonly note: string;
   readonly tier: string;
   readonly squadSize: number;

@@ -43,7 +43,9 @@ describe('Fase 6 · shell mobile-first', () => {
       'Histórico',
       'Central',
     ]) {
-      const button = within(nav).getByRole('button', { name: area });
+      const button = within(nav).getByRole('button', {
+        name: new RegExp(`^${area}`),
+      });
       fireEvent.click(button);
       expect(
         await screen.findByRole('heading', { level: 1, name: area }),
@@ -52,20 +54,53 @@ describe('Fase 6 · shell mobile-first', () => {
     }
   });
 
-  it('organiza a barra inferior com as áreas principais de docs/09', async () => {
+  it('organiza a barra inferior com o loop da rodada (docs/07 §3) e o Menu', async () => {
     await onboard();
     const bottom = screen.getByRole('navigation', {
       name: /navegação principal mobile/i,
     });
+    const buttons = within(bottom).getAllByRole('button');
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      'Central',
+      'Elenco',
+      'Mercado',
+      'Escritório',
+      'Menu',
+    ]);
+    for (const button of buttons) {
+      expect(button.className).toMatch(/min-h-14/);
+      expect(button.className).toMatch(/min-w-0/);
+    }
+    expect(bottom.className).toMatch(/grid-cols-5/);
+    fireEvent.click(within(bottom).getByRole('button', { name: 'Elenco' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Elenco' }),
+    ).toBeTruthy();
     expect(
       within(bottom)
-        .getAllByRole('button')
-        .map((button) => button.textContent),
-    ).toEqual(['Central', 'Mapa', 'Elenco', 'Mercado', 'Menu']);
-    fireEvent.click(within(bottom).getByRole('button', { name: 'Mapa' }));
+        .getByRole('button', { name: 'Elenco' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('esconde a barra inferior na partida ao vivo e a devolve ao rolar', async () => {
+    await onboard();
+    fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
+    await screen.findByRole('button', { name: /pular resultado/i });
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Mapa' }),
+      screen.queryByRole('navigation', { name: /navegação principal mobile/i }),
+    ).toBeNull();
+    act(() => {
+      Object.defineProperty(window, 'scrollY', {
+        value: 80,
+        configurable: true,
+      });
+      window.dispatchEvent(new Event('scroll'));
+    });
+    expect(
+      screen.getByRole('navigation', { name: /navegação principal mobile/i }),
     ).toBeTruthy();
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
   });
 
   it('volta ao Início sem perder a carreira', async () => {
@@ -82,23 +117,132 @@ describe('Fase 6 · shell mobile-first', () => {
     ).toBeTruthy();
   });
 
-  it('abre o menu completo pela barra inferior sem depender de gesto', async () => {
+  it('abre o menu do jogo como diálogo modal agrupado por tema', async () => {
     await onboard();
     const bottom = screen.getByRole('navigation', {
       name: /navegação principal mobile/i,
     });
     const menu = within(bottom).getByRole('button', { name: /menu/i });
     expect(menu.getAttribute('aria-expanded')).toBe('false');
+    expect(menu.getAttribute('aria-haspopup')).toBe('dialog');
     fireEvent.click(menu);
     expect(menu.getAttribute('aria-expanded')).toBe('true');
-    const more = screen.getByRole('navigation', { name: /mais áreas/i });
-    fireEvent.click(within(more).getByRole('button', { name: 'Finanças' }));
+    const dialog = screen.getByRole('dialog', { name: /menu do jogo/i });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    for (const group of ['Clube', 'Futebol', 'Carreira', 'Sistema']) {
+      expect(within(dialog).getByRole('region', { name: group })).toBeTruthy();
+    }
+    expect(
+      within(dialog)
+        .getByRole('region', { name: 'Clube' })
+        .querySelector('.grid')
+        ?.className.includes('grid-cols-3'),
+    ).toBe(true);
+    // Focus lands on the current screen and the grid answers the arrows.
+    const current = within(dialog).getByRole('button', { name: 'Central' });
+    expect(current.getAttribute('aria-current')).toBe('page');
+    expect(document.activeElement).toBe(current);
+    fireEvent.keyDown(dialog, { key: 'ArrowRight' });
+    expect(document.activeElement?.textContent).toBe('Elenco');
+    // Counters: unread mail badge, link to the legal pages, mute toggle.
+    expect(
+      within(dialog).getByRole('button', { name: /caixa de entrada \(\d+\)/i }),
+    ).toBeTruthy();
+    expect(
+      within(dialog)
+        .getByRole('link', { name: /termos/i })
+        .getAttribute('href'),
+    ).toBe('/termos');
+    expect(within(dialog).getByRole('button', { name: /som/i })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Finanças' }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Finanças' }),
     ).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it('navega por todos os destinos do menu do jogo', async () => {
+    await onboard();
+    const openMenu = () => {
+      const bottom = screen.getByRole('navigation', {
+        name: /navegação principal mobile/i,
+      });
+      fireEvent.click(within(bottom).getByRole('button', { name: /menu/i }));
+      return screen.getByRole('dialog', { name: /menu do jogo/i });
+    };
+    for (const area of [
+      'Mapa',
+      'Estádio',
+      'Escritório',
+      'Finanças',
+      'Táticas',
+      'Mercado',
+      'Calendário',
+      'Classificação',
+      'Competições',
+      'Temporada',
+      'Caixa de entrada',
+      'Histórico',
+      'Ranking',
+      'Perfil',
+      'Elenco',
+      'Central',
+    ]) {
+      const dialog = openMenu();
+      const button = within(dialog).getByRole('button', {
+        name: new RegExp(`^${area}`),
+      });
+      fireEvent.click(button);
+      expect(
+        await screen.findByRole('heading', { level: 1, name: area }),
+      ).toBeTruthy();
+      const again = openMenu();
+      expect(
+        within(again)
+          .getByRole('button', { name: new RegExp(`^${area}`) })
+          .getAttribute('aria-current'),
+      ).toBe('page');
+      fireEvent.keyDown(again, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+    }
+  });
+
+  it('fecha o menu com Esc ou pelo botão e devolve o foco ao gatilho', async () => {
+    await onboard();
+    const bottom = screen.getByRole('navigation', {
+      name: /navegação principal mobile/i,
+    });
+    const menu = within(bottom).getByRole('button', { name: /menu/i });
+    fireEvent.click(menu);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(menu);
+    fireEvent.click(menu);
+    const dialog = screen.getByRole('dialog');
+    // Tab from the last control wraps to the first (focus trap).
+    const focusables = dialog.querySelectorAll<HTMLElement>('a[href], button');
+    const last = focusables[focusables.length - 1]!;
+    last.focus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusables[0]);
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: /fechar menu/i }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it('agrupa a barra lateral desktop pelos mesmos temas do menu', async () => {
+    await onboard();
+    const nav = screen.getByRole('navigation', {
+      name: /navegação principal desktop/i,
+    });
     expect(
-      screen.queryByRole('navigation', { name: /mais áreas/i }),
-    ).toBeNull();
+      within(nav)
+        .getAllByRole('region')
+        .map((region) => region.getAttribute('aria-labelledby')),
+    ).toEqual(['desktop-clube', 'desktop-futebol', 'desktop-carreira']);
   });
 
   it('é só modo claro: sem botão de tema nem classe dark (ADR 0009)', async () => {

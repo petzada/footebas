@@ -1,30 +1,24 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  Bank,
-  Bell,
-  Briefcase,
   CalendarDots,
-  ChartLineUp,
-  ClockCounterClockwise,
-  DotsThree,
-  House,
-  ListNumbers,
-  MapTrifold,
-  Ranking,
+  DotsThreeOutline,
   SignOut,
   SoccerBall,
-  Storefront,
-  Strategy,
-  Trophy,
-  UsersThree,
   WifiHigh,
   WifiSlash,
 } from '@phosphor-icons/react';
 import { Brand } from '@/components/brand';
 import { ClubEmblem } from '@/components/club-emblem';
 import { CoachAvatar } from '@/components/coach-avatar';
+import {
+  GameMenu,
+  barDestinations,
+  labels,
+  menuBadges,
+  menuGroups,
+} from '@/components/game-menu';
 import { MuteButton } from '@/components/retro/mute-button';
 import { ScreenTransition } from '@/components/retro/screen-transition';
 import { Badge } from '@/components/ui/badge';
@@ -35,42 +29,6 @@ import { personalityLabel } from '@/lib/coach-profile';
 import { cn } from '@/lib/utils';
 
 type CommandState = 'idle' | 'pending' | 'duplicate' | 'success';
-
-type Destination = readonly [Screen, string, typeof House];
-
-/** The seven main areas of docs/09-telas-e-escopo.md, in order. */
-export const mainDestinations = [
-  ['central', 'Central', House],
-  ['map', 'Mapa', MapTrifold],
-  ['squad', 'Elenco', UsersThree],
-  ['market', 'Mercado', Storefront],
-  ['office', 'Escritório', Briefcase],
-  ['season', 'Temporada', ChartLineUp],
-  ['ranking', 'Ranking', Ranking],
-] as const satisfies ReadonlyArray<Destination>;
-
-/** Current screens that keep working until their own redesign. */
-export const moreDestinations = [
-  ['inbox', 'Caixa de entrada', Bell],
-  ['calendar', 'Calendário', CalendarDots],
-  ['tactics', 'Táticas', Strategy],
-  ['table', 'Classificação', ListNumbers],
-  ['competitions', 'Competições', Trophy],
-  ['stadium', 'Estádio', SoccerBall],
-  ['finance', 'Finanças', Bank],
-  ['history', 'Histórico', ClockCounterClockwise],
-] as const satisfies ReadonlyArray<Destination>;
-
-const destinations: readonly Destination[] = [
-  ...mainDestinations,
-  ...moreDestinations,
-];
-
-const primaryMobile = mainDestinations.slice(0, 4);
-
-const labels = Object.fromEntries(
-  destinations.map(([id, label]) => [id, label]),
-) as Record<Screen, string>;
 
 export function Phase6Shell({
   screen,
@@ -91,29 +49,15 @@ export function Phase6Shell({
   /** Leaves the career for the Início screen (new or saved careers). */
   onHome?: () => void;
   /**
-   * Live match (decision 19): the header stays pinned and the bottom bar
-   * hides until the player scrolls down or changes screen.
+   * Live match (docs/09 decision 19): the bottom bar hides and comes back
+   * when the user scrolls down or changes screen.
    */
   immersive?: boolean;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [navRevealed, setNavRevealed] = useState(false);
-  const [revealKey, setRevealKey] = useState({ immersive, screen });
-  if (revealKey.immersive !== immersive || revealKey.screen !== screen) {
-    // Entering a match hides the bar again; changing screen brings it back.
-    setRevealKey({ immersive, screen });
-    setNavRevealed(revealKey.immersive === immersive);
-  }
-  useEffect(() => {
-    if (!immersive || navRevealed) return;
-    const onScroll = () => {
-      if ((globalThis.scrollY ?? 0) > 80) setNavRevealed(true);
-    };
-    globalThis.addEventListener?.('scroll', onScroll, { passive: true });
-    return () => globalThis.removeEventListener?.('scroll', onScroll);
-  }, [immersive, navRevealed]);
-  const navHidden = immersive && !navRevealed;
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const barVisible = useBarVisibility(immersive, screen);
 
   // Central and Mapa already show the next match and the advance button.
   const showRail = screen !== 'central' && screen !== 'map';
@@ -140,6 +84,7 @@ export function Phase6Shell({
         <header
           className={cn(
             'panel-board mb-5 flex min-h-14 items-center justify-between gap-3 px-3 py-2.5 sm:px-4',
+            // Live match (decision 19): the app header stays pinned on top.
             immersive && 'sticky top-0 z-30 mb-3',
           )}
         >
@@ -179,15 +124,60 @@ export function Phase6Shell({
         <ScreenTransition id={screen}>{children}</ScreenTransition>
       </main>
       {showRail && <DesktopRail career={career} navigate={navigate} />}
-      <MobileNavigation
-        screen={screen}
+      {barVisible && (
+        <MobileNavigation
+          screen={screen}
+          career={career}
+          open={menuOpen}
+          setOpen={setMenuOpen}
+          navigate={navigate}
+          triggerRef={menuTrigger}
+        />
+      )}
+      <GameMenu
         open={menuOpen}
-        setOpen={setMenuOpen}
+        onClose={() => setMenuOpen(false)}
+        screen={screen}
+        career={career}
         navigate={navigate}
-        hidden={navHidden}
+        onHome={onHome}
+        onSignOut={onSignOut}
+        returnFocusTo={menuTrigger}
       />
     </div>
   );
+}
+
+/**
+ * Bottom bar visibility: always on, except in immersive mode, where it hides
+ * until the user scrolls down (24px past the last position) or the screen
+ * changes.
+ */
+function useBarVisibility(immersive: boolean, screen: Screen): boolean {
+  const [revealed, setRevealed] = useState(false);
+  const [seen, setSeen] = useState({ immersive, screen });
+  const lastY = useRef(0);
+
+  // Derived during render (no setState in effects): entering immersive mode
+  // hides the bar again; changing screen while immersive brings it back.
+  if (seen.immersive !== immersive || seen.screen !== screen) {
+    setSeen({ immersive, screen });
+    setRevealed(seen.immersive === immersive && immersive);
+  }
+
+  useEffect(() => {
+    if (!immersive || revealed) return;
+    lastY.current = globalThis.scrollY ?? 0;
+    const onScroll = () => {
+      const y = globalThis.scrollY ?? 0;
+      if (y > lastY.current + 24) setRevealed(true);
+      lastY.current = y;
+    };
+    globalThis.addEventListener('scroll', onScroll, { passive: true });
+    return () => globalThis.removeEventListener('scroll', onScroll);
+  }, [immersive, revealed]);
+
+  return !immersive || revealed;
 }
 
 export function PwaRuntime() {
@@ -250,6 +240,7 @@ function DesktopSidebar({
   screen: Screen;
   navigate(value: Screen): void;
 }) {
+  const badges = menuBadges(career);
   return (
     <aside className="sticky top-0 hidden h-dvh border-r-4 border-ink bg-board p-4 text-chalk lg:flex lg:flex-col">
       <Brand />
@@ -263,48 +254,40 @@ function DesktopSidebar({
         aria-label="Navegação principal desktop"
         className="mt-7 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
       >
-        {mainDestinations.map(([id, label, Icon]) => (
-          <Button
-            key={id}
-            variant={screen === id ? 'outline' : 'ghost'}
-            className="min-h-10 justify-start text-[.6rem]"
-            aria-current={screen === id ? 'page' : undefined}
-            onClick={() => navigate(id)}
+        {menuGroups.map((group) => (
+          <section
+            key={group.id}
+            aria-labelledby={`desktop-${group.id}`}
+            className="mb-3 flex flex-col gap-1"
           >
-            <Icon
-              data-icon="inline-start"
-              weight={screen === id ? 'fill' : 'regular'}
-            />
-            {label}
-          </Button>
-        ))}
-        <p
-          id="mais-areas-desktop"
-          className="mt-4 px-3 font-pixel text-[.5rem] text-chalk/70"
-        >
-          Mais áreas
-        </p>
-        <ul
-          aria-labelledby="mais-areas-desktop"
-          className="flex flex-col gap-1"
-        >
-          {moreDestinations.map(([id, label, Icon]) => (
-            <li key={id}>
+            <p
+              id={`desktop-${group.id}`}
+              className="px-3 pb-1 font-pixel text-[.5rem] text-bulb"
+            >
+              {group.label}
+            </p>
+            {group.items.map(([id, label, Icon]) => (
               <Button
+                key={id}
                 variant={screen === id ? 'outline' : 'ghost'}
-                className="min-h-9 w-full justify-start text-[.55rem] text-chalk/80"
+                className="min-h-10 justify-between text-[.6rem]"
                 aria-current={screen === id ? 'page' : undefined}
                 onClick={() => navigate(id)}
               >
-                <Icon
-                  data-icon="inline-start"
-                  weight={screen === id ? 'fill' : 'regular'}
-                />
-                {label}
+                <span className="flex items-center gap-2">
+                  <Icon data-icon="inline-start" weight="fill" />
+                  {label}
+                </span>
+                {badges[id] && (
+                  <>
+                    <span className="sr-only">({badges[id]})</span>
+                    <Badge aria-hidden="true">{badges[id]}</Badge>
+                  </>
+                )}
               </Button>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </section>
+        ))}
       </nav>
       <Separator className="my-4" />
       <div className="flex min-w-0 items-center gap-3">
@@ -389,79 +372,77 @@ function DesktopRail({
 
 function MobileNavigation({
   screen,
+  career,
   open,
   setOpen,
   navigate,
-  hidden = false,
+  triggerRef,
 }: {
   screen: Screen;
+  career: CareerView;
   open: boolean;
   setOpen(value: boolean): void;
   navigate(value: Screen): void;
-  hidden?: boolean;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) {
-  if (hidden) return null;
+  const badges = menuBadges(career);
+  const pending = Object.keys(badges).filter(
+    (id) => !barDestinations.some(([bar]) => bar === id),
+  ).length;
+  const itemClass =
+    'relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-0.5 font-pixel text-[.45rem] leading-none';
   return (
-    <>
-      {open && (
-        <div className="panel px-rise fixed inset-x-3 bottom-24 z-40 p-3 lg:hidden">
-          <div className="mb-2 flex items-center justify-between px-2">
-            <p className="font-pixel text-[.6rem]">Todas as áreas</p>
-            <Badge variant="secondary">{destinations.length} destinos</Badge>
-          </div>
-          <nav
-            aria-label="Mais áreas"
-            className="grid max-h-[60dvh] grid-cols-2 gap-1 overflow-y-auto sm:grid-cols-3"
-          >
-            {destinations.map(([id, label, Icon]) => (
-              <Button
-                key={id}
-                variant={screen === id ? 'outline' : 'ghost'}
-                className="min-h-11 justify-start text-[.55rem]"
-                aria-current={screen === id ? 'page' : undefined}
-                onClick={() => navigate(id)}
-              >
-                <Icon data-icon="inline-start" />
-                {label}
-              </Button>
-            ))}
-          </nav>
-        </div>
-      )}
-      <nav
-        aria-label="Navegação principal mobile"
-        className="panel-wood fixed inset-x-3 bottom-[max(.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 gap-1 px-1.5 py-1.5 lg:hidden"
-      >
-        {primaryMobile.map(([id, label, Icon]) => (
-          <button
-            key={id}
-            aria-current={screen === id ? 'page' : undefined}
-            className={cn(
-              'flex min-h-14 flex-col items-center justify-center gap-1 px-1 font-pixel text-[.45rem]',
-              screen === id ? 'bg-board text-bulb' : 'text-chalk',
-            )}
-            onClick={() => navigate(id)}
-          >
-            <Icon
-              className="size-5"
-              weight={screen === id ? 'fill' : 'regular'}
-            />
-            {label}
-          </button>
-        ))}
+    <nav
+      aria-label="Navegação principal mobile"
+      className="panel-wood px-rise fixed inset-x-3 bottom-[max(.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 gap-1 px-1.5 py-1.5 lg:hidden"
+    >
+      {barDestinations.map(([id, label, Icon]) => (
         <button
-          aria-expanded={open}
+          key={id}
+          type="button"
+          aria-current={screen === id ? 'page' : undefined}
           className={cn(
-            'flex min-h-14 flex-col items-center justify-center gap-1 px-1 font-pixel text-[.45rem]',
-            open ? 'bg-board text-bulb' : 'text-chalk',
+            itemClass,
+            screen === id ? 'bg-board text-bulb' : 'text-chalk',
           )}
-          onClick={() => setOpen(!open)}
+          onClick={() => navigate(id)}
         >
-          <DotsThree className="size-5" weight="bold" />
-          Menu
+          <Icon
+            className="size-6 drop-shadow-[0_2px_0_rgb(0_0_0/0.45)]"
+            weight="fill"
+            aria-hidden="true"
+          />
+          {label}
+          {badges[id] && (
+            <span
+              aria-hidden="true"
+              className="absolute top-1 right-1 size-2 rounded-full bg-bulb"
+            />
+          )}
         </button>
-      </nav>
-    </>
+      ))}
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={cn(itemClass, open ? 'bg-board text-bulb' : 'text-chalk')}
+        onClick={() => setOpen(!open)}
+      >
+        <DotsThreeOutline
+          className="size-6 drop-shadow-[0_2px_0_rgb(0_0_0/0.45)]"
+          weight="fill"
+          aria-hidden="true"
+        />
+        Menu
+        {pending > 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute top-1 right-1 size-2 rounded-full bg-bulb"
+          />
+        )}
+      </button>
+    </nav>
   );
 }
 

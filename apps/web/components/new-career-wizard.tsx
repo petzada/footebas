@@ -27,6 +27,9 @@ import { Progress } from '@/components/ui/progress';
 import {
   POSITION_GROUP_LABEL,
   clubPreviews,
+  DIVISION_LABEL,
+  FREE_PLAN_DIVISION,
+  type ClubDivision,
   positionLabel,
   type ClubPreview,
 } from '@/lib/club-preview';
@@ -73,6 +76,7 @@ type Errors = Partial<
  */
 export function NewCareerWizard({
   clubs = clubPreviews(),
+  anyClub = true,
   initialCoach = '',
   pending = false,
   error = '',
@@ -81,6 +85,8 @@ export function NewCareerWizard({
   onSignOut,
 }: {
   clubs?: readonly ClubPreview[];
+  /** License: any club; free plan only Série C (docs/05 §5). */
+  anyClub?: boolean;
   initialCoach?: string;
   pending?: boolean;
   /** Refusal from the server (shown on the last step). */
@@ -249,6 +255,7 @@ export function NewCareerWizard({
             {current.id === 'club' && (
               <ClubStep
                 clubs={clubs}
+                anyClub={anyClub}
                 value={club}
                 error={errors.club}
                 onChange={(value) => {
@@ -464,58 +471,135 @@ function UniverseStep() {
   );
 }
 
+const DIVISIONS: readonly ClubDivision[] = ['serie-a', 'serie-b', 'serie-c'];
+
 function ClubStep({
   clubs,
+  anyClub,
   value,
   error,
   onChange,
 }: {
   clubs: readonly ClubPreview[];
+  anyClub: boolean;
   value: string;
   error: string | undefined;
   onChange(value: string): void;
 }) {
   const errorId = useId();
+  const lockId = useId();
+  const searchId = useId();
   const selected = clubs.find((item) => item.name === value);
+  const [division, setDivision] = useState<ClubDivision>(
+    selected?.division ?? (anyClub ? 'serie-a' : FREE_PLAN_DIVISION),
+  );
+  const [query, setQuery] = useState('');
+  const normalize = (text: string) =>
+    text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const visible = useMemo(() => {
+    const needle = normalize(query.trim());
+    return clubs.filter((item) =>
+      needle
+        ? normalize(`${item.name} ${item.note}`).includes(needle)
+        : item.division === division,
+    );
+  }, [clubs, division, query]);
+  const locked = (item: ClubPreview) =>
+    !anyClub && item.division !== FREE_PLAN_DIVISION;
   return (
     <div className="grid gap-4">
+      <div className="grid gap-3">
+        <div role="group" aria-label="Série" className="grid grid-cols-3 gap-2">
+          {DIVISIONS.map((item) => {
+            const count = clubs.filter((club) => club.division === item).length;
+            return (
+              <Button
+                key={item}
+                type="button"
+                variant={division === item && !query ? 'default' : 'outline'}
+                aria-pressed={division === item && !query}
+                className="min-h-11"
+                onClick={() => {
+                  setQuery('');
+                  setDivision(item);
+                }}
+              >
+                {DIVISION_LABEL[item]}
+                <span className="sr-only"> ({count} clubes)</span>
+              </Button>
+            );
+          })}
+        </div>
+        <label htmlFor={searchId} className="sr-only">
+          Buscar clube
+        </label>
+        <Input
+          id={searchId}
+          type="search"
+          value={query}
+          placeholder="Buscar clube ou cidade"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        {!anyClub && (
+          <p id={lockId} className="text-sm text-muted-foreground">
+            No plano grátis a carreira começa de baixo, na Série C. Com a
+            licença você escolhe qualquer clube.
+          </p>
+        )}
+      </div>
       <fieldset
-        className="grid gap-3 sm:grid-cols-3"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
         {...(error ? { 'aria-describedby': errorId } : {})}
       >
         <legend className="mb-2 text-sm text-muted-foreground">
-          Os emblemas são genéricos, gerados pelo jogo. A força vem do catálogo
-          da temporada.
+          {query
+            ? `${visible.length} clube(s) encontrado(s)`
+            : `${DIVISION_LABEL[division]}: ${visible.length} clubes`}
         </legend>
-        {clubs.map((item) => (
-          <OptionCard
-            key={item.name}
-            name="clube"
-            value={item.name}
-            checked={value === item.name}
-            onChange={() => onChange(item.name)}
-            className="text-center"
-          >
-            <span className="flex flex-col items-center gap-2 pt-1">
-              <ClubEmblem name={item.name} size={72} decorative />
-              <strong className="font-pixel text-[.65rem] leading-relaxed">
-                {item.name}
-              </strong>
-            </span>
-            <span className="text-xs text-muted-foreground">{item.note}</span>
-            <span className="mx-auto mt-1 flex items-center gap-2 bg-board px-2 py-1 font-pixel text-[.55rem] text-chalk">
-              <span className="sr-only">Força </span>
-              <span className="led text-sm" aria-hidden="true">
-                {item.strength}
+        {visible.map((item) => {
+          const blocked = locked(item);
+          return (
+            <OptionCard
+              key={item.id}
+              name="clube"
+              value={item.name}
+              checked={value === item.name}
+              disabled={blocked}
+              {...(blocked ? { describedBy: lockId } : {})}
+              onChange={() => onChange(item.name)}
+              className="min-w-0 text-center"
+            >
+              <span className="flex flex-col items-center gap-2 pt-1">
+                <ClubEmblem
+                  name={item.name}
+                  id={item.id}
+                  size={64}
+                  decorative
+                />
+                <strong className="font-pixel text-[.6rem] leading-relaxed break-words">
+                  {item.name}
+                </strong>
               </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                <span className="sr-only">{item.strength} · </span>
-                {item.squadSize} atletas
+              <span className="text-xs text-muted-foreground">{item.note}</span>
+              <span className="mx-auto mt-1 flex items-center gap-2 bg-board px-2 py-1 font-pixel text-[.55rem] text-chalk">
+                <span className="sr-only">Força </span>
+                <span className="led text-sm" aria-hidden="true">
+                  {item.strength}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  <span className="sr-only">{item.strength} · </span>
+                  {item.squadSize} atletas
+                </span>
               </span>
-            </span>
-          </OptionCard>
-        ))}
+              {blocked && (
+                <span className="mx-auto mt-1 bg-bulb px-2 py-0.5 font-pixel text-[.5rem] text-bulb-foreground">
+                  Licença
+                </span>
+              )}
+            </OptionCard>
+          );
+        })}
       </fieldset>
       {error && <FieldError id={errorId} message={error} />}
       {selected && <SquadPreview club={selected} />}

@@ -118,7 +118,7 @@ interface CareerListModel {
     updatedAt?: string;
   }[];
   /** Plan limit (docs/09 decision 5). */
-  limits?: { maxCareers: number; activeCareers?: number };
+  limits?: { maxCareers: number; activeCareers?: number; anyClub?: boolean };
 }
 
 // --- transport shapes (subset of @footebas/contracts read models) ---
@@ -844,7 +844,14 @@ export class HttpCareerApi implements CareerApiPort {
         ...(item.currentDate ? { currentDate: item.currentDate } : {}),
         ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
       })),
-      ...(list.limits === undefined ? {} : { limit: list.limits.maxCareers }),
+      ...(list.limits === undefined
+        ? {}
+        : {
+            limit: list.limits.maxCareers,
+            ...(list.limits.anyClub === undefined
+              ? {}
+              : { anyClub: list.limits.anyClub }),
+          }),
     };
   }
 
@@ -1397,7 +1404,7 @@ export class HttpCareerApi implements CareerApiPort {
       },
       leaderboards: { global: [], underdog: [], monthly: [] },
       archive: {
-        saveVersion: 'game-save-v2',
+        saveVersion: 'game-save-v3',
         migrationStatus: 'atualizado',
         archiveStatus: 'sem compactação pendente',
         lastCompaction: '—',
@@ -2089,6 +2096,25 @@ export class HttpCareerApi implements CareerApiPort {
       tier: input.tier,
     });
     return this.getOffice();
+  }
+
+  // --- generic access for product ports (season, ranking, inbox, account) --
+  /** Authenticated JSON call to any API path (used by the product ports). */
+  public async call<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    return this.#request<T>(method, path, body);
+  }
+
+  /** Sends a career command (`/v1/commands`) with `careerId` filled in. */
+  public async command(
+    type: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    if (!this.#careerId) await this.getCareer();
+    await this.#command(type, { careerId: this.#career(), ...payload });
   }
 }
 

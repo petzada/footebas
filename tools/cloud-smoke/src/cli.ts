@@ -46,5 +46,6 @@ const result = await runSmoke({
   jobTimeoutMs: positive('JOB_TIMEOUT_MS', 120_000),
   jobPollMs: positive('JOB_POLL_MS', 1_000),
   requestTimeoutMs: positive('REQUEST_TIMEOUT_MS', 30_000),
+  commandP95Ms: positive('SMOKE_P95_MS', 800),
 });
 process.exitCode = result.ok ? 0 : 1;

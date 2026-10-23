@@ -16,6 +16,7 @@ import {
   resolveInboxDecision,
   type CareerSnapshot,
   type InboxVoiceKey,
+  careerSaveRepository,
 } from './index.js';
 
 type Personality = CareerSnapshot['coach']['personality'];
@@ -102,7 +103,9 @@ async function playMatch(
 }
 
 async function stored(unitOfWork: InMemoryUnitOfWork, careerId: string) {
-  const save = (await unitOfWork.repositories().saves.peek(careerId))!;
+  const save = (await careerSaveRepository(
+    unitOfWork.repositories().saves,
+  ).peek(careerId))!;
   return { save, snapshot: save.snapshot as unknown as CareerSnapshot };
 }
 
@@ -389,7 +392,9 @@ describe('caixa de entrada com decisões', () => {
     const { app, token, unitOfWork } = setup();
     const careerId = await start(app, token);
     await playMatch(app, token, careerId);
-    const repos = unitOfWork.repositories();
+    const repos = {
+      saves: careerSaveRepository(unitOfWork.repositories().saves),
+    };
     const save = (await repos.saves.peek(careerId))!;
     const legacy = structuredClone(save.snapshot) as Record<string, unknown>;
     delete legacy.inbox;

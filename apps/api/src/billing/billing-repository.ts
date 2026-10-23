@@ -17,6 +17,8 @@ export interface Order {
   readonly brCode?: string;
   readonly qrCodeImage?: string;
   readonly paymentLinkUrl?: string;
+  /** Provider's own charge id (AbacatePay `pix_char_…`). */
+  readonly providerChargeId?: string;
   readonly expiresAt?: string;
   readonly paidAt?: string;
   readonly pixEndToEndId?: string;
@@ -46,6 +48,7 @@ export interface NewOrder {
 }
 
 export interface ChargeAttachment {
+  readonly providerChargeId?: string;
   readonly brCode?: string;
   readonly qrCodeImage?: string;
   readonly paymentLinkUrl?: string;

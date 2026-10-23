@@ -21,15 +21,28 @@ que não depende destes itens; cada item diz o que destrava.
 
 ## Pagamento
 
-6. **Woovi sandbox e produção.** Fornecer `WOOVI_APP_ID` e o segredo de webhook (via `wrangler secret put`, nunca no
-   repositório) e cadastrar a URL do webhook no painel Woovi; realizar o primeiro pagamento e reembolso PIX reais.
+6. **AbacatePay (PIX da licença, ADR 0016).**
+   - Gravar os segredos sem colar no chat:
+     `pnpm --filter @footebas/api exec wrangler secret put ABACATEPAY_API_KEY` e
+     `pnpm --filter @footebas/api exec wrangler secret put ABACATEPAY_WEBHOOK_SECRET` (uma frase longa e aleatória).
+   - A chave precisa das permissões `TRANSPARENT:CREATE`, `TRANSPARENT:READ` e `REFUND:CREATE`.
+   - No painel da AbacatePay, criar o webhook com endpoint `https://api.footebas.com.br/v1/billing/webhook`, o mesmo
+     secret do passo anterior e os eventos `transparent.completed` e `transparent.refunded`.
+   - Testar em modo dev (pagamento simulado e reembolso) e, com a conta de produção aprovada (CNPJ), trocar a chave.
 
 ## Qualidade, jurídico e lançamento
 
-7. **Modelo 3D do estádio** (`football-field`, `football-court`): confirmar a origem e a licença de uso comercial (e
+7. **Escudos dos clubes** (`apps/web/public/crests`, recortados das folhas em `public/images`): são marcas registradas;
+   decidir com revisão jurídica se ficam no lançamento público ou voltam ao emblema genérico.
+8. **Modelo 3D do estádio** (`football-field`, `football-court`): confirmar a origem e a licença de uso comercial (e
    se exige crédito ao autor) antes do lançamento.
-8. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
-9. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
-   tributação da licença.
-10. Beta fechada com 3–5 pessoas e aceite qualitativo do loop.
-11. Aceite humano final.
+9. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
+10. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
+    tributação da licença.
+    - **Preencher os marcadores `[preencher]`** das páginas públicas `/termos` e `/privacidade`
+      (`apps/web/components/legal-page.tsx`, constante `LEGAL_PLACEHOLDER`): razão social, CNPJ, endereço, e-mail
+      de contato, encarregado de dados (DPO) e data da última atualização. Depois da revisão jurídica, remover o
+      selo "versão preliminar — sujeita a revisão jurídica" (`LEGAL_DRAFT_NOTICE`) e confirmar os prazos de
+      retenção declarados (registros técnicos 90 dias, fiscais 5 anos) com quem opera a infraestrutura.
+11. Beta fechada com 3–5 pessoas e aceite qualitativo do loop.
+12. Aceite humano final.

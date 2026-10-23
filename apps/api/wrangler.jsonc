@@ -12,11 +12,14 @@
   // Exposes the deployed version id in GET /health.
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
   // Secrets (never in the repo), via `wrangler secret put`: SMOKE_TOKEN,
-  // WOOVI_APP_ID and, optionally, WOOVI_WEBHOOK_SECRET (see src/billing/README.md).
+  // ABACATEPAY_API_KEY and ABACATEPAY_WEBHOOK_SECRET (PIX via AbacatePay, ADR
+  // 0016; see src/billing/README.md). Woovi secrets only if PAYMENT_PROVIDER=woovi.
   "vars": {
     "SUPABASE_URL": "https://wjisqiiwsuykfbmqglfb.supabase.co",
     "CORS_ORIGINS": "https://footebas.com.br,https://www.footebas.com.br,http://localhost:3000",
-    // Woovi sandbox until launch; production is https://api.woovi.com.
+    // AbacatePay: the API key decides dev mode vs production (same URL).
+    "PAYMENT_PROVIDER": "abacatepay",
+    // Fallback provider (PAYMENT_PROVIDER=woovi): sandbox until launch.
     "WOOVI_API_URL": "https://api.woovi-sandbox.com",
     "LICENSE_PRICE_CENTS": "4990",
     "LICENSE_CHARGE_EXPIRES_IN": "3600",
@@ -52,6 +55,17 @@
       "namespace_id": "1003",
       "simple": { "limit": 120, "period": 60 },
     },
+  ],
+  // Career Durable Objects (ADR 0014): one SQLite-backed object per career
+  // keeps the hydrated aggregate in memory, serializes its commands, stores
+  // idempotency receipts and writes each change to Postgres (game_saves).
+  // Without this binding the Worker falls back to Postgres directly.
+  "durable_objects": {
+    "bindings": [{ "name": "CAREERS", "class_name": "CareerDurableObject" }],
+  },
+  // Durable Object migrations are append-only: never edit or reorder a tag.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CareerDurableObject"] },
   ],
   // Ranking snapshots (ADR 0013): the `scheduled` handler of src/worker.ts
   // aggregates validated achievements into footebas.ranking_snapshots.

@@ -70,6 +70,34 @@ na zona (Rules → Redirect Rules): quando `http.host eq "www.footebas.com.br"`,
    `"routes": [{ "pattern": "api.footebas.com.br", "custom_domain": true }]` (removido enquanto a zona não estava ativa).
 4. Deploy: `pnpm exec wrangler deploy --config apps/api/wrangler.jsonc`.
 
+### Durable Object por carreira e save enxuto (ADR 0014)
+
+O que muda no deploy da API:
+
+- **Classe nova `CareerDurableObject`** (exportada por `apps/api/src/worker.ts`), com binding `CAREERS` em
+  `durable_objects.bindings` e a migração `{ "tag": "v1", "new_sqlite_classes": ["CareerDurableObject"] }` em
+  `apps/api/wrangler.jsonc`. O primeiro `wrangler deploy` aplica a migração e cria o namespace (SQLite); não há
+  comando separado. Migrações de Durable Object são só de acréscimo: nunca edite, remova ou reordene a tag `v1`;
+  renomear ou apagar a classe exige uma tag nova (`renamed_classes`/`deleted_classes`).
+- Validar a configuração sem publicar: `pnpm exec wrangler deploy --dry-run --config apps/api/wrangler.jsonc`
+  (deve listar `env.CAREERS (CareerDurableObject)` entre os bindings).
+- **Roteamento:** com o binding, o Worker (depois do rate limiting) encaminha ao objeto da carreira as leituras
+  `/v1/careers/:id/*` (inclusive `bundle` e `match-preview`), os comandos de `POST /v1/commands` (todos menos
+  `CreateCareer`), `/v1/phase-four/*` e os jobs da fila. Lista de carreiras, status de job, ranking, contadores e
+  billing continuam lendo o Postgres. O dono é checado dentro do objeto (403 para outro usuário).
+- **Persistência:** cada comando que muda estado grava o save no Postgres (`footebas.game_saves`, um `update`
+  condicional e idempotente; conquistas na mesma transação) e depois no storage do objeto, antes de responder. Por
+  isso o Postgres segue sempre atual e o rollback é simples.
+- **Rollback / desligar:** remover o bloco `durable_objects` (mantendo `migrations`) e publicar faz o Worker voltar
+  ao caminho direto no Postgres, sem perda de dados. Os recibos de idempotência guardados nos objetos não valem no
+  caminho direto (um retry de comando antigo seria reexecutado e recusado por versão).
+- **Saves:** o formato passa a ser `game-save-v3` (delta sobre o catálogo, comprimido; ~80 KB depois de uma
+  temporada contra ~2,5 MB no v2). Saves `game-save-v2` são migrados ao carregar e regravados enxutos no próximo
+  comando; não há migração SQL. Mudar o catálogo (`careerContentFromCatalog` ou `@footebas/content`) sem trocar
+  a versão de conteúdo faz os saves v3 serem recusados (`VERSION_CONFLICT`), por proteção.
+- **Fumaça:** `pnpm smoke:cloud` passa a recarregar pelo `bundle` e falha se o p95 dos comandos passar de
+  `SMOKE_P95_MS` (padrão 800 ms).
+
 ## Checagem pós-deploy
 
 ```sh

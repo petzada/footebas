@@ -1,10 +1,11 @@
 import { useId } from 'react';
+import { crestFor } from '@/lib/club-crests';
 import { cn } from '@/lib/utils';
 
 /**
- * Generic club emblem drawn by the game. No real crest or logo is ever used:
- * shape, pattern, colors and initials derive from a stable hash of the club
- * id (or name) unless the catalog supplies colors.
+ * Club emblem: the pixel crest when the club has one (`lib/club-crests.ts`),
+ * otherwise a generic emblem whose shape, pattern, colors and initials derive
+ * from a stable hash of the club id (or name) unless the catalog supplies colors.
  */
 export interface EmblemInput {
   readonly name: string;
@@ -189,6 +190,28 @@ export function ClubEmblem({
   decorative?: boolean;
 }) {
   const clip = useId();
+  const crest = crestFor(name, id);
+  if (crest)
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- tiny pixel PNG, no optimizer needed
+      <img
+        src={crest}
+        width={size}
+        height={size}
+        alt={decorative ? '' : `Escudo do ${name}`}
+        {...(decorative ? { 'aria-hidden': true } : {})}
+        draggable={false}
+        style={{
+          width: size,
+          height: size,
+          objectFit: 'contain',
+          imageRendering: 'pixelated',
+        }}
+        className={cn('shrink-0', className)}
+        data-testid="club-emblem"
+        data-crest="pixel"
+      />
+    );
   const spec = emblemSpec({
     name,
     ...(id === undefined ? {} : { id }),

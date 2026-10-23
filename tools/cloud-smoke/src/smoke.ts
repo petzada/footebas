@@ -10,11 +10,13 @@ export type AuthMode =
 export interface SmokeOptions {
   readonly apiUrl: string;
   readonly auth: AuthMode;
-  /** Club the smoke manager takes over (stable id, e.g. club_flamengo). */
+  /** Club the smoke manager takes over (stable id, e.g. club_brusque; free plan starts in Série C). */
   readonly clubId?: string;
   readonly jobTimeoutMs?: number;
   readonly jobPollMs?: number;
   readonly requestTimeoutMs?: number;
+  /** Commands fail the smoke when their p95 latency exceeds this (ADR 0014). */
+  readonly commandP95Ms?: number;
   readonly fetch?: typeof fetch;
   readonly log?: (line: string) => void;
   readonly sleep?: (ms: number) => Promise<void>;
@@ -26,6 +28,8 @@ export interface SmokeResult {
   readonly careerId?: string;
   readonly failedStep?: string;
   readonly error?: string;
+  /** p95 of the command round trips, in milliseconds. */
+  readonly commandP95Ms?: number;
 }
 
 // --- transport shapes (subset of @footebas/contracts) -----------------------
@@ -86,6 +90,15 @@ interface JobStatus {
   progress: { percent: number; stage: string };
   errorCode?: string;
 }
+interface Bundle {
+  aggregateVersion: number;
+  contentVersion: string;
+  home: Home;
+  squad?: { club: { id: string }; players: unknown[] };
+  nextMatch?: NextMatch;
+  standings?: Standings;
+  inbox: unknown[];
+}
 interface CareerList {
   careers: {
     careerId: string;
@@ -106,6 +119,16 @@ function check(condition: boolean, message: string): asserts condition {
   if (!condition) throw new SmokeFailure(message);
 }
 
+/** Nearest-rank percentile of a non-empty sample. */
+export function percentile(values: readonly number[], rank: number): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil((rank / 100) * sorted.length) - 1),
+  );
+  return sorted[index] ?? 0;
+}
+
 function runId(now: number): string {
   return `${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`
     .toLowerCase()
@@ -121,10 +144,12 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const now = options.now ?? Date.now;
   const base = options.apiUrl.replace(/\/+$/, '');
-  const clubId = options.clubId ?? 'club_flamengo';
+  const clubId = options.clubId ?? 'club_brusque';
   const jobTimeoutMs = options.jobTimeoutMs ?? 120_000;
   const jobPollMs = options.jobPollMs ?? 1_000;
   const requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
+  const commandP95Ms = options.commandP95Ms ?? 800;
+  const latencies: { type: string; ms: number }[] = [];
   const run = runId(now());
   let bearer: string | undefined;
   let careerId: string | undefined;
@@ -137,7 +162,7 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
     path: string,
     body?: unknown,
     extra: Record<string, string> = {},
-  ): Promise<{ status: number; body: unknown }> {
+  ): Promise<{ status: number; body: unknown; headers: Headers }> {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
@@ -163,7 +188,11 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
           `${method} ${path} devolveu ${String(response.status)} sem JSON: ${text.slice(0, 200)}`,
         );
       }
-      return { status: response.status, body: payload };
+      return {
+        status: response.status,
+        body: payload,
+        headers: response.headers,
+      };
     } catch (error) {
       if (error instanceof SmokeFailure) throw error;
       const reason = controller.signal.aborted
@@ -194,24 +223,34 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
     return response.body as T;
   }
 
+  /** Sends a command and records its round trip for the p95 check. */
+  async function timed<T>(type: string, send: () => Promise<T>): Promise<T> {
+    const started = now();
+    const value = await send();
+    latencies.push({ type, ms: now() - started });
+    return value;
+  }
+
   async function command(
     type: string,
     payload: Record<string, unknown>,
   ): Promise<Accepted> {
     sequence += 1;
     const idempotencyKey = `smoke:${run}:${String(sequence)}:${type}`;
-    const accepted = await ok<Accepted>(
-      'POST',
-      '/v1/commands',
-      {
-        version: 1,
-        commandId: `command_smoke_${run}_${String(sequence)}`,
-        idempotencyKey,
-        expectedVersion: version,
-        type,
-        payload,
-      },
-      { 'idempotency-key': idempotencyKey },
+    const accepted = await timed(type, () =>
+      ok<Accepted>(
+        'POST',
+        '/v1/commands',
+        {
+          version: 1,
+          commandId: `command_smoke_${run}_${String(sequence)}`,
+          idempotencyKey,
+          expectedVersion: version,
+          type,
+          payload,
+        },
+        { 'idempotency-key': idempotencyKey },
+      ),
     );
     check(
       accepted.aggregateVersion === version + 1,
@@ -225,18 +264,20 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
   async function deleteCareer(id: string, at: number): Promise<void> {
     sequence += 1;
     const idempotencyKey = `smoke:${run}:${String(sequence)}:DeleteCareer`;
-    await ok<Accepted>(
-      'POST',
-      '/v1/commands',
-      {
-        version: 1,
-        commandId: `command_smoke_${run}_${String(sequence)}`,
-        idempotencyKey,
-        expectedVersion: at,
-        type: 'DeleteCareer',
-        payload: { careerId: id },
-      },
-      { 'idempotency-key': idempotencyKey },
+    await timed('DeleteCareer', () =>
+      ok<Accepted>(
+        'POST',
+        '/v1/commands',
+        {
+          version: 1,
+          commandId: `command_smoke_${run}_${String(sequence)}`,
+          idempotencyKey,
+          expectedVersion: at,
+          type: 'DeleteCareer',
+          payload: { careerId: id },
+        },
+        { 'idempotency-key': idempotencyKey },
+      ),
     );
   }
 
@@ -375,56 +416,68 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
       }
     });
 
-    await stage('recarregar carreira', async () => {
+    await stage('recarregar carreira (bundle)', async () => {
       const id = career();
-      const home = await ok<Home>('GET', `/v1/careers/${id}/home`);
+      // One read for the whole Central (ADR 0014), revalidated by ETag.
+      const loaded = await request('GET', `/v1/careers/${id}/bundle`);
+      check(
+        loaded.status === 200,
+        `GET /v1/careers/${id}/bundle → HTTP ${String(loaded.status)}`,
+      );
+      const bundle = loaded.body as Bundle;
+      const { home } = bundle;
       check(
         !home.pendingActions.includes('simulation_pending'),
         'a carreira ainda tem simulação pendente',
       );
       // The job persists the result as exactly one more save version.
       check(
-        home.aggregateVersion === version + 1,
-        `versão após o job: ${String(home.aggregateVersion)}, esperada ${String(version + 1)}`,
+        bundle.aggregateVersion === version + 1 &&
+          home.aggregateVersion === bundle.aggregateVersion,
+        `versão após o job: ${String(bundle.aggregateVersion)}, esperada ${String(version + 1)}`,
       );
-      version = home.aggregateVersion;
+      version = bundle.aggregateVersion;
       check(
         home.currentDate >= fixture.date,
         `data ${home.currentDate} não chegou ao jogo de ${fixture.date}`,
       );
-      const [post, standings, squad] = await Promise.all([
-        ok<PostMatch>('GET', `/v1/careers/${id}/post-match`),
-        ok<Standings>('GET', `/v1/careers/${id}/standings`),
-        ok<Squad>('GET', `/v1/careers/${id}/squad`),
-      ]);
-      check(
-        post.fixtureId === fixture.fixtureId,
-        `pós-jogo é de ${post.fixtureId}, esperado ${fixture.fixtureId}`,
-      );
+      check(bundle.squad?.club.id === clubId, 'bundle sem o elenco do clube');
+      const standings = bundle.standings;
+      check(standings !== undefined, 'bundle sem classificação');
       const row = standings.rows.find(({ club }) => club.id === clubId);
       check(row !== undefined, 'clube ausente da classificação');
       // The first fixture may belong to a cup or state league; the league
       // table only has to count it when it was a league match.
       if (standings.competition === fixture.competition)
         check(row.played >= 1, 'a classificação não registrou o jogo');
-      for (const [name, read] of [
-        ['pós-jogo', post.aggregateVersion],
-        ['classificação', standings.aggregateVersion],
-        ['elenco', squad.aggregateVersion],
-      ] as const)
-        check(
-          read === version,
-          `${name} na versão ${String(read)}, home na ${String(version)}`,
-        );
-      const next = await request('GET', `/v1/careers/${id}/next-match`);
-      if (next.status === 200) {
-        const upcoming = next.body as NextMatch;
+      const etag = loaded.headers.get('etag');
+      check(etag !== null, 'bundle sem ETag');
+      const revalidated = await request(
+        'GET',
+        `/v1/careers/${id}/bundle`,
+        undefined,
+        { 'if-none-match': etag },
+      );
+      check(
+        revalidated.status === 304,
+        `revalidação com If-None-Match → HTTP ${String(revalidated.status)}, esperado 304`,
+      );
+      const post = await ok<PostMatch>('GET', `/v1/careers/${id}/post-match`);
+      check(
+        post.fixtureId === fixture.fixtureId,
+        `pós-jogo é de ${post.fixtureId}, esperado ${fixture.fixtureId}`,
+      );
+      check(
+        post.aggregateVersion === version,
+        `pós-jogo na versão ${String(post.aggregateVersion)}, bundle na ${String(version)}`,
+      );
+      const upcoming = bundle.nextMatch;
+      if (upcoming !== undefined)
         check(
           upcoming.fixtureId !== fixture.fixtureId &&
             upcoming.date >= fixture.date,
           'o próximo jogo não avançou',
         );
-      }
       log(
         `       ${post.homeClub.name} ${String(post.score.home)} x ${String(post.score.away)} ${post.awayClub.name}; ${standings.competition}: ${String(row.position)}º com ${String(row.played)} jogo(s); versão ${String(version)}`,
       );
@@ -467,8 +520,25 @@ export async function runSmoke(options: SmokeOptions): Promise<SmokeResult> {
       );
     });
 
+    const p95 = await stage('latência dos comandos', () => {
+      const sample = latencies.map(({ ms }) => ms);
+      check(sample.length > 0, 'nenhum comando medido');
+      const value = percentile(sample, 95);
+      log(
+        `       ${String(sample.length)} comandos: p50 ${String(percentile(sample, 50))} ms, p95 ${String(value)} ms (limite ${String(commandP95Ms)} ms)`,
+      );
+      log(
+        `       ${latencies.map(({ type, ms }) => `${type} ${String(ms)} ms`).join(', ')}`,
+      );
+      check(
+        value <= commandP95Ms,
+        `p95 dos comandos ${String(value)} ms passou do limite de ${String(commandP95Ms)} ms`,
+      );
+      return Promise.resolve(value);
+    });
+
     log(`Fumaça OK: carreira ${career()} na versão ${String(version)}.`);
-    return { ok: true, careerId: career() };
+    return { ok: true, careerId: career(), commandP95Ms: p95 };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log(`  [falha] ${step}: ${message}`);

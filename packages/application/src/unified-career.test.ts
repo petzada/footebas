@@ -13,6 +13,7 @@ import {
   PhaseFourApplicationService,
   SequentialIdGenerator,
   UnifiedPhaseFourRepository,
+  storedSize,
 } from './index.js';
 
 function setup() {
@@ -41,7 +42,7 @@ function setup() {
     email: 'owner@example.com',
     displayName: 'Owner',
   });
-  return { app, world, token };
+  return { app, world, token, unitOfWork };
 }
 
 const command = (
@@ -187,7 +188,7 @@ describe('carreira única: mundo, competições e partida no mesmo save', () => 
     'fecha a temporada com prêmios, história, diretoria e elencos jogáveis',
     { timeout: 300_000 },
     async () => {
-      const { app, token } = setup();
+      const { app, token, unitOfWork } = setup();
       const careerId = await start(app, token);
       for (let step = 0; step < 200; step++) {
         if ((await app.home(token, careerId)).season === 2) break;
@@ -209,6 +210,9 @@ describe('carreira única: mundo, competições e partida no mesmo save', () => 
       ).toHaveLength(8);
       expect(world.ledger).toHaveLength(0);
       expect(world.club?.openingBalance).not.toBe(25_000_000_000);
+      // ADR 0014: the stored save after a full season stays lean.
+      const stored = await unitOfWork.repositories().saves.peek(careerId);
+      expect(storedSize(stored!.snapshot)).toBeLessThan(200_000);
     },
   );
 });

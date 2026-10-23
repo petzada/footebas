@@ -1,3 +1,12 @@
+# Billing — licença única via PIX
+
+**Provedor padrão: AbacatePay** (ADR 0016). Variáveis: `PAYMENT_PROVIDER=abacatepay` (var no `wrangler.jsonc`),
+secrets `ABACATEPAY_API_KEY` e `ABACATEPAY_WEBHOOK_SECRET`. Webhook: `POST /v1/billing/webhook` com os eventos
+`transparent.completed` e `transparent.refunded`; a AbacatePay envia o secret no parâmetro `webhookSecret` da URL.
+Código: `abacatepay-client.ts` (cobrança, consulta, reembolso) e `abacatepay-webhook.ts` (autenticidade e efeitos).
+
+O conteúdo abaixo documenta o provedor alternativo Woovi (`PAYMENT_PROVIDER=woovi`).
+
 # Billing — licença única via Woovi/PIX (Fase 8)
 
 Implementa a camada paga do MVP (`docs/05-monetizacao.md`): uma **licença única** paga por **PIX QR Code** na

@@ -5,6 +5,8 @@ test.use({
   viewport: { width: 375, height: 812 },
   hasTouch: true,
   isMobile: true,
+  // Decorative motion off: the flow is what is under test here.
+  reducedMotion: 'reduce',
 });
 
 test('celular 375×812: chega à Central sem rolagem horizontal', async ({

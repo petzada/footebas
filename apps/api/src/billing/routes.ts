@@ -82,12 +82,17 @@ export function billingRoutes(deps: BillingRouteDependencies): ApiRoute[] {
       method: 'POST',
       path: '/v1/billing/webhook',
       schema: {
-        summary: 'Woovi webhook (RSA signature in x-webhook-signature, no JWT)',
+        summary:
+          'PIX provider webhook (AbacatePay: webhookSecret query + HMAC; no JWT)',
       },
       async handler(request) {
         if (request.rawBody === undefined)
           throw new ApplicationError('VALIDATION_ERROR', 'raw body required');
-        const result = await service.webhook(request.rawBody, request.headers);
+        const result = await service.webhook(
+          request.rawBody,
+          request.headers,
+          request.query,
+        );
         return json({ ok: true, ...result });
       },
     },

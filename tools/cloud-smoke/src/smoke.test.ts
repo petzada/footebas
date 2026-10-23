@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runSmoke } from './smoke.js';
+import { percentile, runSmoke } from './smoke.js';
 
 const token = 'x'.repeat(48);
 const club = { id: 'club_flamengo', name: 'Flamengo', shortName: 'FLA' };
@@ -11,6 +11,9 @@ function fakeApi(
     health?: number;
     job?: 'succeeded' | 'failed' | 'stuck';
     authorized?: string;
+    /** Simulated server time per command, on the shared test clock. */
+    commandMs?: number;
+    clock?: { value: number };
   } = {},
 ) {
   let version = 0;
@@ -49,6 +52,7 @@ function fakeApi(
     if (path.endsWith('/market')) return reply(200, { window: { open: true } });
     if (path.endsWith('/office')) return reply(200, { version: 1 });
     if (path === '/v1/commands') {
+      if (options.clock) options.clock.value += options.commandMs ?? 0;
       const body = JSON.parse(init?.body as string) as {
         type: string;
         expectedVersion: number;
@@ -88,6 +92,46 @@ function fakeApi(
       });
     }
     const view = path.split('/').at(-1);
+    if (view === 'bundle') {
+      const etag = `W/"bundle-1-${String(version)}"`;
+      if (headers.get('if-none-match') === etag)
+        return Promise.resolve(
+          new Response(null, { status: 304, headers: { etag } }),
+        );
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            ...versioned,
+            contentVersion: 'catalog-test',
+            home: {
+              ...versioned,
+              managerName: 'Fumaça',
+              club,
+              currentDate: played ? '2026-01-20' : '2026-01-01',
+              season: 2026,
+              pendingActions: [],
+            },
+            squad: { club, players: [] },
+            nextMatch: {
+              ...versioned,
+              fixtureId: played ? 'fixture_two' : 'fixture_one',
+              competition: 'Série A',
+              round: played ? 2 : 1,
+              date: played ? '2026-01-27' : '2026-01-20',
+              homeClub: club,
+              awayClub: rival,
+            },
+            standings: {
+              ...versioned,
+              competition: 'Série A',
+              rows: [{ position: 1, club, played: 1 }],
+            },
+            inbox: [],
+          }),
+          { status: 200, headers: { etag } },
+        ),
+      );
+    }
     if (view === 'home')
       return reply(200, {
         ...versioned,
@@ -132,19 +176,23 @@ function fakeApi(
   return fake;
 }
 
-function run(api: typeof fetch, extra: { jobTimeoutMs?: number } = {}) {
+function run(
+  api: typeof fetch,
+  extra: { jobTimeoutMs?: number; commandP95Ms?: number } = {},
+  time = { value: 0 },
+) {
   const lines: string[] = [];
-  let clock = 0;
   return runSmoke({
     apiUrl: 'https://api.example.test/',
     auth: { kind: 'smoke', token },
+    clubId: club.id,
     fetch: api,
     log: (line) => lines.push(line),
     sleep: (ms) => {
-      clock += ms;
+      time.value += ms;
       return Promise.resolve();
     },
-    now: () => clock,
+    now: () => time.value,
     ...extra,
   }).then((result) => ({ result, lines }));
 }
@@ -152,7 +200,11 @@ function run(api: typeof fetch, extra: { jobTimeoutMs?: number } = {}) {
 describe('fumaça na nuvem', () => {
   it('percorre o fluxo inteiro e confere versões', async () => {
     const { result, lines } = await run(fakeApi());
-    expect(result).toEqual({ ok: true, careerId: 'career_one' });
+    expect(result).toEqual({
+      ok: true,
+      careerId: 'career_one',
+      commandP95Ms: 0,
+    });
     expect(lines.at(-1)).toContain('Fumaça OK');
     expect(lines.join('\n')).toContain('Flamengo 2 x 1 Vasco');
   });
@@ -178,5 +230,33 @@ describe('fumaça na nuvem', () => {
     expect(failed.result.error).toContain('BOOM');
     const stuck = await run(fakeApi({ job: 'stuck' }), { jobTimeoutMs: 5_000 });
     expect(stuck.result.error).toMatch(/não terminou em 5 s/);
+  });
+
+  it('falha quando o p95 dos comandos passa do limite', async () => {
+    const clock = { value: 0 };
+    const slow = await run(
+      fakeApi({ clock, commandMs: 900 }),
+      { commandP95Ms: 800 },
+      clock,
+    );
+    expect(slow.result).toMatchObject({
+      ok: false,
+      failedStep: 'latência dos comandos',
+    });
+    expect(slow.result.error).toMatch(/p95 dos comandos 900 ms/);
+    const fast = { value: 0 };
+    const ok = await run(fakeApi({ clock: fast, commandMs: 300 }), {}, fast);
+    expect(ok.result).toMatchObject({ ok: true, commandP95Ms: 300 });
+  });
+
+  it('calcula percentis pelo posto mais próximo', () => {
+    expect(percentile([5, 1, 3, 2, 4], 50)).toBe(3);
+    expect(
+      percentile(
+        [...Array(20).keys()].map((n) => n + 1),
+        95,
+      ),
+    ).toBe(19);
+    expect(percentile([7], 95)).toBe(7);
   });
 });

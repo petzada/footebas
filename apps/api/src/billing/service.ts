@@ -1,5 +1,6 @@
-// Licença única (Fase 8): checkout PIX, order status, Woovi webhook and the
+// Licença única (Fase 8): checkout PIX, order status, provider webhook and the
 // 7-day refund (CDC art. 49 — direito de arrependimento em compra online).
+// PIX provider: AbacatePay (ADR 0016); the Woovi adapter stays as fallback.
 import { ApplicationError, AuthenticationError } from '@footebas/application';
 import type { FakeAuthIdentity } from '@footebas/contracts';
 import type { Entitlements, EntitlementsPort } from '@footebas/database';
@@ -11,6 +12,10 @@ import type {
   RefundStatus,
   WebhookResult,
 } from './billing-repository.js';
+import {
+  interpretAbacateWebhook,
+  verifyAbacateWebhook,
+} from './abacatepay-webhook.js';
 import { interpretWooviWebhook } from './webhook-events.js';
 import {
   verifyWithSource,
@@ -48,6 +53,12 @@ export interface BillingServiceDependencies {
    * in addition to the RSA signature.
    */
   readonly webhookSecret?: string;
+  /**
+   * Which provider signs the webhooks. `abacatepay` authenticates with the
+   * `webhookSecret` query parameter (ABACATEPAY_WEBHOOK_SECRET) plus the
+   * optional HMAC header; `woovi` (default) uses the RSA signature.
+   */
+  readonly webhookProvider?: 'woovi' | 'abacatepay';
   readonly config?: Partial<BillingConfig>;
   readonly now?: () => Date;
   readonly newId?: () => string;
@@ -230,6 +241,9 @@ export class BillingService {
       const attached = await repository.attachCharge(
         order.id,
         {
+          ...(charge.globalID === undefined
+            ? {}
+            : { providerChargeId: charge.globalID }),
           ...(charge.brCode === undefined ? {} : { brCode: charge.brCode }),
           ...(charge.qrCodeImage === undefined
             ? {}
@@ -265,7 +279,10 @@ export class BillingService {
     if (order.status !== 'pending' || order.brCode === undefined)
       return orderView(order);
     try {
-      const charge = await woovi.getCharge(order.correlationId);
+      const charge = await woovi.getCharge(
+        order.correlationId,
+        order.providerChargeId,
+      );
       if (charge?.status === 'COMPLETED')
         await this.#paidEffect(order, charge, 'reconcile');
       else if (charge?.status === 'EXPIRED')
@@ -284,11 +301,36 @@ export class BillingService {
     return orderView((await repository.order(orderId)) ?? order);
   }
 
-  /** Woovi webhook: authenticity, idempotency and effect in one place. */
+  /** Provider webhook: authenticity, idempotency and effect in one place. */
   public async webhook(
     rawBody: string,
     headers: Readonly<Record<string, string | undefined>>,
+    query: Readonly<Record<string, string | undefined>> = {},
   ): Promise<WebhookResult> {
+    if (this.#deps.webhookProvider === 'abacatepay') {
+      if (
+        !(await verifyAbacateWebhook(
+          rawBody,
+          headers,
+          query,
+          this.#deps.webhookSecret ?? '',
+        ))
+      )
+        throw new AuthenticationError('invalid webhook secret or signature');
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawBody) as unknown;
+      } catch {
+        throw new ApplicationError('VALIDATION_ERROR', 'invalid webhook body');
+      }
+      const now = this.#now();
+      const event = interpretAbacateWebhook(parsed, now);
+      return this.#deps.repository.applyWebhook(
+        { id: event.id, type: event.type, payload: event.payload },
+        event.effect,
+        now,
+      );
+    }
     const secret = this.#deps.webhookSecret;
     if (
       secret !== undefined &&
@@ -353,11 +395,15 @@ export class BillingService {
     );
     if (order?.refundCorrelationId === undefined)
       throw new ApplicationError('VERSION_CONFLICT', 'order is not refundable');
-    const refund = await woovi.refundCharge(order.correlationId, {
-      correlationID: order.refundCorrelationId,
-      value: order.amountCents,
-      comment: 'Footebas - reembolso da licença (7 dias)',
-    });
+    const refund = await woovi.refundCharge(
+      order.correlationId,
+      {
+        correlationID: order.refundCorrelationId,
+        value: order.amountCents,
+        comment: 'Footebas - reembolso da licença (7 dias)',
+      },
+      order.providerChargeId,
+    );
     await repository.attachRefund(
       order.id,
       {
