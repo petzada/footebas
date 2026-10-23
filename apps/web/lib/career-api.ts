@@ -1045,6 +1045,8 @@ export class InMemoryCareerApi implements CareerApiPort {
           : bench.has(player.id)
             ? 'bench'
             : 'reserve',
+        // Slots belonged to the previous lineup: let the board re-fit them.
+        lineupPosition: undefined,
       })),
     };
     return structuredClone(this.#career);

@@ -1,4 +1,5 @@
 import type {
+  AutoPickStrategy,
   Formation,
   PlayerView,
   SquadRole,
@@ -37,7 +38,7 @@ export const FORMATION_LAYOUT: Readonly<
   Record<ServerFormation, readonly FormationSlot[]>
 > = {
   '4-4-2': [
-    { position: 'GOL', x: 50, y: 91 },
+    { position: 'GOL', x: 50, y: 90 },
     { position: 'LD', x: 84, y: 72 },
     { position: 'ZAG', x: 63, y: 76 },
     { position: 'ZAG', x: 37, y: 76 },
@@ -50,7 +51,7 @@ export const FORMATION_LAYOUT: Readonly<
     { position: 'ATA', x: 62, y: 18 },
   ],
   '4-3-3': [
-    { position: 'GOL', x: 50, y: 91 },
+    { position: 'GOL', x: 50, y: 90 },
     { position: 'LD', x: 84, y: 72 },
     { position: 'ZAG', x: 63, y: 76 },
     { position: 'ZAG', x: 37, y: 76 },
@@ -63,9 +64,9 @@ export const FORMATION_LAYOUT: Readonly<
     { position: 'ATA', x: 50, y: 14 },
   ],
   '3-5-2': [
-    { position: 'GOL', x: 50, y: 91 },
+    { position: 'GOL', x: 50, y: 90 },
     { position: 'ZAG', x: 72, y: 75 },
-    { position: 'ZAG', x: 50, y: 78 },
+    { position: 'ZAG', x: 50, y: 76 },
     { position: 'ZAG', x: 28, y: 75 },
     { position: 'LD', x: 88, y: 50 },
     { position: 'LE', x: 12, y: 50 },
@@ -329,6 +330,86 @@ export function boardStrength(
   });
   if (!values.length) return 0;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / 11);
+}
+
+// --- squad list -----------------------------------------------------------
+/** Position groups of the squad list, in pitch order (goal to attack). */
+export const POSITION_GROUPS: readonly {
+  readonly id: string;
+  readonly label: string;
+  readonly positions: readonly string[];
+}[] = [
+  { id: 'gol', label: 'Goleiros', positions: ['GOL'] },
+  { id: 'def', label: 'Defesa', positions: ['LD', 'ZAG', 'LE'] },
+  { id: 'mei', label: 'Meio-campo', positions: ['VOL', 'MC', 'MEI'] },
+  { id: 'ata', label: 'Ataque', positions: ['PD', 'PE', 'ATA'] },
+];
+
+/** Index of a position in the pitch order; unknown codes go last. */
+export function positionOrder(position: string): number {
+  const flat = POSITION_GROUPS.flatMap((group) => group.positions);
+  const index = flat.indexOf(position);
+  return index < 0 ? flat.length : index;
+}
+
+/** Groups players by `POSITION_GROUPS`, keeping only non-empty groups. */
+export function groupByPosition<T extends { primaryPosition: string }>(
+  players: readonly T[],
+): { id: string; label: string; players: T[] }[] {
+  const known = new Set(POSITION_GROUPS.flatMap((group) => group.positions));
+  const groups = POSITION_GROUPS.map((group) => ({
+    id: group.id,
+    label: group.label,
+    players: players.filter((player) =>
+      group.positions.includes(player.primaryPosition),
+    ),
+  }));
+  const others = players.filter((player) => !known.has(player.primaryPosition));
+  if (others.length)
+    groups.push({ id: 'outros', label: 'Outros', players: others });
+  return groups.filter((group) => group.players.length > 0);
+}
+
+// --- automatic lineup -----------------------------------------------------
+export const AUTO_PICK_MODES: readonly {
+  readonly id: AutoPickStrategy;
+  readonly label: string;
+  readonly description: string;
+}[] = [
+  { id: 'best', label: 'Melhor', description: 'Os mais fortes por posição.' },
+  { id: 'rest', label: 'Poupar', description: 'Descansa quem está cansado.' },
+  {
+    id: 'develop',
+    label: 'Desenvolver',
+    description: 'Dá minutos aos jovens.',
+  },
+];
+
+/**
+ * Plain-words summary of what an automatic lineup changed: who came in for
+ * whom (paired by pitch order) or that nothing changed. Lets the manager see
+ * that "Poupar" and "Melhor" really ran, even when they agree with the board.
+ */
+export function autoPickSummary(
+  entering: readonly PlayerView[],
+  leaving: readonly PlayerView[],
+): string {
+  if (!entering.length && !leaving.length)
+    return 'A escalação já é a ideal para este modo.';
+  const byOrder = (a: PlayerView, b: PlayerView) =>
+    positionOrder(a.primaryPosition) - positionOrder(b.primaryPosition);
+  const inList = [...entering].sort(byOrder);
+  const outList = [...leaving].sort(byOrder);
+  const count = Math.max(inList.length, outList.length);
+  const pairs = Array.from({ length: count }, (_, index) => {
+    const incoming = inList[index];
+    const outgoing = outList[index];
+    if (incoming && outgoing)
+      return `${incoming.name} entra no lugar de ${outgoing.name}`;
+    if (incoming) return `${incoming.name} entra`;
+    return `${outgoing!.name} sai`;
+  });
+  return `${String(count)} troca${count === 1 ? '' : 's'}: ${pairs.join('; ')}.`;
 }
 
 // --- tactics --------------------------------------------------------------
