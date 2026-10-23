@@ -174,6 +174,8 @@ class CareerTransaction {
           this.achievements.push(...entries);
           return Promise.resolve();
         },
+        // CreateCareer (the only enrollment) runs on the Worker, not here.
+        enroll: () => unsupported('enrolling a career on the ranking'),
         listByCareer: (careerId) =>
           this.deps.store().listAchievements(careerId),
       },
@@ -199,6 +201,8 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
   };
   private current: GameSave | undefined;
   private loaded = false;
+  /** The career was registered on the ranking in this life of the object. */
+  private rankingEnrolled = false;
   private careerId: string | undefined;
   private tail: Promise<unknown> = Promise.resolve();
 
@@ -304,6 +308,36 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
     this.loaded = true;
   }
 
+  /**
+   * Registers the career on the ranking once per life of the object, on its
+   * first action (ADR 0017): careers created before the ranking accounts get
+   * their coach name and avatar listed. Same rule as CreateCareer: an account
+   * that already has a career keeps it. Best effort: a failure never fails
+   * the action and is retried on the next one.
+   */
+  private async enrollOnce(): Promise<void> {
+    const save = this.current;
+    if (this.rankingEnrolled || save === undefined) return;
+    const snapshot = save.snapshot as unknown as Partial<CareerSnapshot>;
+    const name = snapshot.managerName?.trim().slice(0, 80);
+    if (name === undefined || name === '') {
+      this.rankingEnrolled = true;
+      return;
+    }
+    const avatar = snapshot.coach?.avatar;
+    try {
+      await this.deps.store().enrollRanking({
+        careerId: save.id,
+        userId: save.userId,
+        displayName: name,
+        ...(avatar === undefined ? {} : { avatar }),
+      });
+      this.rankingEnrolled = true;
+    } catch {
+      // Retried on the next action of this object.
+    }
+  }
+
   private async run<T>(
     careerId: string,
     commandId: string | undefined,
@@ -311,6 +345,21 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
   ): Promise<T> {
     await this.bind(careerId);
     await this.timed('load', () => this.ensureLoaded(careerId));
+    // Off the critical path: runs alongside the work, awaited before the
+    // object answers (it never fails the action).
+    const enrolling = this.enrollOnce();
+    try {
+      return await this.runLoaded(careerId, commandId, work);
+    } finally {
+      await enrolling;
+    }
+  }
+
+  private async runLoaded<T>(
+    careerId: string,
+    commandId: string | undefined,
+    work: (tx: TransactionContext) => Promise<T>,
+  ): Promise<T> {
     if (commandId !== undefined) {
       const receipt = await this.deps.storage.get<CommandReceipt>(
         receiptKey(commandId),

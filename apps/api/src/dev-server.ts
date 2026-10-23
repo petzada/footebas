@@ -67,16 +67,12 @@ const phaseFour = new PhaseFourApplicationService({
   random: new Mulberry32RandomFactory(),
 });
 
-// Ranking snapshots over the in-memory ledger, regenerated every minute here
-// (the Worker uses a 15-minute Cron Trigger).
+// Live ranking over the in-memory ledger (ADR 0017): no snapshot job.
 const rankings = new RankingService({
-  store: new InMemoryRankingStore(() => unitOfWork.achievements()),
+  store: new InMemoryRankingStore(unitOfWork),
   clock,
   auth: appAuth,
 });
-setInterval(() => {
-  void rankings.generateSnapshots();
-}, 60_000);
 
 // Billing: offline fake by default; WOOVI_APP_ID (sandbox) switches to the
 // real Woovi API so the PIX flow can be exercised end to end locally.

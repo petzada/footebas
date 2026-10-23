@@ -47,6 +47,36 @@ describe('Perfil e licença', () => {
     expect(pitch.textContent).toMatch(/nunca esportiva/i);
   });
 
+  it('guarda os detalhes técnicos do save num bloco recolhido (D6)', async () => {
+    render(
+      <ProfileScreen
+        account={createFakeAccountPort({
+          profile: { email: 'ana@footebas.com', displayName: 'Ana' },
+        })}
+        player={player}
+        saveArchive={{
+          saveVersion: '4.0.0',
+          migrationStatus: 'Atualizado · schema 4',
+          archiveStatus: 'Temporadas 2023–2024 compactadas',
+          lastCompaction: '08/07/2026 · 02:15',
+          checksum: 'save:9f2a…c814',
+        }}
+      />,
+    );
+    await screen.findByRole('region', { name: 'Ana' });
+    const details = screen.getByTestId('perfil-save-detalhes');
+    expect(details.tagName).toBe('DETAILS');
+    expect(details.hasAttribute('open')).toBe(false);
+    expect(details.textContent).toMatch(/detalhes técnicos do save/i);
+    expect(details.textContent).toMatch(/4\.0\.0/);
+    expect(details.textContent).toMatch(/schema 4/);
+    expect(details.textContent).toMatch(/save:9f2a/);
+    const summary = details.querySelector('summary')!;
+    expect(summary.className).toMatch(/min-h-11/);
+    fireEvent.click(summary);
+    expect(details.hasAttribute('open')).toBe(true);
+  });
+
   it('gera o PIX com preço do servidor, faz polling até pago e atualiza o plano', async () => {
     const account = createFakeAccountPort({
       priceCents: 5990,

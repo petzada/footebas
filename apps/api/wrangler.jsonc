@@ -71,8 +71,9 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["CareerDurableObject"] },
   ],
-  // Ranking snapshots (ADR 0013): the `scheduled` handler of src/worker.ts
-  // aggregates validated achievements into footebas.ranking_snapshots.
+  // `scheduled` handler of src/worker.ts: billing reconciliation and ranking
+  // upkeep (ADR 0017): closes the previous month into
+  // footebas.ranking_snapshots on day 1; the ranking itself is live.
   "triggers": { "crons": ["*/15 * * * *"] },
   "queues": {
     "producers": [

@@ -2,8 +2,8 @@ import type {
   CanonicalValue,
   RankedAchievementType,
   RankingLedgerEntry,
-  RankingRow,
   RankingScope,
+  RankingStanding,
 } from '@footebas/domain';
 import type { GameSave, NewGameSave, SaveUpdate } from './model.js';
 
@@ -71,14 +71,29 @@ export interface ValidatedAchievement extends RankingLedgerEntry {
   readonly rulesVersion: string;
 }
 
+/** The career that names a ranking account while it has no points. */
+export interface RankingEnrollment {
+  readonly careerId: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatar?: string;
+}
+
 /**
  * Ledger of validated achievements. It is written inside the career's
  * transaction, so an achievement exists only if the save that produced it
  * was committed. Recording is idempotent per career, type, season and
- * competition.
+ * competition, and updates the user's ranking totals in the same
+ * transaction (ADR 0017).
  */
 export interface AchievementLedgerPort {
   record(entries: readonly ValidatedAchievement[]): Promise<void>;
+  /**
+   * Links the user's ranking account to their first career (CreateCareer):
+   * from then on the account is listed, with zero, under the coach name.
+   * Later careers never replace the first one.
+   */
+  enroll(career: RankingEnrollment): Promise<void>;
   /** Every achievement of a career, oldest first. */
   listByCareer(careerId: string): Promise<readonly ValidatedAchievement[]>;
 }
@@ -92,41 +107,49 @@ export interface TransactionContext {
 /** `all` for the all-time scopes, `YYYY-MM` for the monthly one. */
 export type RankingPeriod = string;
 
-export interface RankingSnapshotRow extends RankingRow {
+/** Listed standings of a scope and period, read live (ADR 0017). */
+export interface RankingBoard {
   readonly scope: RankingScope;
   readonly period: RankingPeriod;
-  readonly generatedAt: string;
-}
-
-export interface RankingSnapshot {
-  readonly scope: RankingScope;
-  readonly period: RankingPeriod;
-  readonly generatedAt: string;
+  /** Every ranking account (participants), listed or not. */
   readonly total: number;
-  readonly rows: readonly RankingRow[];
+  /** Accounts with a career only, in rank order (up to `limit`). */
+  readonly rows: readonly (RankingStanding & {
+    readonly careerId: string;
+    readonly displayName: string;
+  })[];
 }
 
-/** Snapshots of the leaderboards, served with cache (ADR 0005, ADR 0013). */
+/** The user's place in one scope and period, computed on read. */
+export interface RankingPosition extends Omit<RankingStanding, 'position'> {
+  readonly scope: RankingScope;
+  readonly period: RankingPeriod;
+  readonly total: number;
+  /** Absent when the user has no ranking account. */
+  readonly position?: number;
+}
+
+/** Leaderboards over the live totals (ADR 0017). */
 export interface RankingStorePort {
-  /** Ranked rows (best career per user) computed from the ledger. */
-  aggregate(scope: RankingScope, period?: string): Promise<RankingRow[]>;
-  /** Replaces the snapshot of a scope and period atomically. */
-  replaceSnapshot(
-    scope: RankingScope,
-    period: RankingPeriod,
-    rows: readonly RankingRow[],
-    generatedAt: string,
-  ): Promise<void>;
-  snapshot(
+  board(
     scope: RankingScope,
     period: RankingPeriod,
     limit: number,
-  ): Promise<RankingSnapshot | undefined>;
-  /** The user's row in the given snapshots, when ranked. */
+  ): Promise<RankingBoard>;
   positionsOf(
     userId: string,
-    snapshots: readonly { scope: RankingScope; period: RankingPeriod }[],
-  ): Promise<readonly RankingSnapshotRow[]>;
+    targets: readonly { scope: RankingScope; period: RankingPeriod }[],
+  ): Promise<readonly RankingPosition[]>;
+  /**
+   * Freezes the final standings of a past month in the monthly history.
+   * Returns the rows written, or `undefined` when it was already closed.
+   */
+  closeMonth(period: string, closedAt: string): Promise<number | undefined>;
+  /**
+   * Rebuilds the totals of up to `limit` accounts flagged by the migration
+   * (achievements validated before ADR 0017). Returns how many it rebuilt.
+   */
+  refreshPending(limit: number): Promise<number>;
 }
 
 /**
@@ -158,6 +181,13 @@ export interface CareerSaveStore {
   ): Promise<GameSave>;
   delete(id: string, userId: string): Promise<void>;
   listAchievements(careerId: string): Promise<readonly ValidatedAchievement[]>;
+  /**
+   * Same rule as `AchievementLedgerPort.enroll` (ADR 0017): links the
+   * account to this career only while it has none. The career object calls
+   * it once per life, on the first action, so careers created before the
+   * ranking accounts get their coach name listed.
+   */
+  enrollRanking(career: RankingEnrollment): Promise<void>;
 }
 
 /** Hints for `executeIdempotent`; adapters may ignore them. */

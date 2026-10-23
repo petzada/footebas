@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   CalendarDots,
   CheckCircle,
@@ -11,6 +12,7 @@ import {
 } from '@phosphor-icons/react';
 import { ScreenSkeleton } from '@/components/retro/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -48,9 +50,12 @@ const defaultCompetitionPort = createFakeCompetitionProductPort();
 export function CompetitionScreens({
   port = defaultCompetitionPort,
   initialTab = 'pyramid',
+  onOpenTable,
 }: {
   port?: CompetitionProductPort;
   initialTab?: 'pyramid' | 'calendar' | 'next';
+  /** Opens the Classificação on that competition ("Ver tabela"). */
+  onOpenTable?: ((competitionId: string) => void) | undefined;
 }) {
   const [model, setModel] = useState<CompetitionProductView>();
   const [error, setError] = useState('');
@@ -97,7 +102,11 @@ export function CompetitionScreens({
         <TabsContent value="pyramid" className="mt-4 flex flex-col gap-5">
           <div className="grid gap-3 lg:grid-cols-3">
             {model.divisions.map((competition) => (
-              <CompetitionCard key={competition.id} competition={competition} />
+              <CompetitionCard
+                key={competition.id}
+                competition={competition}
+                onOpenTable={onOpenTable}
+              />
             ))}
           </div>
           <div>
@@ -109,6 +118,7 @@ export function CompetitionScreens({
                 <CompetitionCard
                   key={competition.id}
                   competition={competition}
+                  onOpenTable={onOpenTable}
                 />
               ))}
             </div>
@@ -267,7 +277,13 @@ export function CompetitionScreens({
   );
 }
 
-function CompetitionCard({ competition }: { competition: CompetitionView }) {
+function CompetitionCard({
+  competition,
+  onOpenTable,
+}: {
+  competition: CompetitionView;
+  onOpenTable?: ((competitionId: string) => void) | undefined;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -307,6 +323,16 @@ function CompetitionCard({ competition }: { competition: CompetitionView }) {
         <p>
           {money(competition.prize)} · +{competition.prestige} prestígio
         </p>
+        {onOpenTable && (
+          <Button
+            variant="ghost"
+            className="min-h-11 justify-between"
+            onClick={() => onOpenTable(competition.id)}
+          >
+            Ver tabela: {competition.name}
+            <ArrowRight data-icon="inline-end" />
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

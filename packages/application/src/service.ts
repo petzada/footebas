@@ -157,7 +157,12 @@ import {
   withInboxMarks,
   type CareerInboxState,
 } from './career-inbox.js';
-import { seasonAchievements, type SeasonAchievement } from './rankings.js';
+import {
+  seasonAchievements,
+  titleAchievements,
+  uniqueAchievements,
+  type SeasonAchievement,
+} from './rankings.js';
 import { careerProfileOf } from './coach-personality.js';
 import {
   InMemoryEntitlements,
@@ -479,6 +484,14 @@ export class FootebasApplication {
             rules: RULES_VERSION,
             content: content.version,
           },
+        });
+        // The account is listed on the ranking, with zero, under the coach
+        // name of its first career (ADR 0017).
+        await tx.achievements.enroll({
+          careerId,
+          userId,
+          displayName: snapshot.managerName.slice(0, 80),
+          avatar: snapshot.coach.avatar,
         });
         this.deps.telemetry.event('career.created', { careerId });
         return asCanonical(this.accepted(command, save));
@@ -831,23 +844,30 @@ export class FootebasApplication {
         if (save.version !== job.expectedVersion)
           throw new SaveConflictError('job snapshot version is stale');
         const content = this.loadContent(snapshot.contentVersion);
+        const titles: SeasonAchievement[] = [];
         this.playThrough(
           snapshot,
           save.seed,
           content.competitions,
           job.fixtureId,
           job.instructions,
+          titles,
         );
         // Injuries and suspensions from this round reach the saved lineup
         // now, so the squad screen and the next command see an eligible XI.
         settleAvailableLineup(snapshot);
-        const achievements =
-          job.fixtureId === undefined
+        // Titles of competitions that ended in this job, then (at the season
+        // close) promotion, completed season and the season's titles again;
+        // the first occurrence of each wins (ADR 0017).
+        const achievements = uniqueAchievements([
+          ...titles,
+          ...(job.fixtureId === undefined
             ? rollSeason(snapshot, content.competitions, save.seed)
-            : [];
+            : []),
+        ]);
         delete snapshot.pendingJobId;
         // Validated achievements commit with the save that produced them
-        // (ADR 0013): a rolled back transaction records none.
+        // (ADR 0013, ADR 0017): a rolled back transaction records none.
         if (achievements.length > 0)
           await tx.achievements.record(
             achievements.map((achievement) => ({
@@ -903,7 +923,10 @@ export class FootebasApplication {
     config: MvpCompetitionConfig,
     targetId?: string,
     instructions: readonly MatchInstruction[] = [],
+    /** Collects the titles of the managed club as competitions end. */
+    titles?: SeasonAchievement[],
   ): ManagedMatch | undefined {
+    let ended = endedCompetitionIds(snapshot);
     const target =
       targetId === undefined
         ? undefined
@@ -983,6 +1006,12 @@ export class FootebasApplication {
         scores,
       );
       snapshot.currentDate = date;
+      // A title counts when its competition ends (ADR 0017): the engine
+      // just recorded the outcome of every competition this date finished.
+      if (titles !== undefined) {
+        titles.push(...endedCompetitionTitles(snapshot, config, ended, date));
+        ended = endedCompetitionIds(snapshot);
+      }
       const league =
         managedToday === undefined
           ? undefined
@@ -2026,6 +2055,46 @@ function divisionOf(snapshot: Snapshot, clubId: string): MvpDivisionId {
     throw new ApplicationError('NOT_FOUND', 'club is outside the pyramid');
   return division;
 }
+/** Competitions of the running season that already have an outcome. */
+function endedCompetitionIds(snapshot: Snapshot): ReadonlySet<string> {
+  return new Set(
+    snapshot.competition.competitions.flatMap(({ competitionId, outcome }) =>
+      outcome === undefined ? [] : [competitionId],
+    ),
+  );
+}
+
+/**
+ * Titles of the managed club among the competitions that ended on `date`
+ * (outcome now, none before): the club managed and its reputation at that
+ * moment, the in-game date of the last round (ADR 0017).
+ */
+function endedCompetitionTitles(
+  snapshot: Snapshot,
+  config: MvpCompetitionConfig,
+  endedBefore: ReadonlySet<string>,
+  date: string,
+): SeasonAchievement[] {
+  const outcomes = snapshot.competition.competitions.flatMap(
+    ({ competitionId, outcome }) =>
+      outcome === undefined || endedBefore.has(competitionId) ? [] : [outcome],
+  );
+  const managedClubId = snapshot.world.manager.currentClubId;
+  if (outcomes.length === 0 || managedClubId === undefined) return [];
+  const system = careerSeasonSystem(config, snapshot.competition);
+  return titleAchievements({
+    season: snapshot.season,
+    gameDate: date,
+    managedClubId,
+    clubReputation: Number(
+      snapshot.clubs.find(({ id }) => id === managedClubId)?.reputation ?? 0,
+    ),
+    outcomes,
+    definitions: system.definitions,
+    divisionCompetitionIds: system.ids.divisions,
+  });
+}
+
 /** Closes a finished season, runs the world's season end and opens the next. */
 function rollSeason(
   snapshot: Snapshot,

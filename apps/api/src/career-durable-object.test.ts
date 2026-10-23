@@ -66,6 +66,8 @@ function setup() {
   const calls: string[] = [];
   /** Postgres reads and writes of the career objects (round trips). */
   const storeCalls: string[] = [];
+  /** Makes `enrollRanking` fail while it returns true. */
+  let enrollmentFails = () => false;
   const store = (): CareerSaveStore => {
     const inner = postgres.careerSaveStore();
     const note = <T>(name: string, value: T): T => {
@@ -82,6 +84,13 @@ function setup() {
       delete: (id, userId) => note('delete', inner.delete(id, userId)),
       listAchievements: (id) =>
         note('listAchievements', inner.listAchievements(id)),
+      enrollRanking: (entry) =>
+        note(
+          'enrollRanking',
+          enrollmentFails()
+            ? Promise.reject(new Error('postgres unavailable'))
+            : inner.enrollRanking(entry),
+        ),
     };
   };
   const created: string[] = [];
@@ -162,6 +171,9 @@ function setup() {
     owner,
     stranger,
     restart,
+    failEnrollment: (fails: () => boolean) => {
+      enrollmentFails = fails;
+    },
     api: handler(true),
     fallback: handler(false),
   };
@@ -530,7 +542,8 @@ describe('carreira nova: aquecimento do objeto e idas ao Postgres', () => {
     const context = setup();
     const { careerId } = await createCareer(context);
     expect((await selectClub(context, careerId)).status).toBe(202);
-    expect(context.storeCalls).toEqual(['peek', 'commit']);
+    // The first action of the object's life also registers the ranking name.
+    expect(context.storeCalls).toEqual(['peek', 'enrollRanking', 'commit']);
   });
 
   it('aquecido, o SelectClub não recarrega a carreira do Postgres', async () => {
@@ -544,10 +557,10 @@ describe('carreira nova: aquecimento do objeto e idas ao Postgres', () => {
       version: 1,
     });
     expect((await selectClub(context, careerId)).status).toBe(202);
-    expect(context.storeCalls).toEqual(['peek', 'commit']);
+    expect(context.storeCalls).toEqual(['peek', 'enrollRanking', 'commit']);
     // Warming an object that is already loaded touches nothing.
     await warmCareerObject(context.namespace, careerId);
-    expect(context.storeCalls).toEqual(['peek', 'commit']);
+    expect(context.storeCalls).toEqual(['peek', 'enrollRanking', 'commit']);
     const home = await json<{ aggregateVersion: number }>(
       await read(context.api, context.owner, `/v1/careers/${careerId}/home`),
     );
@@ -562,7 +575,7 @@ describe('carreira nova: aquecimento do objeto e idas ao Postgres', () => {
       selectClub(context, careerId),
     ]);
     expect(selected.status).toBe(202);
-    expect(context.storeCalls).toEqual(['peek', 'commit']);
+    expect(context.storeCalls).toEqual(['peek', 'enrollRanking', 'commit']);
     expect((await stored(context, careerId)).version).toBe(2);
   });
 
@@ -572,7 +585,64 @@ describe('carreira nova: aquecimento do objeto e idas ao Postgres', () => {
     await warmCareerObject(context.namespace, careerId);
     context.restart(careerId);
     expect((await selectClub(context, careerId)).status).toBe(202);
-    expect(context.storeCalls).toEqual(['peek', 'versionOf', 'commit']);
+    // A new life of the object registers the ranking name again (no-op).
+    expect(context.storeCalls).toEqual([
+      'peek',
+      'versionOf',
+      'enrollRanking',
+      'commit',
+    ]);
+  });
+
+  it('registra no ranking, na primeira ação, a carreira criada antes das contas (ADR 0017)', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    // Account backfilled by the migration: counted, but without its career.
+    context.postgres.unlinkRankingCareer('user_owner');
+    expect(context.postgres.rankingPlayers()[0]).not.toHaveProperty('careerId');
+    expect((await selectClub(context, careerId)).status).toBe(202);
+    expect(context.postgres.rankingPlayers()).toEqual([
+      expect.objectContaining({
+        userId: 'user_owner',
+        careerId,
+        displayName: 'Marcio',
+      }),
+    ]);
+    // Once per life of the object: later actions do not repeat it.
+    await read(context.api, context.owner, `/v1/careers/${careerId}/home`);
+    expect(
+      context.storeCalls.filter((name) => name === 'enrollRanking'),
+    ).toHaveLength(1);
+  });
+
+  it('não troca a carreira já registrada no ranking da conta', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    context.postgres.unlinkRankingCareer('user_owner');
+    await context.postgres.careerSaveStore().enrollRanking({
+      careerId: 'career_first',
+      userId: 'user_owner',
+      displayName: 'Primeira',
+    });
+    expect((await selectClub(context, careerId)).status).toBe(202);
+    expect(context.postgres.rankingPlayers()).toEqual([
+      expect.objectContaining({
+        careerId: 'career_first',
+        displayName: 'Primeira',
+      }),
+    ]);
+  });
+
+  it('uma falha ao registrar não derruba a ação e tenta de novo depois', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    context.postgres.unlinkRankingCareer('user_owner');
+    let failures = 1;
+    context.failEnrollment(() => failures-- > 0);
+    expect((await selectClub(context, careerId)).status).toBe(202);
+    expect(context.postgres.rankingPlayers()[0]).not.toHaveProperty('careerId');
+    await read(context.api, context.owner, `/v1/careers/${careerId}/home`);
+    expect(context.postgres.rankingPlayers()[0]).toMatchObject({ careerId });
   });
 
   it('aquecer carreira apagada não falha e ela segue invisível', async () => {

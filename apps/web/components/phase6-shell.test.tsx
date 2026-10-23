@@ -108,6 +108,40 @@ describe('Fase 6 · shell mobile-first', () => {
     ).toBe('page');
   });
 
+  it('abrir a Caixa de entrada marca as mensagens como lidas e o contador some (D6)', async () => {
+    const api = await onboard();
+    const nav = screen.getByRole('navigation', {
+      name: /navegação principal desktop/i,
+    });
+    expect(
+      within(nav).getByRole('button', { name: /caixa de entrada \(\d+\)/i }),
+    ).toBeTruthy();
+    fireEvent.click(
+      within(nav).getByRole('button', { name: /^caixa de entrada/i }),
+    );
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Caixa de entrada',
+      }),
+    ).toBeTruthy();
+    // The screen of its own: decisions and messages, then the Notícias.
+    expect(
+      await screen.findByRole('region', { name: /mensagens/i }),
+    ).toBeTruthy();
+    expect(screen.getByRole('region', { name: /notícias/i })).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        within(nav).queryByRole('button', {
+          name: /caixa de entrada \(\d+\)/i,
+        }),
+      ).toBeNull(),
+    );
+    expect(
+      (await api.getCareer())!.world.news.some(({ unread }) => unread),
+    ).toBe(false);
+  });
+
   it('esconde a barra inferior na partida ao vivo e a devolve ao rolar', async () => {
     await onboard();
     fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
@@ -217,6 +251,15 @@ describe('Fase 6 · shell mobile-first', () => {
         .querySelector('.grid')
         ?.className.includes('grid-cols-3'),
     ).toBe(true);
+    // "Classificação" (13 glyphs) never hyphenates: labels wrap only at
+    // spaces and the pixel font drops to .4rem below 360px (3 columns of
+    // ~90px at 320px: 13 × 6.4px = 83px).
+    const table = within(dialog).getByRole('button', { name: 'Classificação' });
+    expect(table.className).toMatch(/break-normal/);
+    expect(table.className).not.toMatch(/hyphens|break-words/);
+    expect(table.className).toMatch(/text-\[\.4rem\]/);
+    expect(table.className).toMatch(/min-\[360px\]:text-\[\.45rem\]/);
+    expect(13 * 0.4 * 16).toBeLessThanOrEqual((320 - 2 * 12 - 2 * 8) / 3 - 4);
     // Focus lands on the current screen and the grid answers the arrows.
     const current = within(dialog).getByRole('button', { name: 'Central' });
     expect(current.getAttribute('aria-current')).toBe('page');

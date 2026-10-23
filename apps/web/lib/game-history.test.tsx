@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useGameHistory, type GameLocation } from '@/lib/game-history';
 
@@ -30,5 +30,30 @@ describe('histórico do jogo', () => {
       ...NEXT_STATE,
       footebas: { stage: 'game', screen: 'squad' },
     });
+  });
+
+  it('a Caixa de entrada entra no histórico e o Voltar devolve a tela anterior (D6)', () => {
+    window.history.replaceState(NEXT_STATE, '');
+    const restore = vi.fn();
+    const { rerender } = renderHook(
+      (location: GameLocation) => useGameHistory({ location, restore }),
+      { initialProps: { stage: 'game', screen: 'central' } },
+    );
+    rerender({ stage: 'game', screen: 'inbox' });
+    expect(window.history.state).toMatchObject({
+      ...NEXT_STATE,
+      footebas: { stage: 'game', screen: 'inbox' },
+    });
+    act(() => {
+      window.dispatchEvent(
+        new PopStateEvent('popstate', {
+          state: {
+            ...NEXT_STATE,
+            footebas: { stage: 'game', screen: 'central' },
+          },
+        }),
+      );
+    });
+    expect(restore).toHaveBeenCalledWith({ stage: 'game', screen: 'central' });
   });
 });
