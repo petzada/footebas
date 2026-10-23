@@ -72,6 +72,8 @@ export const careerWorldReadModelSchema = z.strictObject({
           'sponsor',
           'prize',
           'stadium',
+          'membership',
+          'sponsor_termination',
         ]),
         amount: signedMoneySchema,
         label: nonEmptyTextSchema,
