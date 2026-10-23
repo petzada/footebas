@@ -317,7 +317,9 @@ function MenuSection({
 }
 
 const menuItemClass =
-  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2 text-center text-[.45rem] normal-case leading-tight tracking-tight break-words';
+  // `hyphens-auto` (html lang="pt-BR") breaks "Classificação" at a syllable
+  // on narrow phones instead of cutting the last letter onto its own line.
+  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2 text-center text-[.45rem] normal-case leading-tight tracking-tight break-words hyphens-auto';
 
 function MenuButton({
   label,

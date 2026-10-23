@@ -101,11 +101,12 @@ export function Phase6Shell({
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <MuteButton compact />
+            {/* 44px targets (WCAG 2.5.5) on the only header controls. */}
             {onHome && (
               <Button
                 variant="outline"
                 size="icon"
-                className="size-9 sm:size-10"
+                className="size-11"
                 aria-label="Voltar ao início"
                 title="Voltar ao início"
                 onClick={onHome}
@@ -117,7 +118,7 @@ export function Phase6Shell({
               <Button
                 variant="outline"
                 size="icon"
-                className="size-9 sm:size-10"
+                className="size-11"
                 aria-label="Sair"
                 title="Sair"
                 onClick={onSignOut}
@@ -259,7 +260,7 @@ function DesktopSidebar({
       </a>
       <nav
         aria-label="Navegação principal desktop"
-        className="mt-7 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
+        className="scrollbar-px mt-7 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-1"
       >
         {menuGroups.map((group) => (
           <section
@@ -396,12 +397,13 @@ function MobileNavigation({
   const pending = Object.keys(badges).filter(
     (id) => !barDestinations.some(([bar]) => bar === id),
   ).length;
-  // Press Start 2P advances 1em per glyph, so "Escritório" is 10em: at
-  // <=375px the labels drop to .4rem and each column is at least as wide as
-  // its label (`minmax(min-content,1fr)`), so nothing overflows or truncates
-  // down to 320px while the columns stay equal whenever they fit.
+  // Press Start 2P advances 1em per glyph, so "Escritório" is 10em: below
+  // 376px the bar shows icons only (the label stays as the accessible
+  // name, D2); from 376px each column is at least as wide as its label
+  // (`minmax(min-content,1fr)`), so nothing overflows or truncates.
   const itemClass =
-    'relative flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 font-pixel text-[.4rem] leading-none whitespace-nowrap min-[376px]:text-[.45rem]';
+    'relative flex min-h-14 min-w-11 flex-col items-center justify-center gap-1 px-0.5 font-pixel text-[.45rem] leading-none whitespace-nowrap';
+  const labelClass = 'hidden min-[376px]:inline';
   return (
     <nav
       aria-label="Navegação principal mobile"
@@ -412,6 +414,7 @@ function MobileNavigation({
           key={id}
           type="button"
           aria-current={screen === id ? 'page' : undefined}
+          aria-label={label}
           className={cn(
             itemClass,
             screen === id ? 'bg-board text-bulb' : 'text-chalk',
@@ -423,7 +426,7 @@ function MobileNavigation({
             weight="fill"
             aria-hidden="true"
           />
-          {label}
+          <span className={labelClass}>{label}</span>
           {badges[id] && (
             <span
               aria-hidden="true"
@@ -437,6 +440,7 @@ function MobileNavigation({
         type="button"
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label="Menu"
         className={cn(itemClass, open ? 'bg-board text-bulb' : 'text-chalk')}
         onClick={() => setOpen(!open)}
       >
@@ -445,7 +449,7 @@ function MobileNavigation({
           weight="fill"
           aria-hidden="true"
         />
-        Menu
+        <span className={labelClass}>Menu</span>
         {pending > 0 && (
           <span
             aria-hidden="true"

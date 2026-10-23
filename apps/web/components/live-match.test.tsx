@@ -71,6 +71,23 @@ describe('partida ao vivo (decisões 18 e 19)', () => {
     ).toEqual(['0,5×', '1×', '2×', '4×']);
   });
 
+  it('abre a partida e o resultado no topo da página', async () => {
+    // The flow scrolls through `globalThis` (as the shell does).
+    const scrollTo = vi
+      .spyOn(globalThis, 'scrollTo')
+      .mockImplementation(() => {});
+    await startLiveMatch();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+    scrollTo.mockClear();
+    // Skipping resolves through the in-memory port: real timers again.
+    vi.useRealTimers();
+    fireEvent.click(
+      screen.getByRole('button', { name: /pular para o resultado/i }),
+    );
+    expect(await screen.findByTestId('match-result')).toBeTruthy();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+  });
+
   it('avança com o relógio, para sozinho só no intervalo e no fim', async () => {
     const api = await startLiveMatch();
     const next = vi.spyOn(api, 'nextMatchEvent');
