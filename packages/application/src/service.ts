@@ -69,6 +69,12 @@ import {
   type MvpDivisionId,
 } from '@footebas/engine';
 import {
+  projectCalendar,
+  projectPyramid,
+  projectTransition,
+  type SeasonSummary,
+} from './career-competitions.js';
+import {
   closeSeasonWorld,
   createCareerWorld,
   employManager,
@@ -103,14 +109,6 @@ const asCanonical = (value: unknown): CanonicalValue => value as CanonicalValue;
 export interface ManagedMatch {
   fixture: CompetitionCalendarFixture;
   result: MatchResult;
-}
-export interface SeasonSummary {
-  season: number;
-  champions: {
-    competitionId: string;
-    championId: string;
-    runnerUpId?: string;
-  }[];
 }
 /** The single career aggregate: world, competitions and matchday in one save. */
 export interface CareerSnapshot {
@@ -1065,6 +1063,36 @@ export class FootebasApplication {
     });
   }
 
+  private competitionView<T>(
+    bearer: string,
+    careerId: string,
+    project: (input: Parameters<typeof projectPyramid>[0]) => T,
+  ): Promise<T> {
+    return this.query(bearer, careerId, (save, s, now) =>
+      project({
+        careerId: save.id,
+        aggregateVersion: save.version,
+        projectedAt: now,
+        config: this.loadContent(s.contentVersion).competitions,
+        competition: s.competition,
+        clubNames: new Map(s.clubs.map(({ id, name }) => [id, name])),
+        ...(s.selectedClubId === undefined
+          ? {}
+          : { managedClubId: s.selectedClubId }),
+        history: s.history,
+      }),
+    );
+  }
+  public competitions(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, projectPyramid);
+  }
+  public calendar(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, projectCalendar);
+  }
+  public seasonTransition(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, projectTransition);
+  }
+
   public async checksum(bearer: string, careerId: string): Promise<string> {
     const user = await this.identity(bearer);
     const save = await this.deps.unitOfWork.withCareerLock(careerId, (tx) =>
@@ -1219,6 +1247,33 @@ function rollSeason(
     ...snapshot.history,
     {
       season: snapshot.season,
+      year: snapshot.competition.year,
+      movements: closure.generation.events.flatMap((event) =>
+        event.type === 'ClubPromoted' || event.type === 'ClubRelegated'
+          ? [
+              {
+                clubId: event.clubId,
+                fromCompetitionId: event.fromCompetitionId,
+                toCompetitionId: event.toCompetitionId,
+                kind:
+                  event.type === 'ClubPromoted'
+                    ? ('promoted' as const)
+                    : ('relegated' as const),
+              },
+            ]
+          : [],
+      ),
+      qualifiers: closure.generation.events.flatMap((event) =>
+        event.type === 'ClubQualified'
+          ? [
+              {
+                clubId: event.clubId,
+                fromCompetitionId: event.fromCompetitionId,
+                toCompetitionId: event.toCompetitionId,
+              },
+            ]
+          : [],
+      ),
       champions: closure.outcomes.map((outcome) => ({
         competitionId: outcome.competitionId,
         championId: outcome.championId,

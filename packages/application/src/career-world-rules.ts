@@ -73,7 +73,9 @@ export interface WorldContext {
 
 const SPONSOR_SHARE = 0.85;
 /** Prize money in BRL for the champion; lower places earn a decreasing share. */
-const PRIZE_BY_TIER: Readonly<Record<CompetitionDefinition['tier'], number>> = {
+export const PRIZE_BY_TIER: Readonly<
+  Record<CompetitionDefinition['tier'], number>
+> = {
   national_league: 40_000_000,
   national_cup: 70_000_000,
   state: 5_000_000,
@@ -574,9 +576,7 @@ function developSquads(context: WorldContext, input: SeasonEndInput): void {
       retired.add(player.id);
       return [];
     }
-    return [
-      { ...result.player, injuryRounds: 0, suspensionRounds: 0 },
-    ];
+    return [{ ...result.player, injuryRounds: 0, suspensionRounds: 0 }];
   });
   if (retired.size === 0) return;
   context.clubs = context.clubs.map((club) => ({

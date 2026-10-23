@@ -17,6 +17,7 @@ import {
 } from '@footebas/application';
 import {
   apiErrorSchema,
+  careerWorldReadModelSchema,
   commandAcceptedSchema,
   commandSchema,
   comparePlayersQuerySchema,
@@ -185,6 +186,35 @@ export async function buildApi(
       async (request) => {
         const { id } = paramsSchemaParse(request.params);
         return query(bearer(request), id);
+      },
+    );
+  }
+
+  const careerViews = {
+    world: {
+      query: deps.application.careerWorld.bind(deps.application),
+      schema: careerWorldReadModelSchema,
+    },
+    competitions: {
+      query: deps.application.competitions.bind(deps.application),
+      schema: competitionPyramidReadModelSchema,
+    },
+    calendar: {
+      query: deps.application.calendar.bind(deps.application),
+      schema: competitionCalendarReadModelSchema,
+    },
+    'next-season': {
+      query: deps.application.seasonTransition.bind(deps.application),
+      schema: nextSeasonTransitionReadModelSchema,
+    },
+  } as const;
+  for (const [name, view] of Object.entries(careerViews)) {
+    app.get(
+      `/v1/careers/:id/${name}`,
+      { schema: { ...commonSchema, params: paramsSchema } },
+      async (request) => {
+        const { id } = paramsSchemaParse(request.params);
+        return view.schema.parse(await view.query(bearer(request), id));
       },
     );
   }

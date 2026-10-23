@@ -10,3 +10,4 @@ export * from './phase-five-fixture.js';
 export * from './phase-six-platform.js';
 export * from './career-world-rules.js';
 export * from './unified-phase-four.js';
+export * from './career-competitions.js';
