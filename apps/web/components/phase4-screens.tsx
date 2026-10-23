@@ -892,7 +892,7 @@ export type WorldScreenPorts = Pick<ProductPorts, 'season' | 'ranking'>;
  * Mundo (Caixa de entrada → "Ver todas", Histórico): every tab reads the
  * same persisted data the rest of the game uses. Notícias lists the inbox
  * the Central shows (plus career milestones), Histórico the season read
- * model, Ranking the server snapshots and Save the stored careers.
+ * model, Ranking the live server boards and Save the stored careers.
  */
 export function WorldScreen(
   props: Phase4ScreenProps & { ports?: WorldScreenPorts },
@@ -960,7 +960,7 @@ export function WorldScreen(
               />
             </CardContent>
           </Card>
-          {/* Same snapshots as the Ranking screen (GET /v1/rankings). */}
+          {/* Same live boards as the Ranking screen (GET /v1/rankings). */}
           <RankingScreen port={ports.ranking} />
         </TabsContent>
         <TabsContent value="save" className="mt-4">

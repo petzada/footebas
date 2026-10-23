@@ -1,5 +1,5 @@
 // Cloudflare Workers entry: HTTP API (fetch), simulation consumer (queue) and
-// the ranking snapshot job (scheduled, Cron Trigger).
+// the scheduled jobs (Cron Trigger: billing reconciliation, ranking upkeep).
 // Persistence is Supabase Postgres through Hyperdrive; auth is Supabase JWT.
 // Career commands, reads and jobs run in the career Durable Object when the
 // `CAREERS` binding exists (ADR 0014); without it they use Postgres directly.
@@ -58,6 +58,7 @@ import {
   WorkersRateLimiter,
   type RateLimitBinding,
 } from './rate-limit.js';
+import { withPublicCache, workersCache } from './public-cache.js';
 import { identifyRequest } from './request-identity.js';
 import { QueueJobStore } from './queue-job-store.js';
 import { coloOfRequest, QueryCounter } from './request-timing.js';
@@ -360,7 +361,13 @@ export default {
     ctx?: ExecutionContext,
   ): Promise<Response> {
     try {
-      return await handle(request, env, ctx);
+      // Public leaderboard: up to 30 s in the Workers Cache (ADR 0017).
+      return await withPublicCache(
+        request,
+        ctx === undefined ? undefined : workersCache(),
+        () => handle(request, env, ctx),
+        (work) => ctx?.waitUntil(work),
+      );
     } catch (error) {
       // Composition failed before the router could answer: log, stay generic.
       const requestId = `request_${crypto.randomUUID().replaceAll('-', '')}`;
@@ -392,8 +399,10 @@ export default {
   /**
    * Cron Trigger (wrangler.jsonc `triggers.crons`, every 15 min): the
    * billing reconciliation (payments, refunds and disputes whose webhook
-   * never arrived), then the ranking snapshots. A billing failure is logged
-   * and never skips the rankings.
+   * never arrived), then the ranking maintenance (ADR 0017): on day 1 it
+   * closes the previous month into the monthly history and it rebuilds the
+   * accounts flagged by the migration. The ranking itself is live: no
+   * snapshot of the whole ledger. A billing failure never skips it.
    */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const version = workerVersion(env);
@@ -402,23 +411,26 @@ export default {
     await reconcileBilling(env, sql, auth, controller.cron, version);
     const started = Date.now();
     try {
-      const run = await rankings.generateSnapshots();
+      const run = await rankings.maintain();
       consoleLogSink({
         type: 'cron',
         level: 'info',
-        task: 'ranking_snapshots',
+        task: 'ranking_maintenance',
         cron: controller.cron,
         durationMs: Date.now() - started,
         version,
-        snapshots: run.snapshots.map(
-          ({ scope, period, rows }) => `${scope}:${period}:${String(rows)}`,
-        ),
+        refreshed: run.refreshed,
+        ...(run.closedMonth === undefined
+          ? {}
+          : {
+              closedMonth: `${run.closedMonth.period}:${String(run.closedMonth.rows)}`,
+            }),
       });
     } catch (error) {
       consoleLogSink({
         type: 'cron',
         level: 'error',
-        task: 'ranking_snapshots',
+        task: 'ranking_maintenance',
         cron: controller.cron,
         durationMs: Date.now() - started,
         version,

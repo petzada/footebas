@@ -162,6 +162,11 @@ banco e checar IPv4/IPv6).
 | 2.11 | **JWKS** fixado com `createLocalJWKSet` e fallback remoto                                                                                                                                                               | −200–400 ms no primeiro uso de cada isolate                 | `supabase-auth.ts:21-29`                                                                                                                |
 | 2.12 | **Limpeza:** TTL em `simulation_jobs`, `command_receipts` e nos recibos `receipt:*` do storage do DO; índice parcial para o agregado do ranking                                                                         | evita degradação com o volume                               | migrations + cron                                                                                                                       |
 
+> **Atualização (ADR 0017, ranking em tempo real):** `GET /v1/rankings` passou a ler os totais por índice
+> (`ranking_entries`) e a passar pelo Workers Cache por até 30 s (`max-age=30`, chave por URL e `Origin`, sem purge);
+> as conquistas entram num `INSERT` de várias linhas (2.9) e o cron não varre mais o ledger a cada 15 minutos (2.12).
+> `/v1/rankings/me` é uma consulta só, calculada na hora.
+
 ### Onda 3 — Cliente (dias)
 
 | #    | Mudança                                                                                                                                                                                                                                                     | Ganho [est.]                                       | Onde                                                             |

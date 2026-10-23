@@ -24,9 +24,20 @@ Para dar arena justa apesar das diferenças de tempo de jogo e de decisão #13:
 
 | Leaderboard | O que mede | Público |
 |-------------|-----------|---------|
-| **Global (all-time)** | Prestígio acumulado por títulos crus | Competidor de longo prazo |
+| **Geral (all-time)** | Soma dos pontos de conquistas (era "Global") | Competidor de longo prazo |
+| **Títulos** | Número de títulos (liga, copa, estadual, continental); desempate por pontos | Quem coleciona taças |
+| **Melhor temporada** | Maior soma de pontos numa única temporada da carreira | Quem fez uma temporada histórica |
 | **Ascensão / Underdog** | Façanhas de clube pequeno: acessos, saltos de divisão, títulos com clube de baixa reputação | Jogador grátis; mitiga o P2W leve |
 | **Do mês** | Ganho de prestígio na janela recente | Novatos e retorno |
+
+Regras e pontos: ADR 0013 (pontos, ascensão, mensal, uma carreira por usuário) e ADR 0017 (escopos novos, tempo
+real). Em cada leaderboard conta a melhor carreira do usuário; carreiras não se somam.
+
+### Tempo real e toda conta no ranking (ADR 0017)
+- O título conta assim que o campeonato termina dentro da carreira, sem esperar o fim da temporada.
+- Os totais são gravados na mesma transação da conquista e a leitura é ao vivo (cache de borda de até 30 s).
+- Toda conta entra com 0 ao se cadastrar: conta na posição ("você é o 1.234º de 5.000") e no total de
+  participantes; a lista pública mostra quem já criou carreira, com o nome de treinador (sem dado pessoal).
 
 ## 3. O P2W leve, assumido (decisão #13)
 
