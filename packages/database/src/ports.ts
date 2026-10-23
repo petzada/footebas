@@ -129,6 +129,37 @@ export interface RankingStorePort {
   ): Promise<readonly RankingSnapshotRow[]>;
 }
 
+/**
+ * Durable copy of the career saves kept by the career Durable Object
+ * (ADR 0014). Each write is a single conditional statement, idempotent when
+ * retried with the same save, so the object can persist after every command
+ * without a lock transaction.
+ */
+export interface CareerSaveStore {
+  /** Active save in its stored form, without ownership check. */
+  peek(id: string): Promise<GameSave | undefined>;
+  /** Version of the active save (cheap freshness check). */
+  versionOf(id: string): Promise<number | undefined>;
+  /**
+   * Stores `save` (already at `expectedVersion + 1`, with the checksum of its
+   * stored snapshot) when the stored version is `expectedVersion`. A retry of
+   * the same write succeeds without changing anything; any other mismatch is
+   * a `SaveConflictError`. Achievements commit atomically with the save.
+   */
+  commit(
+    save: GameSave,
+    expectedVersion: number,
+    achievements: readonly ValidatedAchievement[],
+  ): Promise<void>;
+  archive(
+    id: string,
+    userId: string,
+    expectedVersion: number,
+  ): Promise<GameSave>;
+  delete(id: string, userId: string): Promise<void>;
+  listAchievements(careerId: string): Promise<readonly ValidatedAchievement[]>;
+}
+
 export interface UnitOfWork {
   withCareerLock<T>(
     careerId: string,

@@ -191,4 +191,31 @@ describe('in-memory persistence contract', () => {
       ),
     );
   });
+
+  it('career save store writes conditionally and accepts the same write again', async () => {
+    const uow = new InMemoryUnitOfWork(new FakeClock());
+    const created = await uow.repositories().saves.create(input());
+    const store = uow.careerSaveStore();
+    expect(await store.versionOf('career-1')).toBe(1);
+    const next = {
+      ...created,
+      snapshot: { round: 1 },
+      checksum: checksumSnapshot({ round: 1 }),
+      version: 2,
+    };
+    await store.commit(next, 1, []);
+    await store.commit(next, 1, []);
+    expect((await store.peek('career-1'))?.snapshot).toEqual({ round: 1 });
+    await expect(
+      attempt(() =>
+        store.commit(
+          { ...next, snapshot: { round: 9 }, checksum: 'other' },
+          1,
+          [],
+        ),
+      ),
+    ).rejects.toBeInstanceOf(SaveConflictError);
+    await store.archive('career-1', 'user-1', 2);
+    expect(await store.versionOf('career-1')).toBeUndefined();
+  });
 });
