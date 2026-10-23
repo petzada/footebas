@@ -19,7 +19,7 @@ test('login dev, cria carreira, joga uma rodada e recupera após recarregar', as
   expect(roundBefore).toMatch(/rodada \d+/i);
 
   await playButton(page).click();
-  await page.getByRole('button', { name: /pular resultado/i }).click();
+  await page.getByRole('button', { name: /pular (para o )?resultado/i }).click();
   await expect(page.getByText(/fim de jogo/i)).toBeVisible();
   await page
     .getByRole('button', { name: /preparar próxima rodada/i })
