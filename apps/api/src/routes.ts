@@ -78,6 +78,11 @@ export interface ApiDependencies {
   readonly avatars?: AvatarRouteDependencies;
   /** Development-only sign-in that issues fake bearer tokens. Never in production. */
   readonly devAuth?: FakeBearerAuth;
+  /**
+   * Called after an accepted CreateCareer (also an idempotent replay); must
+   * not throw or block (the Worker warms the career's Durable Object).
+   */
+  readonly onCareerCreated?: (careerId: string) => void;
   /** Browser origins allowed to call the API (CORS). */
   readonly corsOrigins?: readonly string[];
   /** Serves /documentation (Swagger UI, Node only). */
@@ -302,6 +307,8 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
         const result = commandAcceptedSchema.parse(
           await app.execute(bearer(request), command),
         );
+        if (command.type === 'CreateCareer')
+          deps.onCareerCreated?.(result.careerId);
         return {
           status: 202,
           headers: { 'idempotency-key': command.idempotencyKey },

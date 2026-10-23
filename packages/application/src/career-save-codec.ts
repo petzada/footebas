@@ -9,6 +9,7 @@ import {
   type CommandRepository,
   type GameSave,
   type GameSaveRepository,
+  type IdempotentOptions,
   type NewGameSave,
   type SaveUpdate,
   type TransactionContext,
@@ -797,9 +798,13 @@ class LeanSaveUnitOfWork implements HydratedUnitOfWork {
     careerId: string,
     commandId: string,
     work: (tx: TransactionContext) => Promise<T>,
+    options?: IdempotentOptions,
   ): Promise<T> {
-    return this.inner.executeIdempotent(careerId, commandId, (tx) =>
-      work(this.wrap(tx)),
+    return this.inner.executeIdempotent(
+      careerId,
+      commandId,
+      (tx) => work(this.wrap(tx)),
+      options,
     );
   }
 }

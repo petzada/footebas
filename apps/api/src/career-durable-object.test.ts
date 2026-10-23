@@ -13,13 +13,18 @@ import {
   SequentialIdGenerator,
   storedSize,
 } from '@footebas/application';
-import { InMemoryUnitOfWork, type GameSave } from '@footebas/database';
+import {
+  InMemoryUnitOfWork,
+  type CareerSaveStore,
+  type GameSave,
+} from '@footebas/database';
 import { describe, expect, it } from 'vitest';
 import {
   CareerObject,
   careerForwarder,
   careerOfRoute,
   runJobInCareerObject,
+  warmCareerObject,
   type CareerObjectNamespace,
 } from './career-durable-object.js';
 import type { CareerObjectStorage } from './career-unit-of-work.js';
@@ -58,6 +63,27 @@ function setup() {
   const storages = new Map<string, FakeStorage>();
   const objects = new Map<string, CareerObject>();
   const calls: string[] = [];
+  /** Postgres reads and writes of the career objects (round trips). */
+  const storeCalls: string[] = [];
+  const store = (): CareerSaveStore => {
+    const inner = postgres.careerSaveStore();
+    const note = <T>(name: string, value: T): T => {
+      storeCalls.push(name);
+      return value;
+    };
+    return {
+      peek: (id) => note('peek', inner.peek(id)),
+      versionOf: (id) => note('versionOf', inner.versionOf(id)),
+      commit: (save, expected, achievements) =>
+        note('commit', inner.commit(save, expected, achievements)),
+      archive: (id, userId, expected) =>
+        note('archive', inner.archive(id, userId, expected)),
+      delete: (id, userId) => note('delete', inner.delete(id, userId)),
+      listAchievements: (id) =>
+        note('listAchievements', inner.listAchievements(id)),
+    };
+  };
+  const created: string[] = [];
   const objectFor = (careerId: string) => {
     let object = objects.get(careerId);
     if (object === undefined) {
@@ -66,7 +92,7 @@ function setup() {
         storages.set(careerId, (storage = new FakeStorage()));
       object = new CareerObject({
         storage,
-        store: () => postgres.careerSaveStore(),
+        store,
         jobs: () => jobs,
         auth,
         clock,
@@ -116,6 +142,7 @@ function setup() {
           }),
           auth,
         },
+        onCareerCreated: (careerId) => created.push(careerId),
       },
       forward ? { forward: careerForwarder(namespace) } : {},
     );
@@ -128,6 +155,8 @@ function setup() {
     jobs,
     storages,
     calls,
+    storeCalls,
+    created,
     namespace,
     owner,
     stranger,
@@ -459,6 +488,107 @@ describe('Durable Object por carreira (ADR 0014)', () => {
         .status,
     ).toBe(404);
     expect((await remove()).status).toBe(202);
+  });
+});
+
+describe('carreira nova: aquecimento do objeto e idas ao Postgres', () => {
+  const createCareer = async (
+    context: ReturnType<typeof setup>,
+    key?: string,
+  ) =>
+    json<Accepted>(
+      await send(
+        context.api,
+        context.owner,
+        'CreateCareer',
+        0,
+        { managerName: 'Marcio', startDate: '2026-01-01' },
+        key,
+      ),
+    );
+  const selectClub = (context: ReturnType<typeof setup>, careerId: string) =>
+    send(context.api, context.owner, 'SelectClub', 1, {
+      careerId,
+      clubId: 'club_flamengo',
+    });
+
+  it('avisa o Worker de cada CreateCareer aceito, inclusive repetição', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context, 'idem-key-create');
+    expect(context.created).toEqual([careerId]);
+    expect((await selectClub(context, careerId)).status).toBe(202);
+    expect(context.created).toEqual([careerId]);
+    expect((await createCareer(context, 'idem-key-create')).careerId).toBe(
+      careerId,
+    );
+    expect(context.created).toEqual([careerId, careerId]);
+  });
+
+  it('sem aquecimento, o primeiro comando lê o save uma vez (sem checar versão antes)', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    expect((await selectClub(context, careerId)).status).toBe(202);
+    expect(context.storeCalls).toEqual(['peek', 'commit']);
+  });
+
+  it('aquecido, o SelectClub não recarrega a carreira do Postgres', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    await warmCareerObject(context.namespace, careerId);
+    expect(context.calls).toEqual(['POST /internal/careers/warm']);
+    expect(context.storeCalls).toEqual(['peek']);
+    expect(context.storages.get(careerId)!.values.get('save')).toMatchObject({
+      id: careerId,
+      version: 1,
+    });
+    expect((await selectClub(context, careerId)).status).toBe(202);
+    expect(context.storeCalls).toEqual(['peek', 'commit']);
+    // Warming an object that is already loaded touches nothing.
+    await warmCareerObject(context.namespace, careerId);
+    expect(context.storeCalls).toEqual(['peek', 'commit']);
+    const home = await json<{ aggregateVersion: number }>(
+      await read(context.api, context.owner, `/v1/careers/${careerId}/home`),
+    );
+    expect(home.aggregateVersion).toBe(2);
+  });
+
+  it('aquecimento e comando simultâneos: uma carga, comando aplicado', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    const [, selected] = await Promise.all([
+      warmCareerObject(context.namespace, careerId),
+      selectClub(context, careerId),
+    ]);
+    expect(selected.status).toBe(202);
+    expect(context.storeCalls).toEqual(['peek', 'commit']);
+    expect((await stored(context, careerId)).version).toBe(2);
+  });
+
+  it('reiniciado depois do aquecimento, confere a versão e usa a cópia local', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    await warmCareerObject(context.namespace, careerId);
+    context.restart(careerId);
+    expect((await selectClub(context, careerId)).status).toBe(202);
+    expect(context.storeCalls).toEqual(['peek', 'versionOf', 'commit']);
+  });
+
+  it('aquecer carreira apagada não falha e ela segue invisível', async () => {
+    const context = setup();
+    const { careerId } = await createCareer(context);
+    expect(
+      (
+        await send(context.api, context.owner, 'DeleteCareer', 1, {
+          careerId,
+        })
+      ).status,
+    ).toBe(202);
+    context.restart(careerId);
+    await warmCareerObject(context.namespace, careerId);
+    expect(
+      (await read(context.api, context.owner, `/v1/careers/${careerId}/home`))
+        .status,
+    ).toBe(404);
   });
 });
 

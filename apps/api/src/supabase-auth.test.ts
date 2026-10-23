@@ -1,6 +1,6 @@
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { describe, expect, it } from 'vitest';
-import { SupabaseJwtAuth } from './supabase-auth.js';
+import { describe, expect, it, vi } from 'vitest';
+import { projectKeys, SupabaseJwtAuth } from './supabase-auth.js';
 
 const projectUrl = 'https://example-ref.supabase.co';
 
@@ -49,5 +49,42 @@ describe('Supabase Auth na API', () => {
     await expect(auth.authenticate(foreign)).rejects.toThrow(/invalid/);
     const token = await sign({ email: 'a@b.com' });
     await expect(auth.authenticate(`${token}x`)).rejects.toThrow(/invalid/);
+  });
+
+  it('busca o JWKS do projeto uma vez por isolate, não a cada requisição', async () => {
+    const { privateKey, publicKey } = await generateKeyPair('ES256');
+    const jwk = { ...(await exportJWK(publicKey)), kid: 'key-1', alg: 'ES256' };
+    const project = 'https://cached-ref.supabase.co';
+    const jwks = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ keys: [jwk] }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    vi.stubGlobal('fetch', jwks);
+    try {
+      const token = await new SignJWT({ email: 'a@b.com' })
+        .setProtectedHeader({ alg: 'ES256', kid: 'key-1' })
+        .setIssuer(`${project}/auth/v1`)
+        .setAudience('authenticated')
+        .setSubject('user-1')
+        .setExpirationTime('1h')
+        .sign(privateKey);
+      // The Worker builds one SupabaseJwtAuth per request.
+      for (let request = 0; request < 3; request++)
+        await expect(
+          new SupabaseJwtAuth({ projectUrl: project }).authenticate(token),
+        ).resolves.toMatchObject({ userId: 'user-1' });
+      expect(jwks).toHaveBeenCalledTimes(1);
+      expect(projectKeys(`${project}/auth/v1`)).toBe(
+        projectKeys(`${project}/auth/v1`),
+      );
+      expect(projectKeys(`${project}/auth/v1`)).not.toBe(
+        projectKeys(`${projectUrl}/auth/v1`),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

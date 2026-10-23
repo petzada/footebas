@@ -414,12 +414,17 @@ export class FootebasApplication {
         'new careers require expectedVersion 0',
       );
     const careerId = await careerIdFor(userId, command.idempotencyKey);
+    // The plan does not depend on the career lock: read it while the
+    // transaction opens instead of after (one round trip less). An
+    // idempotent replay does not need it; its failure is then ignored.
+    const plan = this.entitlements.forUser(userId);
+    plan.catch(() => undefined);
     const response = await this.unitOfWork.executeIdempotent(
       careerId,
       command.idempotencyKey,
       async (tx) => {
-        const entitlements = await this.entitlements.forUser(userId);
         const active = await tx.saves.countActiveByUser(userId);
+        const entitlements = await plan;
         if (active >= entitlements.maxCareers)
           throw new CareerLimitReachedError(entitlements, active);
         const content = this.loadContent();
@@ -473,6 +478,7 @@ export class FootebasApplication {
         this.deps.telemetry.event('career.created', { careerId });
         return asCanonical(this.accepted(command, save));
       },
+      { countsCareersOf: userId },
     );
     return commandAcceptedSchema.parse(response);
   }
@@ -1854,10 +1860,14 @@ export class FootebasApplication {
     userId: string,
     careerId: string,
   ): Promise<void> {
+    // A dedicated slots port is read alongside the plan (one round trip
+    // instead of two); a licensed plan ignores its answer and its failure.
+    const slots = this.deps.careerSlots?.activeCareerIds(userId);
+    slots?.catch(() => undefined);
     const entitlements = await this.entitlements.forUser(userId);
     // The license allows as many careers as can be created.
     if (entitlements.plan === 'licensed') return;
-    const ids = await this.activeCareerIds(tx, userId);
+    const ids = await (slots ?? this.activeCareerIds(tx, userId));
     if (isCareerLocked(ids, careerId, entitlements))
       throw new CareerLockedError(careerId, entitlements);
   }
