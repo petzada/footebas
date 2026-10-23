@@ -40,6 +40,17 @@ const RENEWAL_RAISE = 1.1;
 const CONTRACT_NOTICE_FROM = '-10-01';
 const RENEWAL_REQUEST_FROM = '-07-01';
 const MAX_CONTRACT_NOTICES = 3;
+/** Days before the same athlete asks for minutes again (any answer). */
+export const MINUTES_COOLDOWN_DAYS = 60;
+/** Answers after which the athlete does not ask again in the season. */
+const MINUTES_CLOSING_OPTIONS: ReadonlySet<string> = new Set([
+  'deny',
+  'list_player',
+]);
+const minutesAskedKey = (playerId: string, date: string) =>
+  `player_minutes_asked|${playerId}|${date}`;
+const minutesClosedKey = (playerId: string, year: string) =>
+  `player_minutes_closed|${playerId}|${year}`;
 
 export interface InboxEffect {
   board?: number;
@@ -579,8 +590,48 @@ function boardMessages(context: Context, input: InboxDayInput): void {
   });
 }
 
-/** A benched top player asks for minutes, at most once a month. */
+/**
+ * Whether this athlete may ask for minutes today: not after the coach said
+ * no or listed him this season, not within the cooldown of his last request
+ * (answered or ignored), and not while he is on the transfer list.
+ */
+function mayAskForMinutes(context: Context, playerId: string): boolean {
+  const year = context.date.slice(0, 4);
+  if (context.inbox.keys.includes(minutesClosedKey(playerId, year)))
+    return false;
+  const since = addDays(context.date, -MINUTES_COOLDOWN_DAYS);
+  const prefix = minutesAskedKey(playerId, '');
+  if (
+    context.inbox.keys.some(
+      (key) => key.startsWith(prefix) && key.slice(prefix.length) > since,
+    ) ||
+    context.inbox.messages.some(
+      (message) =>
+        message.topic === 'player_minutes' &&
+        message.playerId === playerId &&
+        message.occurredOn > since,
+    )
+  )
+    return false;
+  return !(context.snapshot.world.market?.listings ?? []).some(
+    (listing) => listing.playerId === playerId,
+  );
+}
+
+/**
+ * A benched top player asks for minutes: at most once a month, one request
+ * open at a time, each athlete respecting his cooldown and the answer given.
+ */
 function minutesRequest(context: Context, played: PlayedManagedMatch): void {
+  if (
+    context.inbox.messages.some(
+      (message) =>
+        message.topic === 'player_minutes' &&
+        message.status === 'pending' &&
+        message.expiresOn >= context.date,
+    )
+  )
+    return;
   const side = played.fixture.homeClubId === context.clubId ? 'home' : 'away';
   const started = new Set(
     (played.result.playerPerformances ?? [])
@@ -596,10 +647,16 @@ function minutesRequest(context: Context, played: PlayedManagedMatch): void {
     );
   const player = squad
     .slice(0, 9)
-    .find((candidate) => !started.has(candidate.id));
+    .find(
+      (candidate) =>
+        !started.has(candidate.id) && mayAskForMinutes(context, candidate.id),
+    );
   if (player === undefined) return;
   const names = { player: player.name };
-  push(context, `player_minutes|${context.date.slice(0, 7)}`, {
+  const monthKey = `player_minutes|${context.date.slice(0, 7)}`;
+  if (context.inbox.keys.includes(monthKey)) return;
+  context.inbox.keys.push(minutesAskedKey(player.id, context.date));
+  push(context, monthKey, {
     kind: 'player_request',
     topic: 'player_minutes',
     subject: `${player.name} pede mais minutos`,
@@ -784,6 +841,16 @@ export function resolveInboxDecision(
     throw new InboxRuleError('VALIDATION_ERROR', 'inbox message expired');
   }
   applyEffect(snapshot, message, chosen.effect);
+  if (
+    message.topic === 'player_minutes' &&
+    message.playerId !== undefined &&
+    MINUTES_CLOSING_OPTIONS.has(optionId)
+  ) {
+    snapshot.inbox ??= emptyInbox();
+    snapshot.inbox.keys.push(
+      minutesClosedKey(message.playerId, snapshot.currentDate.slice(0, 4)),
+    );
+  }
   message.status = 'resolved';
   message.chosenOptionId = optionId;
   message.resolvedOn = snapshot.currentDate;
