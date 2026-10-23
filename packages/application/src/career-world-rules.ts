@@ -310,6 +310,8 @@ export interface SeasonEndInput {
   readonly generation: SeasonGeneration;
   readonly divisionCompetitionIds: Readonly<Record<string, string>>;
   readonly managedForm: readonly ('W' | 'D' | 'L')[];
+  /** Clubs of next season's national pyramid; only they can offer jobs. */
+  readonly pyramidClubIds: readonly string[];
 }
 
 function payPrizes(context: WorldContext, input: SeasonEndInput): void {
@@ -498,8 +500,10 @@ function boardVerdict(context: WorldContext, input: SeasonEndInput): void {
       clubId: firedFrom,
     });
   }
+  const pyramid = new Set(input.pyramidClubIds);
   const vacancies = context.clubs
     .filter((club) => club.id !== world.manager.currentClubId)
+    .filter((club) => pyramid.has(club.id))
     .filter(
       (club) =>
         hashSeed(`${input.seed}|vacancy|${String(input.season)}|${club.id}`) %

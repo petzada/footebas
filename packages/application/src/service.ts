@@ -1303,6 +1303,7 @@ function rollSeason(
       generation: closure.generation,
       divisionCompetitionIds: system.ids.divisions,
       managedForm,
+      pyramidClubIds: Object.values(closure.next.divisions).flat(),
     }),
   );
   snapshot.competition = createCareerSeason(config, closure.next);

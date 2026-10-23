@@ -1,25 +1,32 @@
 // Regenerates the launch catalog from the immutable research Markdown.
 // Usage: pnpm --filter @footebas/content generate
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCatalog } from '../src/build.js';
+import { buildCatalog, type ExtraClubConfig } from '../src/build.js';
 
-const CONTENT_VERSION = 'catalog-2026-07-v1';
+const CONTENT_VERSION = 'catalog-2026-07-v2';
 const SNAPSHOT_DATE = '2026-07';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 
-const configPath = 'tools/sim-lab/config/mvp-competitions.json';
+const configPath = 'packages/content/config/competitions-2026.json';
 const config = JSON.parse(read(configPath)) as {
   sources: Record<string, string>;
 };
 const glueFile = 'dados/elencos/forca-relativa-cola.md';
+const highlightsFile = 'dados/elencos/destaques-2026.md';
+const extras = JSON.parse(read('packages/content/config/extra-clubs.json')) as {
+  clubs: ExtraClubConfig[];
+};
+const hasHighlights = existsSync(join(root, highlightsFile));
 const files = Object.fromEntries(
-  [...Object.values(config.sources), glueFile].map((path) => [
-    path,
-    read(path),
-  ]),
+  [
+    ...Object.values(config.sources),
+    glueFile,
+    ...extras.clubs.map(({ source }) => source),
+    ...(hasHighlights ? [highlightsFile] : []),
+  ].map((path) => [path, read(path)]),
 );
 
 const catalog = buildCatalog({
@@ -28,6 +35,8 @@ const catalog = buildCatalog({
   files,
   competitionConfig: config,
   glueFile,
+  extraClubs: extras.clubs,
+  ...(hasHighlights ? { highlightsFile } : {}),
 });
 
 const outDir = join(root, 'packages', 'content', 'src', 'generated');
@@ -53,6 +62,13 @@ const report = [
   `- Clubes: ${String(catalog.clubs.length)}`,
   `- Jogadores: ${String(catalog.players.length)}`,
   `- Clubes [parcial]: ${String(catalog.clubs.filter(({ partial }) => partial).length)}`,
+  `- Clubes por origem: ${(['national', 'state', 'foreign'] as const)
+    .map(
+      (origin) =>
+        `${origin} ${String(catalog.clubs.filter((club) => club.origin === origin).length)}`,
+    )
+    .join(', ')}`,
+  `- Destaques: ${String(catalog.players.filter(({ highlight }) => highlight?.level === 'craque').length)} craques, ${String(catalog.players.filter(({ highlight }) => highlight?.level === 'destaque').length)} destaques`,
   '',
   '## Lacunas mantidas explícitas (nada foi inventado)',
   '',

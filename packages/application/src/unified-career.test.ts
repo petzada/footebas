@@ -201,7 +201,7 @@ describe('carreira única: mundo, competições e partida no mesmo save', () => 
         true,
       );
       expect(world.history.filter(({ type }) => type === 'title')).toHaveLength(
-        10,
+        12,
       );
       expect(
         world.history.filter(({ type }) => type === 'promotion'),

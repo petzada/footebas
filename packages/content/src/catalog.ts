@@ -6,7 +6,15 @@ import {
 } from '@footebas/engine';
 
 export const CATALOG_SCHEMA_VERSION = 'footebas-catalog-v1' as const;
-export const ATTRIBUTE_DERIVATION_VERSION = 'relative-strength-derived-v2';
+export const ATTRIBUTE_DERIVATION_VERSION = 'relative-strength-derived-v3';
+export const MAXIMUM_SQUAD = 35;
+
+/** Research-backed standout status; drives the in-game competitive edge. */
+export interface CatalogHighlight {
+  readonly level: 'craque' | 'destaque';
+  readonly reason: string;
+  readonly source: string;
+}
 
 /** Shirt as researched: unknown (`#?`), absent (`—`) and conflicts stay explicit. */
 export type CatalogShirt =
@@ -29,6 +37,7 @@ export interface CatalogPlayer {
   readonly preferredSide?: PreferredSide;
   readonly shirt: CatalogShirt;
   readonly source: CatalogSource;
+  readonly highlight?: CatalogHighlight;
   /** Every number below is `derived`, never research data. */
   readonly derived: Readonly<{
     version: string;
@@ -52,7 +61,10 @@ export interface CatalogClub {
   readonly name: string;
   readonly shortName: string;
   readonly location?: string;
-  readonly division: MvpDivisionId;
+  /** Only clubs of the national pyramid have a division. */
+  readonly division?: MvpDivisionId;
+  readonly origin: 'national' | 'state' | 'foreign';
+  readonly country: string;
   readonly tier: string;
   readonly tierRank: number;
   readonly partial: boolean;
@@ -67,7 +79,11 @@ export interface CatalogNote {
     | 'absent-shirt'
     | 'shirt-conflict'
     | 'repeated-name-in-club'
-    | 'name-in-several-clubs';
+    | 'name-in-several-clubs'
+    | 'excluded-over-cap'
+    | 'club-without-playable-squad'
+    | 'highlight-not-in-roster'
+    | 'assumed-strength-tier';
   readonly subject: string;
   readonly source: CatalogSource;
 }
@@ -125,6 +141,8 @@ export function parseCatalog(value: unknown): ContentCatalog {
       goalkeepers.set(player.clubId, (goalkeepers.get(player.clubId) ?? 0) + 1);
   }
   for (const club of catalog.clubs) {
+    if ((byClub.get(club.id) ?? 0) > MAXIMUM_SQUAD)
+      fail(`club ${club.id} exceeds ${String(MAXIMUM_SQUAD)} players`);
     if ((byClub.get(club.id) ?? 0) < 18)
       fail(`club ${club.id} has fewer than 18 players`);
     if ((goalkeepers.get(club.id) ?? 0) < 2)
@@ -134,6 +152,9 @@ export function parseCatalog(value: unknown): ContentCatalog {
         fail(`club ${club.id} references unknown player ${playerId}`);
   }
   const competitions = parseMvpCompetitionConfig(catalog.competitions);
+  for (const clubId of competitions.continental.fixedClubIds)
+    if (!clubIds.has(clubId))
+      fail(`continental references unknown fixed club ${clubId}`);
   for (const league of competitions.stateLeagues)
     for (const [clubId] of league.participants)
       if (!clubIds.has(clubId))

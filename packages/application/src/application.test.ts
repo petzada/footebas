@@ -346,7 +346,8 @@ describe('server-authoritative application slice', () => {
 
   it('builds a career from the launch catalog with every competition scheduled', async () => {
     const content = catalogCareerContent.load();
-    expect(content.clubs).toHaveLength(60);
+    expect(content.clubs).toHaveLength(71);
+    expect(Object.values(content.divisions).flat()).toHaveLength(60);
     const { app, token } = setup();
     const careerId = await createAndSelect(app, token);
     const next = await app.nextMatch(token, careerId);

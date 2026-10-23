@@ -169,7 +169,10 @@ export function createCareerSeason(
   const continental = definitionOf(system, system.ids.continental);
   seeded.set(continental.id, {
     [continental.stages[0]!.id]: input.continentalPreliminary,
-    groups: input.continentalDirect,
+    groups: [
+      ...input.continentalDirect,
+      ...config.continental.fixedClubIds.map((clubId) => clubId as ClubId),
+    ],
   });
 
   const fixtures: CompetitionCalendarFixture[] = [];

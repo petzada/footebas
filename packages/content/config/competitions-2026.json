@@ -1,0 +1,200 @@
+{
+  "schemaVersion": "footebas-mvp-competitions-v1",
+  "seasonDays": 200,
+  "minimumRestDays": 1,
+  "reservedMatchDays": [0, 1, 199],
+  "sources": {
+    "serie-a": "dados/elencos/brasileirao-serie-a-2026.md",
+    "serie-b": "dados/elencos/brasileirao-serie-b-2026.md",
+    "serie-c": "dados/elencos/brasileirao-serie-c-2026.md",
+    "states": "dados/elencos/estaduais-1a-divisao-2026.md",
+    "cup": "dados/elencos/copa-do-brasil-2026.md",
+    "continental": "dados/elencos/copa-libertadores-2026.md"
+  },
+  "nationalLeagues": [
+    {
+      "id": "brasileirao-serie-a",
+      "name": "Brasileirão Série A",
+      "division": "serie-a",
+      "clubs": 20,
+      "roundRobinLegs": 2,
+      "promoted": 0,
+      "relegated": 4,
+      "firstMatchDay": 48,
+      "matchDayInterval": 4
+    },
+    {
+      "id": "brasileirao-serie-b",
+      "name": "Brasileirão Série B",
+      "division": "serie-b",
+      "clubs": 20,
+      "roundRobinLegs": 2,
+      "promoted": 4,
+      "relegated": 4,
+      "firstMatchDay": 48,
+      "matchDayInterval": 4
+    },
+    {
+      "id": "brasileirao-serie-c",
+      "name": "Brasileirão Série C",
+      "division": "serie-c",
+      "clubs": 20,
+      "roundRobinLegs": 2,
+      "promoted": 4,
+      "relegated": 0,
+      "firstMatchDay": 48,
+      "matchDayInterval": 4
+    }
+  ],
+  "nationalCup": {
+    "id": "copa-do-brasil",
+    "name": "Copa do Brasil",
+    "participantSelector": "all-national-clubs",
+    "legsByRound": [1, 1, 1, 1, 1, 1],
+    "matchDays": [114, 118, 122, 126, 130, 134]
+  },
+  "stateLeagues": [
+    {
+      "id": "paulistao",
+      "name": "Paulistão",
+      "sourceSection": "Paulistão",
+      "firstMatchDay": 2,
+      "matchDayInterval": 3,
+      "participants": [
+        ["serie-a:corinthians", "Corinthians"],
+        ["serie-a:mirassol", "Mirassol"],
+        ["serie-a:palmeiras", "Palmeiras"],
+        ["serie-a:red-bull-bragantino", "Red Bull Bragantino"],
+        ["serie-a:santos", "Santos"],
+        ["serie-a:sao-paulo", "São Paulo"],
+        ["serie-b:botafogo-sp", "Botafogo-SP"],
+        ["serie-b:novorizontino", "Novorizontino"],
+        ["serie-b:ponte-preta", "Ponte Preta"],
+        ["serie-b:sao-bernardo", "São Bernardo"],
+        ["serie-c:guarani", "Guarani"],
+        ["state:primavera", "Primavera"]
+      ]
+    },
+    {
+      "id": "carioca",
+      "name": "Carioca",
+      "sourceSection": "Carioca",
+      "firstMatchDay": 2,
+      "matchDayInterval": 3,
+      "participants": [
+        ["serie-a:botafogo", "Botafogo"],
+        ["serie-a:flamengo", "Flamengo"],
+        ["serie-a:fluminense", "Fluminense"],
+        ["serie-a:vasco-da-gama", "Vasco da Gama"],
+        ["serie-c:volta-redonda", "Volta Redonda"]
+      ]
+    },
+    {
+      "id": "mineiro",
+      "name": "Mineiro",
+      "sourceSection": "Mineiro",
+      "firstMatchDay": 2,
+      "matchDayInterval": 3,
+      "participants": [
+        ["serie-a:atletico-mineiro", "Atlético-MG"],
+        ["serie-a:cruzeiro", "Cruzeiro"],
+        ["serie-b:america-mineiro", "América-MG"],
+        ["serie-b:athletic-club", "Athletic Club"]
+      ]
+    },
+    {
+      "id": "gaucho",
+      "name": "Gaúcho",
+      "sourceSection": "Gaúcho",
+      "firstMatchDay": 2,
+      "matchDayInterval": 3,
+      "participants": [
+        ["serie-a:gremio", "Grêmio"],
+        ["serie-a:internacional", "Internacional"],
+        ["serie-b:juventude", "Juventude"],
+        ["serie-c:caxias", "Caxias"],
+        ["serie-c:ypiranga-rs", "Ypiranga"]
+      ]
+    },
+    {
+      "id": "paranaense",
+      "name": "Paranaense",
+      "sourceSection": "Paranaense",
+      "firstMatchDay": 2,
+      "matchDayInterval": 3,
+      "participants": [
+        ["serie-a:athletico-paranaense", "Athletico Paranaense"],
+        ["serie-a:coritiba", "Coritiba"],
+        ["serie-b:londrina", "Londrina"],
+        ["serie-b:operario-pr", "Operário-PR"],
+        ["serie-c:maringa", "Maringá"]
+      ]
+    },
+    {
+      "id": "catarinense",
+      "name": "Catarinense",
+      "sourceSection": "Catarinense",
+      "firstMatchDay": 2,
+      "matchDayInterval": 3,
+      "participants": [
+        ["serie-b:avai", "Avaí"],
+        ["serie-b:criciuma", "Criciúma"],
+        ["serie-a:chapecoense", "Chapecoense"],
+        ["serie-c:brusque", "Brusque"],
+        ["serie-c:barra-sc", "Barra-SC"],
+        ["serie-c:figueirense", "Figueirense"]
+      ]
+    },
+    {
+      "id": "goiano",
+      "name": "Goiano",
+      "sourceSection": "Goiano",
+      "firstMatchDay": 2,
+      "matchDayInterval": 3,
+      "participants": [
+        ["serie-b:goias", "Goiás"],
+        ["serie-b:vila-nova", "Vila Nova"],
+        ["serie-b:atletico-goianiense", "Atlético-GO"],
+        ["serie-c:anapolis", "Anápolis"]
+      ]
+    }
+  ],
+  "continental": {
+    "id": "copa-libertadores",
+    "name": "Copa Libertadores",
+    "initialDirectClubIds": [
+      "serie-a:flamengo",
+      "serie-a:corinthians",
+      "serie-a:palmeiras",
+      "serie-a:cruzeiro"
+    ],
+    "initialPreliminaryClubIds": [
+      "serie-a:mirassol",
+      "serie-a:fluminense",
+      "serie-a:botafogo",
+      "serie-a:bahia"
+    ],
+    "directSlots": 4,
+    "preliminarySlots": 4,
+    "groupCount": 4,
+    "groupSize": 4,
+    "qualifiersPerGroup": 2,
+    "preliminaryLegs": 2,
+    "knockoutLegs": 2,
+    "preliminaryMatchDays": [42, 46],
+    "groupMatchDays": [50, 54, 58, 62, 66, 70],
+    "knockoutMatchDays": [74, 78, 82, 86, 90, 94],
+    "fixedClubIds": [
+      "foreign:estudiantes",
+      "foreign:independiente-rivadavia",
+      "foreign:universidad-catolica",
+      "foreign:coquimbo-unido",
+      "foreign:cerro-porteno",
+      "foreign:ldu-quito",
+      "foreign:independiente-del-valle",
+      "foreign:rosario-central",
+      "foreign:platense",
+      "foreign:deportes-tolima"
+    ]
+  }
+}

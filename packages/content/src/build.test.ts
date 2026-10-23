@@ -1,27 +1,36 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildCatalog } from './build.js';
+import { buildCatalog, type ExtraClubConfig } from './build.js';
 import { parseCatalog } from './catalog.js';
 import { loadCatalog } from './index.js';
 
 const root = join(import.meta.dirname, '..', '..', '..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 const config = JSON.parse(
-  read('tools/sim-lab/config/mvp-competitions.json'),
+  read('packages/content/config/competitions-2026.json'),
 ) as { sources: Record<string, string> };
+const extras = JSON.parse(read('packages/content/config/extra-clubs.json')) as {
+  clubs: ExtraClubConfig[];
+};
 const glueFile = 'dados/elencos/forca-relativa-cola.md';
+const highlightsFile = 'dados/elencos/destaques-2026.md';
+const hasHighlights = existsSync(join(root, highlightsFile));
 const input = {
-  contentVersion: 'catalog-2026-07-v1',
+  contentVersion: 'catalog-2026-07-v2',
   snapshotDate: '2026-07',
   files: Object.fromEntries(
-    [...Object.values(config.sources), glueFile].map((path) => [
-      path,
-      read(path),
-    ]),
+    [
+      ...Object.values(config.sources),
+      glueFile,
+      ...extras.clubs.map(({ source }) => source),
+      ...(hasHighlights ? [highlightsFile] : []),
+    ].map((path) => [path, read(path)]),
   ),
   competitionConfig: config,
   glueFile,
+  extraClubs: extras.clubs,
+  ...(hasHighlights ? { highlightsFile } : {}),
 };
 
 describe('catálogo canônico de conteúdo', () => {
@@ -33,7 +42,9 @@ describe('catálogo canônico de conteúdo', () => {
 
   it('cobre as três divisões com IDs independentes de divisão', () => {
     const catalog = loadCatalog();
-    expect(catalog.clubs).toHaveLength(60);
+    expect(
+      catalog.clubs.filter(({ origin }) => origin === 'national'),
+    ).toHaveLength(60);
     for (const division of ['serie-a', 'serie-b', 'serie-c'])
       expect(
         catalog.clubs.filter((club) => club.division === division),
@@ -57,7 +68,7 @@ describe('catálogo canônico de conteúdo', () => {
     );
     for (const player of catalog.players) {
       expect(player.source.file).toMatch(/^dados\/elencos\//);
-      expect(player.derived.version).toBe('relative-strength-derived-v2');
+      expect(player.derived.version).toBe('relative-strength-derived-v3');
     }
   });
 
@@ -102,5 +113,42 @@ describe('catálogo canônico de conteúdo', () => {
         ),
       }),
     ).toThrow(/unknown club/);
+  });
+
+  it('inclui estrangeiros da Libertadores e clubes estaduais com elenco jogável', () => {
+    const catalog = loadCatalog();
+    const foreign = catalog.clubs.filter(({ origin }) => origin === 'foreign');
+    expect(foreign).toHaveLength(10);
+    expect(foreign.every(({ division }) => division === undefined)).toBe(true);
+    expect(catalog.competitions.continental.fixedClubIds).toEqual(
+      foreign.map(({ id }) => id),
+    );
+    expect(catalog.clubs.find(({ name }) => name === 'Primavera')?.origin).toBe(
+      'state',
+    );
+    expect(
+      catalog.competitions.stateLeagues
+        .find(({ id }) => id === 'paulistao')
+        ?.participants.some(([id]) => id === 'club_primavera'),
+    ).toBe(true);
+    expect(
+      catalog.notes.filter(
+        ({ kind }) => kind === 'club-without-playable-squad',
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('limita cada elenco a 35 atletas sem perder o piso por posição', () => {
+    const catalog = loadCatalog();
+    for (const club of catalog.clubs) {
+      const roster = catalog.players.filter(({ clubId }) => clubId === club.id);
+      expect(roster.length).toBeLessThanOrEqual(35);
+      expect(
+        roster.filter(({ position }) => position === 'GK').length,
+      ).toBeGreaterThanOrEqual(2);
+    }
+    expect(
+      catalog.notes.filter(({ kind }) => kind === 'excluded-over-cap').length,
+    ).toBeGreaterThan(0);
   });
 });

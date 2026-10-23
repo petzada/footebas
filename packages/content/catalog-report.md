@@ -1,19 +1,23 @@
-# Relatório do catálogo catalog-2026-07-v1
+# Relatório do catálogo catalog-2026-07-v2
 
 Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/brasileirao-serie-b-2026.md`, `dados/elencos/brasileirao-serie-c-2026.md`, `dados/elencos/estaduais-1a-divisao-2026.md`, `dados/elencos/copa-do-brasil-2026.md`, `dados/elencos/copa-libertadores-2026.md`, `dados/elencos/forca-relativa-cola.md`.
 
-- Clubes: 60
-- Jogadores: 2230
-- Clubes [parcial]: 30
+- Clubes: 71
+- Jogadores: 2310
+- Clubes [parcial]: 31
+- Clubes por origem: national 60, state 1, foreign 10
+- Destaques: 0 craques, 0 destaques
 
 ## Lacunas mantidas explícitas (nada foi inventado)
 
-- `absent-shirt`: 267
+- `absent-shirt`: 177
 - `repeated-name-in-club`: 2
 - `shirt-conflict`: 4
-- `partial-club`: 30
-- `unknown-shirt`: 452
-- `name-in-several-clubs`: 546
+- `excluded-over-cap`: 222
+- `partial-club`: 31
+- `unknown-shirt`: 446
+- `assumed-strength-tier`: 11
+- `name-in-several-clubs`: 492
 
 ## Detalhe
 
@@ -58,11 +62,11 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | shirt-conflict | player_mirassol_everton_galdino | dados/elencos/brasileirao-serie-a-2026.md:480 |
 | absent-shirt | player_mirassol_luiz_filipe | dados/elencos/brasileirao-serie-a-2026.md:482 |
 | absent-shirt | player_palmeiras_naves | dados/elencos/brasileirao-serie-a-2026.md:499 |
+| excluded-over-cap | club_red_bull_bragantino:Ignacio Laquintana | dados/elencos/brasileirao-serie-a-2026.md:559 |
+| excluded-over-cap | club_red_bull_bragantino:Thiago Borbas | dados/elencos/brasileirao-serie-a-2026.md:561 |
+| excluded-over-cap | club_red_bull_bragantino:Gabriel Novaes | dados/elencos/brasileirao-serie-a-2026.md:564 |
 | absent-shirt | player_red_bull_bragantino_gustavo_marques | dados/elencos/brasileirao-serie-a-2026.md:532 |
 | absent-shirt | player_red_bull_bragantino_bruninho | dados/elencos/brasileirao-serie-a-2026.md:552 |
-| absent-shirt | player_red_bull_bragantino_ignacio_laquintana | dados/elencos/brasileirao-serie-a-2026.md:559 |
-| absent-shirt | player_red_bull_bragantino_thiago_borbas | dados/elencos/brasileirao-serie-a-2026.md:561 |
-| absent-shirt | player_red_bull_bragantino_gabriel_novaes | dados/elencos/brasileirao-serie-a-2026.md:564 |
 | absent-shirt | player_remo_ze_ivaldo | dados/elencos/brasileirao-serie-a-2026.md:570 |
 | absent-shirt | player_remo_matheus_felipe | dados/elencos/brasileirao-serie-a-2026.md:572 |
 | absent-shirt | player_remo_edson_kaua | dados/elencos/brasileirao-serie-a-2026.md:579 |
@@ -74,26 +78,56 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | absent-shirt | player_santos_alex | dados/elencos/brasileirao-serie-a-2026.md:612 |
 | absent-shirt | player_santos_gustavo_caballero | dados/elencos/brasileirao-serie-a-2026.md:631 |
 | absent-shirt | player_santos_enzo_boer | dados/elencos/brasileirao-serie-a-2026.md:635 |
-| absent-shirt | player_sao_paulo_matheus_belem | dados/elencos/brasileirao-serie-a-2026.md:646 |
-| absent-shirt | player_sao_paulo_aurelio_buta | dados/elencos/brasileirao-serie-a-2026.md:654 |
-| absent-shirt | player_sao_paulo_newton | dados/elencos/brasileirao-serie-a-2026.md:661 |
-| absent-shirt | player_sao_paulo_victor_sa | dados/elencos/brasileirao-serie-a-2026.md:672 |
+| excluded-over-cap | club_sao_paulo:Matheus Belém | dados/elencos/brasileirao-serie-a-2026.md:646 |
+| excluded-over-cap | club_sao_paulo:Aurélio Buta | dados/elencos/brasileirao-serie-a-2026.md:654 |
+| excluded-over-cap | club_sao_paulo:Newton | dados/elencos/brasileirao-serie-a-2026.md:661 |
+| excluded-over-cap | club_sao_paulo:Victor Sá | dados/elencos/brasileirao-serie-a-2026.md:672 |
+| excluded-over-cap | club_sao_paulo:Jonathan Calleri | dados/elencos/brasileirao-serie-a-2026.md:679 |
+| excluded-over-cap | club_sao_paulo:Luciano | dados/elencos/brasileirao-serie-a-2026.md:680 |
+| excluded-over-cap | club_sao_paulo:Paulinho | dados/elencos/brasileirao-serie-a-2026.md:681 |
 | absent-shirt | player_vasco_da_gama_riquelme | dados/elencos/brasileirao-serie-a-2026.md:694 |
 | absent-shirt | player_vasco_da_gama_paulinho | dados/elencos/brasileirao-serie-a-2026.md:695 |
 | absent-shirt | player_vasco_da_gama_guilherme_estrella | dados/elencos/brasileirao-serie-a-2026.md:707 |
 | absent-shirt | player_vasco_da_gama_loide_augusto | dados/elencos/brasileirao-serie-a-2026.md:714 |
-| absent-shirt | player_vitoria_ze_marcos | dados/elencos/brasileirao-serie-a-2026.md:725 |
-| absent-shirt | player_vitoria_lucas_braga | dados/elencos/brasileirao-serie-a-2026.md:748 |
+| excluded-over-cap | club_vitoria:Zé Marcos | dados/elencos/brasileirao-serie-a-2026.md:725 |
+| excluded-over-cap | club_vitoria:Lucas Braga | dados/elencos/brasileirao-serie-a-2026.md:748 |
 | partial-club | club_america_mineiro | dados/elencos/brasileirao-serie-b-2026.md:34 |
-| absent-shirt | player_america_mineiro_bruno_brigido | dados/elencos/brasileirao-serie-b-2026.md:39 |
-| absent-shirt | player_america_mineiro_luca_sosa | dados/elencos/brasileirao-serie-b-2026.md:47 |
-| absent-shirt | player_america_mineiro_tobias_ostchega | dados/elencos/brasileirao-serie-b-2026.md:49 |
-| absent-shirt | player_america_mineiro_fabio | dados/elencos/brasileirao-serie-b-2026.md:52 |
-| absent-shirt | player_america_mineiro_heitor | dados/elencos/brasileirao-serie-b-2026.md:53 |
-| absent-shirt | player_america_mineiro_leo_izidoro | dados/elencos/brasileirao-serie-b-2026.md:59 |
-| absent-shirt | player_america_mineiro_gabriel_oliveira_santos | dados/elencos/brasileirao-serie-b-2026.md:71 |
-| absent-shirt | player_america_mineiro_rodrigo_pineiro | dados/elencos/brasileirao-serie-b-2026.md:77 |
+| excluded-over-cap | club_america_mineiro:Bruno Brígido | dados/elencos/brasileirao-serie-b-2026.md:39 |
+| excluded-over-cap | club_america_mineiro:Luca Sosa | dados/elencos/brasileirao-serie-b-2026.md:47 |
+| excluded-over-cap | club_america_mineiro:Tobias Ostchega | dados/elencos/brasileirao-serie-b-2026.md:49 |
+| excluded-over-cap | club_america_mineiro:Fábio | dados/elencos/brasileirao-serie-b-2026.md:52 |
+| excluded-over-cap | club_america_mineiro:Heitor | dados/elencos/brasileirao-serie-b-2026.md:53 |
+| excluded-over-cap | club_america_mineiro:Leo Izidoro | dados/elencos/brasileirao-serie-b-2026.md:59 |
+| excluded-over-cap | club_america_mineiro:Gabriel Oliveira Santos | dados/elencos/brasileirao-serie-b-2026.md:71 |
+| excluded-over-cap | club_america_mineiro:Rodrigo Piñeiro | dados/elencos/brasileirao-serie-b-2026.md:77 |
+| excluded-over-cap | club_america_mineiro:Willian Bigode | dados/elencos/brasileirao-serie-b-2026.md:78 |
+| excluded-over-cap | club_america_mineiro:Gonzalo Mastriani | dados/elencos/brasileirao-serie-b-2026.md:79 |
+| excluded-over-cap | club_america_mineiro:Everton Sidnei De Brito | dados/elencos/brasileirao-serie-b-2026.md:80 |
+| excluded-over-cap | club_america_mineiro:Yarlen | dados/elencos/brasileirao-serie-b-2026.md:81 |
+| excluded-over-cap | club_america_mineiro:Pedro Geovane Paranhos Santos | dados/elencos/brasileirao-serie-b-2026.md:82 |
 | partial-club | club_athletic_club | dados/elencos/brasileirao-serie-b-2026.md:84 |
+| excluded-over-cap | club_athletic_club:Felipe Negrucci | dados/elencos/brasileirao-serie-b-2026.md:109 |
+| excluded-over-cap | club_athletic_club:Fabrício Isidoro | dados/elencos/brasileirao-serie-b-2026.md:113 |
+| excluded-over-cap | club_athletic_club:Yago Santos | dados/elencos/brasileirao-serie-b-2026.md:114 |
+| excluded-over-cap | club_athletic_club:Alexandre Pena | dados/elencos/brasileirao-serie-b-2026.md:118 |
+| excluded-over-cap | club_athletic_club:Alexandre Cesar | dados/elencos/brasileirao-serie-b-2026.md:119 |
+| excluded-over-cap | club_athletic_club:Caick José Ferreira Ramos | dados/elencos/brasileirao-serie-b-2026.md:120 |
+| excluded-over-cap | club_athletic_club:Eduardo Filipe Silva De Oliveira | dados/elencos/brasileirao-serie-b-2026.md:121 |
+| excluded-over-cap | club_athletic_club:Leandro Silva | dados/elencos/brasileirao-serie-b-2026.md:122 |
+| excluded-over-cap | club_athletic_club:Luiz Fernando Souza Santos | dados/elencos/brasileirao-serie-b-2026.md:123 |
+| excluded-over-cap | club_athletic_club:Bruninho | dados/elencos/brasileirao-serie-b-2026.md:128 |
+| excluded-over-cap | club_athletic_club:João Adriano | dados/elencos/brasileirao-serie-b-2026.md:129 |
+| excluded-over-cap | club_athletic_club:Leandro Alves | dados/elencos/brasileirao-serie-b-2026.md:130 |
+| excluded-over-cap | club_athletic_club:Ruan Assis | dados/elencos/brasileirao-serie-b-2026.md:131 |
+| excluded-over-cap | club_athletic_club:Yarlen | dados/elencos/brasileirao-serie-b-2026.md:132 |
+| excluded-over-cap | club_athletic_club:Carlinhos | dados/elencos/brasileirao-serie-b-2026.md:134 |
+| excluded-over-cap | club_athletic_club:Gustavão | dados/elencos/brasileirao-serie-b-2026.md:135 |
+| excluded-over-cap | club_athletic_club:Samuel Otusanya | dados/elencos/brasileirao-serie-b-2026.md:136 |
+| excluded-over-cap | club_athletic_club:Wilinton Aponzá | dados/elencos/brasileirao-serie-b-2026.md:137 |
+| excluded-over-cap | club_athletic_club:Caua Medeiros Araujo | dados/elencos/brasileirao-serie-b-2026.md:138 |
+| excluded-over-cap | club_athletic_club:Gabriel Da Silva Sinfronio | dados/elencos/brasileirao-serie-b-2026.md:139 |
+| excluded-over-cap | club_athletic_club:Ronaldo Tavares | dados/elencos/brasileirao-serie-b-2026.md:140 |
+| excluded-over-cap | club_athletic_club:Samuel Da Conceição Schirmer | dados/elencos/brasileirao-serie-b-2026.md:141 |
 | absent-shirt | player_athletic_club_eduardo_freire | dados/elencos/brasileirao-serie-b-2026.md:87 |
 | absent-shirt | player_athletic_club_glauco | dados/elencos/brasileirao-serie-b-2026.md:88 |
 | absent-shirt | player_athletic_club_tony_batista | dados/elencos/brasileirao-serie-b-2026.md:89 |
@@ -109,30 +143,29 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | absent-shirt | player_athletic_club_kazim | dados/elencos/brasileirao-serie-b-2026.md:104 |
 | absent-shirt | player_athletic_club_matheus_pimenta | dados/elencos/brasileirao-serie-b-2026.md:105 |
 | absent-shirt | player_athletic_club_sam_philip | dados/elencos/brasileirao-serie-b-2026.md:106 |
-| absent-shirt | player_athletic_club_felipe_negrucci | dados/elencos/brasileirao-serie-b-2026.md:109 |
-| absent-shirt | player_athletic_club_fabricio_isidoro | dados/elencos/brasileirao-serie-b-2026.md:113 |
-| absent-shirt | player_athletic_club_yago_santos | dados/elencos/brasileirao-serie-b-2026.md:114 |
-| absent-shirt | player_athletic_club_alexandre_pena | dados/elencos/brasileirao-serie-b-2026.md:118 |
-| absent-shirt | player_athletic_club_alexandre_cesar | dados/elencos/brasileirao-serie-b-2026.md:119 |
-| absent-shirt | player_athletic_club_caick_jose_ferreira_ramos | dados/elencos/brasileirao-serie-b-2026.md:120 |
-| absent-shirt | player_athletic_club_eduardo_filipe_silva_de_oliveira | dados/elencos/brasileirao-serie-b-2026.md:121 |
-| absent-shirt | player_athletic_club_leandro_silva | dados/elencos/brasileirao-serie-b-2026.md:122 |
-| absent-shirt | player_athletic_club_luiz_fernando_souza_santos | dados/elencos/brasileirao-serie-b-2026.md:123 |
 | absent-shirt | player_athletic_club_leo_chu | dados/elencos/brasileirao-serie-b-2026.md:126 |
-| absent-shirt | player_athletic_club_bruninho | dados/elencos/brasileirao-serie-b-2026.md:128 |
-| absent-shirt | player_athletic_club_joao_adriano | dados/elencos/brasileirao-serie-b-2026.md:129 |
-| absent-shirt | player_athletic_club_leandro_alves | dados/elencos/brasileirao-serie-b-2026.md:130 |
-| absent-shirt | player_athletic_club_ruan_assis | dados/elencos/brasileirao-serie-b-2026.md:131 |
-| absent-shirt | player_athletic_club_yarlen | dados/elencos/brasileirao-serie-b-2026.md:132 |
-| absent-shirt | player_athletic_club_carlinhos | dados/elencos/brasileirao-serie-b-2026.md:134 |
-| absent-shirt | player_athletic_club_gustavao | dados/elencos/brasileirao-serie-b-2026.md:135 |
-| absent-shirt | player_athletic_club_samuel_otusanya | dados/elencos/brasileirao-serie-b-2026.md:136 |
-| absent-shirt | player_athletic_club_wilinton_aponza | dados/elencos/brasileirao-serie-b-2026.md:137 |
-| absent-shirt | player_athletic_club_caua_medeiros_araujo | dados/elencos/brasileirao-serie-b-2026.md:138 |
-| absent-shirt | player_athletic_club_gabriel_da_silva_sinfronio | dados/elencos/brasileirao-serie-b-2026.md:139 |
-| absent-shirt | player_athletic_club_ronaldo_tavares | dados/elencos/brasileirao-serie-b-2026.md:140 |
-| absent-shirt | player_athletic_club_samuel_da_conceicao_schirmer | dados/elencos/brasileirao-serie-b-2026.md:141 |
 | partial-club | club_atletico_goianiense | dados/elencos/brasileirao-serie-b-2026.md:143 |
+| excluded-over-cap | club_atletico_goianiense:Ariel | dados/elencos/brasileirao-serie-b-2026.md:174 |
+| excluded-over-cap | club_atletico_goianiense:Gabriel Araujo | dados/elencos/brasileirao-serie-b-2026.md:175 |
+| excluded-over-cap | club_atletico_goianiense:Indio | dados/elencos/brasileirao-serie-b-2026.md:176 |
+| excluded-over-cap | club_atletico_goianiense:Jampierre | dados/elencos/brasileirao-serie-b-2026.md:177 |
+| excluded-over-cap | club_atletico_goianiense:Kaio Gois | dados/elencos/brasileirao-serie-b-2026.md:178 |
+| excluded-over-cap | club_atletico_goianiense:Klebert De Oliveira Pereira | dados/elencos/brasileirao-serie-b-2026.md:179 |
+| excluded-over-cap | club_atletico_goianiense:Mateus Aires | dados/elencos/brasileirao-serie-b-2026.md:180 |
+| excluded-over-cap | club_atletico_goianiense:Riquelme | dados/elencos/brasileirao-serie-b-2026.md:181 |
+| excluded-over-cap | club_atletico_goianiense:Sancho | dados/elencos/brasileirao-serie-b-2026.md:182 |
+| excluded-over-cap | club_atletico_goianiense:Vitinho | dados/elencos/brasileirao-serie-b-2026.md:183 |
+| excluded-over-cap | club_atletico_goianiense:Daniel Lima | dados/elencos/brasileirao-serie-b-2026.md:189 |
+| excluded-over-cap | club_atletico_goianiense:Geovany Soares | dados/elencos/brasileirao-serie-b-2026.md:190 |
+| excluded-over-cap | club_atletico_goianiense:Gustavo Coutinho | dados/elencos/brasileirao-serie-b-2026.md:191 |
+| excluded-over-cap | club_atletico_goianiense:Léo Jacó | dados/elencos/brasileirao-serie-b-2026.md:192 |
+| excluded-over-cap | club_atletico_goianiense:Alan | dados/elencos/brasileirao-serie-b-2026.md:193 |
+| excluded-over-cap | club_atletico_goianiense:Eduardo Taumaturgo | dados/elencos/brasileirao-serie-b-2026.md:194 |
+| excluded-over-cap | club_atletico_goianiense:Gabriel Adão | dados/elencos/brasileirao-serie-b-2026.md:195 |
+| excluded-over-cap | club_atletico_goianiense:Gabriel Dias | dados/elencos/brasileirao-serie-b-2026.md:196 |
+| excluded-over-cap | club_atletico_goianiense:Gabriel Maranhão | dados/elencos/brasileirao-serie-b-2026.md:197 |
+| excluded-over-cap | club_atletico_goianiense:Jader | dados/elencos/brasileirao-serie-b-2026.md:198 |
+| excluded-over-cap | club_atletico_goianiense:Nathan | dados/elencos/brasileirao-serie-b-2026.md:199 |
 | absent-shirt | player_atletico_goianiense_leo | dados/elencos/brasileirao-serie-b-2026.md:144 |
 | absent-shirt | player_atletico_goianiense_paulo_henrique | dados/elencos/brasileirao-serie-b-2026.md:145 |
 | absent-shirt | player_atletico_goianiense_paulo_vitor | dados/elencos/brasileirao-serie-b-2026.md:146 |
@@ -163,157 +196,188 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | absent-shirt | player_atletico_goianiense_assis | dados/elencos/brasileirao-serie-b-2026.md:171 |
 | absent-shirt | player_atletico_goianiense_guilherme | dados/elencos/brasileirao-serie-b-2026.md:172 |
 | absent-shirt | player_atletico_goianiense_anthony_matheus | dados/elencos/brasileirao-serie-b-2026.md:173 |
-| absent-shirt | player_atletico_goianiense_ariel | dados/elencos/brasileirao-serie-b-2026.md:174 |
-| absent-shirt | player_atletico_goianiense_gabriel_araujo | dados/elencos/brasileirao-serie-b-2026.md:175 |
-| absent-shirt | player_atletico_goianiense_indio | dados/elencos/brasileirao-serie-b-2026.md:176 |
-| absent-shirt | player_atletico_goianiense_jampierre | dados/elencos/brasileirao-serie-b-2026.md:177 |
-| absent-shirt | player_atletico_goianiense_kaio_gois | dados/elencos/brasileirao-serie-b-2026.md:178 |
-| absent-shirt | player_atletico_goianiense_klebert_de_oliveira_pereira | dados/elencos/brasileirao-serie-b-2026.md:179 |
-| absent-shirt | player_atletico_goianiense_mateus_aires | dados/elencos/brasileirao-serie-b-2026.md:180 |
-| absent-shirt | player_atletico_goianiense_riquelme | dados/elencos/brasileirao-serie-b-2026.md:181 |
-| absent-shirt | player_atletico_goianiense_sancho | dados/elencos/brasileirao-serie-b-2026.md:182 |
-| absent-shirt | player_atletico_goianiense_vitinho | dados/elencos/brasileirao-serie-b-2026.md:183 |
 | absent-shirt | player_atletico_goianiense_guilherme_henrique | dados/elencos/brasileirao-serie-b-2026.md:184 |
 | absent-shirt | player_atletico_goianiense_bruno_jose | dados/elencos/brasileirao-serie-b-2026.md:185 |
 | absent-shirt | player_atletico_goianiense_lima | dados/elencos/brasileirao-serie-b-2026.md:186 |
 | absent-shirt | player_atletico_goianiense_leo_tocantins | dados/elencos/brasileirao-serie-b-2026.md:187 |
 | absent-shirt | player_atletico_goianiense_marrony | dados/elencos/brasileirao-serie-b-2026.md:188 |
-| absent-shirt | player_atletico_goianiense_daniel_lima | dados/elencos/brasileirao-serie-b-2026.md:189 |
-| absent-shirt | player_atletico_goianiense_geovany_soares | dados/elencos/brasileirao-serie-b-2026.md:190 |
-| absent-shirt | player_atletico_goianiense_gustavo_coutinho | dados/elencos/brasileirao-serie-b-2026.md:191 |
-| absent-shirt | player_atletico_goianiense_leo_jaco | dados/elencos/brasileirao-serie-b-2026.md:192 |
-| absent-shirt | player_atletico_goianiense_alan | dados/elencos/brasileirao-serie-b-2026.md:193 |
-| absent-shirt | player_atletico_goianiense_eduardo_taumaturgo | dados/elencos/brasileirao-serie-b-2026.md:194 |
-| absent-shirt | player_atletico_goianiense_gabriel_adao | dados/elencos/brasileirao-serie-b-2026.md:195 |
-| absent-shirt | player_atletico_goianiense_gabriel_dias | dados/elencos/brasileirao-serie-b-2026.md:196 |
-| absent-shirt | player_atletico_goianiense_gabriel_maranhao | dados/elencos/brasileirao-serie-b-2026.md:197 |
-| absent-shirt | player_atletico_goianiense_jader | dados/elencos/brasileirao-serie-b-2026.md:198 |
-| absent-shirt | player_atletico_goianiense_nathan | dados/elencos/brasileirao-serie-b-2026.md:199 |
 | partial-club | club_avai | dados/elencos/brasileirao-serie-b-2026.md:201 |
-| absent-shirt | player_avai_reynaldo | dados/elencos/brasileirao-serie-b-2026.md:212 |
-| absent-shirt | player_avai_renanzinho | dados/elencos/brasileirao-serie-b-2026.md:238 |
+| excluded-over-cap | club_avai:Reynaldo | dados/elencos/brasileirao-serie-b-2026.md:212 |
+| excluded-over-cap | club_avai:Kevin | dados/elencos/brasileirao-serie-b-2026.md:233 |
+| excluded-over-cap | club_avai:Renanzinho | dados/elencos/brasileirao-serie-b-2026.md:238 |
+| excluded-over-cap | club_avai:Bilu | dados/elencos/brasileirao-serie-b-2026.md:240 |
+| excluded-over-cap | club_avai:João Vitor Oliveira | dados/elencos/brasileirao-serie-b-2026.md:241 |
+| excluded-over-cap | club_avai:Marcio Vitor | dados/elencos/brasileirao-serie-b-2026.md:242 |
+| excluded-over-cap | club_avai:Cristiano | dados/elencos/brasileirao-serie-b-2026.md:243 |
+| excluded-over-cap | club_avai:Tucão | dados/elencos/brasileirao-serie-b-2026.md:244 |
 | partial-club | club_botafogo_sp | dados/elencos/brasileirao-serie-b-2026.md:246 |
-| absent-shirt | player_botafogo_sp_penha | dados/elencos/brasileirao-serie-b-2026.md:265 |
-| absent-shirt | player_botafogo_sp_joao_costa | dados/elencos/brasileirao-serie-b-2026.md:273 |
-| absent-shirt | player_botafogo_sp_gabriel_cruz | dados/elencos/brasileirao-serie-b-2026.md:276 |
-| absent-shirt | player_botafogo_sp_ruan_pablo_de_oliveira_romano | dados/elencos/brasileirao-serie-b-2026.md:277 |
-| absent-shirt | player_botafogo_sp_kaua_freire | dados/elencos/brasileirao-serie-b-2026.md:288 |
-| absent-shirt | player_botafogo_sp_willian | dados/elencos/brasileirao-serie-b-2026.md:291 |
+| excluded-over-cap | club_botafogo_sp:Penha | dados/elencos/brasileirao-serie-b-2026.md:265 |
+| excluded-over-cap | club_botafogo_sp:João Costa | dados/elencos/brasileirao-serie-b-2026.md:273 |
+| excluded-over-cap | club_botafogo_sp:Gabriel Cruz | dados/elencos/brasileirao-serie-b-2026.md:276 |
+| excluded-over-cap | club_botafogo_sp:Ruan Pablo De Oliveira Romano | dados/elencos/brasileirao-serie-b-2026.md:277 |
+| excluded-over-cap | club_botafogo_sp:Luizão | dados/elencos/brasileirao-serie-b-2026.md:286 |
+| excluded-over-cap | club_botafogo_sp:Thalles | dados/elencos/brasileirao-serie-b-2026.md:287 |
+| excluded-over-cap | club_botafogo_sp:Kauã Freire | dados/elencos/brasileirao-serie-b-2026.md:288 |
+| excluded-over-cap | club_botafogo_sp:Luiz Guilherme Vieira Da Silva | dados/elencos/brasileirao-serie-b-2026.md:289 |
+| excluded-over-cap | club_botafogo_sp:Hugo | dados/elencos/brasileirao-serie-b-2026.md:290 |
+| excluded-over-cap | club_botafogo_sp:Willian | dados/elencos/brasileirao-serie-b-2026.md:291 |
 | partial-club | club_ceara | dados/elencos/brasileirao-serie-b-2026.md:293 |
-| absent-shirt | player_ceara_janderson | dados/elencos/brasileirao-serie-b-2026.md:313 |
-| absent-shirt | player_ceara_vitor_figueiredo | dados/elencos/brasileirao-serie-b-2026.md:327 |
+| excluded-over-cap | club_ceara:Janderson | dados/elencos/brasileirao-serie-b-2026.md:313 |
+| excluded-over-cap | club_ceara:Caio | dados/elencos/brasileirao-serie-b-2026.md:326 |
+| excluded-over-cap | club_ceara:Vitor Figueiredo | dados/elencos/brasileirao-serie-b-2026.md:327 |
+| excluded-over-cap | club_ceara:Kauã | dados/elencos/brasileirao-serie-b-2026.md:332 |
+| excluded-over-cap | club_ceara:Lucca | dados/elencos/brasileirao-serie-b-2026.md:333 |
+| excluded-over-cap | club_ceara:Enzo | dados/elencos/brasileirao-serie-b-2026.md:334 |
 | partial-club | club_crb | dados/elencos/brasileirao-serie-b-2026.md:336 |
+| excluded-over-cap | club_crb:Anderson | dados/elencos/brasileirao-serie-b-2026.md:355 |
+| excluded-over-cap | club_crb:Cauã Ávila | dados/elencos/brasileirao-serie-b-2026.md:356 |
+| excluded-over-cap | club_crb:Heitor Brissantt | dados/elencos/brasileirao-serie-b-2026.md:357 |
+| excluded-over-cap | club_crb:Lucas Pinheiro | dados/elencos/brasileirao-serie-b-2026.md:367 |
+| excluded-over-cap | club_crb:Rian | dados/elencos/brasileirao-serie-b-2026.md:368 |
+| excluded-over-cap | club_crb:Anthony Matheus | dados/elencos/brasileirao-serie-b-2026.md:377 |
+| excluded-over-cap | club_crb:Guilherme Kauan Lucio Ferreira | dados/elencos/brasileirao-serie-b-2026.md:378 |
+| excluded-over-cap | club_crb:Kauã | dados/elencos/brasileirao-serie-b-2026.md:379 |
 | absent-shirt | player_crb_candido | dados/elencos/brasileirao-serie-b-2026.md:340 |
 | absent-shirt | player_crb_pablo | dados/elencos/brasileirao-serie-b-2026.md:341 |
-| absent-shirt | player_crb_anderson | dados/elencos/brasileirao-serie-b-2026.md:355 |
-| absent-shirt | player_crb_caua_avila | dados/elencos/brasileirao-serie-b-2026.md:356 |
-| absent-shirt | player_crb_heitor_brissantt | dados/elencos/brasileirao-serie-b-2026.md:357 |
-| absent-shirt | player_crb_lucas_pinheiro | dados/elencos/brasileirao-serie-b-2026.md:367 |
-| absent-shirt | player_crb_rian | dados/elencos/brasileirao-serie-b-2026.md:368 |
-| absent-shirt | player_crb_anthony_matheus | dados/elencos/brasileirao-serie-b-2026.md:377 |
-| absent-shirt | player_crb_guilherme_kauan_lucio_ferreira | dados/elencos/brasileirao-serie-b-2026.md:378 |
-| absent-shirt | player_crb_kaua | dados/elencos/brasileirao-serie-b-2026.md:379 |
 | partial-club | club_criciuma | dados/elencos/brasileirao-serie-b-2026.md:381 |
-| absent-shirt | player_criciuma_erick_garcia | dados/elencos/brasileirao-serie-b-2026.md:398 |
-| absent-shirt | player_criciuma_octavio_henrique | dados/elencos/brasileirao-serie-b-2026.md:399 |
-| absent-shirt | player_criciuma_eliel | dados/elencos/brasileirao-serie-b-2026.md:411 |
-| absent-shirt | player_criciuma_yuri_tanque | dados/elencos/brasileirao-serie-b-2026.md:420 |
+| excluded-over-cap | club_criciuma:Erick Garcia | dados/elencos/brasileirao-serie-b-2026.md:398 |
+| excluded-over-cap | club_criciuma:Octávio Henrique | dados/elencos/brasileirao-serie-b-2026.md:399 |
+| excluded-over-cap | club_criciuma:Eliel | dados/elencos/brasileirao-serie-b-2026.md:411 |
+| excluded-over-cap | club_criciuma:Yuri Tanque | dados/elencos/brasileirao-serie-b-2026.md:420 |
+| excluded-over-cap | club_criciuma:Carlos Eduardo | dados/elencos/brasileirao-serie-b-2026.md:421 |
 | partial-club | club_cuiaba | dados/elencos/brasileirao-serie-b-2026.md:423 |
-| absent-shirt | player_cuiaba_joao_chaves | dados/elencos/brasileirao-serie-b-2026.md:428 |
-| absent-shirt | player_cuiaba_lucas_moraes | dados/elencos/brasileirao-serie-b-2026.md:429 |
-| absent-shirt | player_cuiaba_lazaro | dados/elencos/brasileirao-serie-b-2026.md:442 |
-| absent-shirt | player_cuiaba_marcelo_henrique | dados/elencos/brasileirao-serie-b-2026.md:443 |
-| absent-shirt | player_cuiaba_oscar | dados/elencos/brasileirao-serie-b-2026.md:444 |
-| absent-shirt | player_cuiaba_wesley_dias | dados/elencos/brasileirao-serie-b-2026.md:450 |
-| absent-shirt | player_cuiaba_joao_vitor | dados/elencos/brasileirao-serie-b-2026.md:456 |
-| absent-shirt | player_cuiaba_gabriel_mineiro | dados/elencos/brasileirao-serie-b-2026.md:460 |
-| absent-shirt | player_cuiaba_jadson | dados/elencos/brasileirao-serie-b-2026.md:463 |
-| absent-shirt | player_cuiaba_fabio_gomes | dados/elencos/brasileirao-serie-b-2026.md:469 |
-| absent-shirt | player_cuiaba_diodato | dados/elencos/brasileirao-serie-b-2026.md:472 |
-| absent-shirt | player_cuiaba_mansano | dados/elencos/brasileirao-serie-b-2026.md:473 |
-| absent-shirt | player_cuiaba_mateus_patolino | dados/elencos/brasileirao-serie-b-2026.md:474 |
-| absent-shirt | player_fortaleza_calebe | dados/elencos/brasileirao-serie-b-2026.md:502 |
+| excluded-over-cap | club_cuiaba:João Chaves | dados/elencos/brasileirao-serie-b-2026.md:428 |
+| excluded-over-cap | club_cuiaba:Lucas Moraes | dados/elencos/brasileirao-serie-b-2026.md:429 |
+| excluded-over-cap | club_cuiaba:Lázaro | dados/elencos/brasileirao-serie-b-2026.md:442 |
+| excluded-over-cap | club_cuiaba:Marcelo Henrique | dados/elencos/brasileirao-serie-b-2026.md:443 |
+| excluded-over-cap | club_cuiaba:Oscar | dados/elencos/brasileirao-serie-b-2026.md:444 |
+| excluded-over-cap | club_cuiaba:Wesley Dias | dados/elencos/brasileirao-serie-b-2026.md:450 |
+| excluded-over-cap | club_cuiaba:João Vitor | dados/elencos/brasileirao-serie-b-2026.md:456 |
+| excluded-over-cap | club_cuiaba:Gabriel Mineiro | dados/elencos/brasileirao-serie-b-2026.md:460 |
+| excluded-over-cap | club_cuiaba:Jadson | dados/elencos/brasileirao-serie-b-2026.md:463 |
+| excluded-over-cap | club_cuiaba:Nathan Cruz | dados/elencos/brasileirao-serie-b-2026.md:468 |
+| excluded-over-cap | club_cuiaba:Fábio Gomes | dados/elencos/brasileirao-serie-b-2026.md:469 |
+| excluded-over-cap | club_cuiaba:Aiyran | dados/elencos/brasileirao-serie-b-2026.md:470 |
+| excluded-over-cap | club_cuiaba:Yamil Asad | dados/elencos/brasileirao-serie-b-2026.md:471 |
+| excluded-over-cap | club_cuiaba:Diodato | dados/elencos/brasileirao-serie-b-2026.md:472 |
+| excluded-over-cap | club_cuiaba:Mansano | dados/elencos/brasileirao-serie-b-2026.md:473 |
+| excluded-over-cap | club_cuiaba:Mateus Patolino | dados/elencos/brasileirao-serie-b-2026.md:474 |
+| excluded-over-cap | club_fortaleza:Calebe | dados/elencos/brasileirao-serie-b-2026.md:502 |
+| excluded-over-cap | club_fortaleza:Caio Wesley | dados/elencos/brasileirao-serie-b-2026.md:513 |
+| excluded-over-cap | club_fortaleza:Tomás Roco | dados/elencos/brasileirao-serie-b-2026.md:514 |
 | absent-shirt | player_goias_assis | dados/elencos/brasileirao-serie-b-2026.md:543 |
 | partial-club | club_juventude | dados/elencos/brasileirao-serie-b-2026.md:552 |
-| absent-shirt | player_juventude_joaquim | dados/elencos/brasileirao-serie-b-2026.md:557 |
-| absent-shirt | player_juventude_leo_agliardi | dados/elencos/brasileirao-serie-b-2026.md:558 |
-| absent-shirt | player_juventude_clebio | dados/elencos/brasileirao-serie-b-2026.md:575 |
-| absent-shirt | player_juventude_gabriel_borges | dados/elencos/brasileirao-serie-b-2026.md:576 |
-| absent-shirt | player_juventude_luiz_eduardo | dados/elencos/brasileirao-serie-b-2026.md:577 |
-| absent-shirt | player_juventude_nicolas_begliardi | dados/elencos/brasileirao-serie-b-2026.md:589 |
-| absent-shirt | player_juventude_sasso | dados/elencos/brasileirao-serie-b-2026.md:590 |
-| absent-shirt | player_juventude_schroeder | dados/elencos/brasileirao-serie-b-2026.md:591 |
-| absent-shirt | player_juventude_yarlei | dados/elencos/brasileirao-serie-b-2026.md:592 |
+| excluded-over-cap | club_juventude:Joaquim | dados/elencos/brasileirao-serie-b-2026.md:557 |
+| excluded-over-cap | club_juventude:Léo Agliardi | dados/elencos/brasileirao-serie-b-2026.md:558 |
+| excluded-over-cap | club_juventude:Clébio | dados/elencos/brasileirao-serie-b-2026.md:575 |
+| excluded-over-cap | club_juventude:Gabriel Borges | dados/elencos/brasileirao-serie-b-2026.md:576 |
+| excluded-over-cap | club_juventude:Luiz Eduardo | dados/elencos/brasileirao-serie-b-2026.md:577 |
+| excluded-over-cap | club_juventude:Kaynan Fragoso Azevedo | dados/elencos/brasileirao-serie-b-2026.md:588 |
+| excluded-over-cap | club_juventude:Nicolas Begliardi | dados/elencos/brasileirao-serie-b-2026.md:589 |
+| excluded-over-cap | club_juventude:Sasso | dados/elencos/brasileirao-serie-b-2026.md:590 |
+| excluded-over-cap | club_juventude:Schroeder | dados/elencos/brasileirao-serie-b-2026.md:591 |
+| excluded-over-cap | club_juventude:Yarlei | dados/elencos/brasileirao-serie-b-2026.md:592 |
+| excluded-over-cap | club_juventude:Alan Kardec | dados/elencos/brasileirao-serie-b-2026.md:598 |
+| excluded-over-cap | club_juventude:Alisson Safira | dados/elencos/brasileirao-serie-b-2026.md:599 |
+| excluded-over-cap | club_juventude:Carlinhos | dados/elencos/brasileirao-serie-b-2026.md:600 |
+| excluded-over-cap | club_juventude:João Scatolin | dados/elencos/brasileirao-serie-b-2026.md:601 |
+| excluded-over-cap | club_juventude:Lucca Amaro | dados/elencos/brasileirao-serie-b-2026.md:602 |
 | repeated-name-in-club | player_juventude_marcos_paulo_2 | dados/elencos/brasileirao-serie-b-2026.md:593 |
-| absent-shirt | player_juventude_lucca_amaro | dados/elencos/brasileirao-serie-b-2026.md:602 |
-| absent-shirt | player_londrina_thiago | dados/elencos/brasileirao-serie-b-2026.md:608 |
-| absent-shirt | player_londrina_rafael_soares | dados/elencos/brasileirao-serie-b-2026.md:617 |
-| absent-shirt | player_londrina_athyrson | dados/elencos/brasileirao-serie-b-2026.md:639 |
-| absent-shirt | player_londrina_rai_nascimento | dados/elencos/brasileirao-serie-b-2026.md:640 |
-| absent-shirt | player_londrina_asafe | dados/elencos/brasileirao-serie-b-2026.md:649 |
+| excluded-over-cap | club_londrina:Thiago | dados/elencos/brasileirao-serie-b-2026.md:608 |
+| excluded-over-cap | club_londrina:Rafael Soares | dados/elencos/brasileirao-serie-b-2026.md:617 |
+| excluded-over-cap | club_londrina:Athyrson | dados/elencos/brasileirao-serie-b-2026.md:639 |
+| excluded-over-cap | club_londrina:Raí Nascimento | dados/elencos/brasileirao-serie-b-2026.md:640 |
+| excluded-over-cap | club_londrina:Gilberto | dados/elencos/brasileirao-serie-b-2026.md:644 |
+| excluded-over-cap | club_londrina:Emiliano Rodríguez | dados/elencos/brasileirao-serie-b-2026.md:645 |
+| excluded-over-cap | club_londrina:Bruno Santos | dados/elencos/brasileirao-serie-b-2026.md:646 |
+| excluded-over-cap | club_londrina:Iago Teles Da Silva | dados/elencos/brasileirao-serie-b-2026.md:647 |
+| excluded-over-cap | club_londrina:Kauã Jonathan | dados/elencos/brasileirao-serie-b-2026.md:648 |
+| excluded-over-cap | club_londrina:Asafe | dados/elencos/brasileirao-serie-b-2026.md:649 |
 | partial-club | club_nautico | dados/elencos/brasileirao-serie-b-2026.md:651 |
+| excluded-over-cap | club_nautico:Léo | dados/elencos/brasileirao-serie-b-2026.md:655 |
+| excluded-over-cap | club_nautico:Índio | dados/elencos/brasileirao-serie-b-2026.md:660 |
+| excluded-over-cap | club_nautico:Alemão Irioni | dados/elencos/brasileirao-serie-b-2026.md:670 |
+| excluded-over-cap | club_nautico:Emanuel Minervino | dados/elencos/brasileirao-serie-b-2026.md:671 |
+| excluded-over-cap | club_nautico:Gledson | dados/elencos/brasileirao-serie-b-2026.md:672 |
+| excluded-over-cap | club_nautico:Benjamín Borasi | dados/elencos/brasileirao-serie-b-2026.md:687 |
+| excluded-over-cap | club_nautico:Kevyn | dados/elencos/brasileirao-serie-b-2026.md:693 |
+| excluded-over-cap | club_nautico:Rosa | dados/elencos/brasileirao-serie-b-2026.md:694 |
+| excluded-over-cap | club_nautico:Isaque Ferreira | dados/elencos/brasileirao-serie-b-2026.md:695 |
+| excluded-over-cap | club_nautico:Maranhão | dados/elencos/brasileirao-serie-b-2026.md:696 |
 | absent-shirt | player_nautico_arthur_henrique_bittencourt | dados/elencos/brasileirao-serie-b-2026.md:654 |
-| absent-shirt | player_nautico_leo | dados/elencos/brasileirao-serie-b-2026.md:655 |
-| absent-shirt | player_nautico_indio | dados/elencos/brasileirao-serie-b-2026.md:660 |
-| absent-shirt | player_nautico_alemao_irioni | dados/elencos/brasileirao-serie-b-2026.md:670 |
-| absent-shirt | player_nautico_emanuel_minervino | dados/elencos/brasileirao-serie-b-2026.md:671 |
-| absent-shirt | player_nautico_gledson | dados/elencos/brasileirao-serie-b-2026.md:672 |
-| absent-shirt | player_nautico_benjamin_borasi | dados/elencos/brasileirao-serie-b-2026.md:687 |
-| absent-shirt | player_nautico_maranhao | dados/elencos/brasileirao-serie-b-2026.md:696 |
 | partial-club | club_novorizontino | dados/elencos/brasileirao-serie-b-2026.md:698 |
-| absent-shirt | player_novorizontino_arthur_barbosa | dados/elencos/brasileirao-serie-b-2026.md:716 |
-| absent-shirt | player_novorizontino_gabriel_correia_da_silva | dados/elencos/brasileirao-serie-b-2026.md:717 |
-| absent-shirt | player_novorizontino_antony_gustavo_mariano_dos_santos | dados/elencos/brasileirao-serie-b-2026.md:731 |
-| absent-shirt | player_novorizontino_nogueira | dados/elencos/brasileirao-serie-b-2026.md:732 |
+| excluded-over-cap | club_novorizontino:Arthur Barbosa | dados/elencos/brasileirao-serie-b-2026.md:716 |
+| excluded-over-cap | club_novorizontino:Gabriel Correia Da Silva | dados/elencos/brasileirao-serie-b-2026.md:717 |
+| excluded-over-cap | club_novorizontino:Antony Gustavo Mariano Dos Santos | dados/elencos/brasileirao-serie-b-2026.md:731 |
+| excluded-over-cap | club_novorizontino:Nogueira | dados/elencos/brasileirao-serie-b-2026.md:732 |
+| excluded-over-cap | club_novorizontino:Carlão | dados/elencos/brasileirao-serie-b-2026.md:738 |
+| excluded-over-cap | club_novorizontino:Diego Mathias | dados/elencos/brasileirao-serie-b-2026.md:739 |
+| excluded-over-cap | club_novorizontino:Nicolas Careca | dados/elencos/brasileirao-serie-b-2026.md:740 |
+| excluded-over-cap | club_novorizontino:Jardiel | dados/elencos/brasileirao-serie-b-2026.md:741 |
 | partial-club | club_operario_pr | dados/elencos/brasileirao-serie-b-2026.md:743 |
-| absent-shirt | player_operario_pr_paulo_guilherme | dados/elencos/brasileirao-serie-b-2026.md:748 |
-| absent-shirt | player_operario_pr_kayo_jose_fernandes_da_luz | dados/elencos/brasileirao-serie-b-2026.md:761 |
-| absent-shirt | player_operario_pr_miguel | dados/elencos/brasileirao-serie-b-2026.md:762 |
-| absent-shirt | player_operario_pr_brenno | dados/elencos/brasileirao-serie-b-2026.md:772 |
-| absent-shirt | player_operario_pr_henrique | dados/elencos/brasileirao-serie-b-2026.md:773 |
-| absent-shirt | player_operario_pr_jaaziel | dados/elencos/brasileirao-serie-b-2026.md:774 |
-| absent-shirt | player_operario_pr_kaua_lucas | dados/elencos/brasileirao-serie-b-2026.md:775 |
-| absent-shirt | player_operario_pr_marcos_otavio | dados/elencos/brasileirao-serie-b-2026.md:776 |
-| absent-shirt | player_operario_pr_thiago | dados/elencos/brasileirao-serie-b-2026.md:777 |
-| absent-shirt | player_operario_pr_maxwell | dados/elencos/brasileirao-serie-b-2026.md:778 |
-| absent-shirt | player_operario_pr_gabriel_cardozo | dados/elencos/brasileirao-serie-b-2026.md:789 |
-| absent-shirt | player_operario_pr_germano | dados/elencos/brasileirao-serie-b-2026.md:790 |
-| absent-shirt | player_operario_pr_jhow_torres | dados/elencos/brasileirao-serie-b-2026.md:791 |
-| absent-shirt | player_operario_pr_jonas | dados/elencos/brasileirao-serie-b-2026.md:792 |
-| absent-shirt | player_operario_pr_matheus_galdino_silva | dados/elencos/brasileirao-serie-b-2026.md:793 |
+| excluded-over-cap | club_operario_pr:Paulo Guilherme | dados/elencos/brasileirao-serie-b-2026.md:748 |
+| excluded-over-cap | club_operario_pr:Kayo José Fernandes Da Luz | dados/elencos/brasileirao-serie-b-2026.md:761 |
+| excluded-over-cap | club_operario_pr:Miguel | dados/elencos/brasileirao-serie-b-2026.md:762 |
+| excluded-over-cap | club_operario_pr:Brenno | dados/elencos/brasileirao-serie-b-2026.md:772 |
+| excluded-over-cap | club_operario_pr:Henrique | dados/elencos/brasileirao-serie-b-2026.md:773 |
+| excluded-over-cap | club_operario_pr:Jaaziel | dados/elencos/brasileirao-serie-b-2026.md:774 |
+| excluded-over-cap | club_operario_pr:Kaua Lucas | dados/elencos/brasileirao-serie-b-2026.md:775 |
+| excluded-over-cap | club_operario_pr:Marcos Otávio | dados/elencos/brasileirao-serie-b-2026.md:776 |
+| excluded-over-cap | club_operario_pr:Thiago | dados/elencos/brasileirao-serie-b-2026.md:777 |
+| excluded-over-cap | club_operario_pr:Maxwell | dados/elencos/brasileirao-serie-b-2026.md:778 |
+| excluded-over-cap | club_operario_pr:Gabriel Cardozo | dados/elencos/brasileirao-serie-b-2026.md:789 |
+| excluded-over-cap | club_operario_pr:Germano | dados/elencos/brasileirao-serie-b-2026.md:790 |
+| excluded-over-cap | club_operario_pr:Jhow Torres | dados/elencos/brasileirao-serie-b-2026.md:791 |
+| excluded-over-cap | club_operario_pr:Jonas | dados/elencos/brasileirao-serie-b-2026.md:792 |
+| excluded-over-cap | club_operario_pr:Matheus Galdino Silva | dados/elencos/brasileirao-serie-b-2026.md:793 |
 | partial-club | club_ponte_preta | dados/elencos/brasileirao-serie-b-2026.md:795 |
+| excluded-over-cap | club_ponte_preta:Kawann | dados/elencos/brasileirao-serie-b-2026.md:808 |
+| excluded-over-cap | club_ponte_preta:Gabriel | dados/elencos/brasileirao-serie-b-2026.md:814 |
+| excluded-over-cap | club_ponte_preta:João Gabriel | dados/elencos/brasileirao-serie-b-2026.md:815 |
+| excluded-over-cap | club_ponte_preta:Diogo Mora | dados/elencos/brasileirao-serie-b-2026.md:821 |
+| excluded-over-cap | club_ponte_preta:Chicão | dados/elencos/brasileirao-serie-b-2026.md:827 |
+| excluded-over-cap | club_ponte_preta:Matheus | dados/elencos/brasileirao-serie-b-2026.md:828 |
+| excluded-over-cap | club_ponte_preta:Vitor Ribeiro | dados/elencos/brasileirao-serie-b-2026.md:834 |
+| excluded-over-cap | club_ponte_preta:João Victor Damião Dos Santos | dados/elencos/brasileirao-serie-b-2026.md:838 |
 | absent-shirt | player_ponte_preta_guilherme_martins | dados/elencos/brasileirao-serie-b-2026.md:807 |
-| absent-shirt | player_ponte_preta_kawann | dados/elencos/brasileirao-serie-b-2026.md:808 |
-| absent-shirt | player_ponte_preta_gabriel | dados/elencos/brasileirao-serie-b-2026.md:814 |
-| absent-shirt | player_ponte_preta_joao_gabriel | dados/elencos/brasileirao-serie-b-2026.md:815 |
-| absent-shirt | player_ponte_preta_diogo_mora | dados/elencos/brasileirao-serie-b-2026.md:821 |
-| absent-shirt | player_ponte_preta_chicao | dados/elencos/brasileirao-serie-b-2026.md:827 |
-| absent-shirt | player_ponte_preta_matheus | dados/elencos/brasileirao-serie-b-2026.md:828 |
-| absent-shirt | player_ponte_preta_vitor_ribeiro | dados/elencos/brasileirao-serie-b-2026.md:834 |
-| absent-shirt | player_ponte_preta_joao_victor_damiao_dos_santos | dados/elencos/brasileirao-serie-b-2026.md:838 |
+| excluded-over-cap | club_sao_bernardo:Daniel Amorim | dados/elencos/brasileirao-serie-b-2026.md:876 |
+| excluded-over-cap | club_sao_bernardo:Pablo Dyego | dados/elencos/brasileirao-serie-b-2026.md:877 |
 | partial-club | club_sport | dados/elencos/brasileirao-serie-b-2026.md:879 |
-| absent-shirt | player_sport_joao_silva | dados/elencos/brasileirao-serie-b-2026.md:890 |
-| absent-shirt | player_sport_fabricio_dominguez | dados/elencos/brasileirao-serie-b-2026.md:909 |
-| absent-shirt | player_sport_dudu_teodora | dados/elencos/brasileirao-serie-b-2026.md:919 |
+| excluded-over-cap | club_sport:João Silva | dados/elencos/brasileirao-serie-b-2026.md:890 |
+| excluded-over-cap | club_sport:Fabricio Domínguez | dados/elencos/brasileirao-serie-b-2026.md:909 |
+| excluded-over-cap | club_sport:Iury Castilho | dados/elencos/brasileirao-serie-b-2026.md:917 |
+| excluded-over-cap | club_sport:Zé Roberto | dados/elencos/brasileirao-serie-b-2026.md:918 |
+| excluded-over-cap | club_sport:Dudu Teodora | dados/elencos/brasileirao-serie-b-2026.md:919 |
+| excluded-over-cap | club_sport:Dedé | dados/elencos/brasileirao-serie-b-2026.md:920 |
+| excluded-over-cap | club_sport:Lipão | dados/elencos/brasileirao-serie-b-2026.md:921 |
+| excluded-over-cap | club_sport:Maron | dados/elencos/brasileirao-serie-b-2026.md:922 |
+| excluded-over-cap | club_sport:Arthur Moreira | dados/elencos/brasileirao-serie-b-2026.md:923 |
+| excluded-over-cap | club_sport:Micael | dados/elencos/brasileirao-serie-b-2026.md:924 |
+| excluded-over-cap | club_sport:Jefinho | dados/elencos/brasileirao-serie-b-2026.md:925 |
+| excluded-over-cap | club_sport:Fernandinho | dados/elencos/brasileirao-serie-b-2026.md:926 |
 | partial-club | club_vila_nova | dados/elencos/brasileirao-serie-b-2026.md:928 |
+| excluded-over-cap | club_vila_nova:Alex | dados/elencos/brasileirao-serie-b-2026.md:943 |
+| excluded-over-cap | club_vila_nova:Carlão | dados/elencos/brasileirao-serie-b-2026.md:944 |
+| excluded-over-cap | club_vila_nova:Gabriel Delfino | dados/elencos/brasileirao-serie-b-2026.md:945 |
+| excluded-over-cap | club_vila_nova:Gil | dados/elencos/brasileirao-serie-b-2026.md:946 |
+| excluded-over-cap | club_vila_nova:Samuel Lucas De Oliveira Souza | dados/elencos/brasileirao-serie-b-2026.md:947 |
+| excluded-over-cap | club_vila_nova:Guilherme Vieira | dados/elencos/brasileirao-serie-b-2026.md:958 |
+| excluded-over-cap | club_vila_nova:Kerlon Da Silva Carvalho | dados/elencos/brasileirao-serie-b-2026.md:959 |
+| excluded-over-cap | club_vila_nova:Miguel | dados/elencos/brasileirao-serie-b-2026.md:960 |
+| excluded-over-cap | club_vila_nova:João Pedro | dados/elencos/brasileirao-serie-b-2026.md:972 |
+| excluded-over-cap | club_vila_nova:Warley | dados/elencos/brasileirao-serie-b-2026.md:973 |
 | absent-shirt | player_vila_nova_kaua | dados/elencos/brasileirao-serie-b-2026.md:932 |
 | absent-shirt | player_vila_nova_douglas_mendes | dados/elencos/brasileirao-serie-b-2026.md:937 |
-| absent-shirt | player_vila_nova_alex | dados/elencos/brasileirao-serie-b-2026.md:943 |
-| absent-shirt | player_vila_nova_carlao | dados/elencos/brasileirao-serie-b-2026.md:944 |
-| absent-shirt | player_vila_nova_gabriel_delfino | dados/elencos/brasileirao-serie-b-2026.md:945 |
-| absent-shirt | player_vila_nova_gil | dados/elencos/brasileirao-serie-b-2026.md:946 |
-| absent-shirt | player_vila_nova_samuel_lucas_de_oliveira_souza | dados/elencos/brasileirao-serie-b-2026.md:947 |
-| absent-shirt | player_vila_nova_guilherme_vieira | dados/elencos/brasileirao-serie-b-2026.md:958 |
-| absent-shirt | player_vila_nova_kerlon_da_silva_carvalho | dados/elencos/brasileirao-serie-b-2026.md:959 |
-| absent-shirt | player_vila_nova_miguel | dados/elencos/brasileirao-serie-b-2026.md:960 |
-| absent-shirt | player_vila_nova_joao_pedro | dados/elencos/brasileirao-serie-b-2026.md:972 |
-| absent-shirt | player_vila_nova_warley | dados/elencos/brasileirao-serie-b-2026.md:973 |
 | unknown-shirt | player_amazonas_abdul_mendy | dados/elencos/brasileirao-serie-c-2026.md:34 |
 | unknown-shirt | player_amazonas_guga | dados/elencos/brasileirao-serie-c-2026.md:44 |
 | unknown-shirt | player_amazonas_iverton | dados/elencos/brasileirao-serie-c-2026.md:48 |
 | unknown-shirt | player_amazonas_kaio_luciano | dados/elencos/brasileirao-serie-c-2026.md:51 |
 | unknown-shirt | player_amazonas_vitor_neves | dados/elencos/brasileirao-serie-c-2026.md:65 |
 | partial-club | club_anapolis | dados/elencos/brasileirao-serie-c-2026.md:68 |
+| excluded-over-cap | club_anapolis:Victor Hugo | dados/elencos/brasileirao-serie-c-2026.md:104 |
+| excluded-over-cap | club_anapolis:Vinícius Lucas | dados/elencos/brasileirao-serie-c-2026.md:105 |
+| excluded-over-cap | club_anapolis:Vitor Fonseca | dados/elencos/brasileirao-serie-c-2026.md:106 |
+| excluded-over-cap | club_anapolis:Ygor | dados/elencos/brasileirao-serie-c-2026.md:107 |
 | unknown-shirt | player_anapolis_carioca | dados/elencos/brasileirao-serie-c-2026.md:69 |
 | unknown-shirt | player_anapolis_cassio_gabriel | dados/elencos/brasileirao-serie-c-2026.md:70 |
 | unknown-shirt | player_anapolis_darlisson | dados/elencos/brasileirao-serie-c-2026.md:71 |
@@ -348,10 +412,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | unknown-shirt | player_anapolis_rodriguinho | dados/elencos/brasileirao-serie-c-2026.md:101 |
 | unknown-shirt | player_anapolis_rubinho | dados/elencos/brasileirao-serie-c-2026.md:102 |
 | unknown-shirt | player_anapolis_samuel | dados/elencos/brasileirao-serie-c-2026.md:103 |
-| unknown-shirt | player_anapolis_victor_hugo | dados/elencos/brasileirao-serie-c-2026.md:104 |
-| unknown-shirt | player_anapolis_vinicius_lucas | dados/elencos/brasileirao-serie-c-2026.md:105 |
-| unknown-shirt | player_anapolis_vitor_fonseca | dados/elencos/brasileirao-serie-c-2026.md:106 |
-| unknown-shirt | player_anapolis_ygor | dados/elencos/brasileirao-serie-c-2026.md:107 |
 | partial-club | club_barra_sc | dados/elencos/brasileirao-serie-c-2026.md:109 |
 | unknown-shirt | player_barra_sc_augusto_potiguar | dados/elencos/brasileirao-serie-c-2026.md:110 |
 | unknown-shirt | player_barra_sc_barba | dados/elencos/brasileirao-serie-c-2026.md:111 |
@@ -527,6 +587,8 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | unknown-shirt | player_ferroviaria_vinicius_kaue | dados/elencos/brasileirao-serie-c-2026.md:312 |
 | unknown-shirt | player_ferroviaria_vinni_faria | dados/elencos/brasileirao-serie-c-2026.md:313 |
 | unknown-shirt | player_ferroviaria_ze_vitor | dados/elencos/brasileirao-serie-c-2026.md:315 |
+| excluded-over-cap | club_figueirense:Vitor Ricardo | dados/elencos/brasileirao-serie-c-2026.md:353 |
+| excluded-over-cap | club_figueirense:Zé Carlos | dados/elencos/brasileirao-serie-c-2026.md:354 |
 | unknown-shirt | player_figueirense_choco | dados/elencos/brasileirao-serie-c-2026.md:322 |
 | unknown-shirt | player_figueirense_emerson_galego | dados/elencos/brasileirao-serie-c-2026.md:325 |
 | unknown-shirt | player_figueirense_jean_gabriel | dados/elencos/brasileirao-serie-c-2026.md:334 |
@@ -537,8 +599,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | unknown-shirt | player_figueirense_maiky | dados/elencos/brasileirao-serie-c-2026.md:344 |
 | unknown-shirt | player_figueirense_mailson | dados/elencos/brasileirao-serie-c-2026.md:345 |
 | unknown-shirt | player_figueirense_vava | dados/elencos/brasileirao-serie-c-2026.md:352 |
-| unknown-shirt | player_figueirense_vitor_ricardo | dados/elencos/brasileirao-serie-c-2026.md:353 |
-| unknown-shirt | player_figueirense_ze_carlos | dados/elencos/brasileirao-serie-c-2026.md:354 |
 | partial-club | club_floresta | dados/elencos/brasileirao-serie-c-2026.md:356 |
 | unknown-shirt | player_floresta_afonso | dados/elencos/brasileirao-serie-c-2026.md:357 |
 | unknown-shirt | player_floresta_arilson | dados/elencos/brasileirao-serie-c-2026.md:358 |
@@ -774,9 +834,90 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | unknown-shirt | player_ypiranga_rs_ranisson | dados/elencos/brasileirao-serie-c-2026.md:719 |
 | unknown-shirt | player_ypiranga_rs_reinaldo | dados/elencos/brasileirao-serie-c-2026.md:720 |
 | unknown-shirt | player_ypiranga_rs_vini_charopem | dados/elencos/brasileirao-serie-c-2026.md:722 |
+| assumed-strength-tier | foreign:estudiantes | dados/elencos/copa-libertadores-2026.md:341 |
+| absent-shirt | player_estudiantes_santiago_flores | dados/elencos/copa-libertadores-2026.md:351 |
+| absent-shirt | player_estudiantes_bautista_kociubinski | dados/elencos/copa-libertadores-2026.md:361 |
+| absent-shirt | player_estudiantes_alexis_manyoma | dados/elencos/copa-libertadores-2026.md:368 |
+| absent-shirt | player_estudiantes_mauro_mendez | dados/elencos/copa-libertadores-2026.md:371 |
+| absent-shirt | player_estudiantes_luciano_gimenez | dados/elencos/copa-libertadores-2026.md:373 |
+| assumed-strength-tier | foreign:independiente-rivadavia | dados/elencos/copa-libertadores-2026.md:378 |
+| assumed-strength-tier | foreign:universidad-catolica | dados/elencos/copa-libertadores-2026.md:409 |
+| partial-club | club_universidad_catolica | dados/elencos/copa-libertadores-2026.md:409 |
+| absent-shirt | player_universidad_catolica_justo_giani | dados/elencos/copa-libertadores-2026.md:432 |
+| absent-shirt | player_universidad_catolica_diego_valencia | dados/elencos/copa-libertadores-2026.md:435 |
+| assumed-strength-tier | foreign:coquimbo-unido | dados/elencos/copa-libertadores-2026.md:438 |
+| absent-shirt | player_coquimbo_unido_lukas_soza | dados/elencos/copa-libertadores-2026.md:454 |
+| absent-shirt | player_coquimbo_unido_joshua_arancibia | dados/elencos/copa-libertadores-2026.md:455 |
+| absent-shirt | player_coquimbo_unido_matias_zepeda | dados/elencos/copa-libertadores-2026.md:461 |
+| absent-shirt | player_coquimbo_unido_rodrigo_holgado | dados/elencos/copa-libertadores-2026.md:469 |
+| absent-shirt | player_coquimbo_unido_dixon_pereira | dados/elencos/copa-libertadores-2026.md:470 |
+| absent-shirt | player_coquimbo_unido_matias_alvarado | dados/elencos/copa-libertadores-2026.md:471 |
+| assumed-strength-tier | foreign:cerro-porteno | dados/elencos/copa-libertadores-2026.md:474 |
+| excluded-over-cap | club_cerro_porteno:Agustín Almendra | dados/elencos/copa-libertadores-2026.md:496 |
+| excluded-over-cap | club_cerro_porteno:Derlis Rodríguez | dados/elencos/copa-libertadores-2026.md:505 |
+| absent-shirt | player_cerro_porteno_manuel_roffo | dados/elencos/copa-libertadores-2026.md:477 |
+| absent-shirt | player_cerro_porteno_angel_martinez | dados/elencos/copa-libertadores-2026.md:478 |
+| absent-shirt | player_cerro_porteno_lucas_merolla | dados/elencos/copa-libertadores-2026.md:482 |
+| absent-shirt | player_cerro_porteno_alexis_canete | dados/elencos/copa-libertadores-2026.md:483 |
+| absent-shirt | player_cerro_porteno_fabricio_dominguez | dados/elencos/copa-libertadores-2026.md:490 |
+| absent-shirt | player_cerro_porteno_alan_nunez | dados/elencos/copa-libertadores-2026.md:491 |
+| absent-shirt | player_cerro_porteno_ivan_ramirez | dados/elencos/copa-libertadores-2026.md:492 |
+| assumed-strength-tier | foreign:ldu-quito | dados/elencos/copa-libertadores-2026.md:515 |
+| absent-shirt | player_ldu_quito_josue_cuero | dados/elencos/copa-libertadores-2026.md:527 |
+| absent-shirt | player_ldu_quito_maikel_caicedo | dados/elencos/copa-libertadores-2026.md:528 |
+| absent-shirt | player_ldu_quito_kevin_minda | dados/elencos/copa-libertadores-2026.md:534 |
+| absent-shirt | player_ldu_quito_ederson_castillo | dados/elencos/copa-libertadores-2026.md:535 |
+| absent-shirt | player_ldu_quito_daniel_de_la_cruz | dados/elencos/copa-libertadores-2026.md:536 |
+| absent-shirt | player_ldu_quito_paul_duran | dados/elencos/copa-libertadores-2026.md:542 |
+| assumed-strength-tier | foreign:independiente-del-valle | dados/elencos/copa-libertadores-2026.md:545 |
+| assumed-strength-tier | foreign:rosario-central | dados/elencos/copa-libertadores-2026.md:570 |
+| absent-shirt | player_rosario_central_axel_werner | dados/elencos/copa-libertadores-2026.md:574 |
+| absent-shirt | player_rosario_central_sebastian_zaracho | dados/elencos/copa-libertadores-2026.md:581 |
+| absent-shirt | player_rosario_central_franco_cervi | dados/elencos/copa-libertadores-2026.md:595 |
+| absent-shirt | player_rosario_central_tomas_badaloni | dados/elencos/copa-libertadores-2026.md:599 |
+| assumed-strength-tier | foreign:platense | dados/elencos/copa-libertadores-2026.md:608 |
+| absent-shirt | player_platense_mateo_mendia | dados/elencos/copa-libertadores-2026.md:619 |
+| absent-shirt | player_platense_santiago_quiros | dados/elencos/copa-libertadores-2026.md:620 |
+| absent-shirt | player_platense_juan_gauto | dados/elencos/copa-libertadores-2026.md:626 |
+| absent-shirt | player_platense_bautista_merlini | dados/elencos/copa-libertadores-2026.md:627 |
+| absent-shirt | player_platense_hector_bobadilla | dados/elencos/copa-libertadores-2026.md:632 |
+| absent-shirt | player_platense_leonardo_heredia | dados/elencos/copa-libertadores-2026.md:633 |
+| assumed-strength-tier | foreign:deportes-tolima | dados/elencos/copa-libertadores-2026.md:636 |
+| assumed-strength-tier | state:primavera | dados/elencos/estaduais-1a-divisao-2026.md:477 |
+| absent-shirt | player_primavera_victor_hugo | dados/elencos/estaduais-1a-divisao-2026.md:479 |
+| absent-shirt | player_primavera_dheimison | dados/elencos/estaduais-1a-divisao-2026.md:480 |
+| absent-shirt | player_primavera_levy | dados/elencos/estaduais-1a-divisao-2026.md:481 |
+| absent-shirt | player_primavera_vitor_guilherme | dados/elencos/estaduais-1a-divisao-2026.md:482 |
+| absent-shirt | player_primavera_afonso | dados/elencos/estaduais-1a-divisao-2026.md:483 |
+| absent-shirt | player_primavera_renato_vischi | dados/elencos/estaduais-1a-divisao-2026.md:484 |
+| absent-shirt | player_primavera_ligger | dados/elencos/estaduais-1a-divisao-2026.md:485 |
+| absent-shirt | player_primavera_gabriel_tobias | dados/elencos/estaduais-1a-divisao-2026.md:486 |
+| absent-shirt | player_primavera_thales_olesques | dados/elencos/estaduais-1a-divisao-2026.md:487 |
+| absent-shirt | player_primavera_kevin | dados/elencos/estaduais-1a-divisao-2026.md:488 |
+| absent-shirt | player_primavera_joao_victor | dados/elencos/estaduais-1a-divisao-2026.md:489 |
+| absent-shirt | player_primavera_brayan | dados/elencos/estaduais-1a-divisao-2026.md:490 |
+| absent-shirt | player_primavera_yuri_lima | dados/elencos/estaduais-1a-divisao-2026.md:491 |
+| absent-shirt | player_primavera_bruno_lima | dados/elencos/estaduais-1a-divisao-2026.md:492 |
+| absent-shirt | player_primavera_junior_caicara | dados/elencos/estaduais-1a-divisao-2026.md:493 |
+| absent-shirt | player_primavera_paulinho | dados/elencos/estaduais-1a-divisao-2026.md:494 |
+| absent-shirt | player_primavera_luan_martins | dados/elencos/estaduais-1a-divisao-2026.md:495 |
+| absent-shirt | player_primavera_samuel_andrade | dados/elencos/estaduais-1a-divisao-2026.md:496 |
+| absent-shirt | player_primavera_richard | dados/elencos/estaduais-1a-divisao-2026.md:497 |
+| absent-shirt | player_primavera_renatinho | dados/elencos/estaduais-1a-divisao-2026.md:498 |
+| absent-shirt | player_primavera_matheus_anjos | dados/elencos/estaduais-1a-divisao-2026.md:499 |
+| absent-shirt | player_primavera_welliton | dados/elencos/estaduais-1a-divisao-2026.md:500 |
+| absent-shirt | player_primavera_paulo_baya | dados/elencos/estaduais-1a-divisao-2026.md:501 |
+| absent-shirt | player_primavera_kauan_cunha | dados/elencos/estaduais-1a-divisao-2026.md:502 |
+| absent-shirt | player_primavera_luiz_fernando | dados/elencos/estaduais-1a-divisao-2026.md:503 |
+| absent-shirt | player_primavera_brunao | dados/elencos/estaduais-1a-divisao-2026.md:504 |
+| absent-shirt | player_primavera_josiel | dados/elencos/estaduais-1a-divisao-2026.md:505 |
+| absent-shirt | player_primavera_lucas_douglas | dados/elencos/estaduais-1a-divisao-2026.md:506 |
+| absent-shirt | player_primavera_leo_passos | dados/elencos/estaduais-1a-divisao-2026.md:507 |
+| absent-shirt | player_primavera_gabriel_poveda | dados/elencos/estaduais-1a-divisao-2026.md:508 |
+| absent-shirt | player_primavera_neto | dados/elencos/estaduais-1a-divisao-2026.md:509 |
+| absent-shirt | player_primavera_vinicius | dados/elencos/estaduais-1a-divisao-2026.md:510 |
 | name-in-several-clubs | player_athletico_paranaense_leo | dados/elencos/brasileirao-serie-a-2026.md:40 |
 | name-in-several-clubs | player_athletico_paranaense_dantas | dados/elencos/brasileirao-serie-a-2026.md:41 |
-| name-in-several-clubs | player_athletico_paranaense_gilberto | dados/elencos/brasileirao-serie-a-2026.md:45 |
 | name-in-several-clubs | player_athletico_paranaense_dudu | dados/elencos/brasileirao-serie-a-2026.md:47 |
 | name-in-several-clubs | player_athletico_paranaense_luiz_gustavo | dados/elencos/brasileirao-serie-a-2026.md:49 |
 | name-in-several-clubs | player_athletico_paranaense_felipinho | dados/elencos/brasileirao-serie-a-2026.md:52 |
@@ -813,7 +954,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_chapecoense_marcinho | dados/elencos/brasileirao-serie-a-2026.md:203 |
 | name-in-several-clubs | player_corinthians_kaue | dados/elencos/brasileirao-serie-a-2026.md:214 |
 | name-in-several-clubs | player_corinthians_gustavo_henrique | dados/elencos/brasileirao-serie-a-2026.md:217 |
-| name-in-several-clubs | player_corinthians_hugo | dados/elencos/brasileirao-serie-a-2026.md:221 |
 | name-in-several-clubs | player_corinthians_matheuzinho | dados/elencos/brasileirao-serie-a-2026.md:223 |
 | name-in-several-clubs | player_corinthians_allan | dados/elencos/brasileirao-serie-a-2026.md:226 |
 | name-in-several-clubs | player_corinthians_andre | dados/elencos/brasileirao-serie-a-2026.md:229 |
@@ -838,7 +978,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_flamengo_everton | dados/elencos/brasileirao-serie-a-2026.md:339 |
 | name-in-several-clubs | player_flamengo_pedro | dados/elencos/brasileirao-serie-a-2026.md:342 |
 | name-in-several-clubs | player_flamengo_bruno_henrique | dados/elencos/brasileirao-serie-a-2026.md:344 |
-| name-in-several-clubs | player_fluminense_fabio | dados/elencos/brasileirao-serie-a-2026.md:349 |
 | name-in-several-clubs | player_fluminense_rene | dados/elencos/brasileirao-serie-a-2026.md:358 |
 | name-in-several-clubs | player_fluminense_guga | dados/elencos/brasileirao-serie-a-2026.md:359 |
 | name-in-several-clubs | player_fluminense_otavio | dados/elencos/brasileirao-serie-a-2026.md:363 |
@@ -852,7 +991,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_gremio_joao_pedro | dados/elencos/brasileirao-serie-a-2026.md:396 |
 | name-in-several-clubs | player_gremio_tiaguinho | dados/elencos/brasileirao-serie-a-2026.md:403 |
 | name-in-several-clubs | player_gremio_riquelme | dados/elencos/brasileirao-serie-a-2026.md:406 |
-| name-in-several-clubs | player_gremio_willian | dados/elencos/brasileirao-serie-a-2026.md:408 |
 | name-in-several-clubs | player_gremio_tete | dados/elencos/brasileirao-serie-a-2026.md:409 |
 | name-in-several-clubs | player_internacional_kauan | dados/elencos/brasileirao-serie-a-2026.md:421 |
 | name-in-several-clubs | player_internacional_juninho | dados/elencos/brasileirao-serie-a-2026.md:426 |
@@ -869,7 +1007,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_mirassol_fernandinho | dados/elencos/brasileirao-serie-a-2026.md:477 |
 | name-in-several-clubs | player_mirassol_carlos_eduardo | dados/elencos/brasileirao-serie-a-2026.md:481 |
 | name-in-several-clubs | player_mirassol_andre_luis | dados/elencos/brasileirao-serie-a-2026.md:484 |
-| name-in-several-clubs | player_mirassol_bruno_santos | dados/elencos/brasileirao-serie-a-2026.md:485 |
 | name-in-several-clubs | player_palmeiras_murilo | dados/elencos/brasileirao-serie-a-2026.md:498 |
 | name-in-several-clubs | player_palmeiras_allan | dados/elencos/brasileirao-serie-a-2026.md:518 |
 | name-in-several-clubs | player_palmeiras_paulinho | dados/elencos/brasileirao-serie-a-2026.md:521 |
@@ -887,6 +1024,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_remo_marcelinho | dados/elencos/brasileirao-serie-a-2026.md:582 |
 | name-in-several-clubs | player_remo_ze_ricardo | dados/elencos/brasileirao-serie-a-2026.md:588 |
 | name-in-several-clubs | player_remo_patrick | dados/elencos/brasileirao-serie-a-2026.md:589 |
+| name-in-several-clubs | player_remo_gabriel_poveda | dados/elencos/brasileirao-serie-a-2026.md:599 |
 | name-in-several-clubs | player_santos_joao_paulo | dados/elencos/brasileirao-serie-a-2026.md:604 |
 | name-in-several-clubs | player_santos_alex | dados/elencos/brasileirao-serie-a-2026.md:612 |
 | name-in-several-clubs | player_santos_gustavinho | dados/elencos/brasileirao-serie-a-2026.md:621 |
@@ -897,7 +1035,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_sao_paulo_lucca | dados/elencos/brasileirao-serie-a-2026.md:671 |
 | name-in-several-clubs | player_sao_paulo_tete | dados/elencos/brasileirao-serie-a-2026.md:673 |
 | name-in-several-clubs | player_sao_paulo_artur | dados/elencos/brasileirao-serie-a-2026.md:674 |
-| name-in-several-clubs | player_sao_paulo_paulinho | dados/elencos/brasileirao-serie-a-2026.md:681 |
 | name-in-several-clubs | player_vasco_da_gama_pablo | dados/elencos/brasileirao-serie-a-2026.md:686 |
 | name-in-several-clubs | player_vasco_da_gama_riquelme | dados/elencos/brasileirao-serie-a-2026.md:694 |
 | name-in-several-clubs | player_vasco_da_gama_paulinho | dados/elencos/brasileirao-serie-a-2026.md:695 |
@@ -921,23 +1058,15 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_america_mineiro_cassio | dados/elencos/brasileirao-serie-b-2026.md:37 |
 | name-in-several-clubs | player_america_mineiro_manoel | dados/elencos/brasileirao-serie-b-2026.md:43 |
 | name-in-several-clubs | player_america_mineiro_thallyson | dados/elencos/brasileirao-serie-b-2026.md:45 |
-| name-in-several-clubs | player_america_mineiro_fabio | dados/elencos/brasileirao-serie-b-2026.md:52 |
 | name-in-several-clubs | player_america_mineiro_paulinho | dados/elencos/brasileirao-serie-b-2026.md:54 |
-| name-in-several-clubs | player_america_mineiro_yago_santos | dados/elencos/brasileirao-serie-b-2026.md:69 |
-| name-in-several-clubs | player_america_mineiro_yarlen | dados/elencos/brasileirao-serie-b-2026.md:81 |
 | name-in-several-clubs | player_athletic_club_felipe_vieira | dados/elencos/brasileirao-serie-b-2026.md:92 |
 | name-in-several-clubs | player_athletic_club_gabriel_indio | dados/elencos/brasileirao-serie-b-2026.md:93 |
 | name-in-several-clubs | player_athletic_club_jhan_torres | dados/elencos/brasileirao-serie-b-2026.md:94 |
 | name-in-several-clubs | player_athletic_club_enzo | dados/elencos/brasileirao-serie-b-2026.md:96 |
-| name-in-several-clubs | player_athletic_club_marcelo_henrique | dados/elencos/brasileirao-serie-b-2026.md:97 |
 | name-in-several-clubs | player_athletic_club_joao_vitor | dados/elencos/brasileirao-serie-b-2026.md:103 |
 | name-in-several-clubs | player_athletic_club_jota | dados/elencos/brasileirao-serie-b-2026.md:111 |
-| name-in-several-clubs | player_athletic_club_yago_santos | dados/elencos/brasileirao-serie-b-2026.md:114 |
 | name-in-several-clubs | player_athletic_club_gustavinho | dados/elencos/brasileirao-serie-b-2026.md:115 |
 | name-in-several-clubs | player_athletic_club_max | dados/elencos/brasileirao-serie-b-2026.md:127 |
-| name-in-several-clubs | player_athletic_club_bruninho | dados/elencos/brasileirao-serie-b-2026.md:128 |
-| name-in-several-clubs | player_athletic_club_yarlen | dados/elencos/brasileirao-serie-b-2026.md:132 |
-| name-in-several-clubs | player_athletic_club_carlinhos | dados/elencos/brasileirao-serie-b-2026.md:134 |
 | name-in-several-clubs | player_atletico_goianiense_leo | dados/elencos/brasileirao-serie-b-2026.md:144 |
 | name-in-several-clubs | player_atletico_goianiense_paulo_henrique | dados/elencos/brasileirao-serie-b-2026.md:145 |
 | name-in-several-clubs | player_atletico_goianiense_railson | dados/elencos/brasileirao-serie-b-2026.md:147 |
@@ -946,27 +1075,17 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_atletico_goianiense_tito | dados/elencos/brasileirao-serie-b-2026.md:154 |
 | name-in-several-clubs | player_atletico_goianiense_isaac | dados/elencos/brasileirao-serie-b-2026.md:162 |
 | name-in-several-clubs | player_atletico_goianiense_geovane | dados/elencos/brasileirao-serie-b-2026.md:166 |
-| name-in-several-clubs | player_atletico_goianiense_cristiano | dados/elencos/brasileirao-serie-b-2026.md:169 |
 | name-in-several-clubs | player_atletico_goianiense_assis | dados/elencos/brasileirao-serie-b-2026.md:171 |
 | name-in-several-clubs | player_atletico_goianiense_guilherme | dados/elencos/brasileirao-serie-b-2026.md:172 |
-| name-in-several-clubs | player_atletico_goianiense_anthony_matheus | dados/elencos/brasileirao-serie-b-2026.md:173 |
-| name-in-several-clubs | player_atletico_goianiense_ariel | dados/elencos/brasileirao-serie-b-2026.md:174 |
-| name-in-several-clubs | player_atletico_goianiense_riquelme | dados/elencos/brasileirao-serie-b-2026.md:181 |
-| name-in-several-clubs | player_atletico_goianiense_vitinho | dados/elencos/brasileirao-serie-b-2026.md:183 |
-| name-in-several-clubs | player_atletico_goianiense_gabriel_dias | dados/elencos/brasileirao-serie-b-2026.md:196 |
-| name-in-several-clubs | player_atletico_goianiense_nathan | dados/elencos/brasileirao-serie-b-2026.md:199 |
 | name-in-several-clubs | player_avai_otavio | dados/elencos/brasileirao-serie-b-2026.md:203 |
 | name-in-several-clubs | player_avai_leonardo | dados/elencos/brasileirao-serie-b-2026.md:204 |
-| name-in-several-clubs | player_avai_joaquim | dados/elencos/brasileirao-serie-b-2026.md:206 |
 | name-in-several-clubs | player_avai_jefferson | dados/elencos/brasileirao-serie-b-2026.md:210 |
 | name-in-several-clubs | player_avai_jamerson | dados/elencos/brasileirao-serie-b-2026.md:221 |
 | name-in-several-clubs | player_avai_ze_ricardo | dados/elencos/brasileirao-serie-b-2026.md:224 |
 | name-in-several-clubs | player_avai_wenderson | dados/elencos/brasileirao-serie-b-2026.md:228 |
 | name-in-several-clubs | player_avai_luiz_henrique | dados/elencos/brasileirao-serie-b-2026.md:229 |
 | name-in-several-clubs | player_avai_jean_lucas | dados/elencos/brasileirao-serie-b-2026.md:230 |
-| name-in-several-clubs | player_avai_kevin | dados/elencos/brasileirao-serie-b-2026.md:233 |
 | name-in-several-clubs | player_avai_thayllon | dados/elencos/brasileirao-serie-b-2026.md:237 |
-| name-in-several-clubs | player_avai_cristiano | dados/elencos/brasileirao-serie-b-2026.md:243 |
 | name-in-several-clubs | player_botafogo_sp_wallace | dados/elencos/brasileirao-serie-b-2026.md:252 |
 | name-in-several-clubs | player_botafogo_sp_carlao | dados/elencos/brasileirao-serie-b-2026.md:253 |
 | name-in-several-clubs | player_botafogo_sp_felipe_vieira | dados/elencos/brasileirao-serie-b-2026.md:258 |
@@ -975,38 +1094,26 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_botafogo_sp_thiaguinho | dados/elencos/brasileirao-serie-b-2026.md:269 |
 | name-in-several-clubs | player_botafogo_sp_wesley_santos | dados/elencos/brasileirao-serie-b-2026.md:281 |
 | name-in-several-clubs | player_botafogo_sp_hygor | dados/elencos/brasileirao-serie-b-2026.md:284 |
-| name-in-several-clubs | player_botafogo_sp_luizao | dados/elencos/brasileirao-serie-b-2026.md:286 |
-| name-in-several-clubs | player_botafogo_sp_hugo | dados/elencos/brasileirao-serie-b-2026.md:290 |
-| name-in-several-clubs | player_botafogo_sp_willian | dados/elencos/brasileirao-serie-b-2026.md:291 |
 | name-in-several-clubs | player_ceara_gustavo_martins | dados/elencos/brasileirao-serie-b-2026.md:296 |
 | name-in-several-clubs | player_ceara_luizao | dados/elencos/brasileirao-serie-b-2026.md:298 |
 | name-in-several-clubs | player_ceara_fernando | dados/elencos/brasileirao-serie-b-2026.md:305 |
 | name-in-several-clubs | player_ceara_ronald | dados/elencos/brasileirao-serie-b-2026.md:308 |
 | name-in-several-clubs | player_ceara_luiz_otavio | dados/elencos/brasileirao-serie-b-2026.md:309 |
 | name-in-several-clubs | player_ceara_alex | dados/elencos/brasileirao-serie-b-2026.md:310 |
-| name-in-several-clubs | player_ceara_janderson | dados/elencos/brasileirao-serie-b-2026.md:313 |
 | name-in-several-clubs | player_ceara_joao_gabriel | dados/elencos/brasileirao-serie-b-2026.md:316 |
 | name-in-several-clubs | player_ceara_matheusinho | dados/elencos/brasileirao-serie-b-2026.md:323 |
 | name-in-several-clubs | player_ceara_gabriel | dados/elencos/brasileirao-serie-b-2026.md:324 |
-| name-in-several-clubs | player_ceara_caio | dados/elencos/brasileirao-serie-b-2026.md:326 |
 | name-in-several-clubs | player_ceara_wendel | dados/elencos/brasileirao-serie-b-2026.md:331 |
-| name-in-several-clubs | player_ceara_kaua | dados/elencos/brasileirao-serie-b-2026.md:332 |
-| name-in-several-clubs | player_ceara_lucca | dados/elencos/brasileirao-serie-b-2026.md:333 |
-| name-in-several-clubs | player_ceara_enzo | dados/elencos/brasileirao-serie-b-2026.md:334 |
 | name-in-several-clubs | player_crb_pablo | dados/elencos/brasileirao-serie-b-2026.md:341 |
 | name-in-several-clubs | player_crb_kevin | dados/elencos/brasileirao-serie-b-2026.md:348 |
 | name-in-several-clubs | player_crb_maycon | dados/elencos/brasileirao-serie-b-2026.md:353 |
 | name-in-several-clubs | player_crb_wallace | dados/elencos/brasileirao-serie-b-2026.md:354 |
-| name-in-several-clubs | player_crb_anderson | dados/elencos/brasileirao-serie-b-2026.md:355 |
 | name-in-several-clubs | player_crb_luizao | dados/elencos/brasileirao-serie-b-2026.md:359 |
 | name-in-several-clubs | player_crb_geovane | dados/elencos/brasileirao-serie-b-2026.md:361 |
 | name-in-several-clubs | player_crb_danielzinho | dados/elencos/brasileirao-serie-b-2026.md:363 |
 | name-in-several-clubs | player_crb_guilherme_estrella | dados/elencos/brasileirao-serie-b-2026.md:364 |
-| name-in-several-clubs | player_crb_rian | dados/elencos/brasileirao-serie-b-2026.md:368 |
 | name-in-several-clubs | player_crb_thiaguinho | dados/elencos/brasileirao-serie-b-2026.md:371 |
 | name-in-several-clubs | player_crb_joao_neto | dados/elencos/brasileirao-serie-b-2026.md:374 |
-| name-in-several-clubs | player_crb_anthony_matheus | dados/elencos/brasileirao-serie-b-2026.md:377 |
-| name-in-several-clubs | player_crb_kaua | dados/elencos/brasileirao-serie-b-2026.md:379 |
 | name-in-several-clubs | player_criciuma_alisson | dados/elencos/brasileirao-serie-b-2026.md:382 |
 | name-in-several-clubs | player_criciuma_bruno_alves | dados/elencos/brasileirao-serie-b-2026.md:388 |
 | name-in-several-clubs | player_criciuma_marcinho | dados/elencos/brasileirao-serie-b-2026.md:395 |
@@ -1015,27 +1122,21 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_criciuma_ronald | dados/elencos/brasileirao-serie-b-2026.md:401 |
 | name-in-several-clubs | player_criciuma_thiaguinho | dados/elencos/brasileirao-serie-b-2026.md:405 |
 | name-in-several-clubs | player_criciuma_fabricio | dados/elencos/brasileirao-serie-b-2026.md:410 |
-| name-in-several-clubs | player_criciuma_eliel | dados/elencos/brasileirao-serie-b-2026.md:411 |
 | name-in-several-clubs | player_criciuma_romarinho | dados/elencos/brasileirao-serie-b-2026.md:415 |
 | name-in-several-clubs | player_criciuma_joao_carlos | dados/elencos/brasileirao-serie-b-2026.md:416 |
 | name-in-several-clubs | player_criciuma_nicolas | dados/elencos/brasileirao-serie-b-2026.md:417 |
 | name-in-several-clubs | player_criciuma_caue | dados/elencos/brasileirao-serie-b-2026.md:419 |
-| name-in-several-clubs | player_criciuma_carlos_eduardo | dados/elencos/brasileirao-serie-b-2026.md:421 |
 | name-in-several-clubs | player_cuiaba_jean | dados/elencos/brasileirao-serie-b-2026.md:424 |
 | name-in-several-clubs | player_cuiaba_joao_carlos | dados/elencos/brasileirao-serie-b-2026.md:425 |
 | name-in-several-clubs | player_cuiaba_marlon | dados/elencos/brasileirao-serie-b-2026.md:434 |
 | name-in-several-clubs | player_cuiaba_tarcisio | dados/elencos/brasileirao-serie-b-2026.md:437 |
 | name-in-several-clubs | player_cuiaba_joao_victor | dados/elencos/brasileirao-serie-b-2026.md:439 |
 | name-in-several-clubs | player_cuiaba_luisao | dados/elencos/brasileirao-serie-b-2026.md:441 |
-| name-in-several-clubs | player_cuiaba_marcelo_henrique | dados/elencos/brasileirao-serie-b-2026.md:443 |
 | name-in-several-clubs | player_cuiaba_raul | dados/elencos/brasileirao-serie-b-2026.md:446 |
 | name-in-several-clubs | player_cuiaba_luiz_otavio | dados/elencos/brasileirao-serie-b-2026.md:449 |
 | name-in-several-clubs | player_cuiaba_otavio | dados/elencos/brasileirao-serie-b-2026.md:455 |
-| name-in-several-clubs | player_cuiaba_joao_vitor | dados/elencos/brasileirao-serie-b-2026.md:456 |
-| name-in-several-clubs | player_cuiaba_eliel | dados/elencos/brasileirao-serie-b-2026.md:457 |
 | name-in-several-clubs | player_cuiaba_rodrigo_rodrigues | dados/elencos/brasileirao-serie-b-2026.md:465 |
 | name-in-several-clubs | player_cuiaba_pedro_henrique | dados/elencos/brasileirao-serie-b-2026.md:467 |
-| name-in-several-clubs | player_fortaleza_brenno | dados/elencos/brasileirao-serie-b-2026.md:478 |
 | name-in-several-clubs | player_fortaleza_vinicius | dados/elencos/brasileirao-serie-b-2026.md:480 |
 | name-in-several-clubs | player_fortaleza_paulinho | dados/elencos/brasileirao-serie-b-2026.md:489 |
 | name-in-several-clubs | player_fortaleza_guilherme | dados/elencos/brasileirao-serie-b-2026.md:490 |
@@ -1044,9 +1145,12 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_fortaleza_ryan | dados/elencos/brasileirao-serie-b-2026.md:495 |
 | name-in-several-clubs | player_fortaleza_tomas_pochettino | dados/elencos/brasileirao-serie-b-2026.md:503 |
 | name-in-several-clubs | player_fortaleza_bruninho | dados/elencos/brasileirao-serie-b-2026.md:504 |
+| name-in-several-clubs | player_fortaleza_luiz_fernando | dados/elencos/brasileirao-serie-b-2026.md:505 |
 | name-in-several-clubs | player_fortaleza_rodriguinho | dados/elencos/brasileirao-serie-b-2026.md:506 |
+| name-in-several-clubs | player_fortaleza_paulo_baya | dados/elencos/brasileirao-serie-b-2026.md:507 |
 | name-in-several-clubs | player_fortaleza_vitinho | dados/elencos/brasileirao-serie-b-2026.md:508 |
 | name-in-several-clubs | player_fortaleza_pedro_henrique | dados/elencos/brasileirao-serie-b-2026.md:509 |
+| name-in-several-clubs | player_fortaleza_welliton | dados/elencos/brasileirao-serie-b-2026.md:510 |
 | name-in-several-clubs | player_goias_luiz_felipe | dados/elencos/brasileirao-serie-b-2026.md:521 |
 | name-in-several-clubs | player_goias_luisao | dados/elencos/brasileirao-serie-b-2026.md:524 |
 | name-in-several-clubs | player_goias_nicolas | dados/elencos/brasileirao-serie-b-2026.md:525 |
@@ -1059,20 +1163,15 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_goias_pedrinho | dados/elencos/brasileirao-serie-b-2026.md:547 |
 | name-in-several-clubs | player_goias_cadu | dados/elencos/brasileirao-serie-b-2026.md:549 |
 | name-in-several-clubs | player_juventude_pedro_rocha | dados/elencos/brasileirao-serie-b-2026.md:553 |
-| name-in-several-clubs | player_juventude_joaquim | dados/elencos/brasileirao-serie-b-2026.md:557 |
 | name-in-several-clubs | player_juventude_marcos_paulo | dados/elencos/brasileirao-serie-b-2026.md:562 |
-| name-in-several-clubs | player_juventude_nathan | dados/elencos/brasileirao-serie-b-2026.md:569 |
 | name-in-several-clubs | player_juventude_kaue | dados/elencos/brasileirao-serie-b-2026.md:570 |
 | name-in-several-clubs | player_juventude_bernardo | dados/elencos/brasileirao-serie-b-2026.md:573 |
+| name-in-several-clubs | player_juventude_luan_martins | dados/elencos/brasileirao-serie-b-2026.md:578 |
 | name-in-several-clubs | player_juventude_rai | dados/elencos/brasileirao-serie-b-2026.md:585 |
 | name-in-several-clubs | player_juventude_luiz_henrique | dados/elencos/brasileirao-serie-b-2026.md:586 |
 | name-in-several-clubs | player_juventude_marcos_paulo_2 | dados/elencos/brasileirao-serie-b-2026.md:593 |
-| name-in-several-clubs | player_juventude_carlinhos | dados/elencos/brasileirao-serie-b-2026.md:600 |
-| name-in-several-clubs | player_londrina_thiago | dados/elencos/brasileirao-serie-b-2026.md:608 |
 | name-in-several-clubs | player_londrina_wallace | dados/elencos/brasileirao-serie-b-2026.md:610 |
-| name-in-several-clubs | player_londrina_caio | dados/elencos/brasileirao-serie-b-2026.md:613 |
 | name-in-several-clubs | player_londrina_artur | dados/elencos/brasileirao-serie-b-2026.md:615 |
-| name-in-several-clubs | player_londrina_kevyn | dados/elencos/brasileirao-serie-b-2026.md:616 |
 | name-in-several-clubs | player_londrina_weverton | dados/elencos/brasileirao-serie-b-2026.md:619 |
 | name-in-several-clubs | player_londrina_tarik | dados/elencos/brasileirao-serie-b-2026.md:624 |
 | name-in-several-clubs | player_londrina_fabiano | dados/elencos/brasileirao-serie-b-2026.md:626 |
@@ -1080,15 +1179,10 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_londrina_thalis | dados/elencos/brasileirao-serie-b-2026.md:633 |
 | name-in-several-clubs | player_londrina_fabricio | dados/elencos/brasileirao-serie-b-2026.md:636 |
 | name-in-several-clubs | player_londrina_juninho | dados/elencos/brasileirao-serie-b-2026.md:638 |
-| name-in-several-clubs | player_londrina_pablo_dyego | dados/elencos/brasileirao-serie-b-2026.md:642 |
-| name-in-several-clubs | player_londrina_gilberto | dados/elencos/brasileirao-serie-b-2026.md:644 |
-| name-in-several-clubs | player_londrina_bruno_santos | dados/elencos/brasileirao-serie-b-2026.md:646 |
-| name-in-several-clubs | player_nautico_leo | dados/elencos/brasileirao-serie-b-2026.md:655 |
 | name-in-several-clubs | player_nautico_betao | dados/elencos/brasileirao-serie-b-2026.md:656 |
 | name-in-several-clubs | player_nautico_mateus_silva | dados/elencos/brasileirao-serie-b-2026.md:657 |
 | name-in-several-clubs | player_nautico_wanderson | dados/elencos/brasileirao-serie-b-2026.md:658 |
 | name-in-several-clubs | player_nautico_gustavo_henrique | dados/elencos/brasileirao-serie-b-2026.md:659 |
-| name-in-several-clubs | player_nautico_indio | dados/elencos/brasileirao-serie-b-2026.md:660 |
 | name-in-several-clubs | player_nautico_yuri | dados/elencos/brasileirao-serie-b-2026.md:661 |
 | name-in-several-clubs | player_nautico_luiz_felipe | dados/elencos/brasileirao-serie-b-2026.md:667 |
 | name-in-several-clubs | player_nautico_gabriel_indio | dados/elencos/brasileirao-serie-b-2026.md:669 |
@@ -1099,33 +1193,22 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_nautico_juninho | dados/elencos/brasileirao-serie-b-2026.md:681 |
 | name-in-several-clubs | player_nautico_ramon | dados/elencos/brasileirao-serie-b-2026.md:684 |
 | name-in-several-clubs | player_nautico_vinicius | dados/elencos/brasileirao-serie-b-2026.md:685 |
-| name-in-several-clubs | player_nautico_kevyn | dados/elencos/brasileirao-serie-b-2026.md:693 |
-| name-in-several-clubs | player_nautico_maranhao | dados/elencos/brasileirao-serie-b-2026.md:696 |
 | name-in-several-clubs | player_novorizontino_paulo_henrique | dados/elencos/brasileirao-serie-b-2026.md:701 |
-| name-in-several-clubs | player_novorizontino_carlinhos | dados/elencos/brasileirao-serie-b-2026.md:704 |
 | name-in-several-clubs | player_novorizontino_patrick | dados/elencos/brasileirao-serie-b-2026.md:705 |
 | name-in-several-clubs | player_novorizontino_dantas | dados/elencos/brasileirao-serie-b-2026.md:715 |
 | name-in-several-clubs | player_novorizontino_marlon | dados/elencos/brasileirao-serie-b-2026.md:721 |
 | name-in-several-clubs | player_novorizontino_romulo | dados/elencos/brasileirao-serie-b-2026.md:726 |
 | name-in-several-clubs | player_novorizontino_juninho | dados/elencos/brasileirao-serie-b-2026.md:727 |
 | name-in-several-clubs | player_novorizontino_robson | dados/elencos/brasileirao-serie-b-2026.md:734 |
-| name-in-several-clubs | player_novorizontino_carlao | dados/elencos/brasileirao-serie-b-2026.md:738 |
 | name-in-several-clubs | player_operario_pr_andre | dados/elencos/brasileirao-serie-b-2026.md:750 |
 | name-in-several-clubs | player_operario_pr_joao_gabriel | dados/elencos/brasileirao-serie-b-2026.md:758 |
 | name-in-several-clubs | player_operario_pr_jhan_torres | dados/elencos/brasileirao-serie-b-2026.md:760 |
-| name-in-several-clubs | player_operario_pr_miguel | dados/elencos/brasileirao-serie-b-2026.md:762 |
 | name-in-several-clubs | player_operario_pr_indio | dados/elencos/brasileirao-serie-b-2026.md:763 |
-| name-in-several-clubs | player_operario_pr_brenno | dados/elencos/brasileirao-serie-b-2026.md:772 |
-| name-in-several-clubs | player_operario_pr_henrique | dados/elencos/brasileirao-serie-b-2026.md:773 |
-| name-in-several-clubs | player_operario_pr_thiago | dados/elencos/brasileirao-serie-b-2026.md:777 |
 | name-in-several-clubs | player_operario_pr_pablo | dados/elencos/brasileirao-serie-b-2026.md:783 |
 | name-in-several-clubs | player_operario_pr_dudu | dados/elencos/brasileirao-serie-b-2026.md:786 |
 | name-in-several-clubs | player_operario_pr_joao_victor | dados/elencos/brasileirao-serie-b-2026.md:788 |
 | name-in-several-clubs | player_ponte_preta_lucas_cunha | dados/elencos/brasileirao-serie-b-2026.md:799 |
-| name-in-several-clubs | player_ponte_preta_gabriel | dados/elencos/brasileirao-serie-b-2026.md:814 |
-| name-in-several-clubs | player_ponte_preta_joao_gabriel | dados/elencos/brasileirao-serie-b-2026.md:815 |
 | name-in-several-clubs | player_ponte_preta_murilo | dados/elencos/brasileirao-serie-b-2026.md:819 |
-| name-in-several-clubs | player_ponte_preta_miguel | dados/elencos/brasileirao-serie-b-2026.md:823 |
 | name-in-several-clubs | player_ponte_preta_tarik | dados/elencos/brasileirao-serie-b-2026.md:825 |
 | name-in-several-clubs | player_ponte_preta_pedrinho | dados/elencos/brasileirao-serie-b-2026.md:826 |
 | name-in-several-clubs | player_ponte_preta_rodriguinho | dados/elencos/brasileirao-serie-b-2026.md:832 |
@@ -1137,7 +1220,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_sao_bernardo_lucas_lima | dados/elencos/brasileirao-serie-b-2026.md:857 |
 | name-in-several-clubs | player_sao_bernardo_marcao | dados/elencos/brasileirao-serie-b-2026.md:860 |
 | name-in-several-clubs | player_sao_bernardo_pedrinho | dados/elencos/brasileirao-serie-b-2026.md:869 |
-| name-in-several-clubs | player_sao_bernardo_pablo_dyego | dados/elencos/brasileirao-serie-b-2026.md:877 |
 | name-in-several-clubs | player_sport_erick | dados/elencos/brasileirao-serie-b-2026.md:885 |
 | name-in-several-clubs | player_sport_patrick | dados/elencos/brasileirao-serie-b-2026.md:889 |
 | name-in-several-clubs | player_sport_felipinho | dados/elencos/brasileirao-serie-b-2026.md:891 |
@@ -1146,23 +1228,14 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_sport_rafinha | dados/elencos/brasileirao-serie-b-2026.md:897 |
 | name-in-several-clubs | player_sport_thalis | dados/elencos/brasileirao-serie-b-2026.md:908 |
 | name-in-several-clubs | player_sport_marlon | dados/elencos/brasileirao-serie-b-2026.md:914 |
-| name-in-several-clubs | player_sport_fernandinho | dados/elencos/brasileirao-serie-b-2026.md:926 |
-| name-in-several-clubs | player_vila_nova_kaua | dados/elencos/brasileirao-serie-b-2026.md:932 |
 | name-in-several-clubs | player_vila_nova_anderson | dados/elencos/brasileirao-serie-b-2026.md:934 |
-| name-in-several-clubs | player_vila_nova_alex | dados/elencos/brasileirao-serie-b-2026.md:943 |
-| name-in-several-clubs | player_vila_nova_carlao | dados/elencos/brasileirao-serie-b-2026.md:944 |
 | name-in-several-clubs | player_vila_nova_dudu | dados/elencos/brasileirao-serie-b-2026.md:950 |
 | name-in-several-clubs | player_vila_nova_enzo | dados/elencos/brasileirao-serie-b-2026.md:951 |
 | name-in-several-clubs | player_vila_nova_gabriel_dias | dados/elencos/brasileirao-serie-b-2026.md:957 |
-| name-in-several-clubs | player_vila_nova_guilherme_vieira | dados/elencos/brasileirao-serie-b-2026.md:958 |
-| name-in-several-clubs | player_vila_nova_miguel | dados/elencos/brasileirao-serie-b-2026.md:960 |
 | name-in-several-clubs | player_vila_nova_ryan | dados/elencos/brasileirao-serie-b-2026.md:961 |
 | name-in-several-clubs | player_vila_nova_dodo | dados/elencos/brasileirao-serie-b-2026.md:962 |
 | name-in-several-clubs | player_vila_nova_andre_luis | dados/elencos/brasileirao-serie-b-2026.md:964 |
-| name-in-several-clubs | player_vila_nova_janderson | dados/elencos/brasileirao-serie-b-2026.md:965 |
 | name-in-several-clubs | player_vila_nova_caique | dados/elencos/brasileirao-serie-b-2026.md:968 |
-| name-in-several-clubs | player_vila_nova_joao_pedro | dados/elencos/brasileirao-serie-b-2026.md:972 |
-| name-in-several-clubs | player_vila_nova_warley | dados/elencos/brasileirao-serie-b-2026.md:973 |
 | name-in-several-clubs | player_amazonas_ezequiel | dados/elencos/brasileirao-serie-c-2026.md:41 |
 | name-in-several-clubs | player_amazonas_fabinho | dados/elencos/brasileirao-serie-c-2026.md:42 |
 | name-in-several-clubs | player_amazonas_guga | dados/elencos/brasileirao-serie-c-2026.md:44 |
@@ -1176,7 +1249,6 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_anapolis_patrick | dados/elencos/brasileirao-serie-c-2026.md:97 |
 | name-in-several-clubs | player_anapolis_rodriguinho | dados/elencos/brasileirao-serie-c-2026.md:101 |
 | name-in-several-clubs | player_anapolis_samuel | dados/elencos/brasileirao-serie-c-2026.md:103 |
-| name-in-several-clubs | player_anapolis_victor_hugo | dados/elencos/brasileirao-serie-c-2026.md:104 |
 | name-in-several-clubs | player_barra_sc_bruno_henrique | dados/elencos/brasileirao-serie-c-2026.md:113 |
 | name-in-several-clubs | player_barra_sc_leo_duarte | dados/elencos/brasileirao-serie-c-2026.md:127 |
 | name-in-several-clubs | player_barra_sc_marcelinho | dados/elencos/brasileirao-serie-c-2026.md:129 |
@@ -1185,13 +1257,11 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_barra_sc_tete | dados/elencos/brasileirao-serie-c-2026.md:139 |
 | name-in-several-clubs | player_barra_sc_vava | dados/elencos/brasileirao-serie-c-2026.md:140 |
 | name-in-several-clubs | player_barra_sc_vitao | dados/elencos/brasileirao-serie-c-2026.md:142 |
-| name-in-several-clubs | player_barra_sc_warley | dados/elencos/brasileirao-serie-c-2026.md:143 |
 | name-in-several-clubs | player_botafogo_pb_erick | dados/elencos/brasileirao-serie-c-2026.md:153 |
 | name-in-several-clubs | player_botafogo_pb_gustavo | dados/elencos/brasileirao-serie-c-2026.md:157 |
 | name-in-several-clubs | player_botafogo_pb_pk | dados/elencos/brasileirao-serie-c-2026.md:174 |
 | name-in-several-clubs | player_botafogo_pb_romario | dados/elencos/brasileirao-serie-c-2026.md:177 |
 | name-in-several-clubs | player_botafogo_pb_thallyson | dados/elencos/brasileirao-serie-c-2026.md:179 |
-| name-in-several-clubs | player_brusque_ariel | dados/elencos/brasileirao-serie-c-2026.md:187 |
 | name-in-several-clubs | player_brusque_bernardo | dados/elencos/brasileirao-serie-c-2026.md:188 |
 | name-in-several-clubs | player_brusque_guga | dados/elencos/brasileirao-serie-c-2026.md:193 |
 | name-in-several-clubs | player_brusque_joao_pedro | dados/elencos/brasileirao-serie-c-2026.md:198 |
@@ -1199,6 +1269,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_brusque_matheus_nogueira | dados/elencos/brasileirao-serie-c-2026.md:206 |
 | name-in-several-clubs | player_caxias_joao_lucas | dados/elencos/brasileirao-serie-c-2026.md:229 |
 | name-in-several-clubs | player_caxias_mancha | dados/elencos/brasileirao-serie-c-2026.md:235 |
+| name-in-several-clubs | player_caxias_matheus_anjos | dados/elencos/brasileirao-serie-c-2026.md:238 |
 | name-in-several-clubs | player_caxias_vitinho | dados/elencos/brasileirao-serie-c-2026.md:245 |
 | name-in-several-clubs | player_confianca_alisson | dados/elencos/brasileirao-serie-c-2026.md:252 |
 | name-in-several-clubs | player_confianca_cadu | dados/elencos/brasileirao-serie-c-2026.md:255 |
@@ -1222,13 +1293,13 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_ferroviaria_ze_vitor | dados/elencos/brasileirao-serie-c-2026.md:315 |
 | name-in-several-clubs | player_figueirense_ezequiel | dados/elencos/brasileirao-serie-c-2026.md:326 |
 | name-in-several-clubs | player_figueirense_fabricio | dados/elencos/brasileirao-serie-c-2026.md:327 |
-| name-in-several-clubs | player_figueirense_guilherme_vieira | dados/elencos/brasileirao-serie-c-2026.md:330 |
 | name-in-several-clubs | player_figueirense_jorginho | dados/elencos/brasileirao-serie-c-2026.md:339 |
 | name-in-several-clubs | player_figueirense_lucas_dias | dados/elencos/brasileirao-serie-c-2026.md:343 |
 | name-in-several-clubs | player_figueirense_pablo | dados/elencos/brasileirao-serie-c-2026.md:346 |
 | name-in-several-clubs | player_figueirense_vava | dados/elencos/brasileirao-serie-c-2026.md:352 |
-| name-in-several-clubs | player_figueirense_ze_carlos | dados/elencos/brasileirao-serie-c-2026.md:354 |
+| name-in-several-clubs | player_floresta_afonso | dados/elencos/brasileirao-serie-c-2026.md:357 |
 | name-in-several-clubs | player_floresta_caique | dados/elencos/brasileirao-serie-c-2026.md:361 |
+| name-in-several-clubs | player_floresta_dheimison | dados/elencos/brasileirao-serie-c-2026.md:364 |
 | name-in-several-clubs | player_floresta_eduardo | dados/elencos/brasileirao-serie-c-2026.md:367 |
 | name-in-several-clubs | player_floresta_gustavinho | dados/elencos/brasileirao-serie-c-2026.md:371 |
 | name-in-several-clubs | player_floresta_joao_victor | dados/elencos/brasileirao-serie-c-2026.md:377 |
@@ -1243,9 +1314,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_guarani_isaque | dados/elencos/brasileirao-serie-c-2026.md:400 |
 | name-in-several-clubs | player_guarani_joao_paulo | dados/elencos/brasileirao-serie-c-2026.md:401 |
 | name-in-several-clubs | player_guarani_lucca | dados/elencos/brasileirao-serie-c-2026.md:406 |
-| name-in-several-clubs | player_guarani_maranhao | dados/elencos/brasileirao-serie-c-2026.md:407 |
 | name-in-several-clubs | player_guarani_pedro | dados/elencos/brasileirao-serie-c-2026.md:412 |
-| name-in-several-clubs | player_guarani_rian | dados/elencos/brasileirao-serie-c-2026.md:417 |
 | name-in-several-clubs | player_inter_de_limeira_claudinho | dados/elencos/brasileirao-serie-c-2026.md:427 |
 | name-in-several-clubs | player_inter_de_limeira_gabriel_dias | dados/elencos/brasileirao-serie-c-2026.md:432 |
 | name-in-several-clubs | player_inter_de_limeira_joao_victor | dados/elencos/brasileirao-serie-c-2026.md:435 |
@@ -1261,12 +1330,15 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_itabaiana_cleiton | dados/elencos/brasileirao-serie-c-2026.md:463 |
 | name-in-several-clubs | player_itabaiana_isaque | dados/elencos/brasileirao-serie-c-2026.md:473 |
 | name-in-several-clubs | player_itabaiana_jefferson | dados/elencos/brasileirao-serie-c-2026.md:474 |
+| name-in-several-clubs | player_itabaiana_ligger | dados/elencos/brasileirao-serie-c-2026.md:478 |
 | name-in-several-clubs | player_itabaiana_lucao | dados/elencos/brasileirao-serie-c-2026.md:480 |
 | name-in-several-clubs | player_itabaiana_manoel | dados/elencos/brasileirao-serie-c-2026.md:482 |
+| name-in-several-clubs | player_itabaiana_renatinho | dados/elencos/brasileirao-serie-c-2026.md:483 |
 | name-in-several-clubs | player_itabaiana_tarcisio | dados/elencos/brasileirao-serie-c-2026.md:487 |
 | name-in-several-clubs | player_itabaiana_tito | dados/elencos/brasileirao-serie-c-2026.md:488 |
 | name-in-several-clubs | player_itabaiana_william | dados/elencos/brasileirao-serie-c-2026.md:490 |
 | name-in-several-clubs | player_ituano_bruno_alves | dados/elencos/brasileirao-serie-c-2026.md:494 |
+| name-in-several-clubs | player_ituano_leo_passos | dados/elencos/brasileirao-serie-c-2026.md:503 |
 | name-in-several-clubs | player_ituano_lucas_dias | dados/elencos/brasileirao-serie-c-2026.md:505 |
 | name-in-several-clubs | player_ituano_richard | dados/elencos/brasileirao-serie-c-2026.md:514 |
 | name-in-several-clubs | player_ituano_saulo | dados/elencos/brasileirao-serie-c-2026.md:515 |
@@ -1287,6 +1359,7 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_maringa_gabriel_souza | dados/elencos/brasileirao-serie-c-2026.md:566 |
 | name-in-several-clubs | player_maringa_jonathan | dados/elencos/brasileirao-serie-c-2026.md:571 |
 | name-in-several-clubs | player_maringa_keven | dados/elencos/brasileirao-serie-c-2026.md:573 |
+| name-in-several-clubs | player_maringa_neto | dados/elencos/brasileirao-serie-c-2026.md:575 |
 | name-in-several-clubs | player_maringa_paulinho | dados/elencos/brasileirao-serie-c-2026.md:576 |
 | name-in-several-clubs | player_maringa_pedrinho | dados/elencos/brasileirao-serie-c-2026.md:577 |
 | name-in-several-clubs | player_maringa_rafinha | dados/elencos/brasileirao-serie-c-2026.md:578 |
@@ -1315,8 +1388,23 @@ Gerado a partir de `dados/elencos/brasileirao-serie-a-2026.md`, `dados/elencos/b
 | name-in-several-clubs | player_ypiranga_rs_cleiton | dados/elencos/brasileirao-serie-c-2026.md:699 |
 | name-in-several-clubs | player_ypiranga_rs_danielzinho | dados/elencos/brasileirao-serie-c-2026.md:700 |
 | name-in-several-clubs | player_ypiranga_rs_dudu | dados/elencos/brasileirao-serie-c-2026.md:702 |
-| name-in-several-clubs | player_ypiranga_rs_henrique | dados/elencos/brasileirao-serie-c-2026.md:708 |
 | name-in-several-clubs | player_ypiranga_rs_marcelinho | dados/elencos/brasileirao-serie-c-2026.md:715 |
 | name-in-several-clubs | player_ypiranga_rs_pedro_lucas | dados/elencos/brasileirao-serie-c-2026.md:717 |
 | name-in-several-clubs | player_ypiranga_rs_reinaldo | dados/elencos/brasileirao-serie-c-2026.md:720 |
-| name-in-several-clubs | player_ypiranga_rs_ze_carlos | dados/elencos/brasileirao-serie-c-2026.md:725 |
+| name-in-several-clubs | player_primavera_victor_hugo | dados/elencos/estaduais-1a-divisao-2026.md:479 |
+| name-in-several-clubs | player_primavera_dheimison | dados/elencos/estaduais-1a-divisao-2026.md:480 |
+| name-in-several-clubs | player_primavera_afonso | dados/elencos/estaduais-1a-divisao-2026.md:483 |
+| name-in-several-clubs | player_primavera_ligger | dados/elencos/estaduais-1a-divisao-2026.md:485 |
+| name-in-several-clubs | player_primavera_kevin | dados/elencos/estaduais-1a-divisao-2026.md:488 |
+| name-in-several-clubs | player_primavera_joao_victor | dados/elencos/estaduais-1a-divisao-2026.md:489 |
+| name-in-several-clubs | player_primavera_paulinho | dados/elencos/estaduais-1a-divisao-2026.md:494 |
+| name-in-several-clubs | player_primavera_luan_martins | dados/elencos/estaduais-1a-divisao-2026.md:495 |
+| name-in-several-clubs | player_primavera_richard | dados/elencos/estaduais-1a-divisao-2026.md:497 |
+| name-in-several-clubs | player_primavera_renatinho | dados/elencos/estaduais-1a-divisao-2026.md:498 |
+| name-in-several-clubs | player_primavera_matheus_anjos | dados/elencos/estaduais-1a-divisao-2026.md:499 |
+| name-in-several-clubs | player_primavera_welliton | dados/elencos/estaduais-1a-divisao-2026.md:500 |
+| name-in-several-clubs | player_primavera_paulo_baya | dados/elencos/estaduais-1a-divisao-2026.md:501 |
+| name-in-several-clubs | player_primavera_luiz_fernando | dados/elencos/estaduais-1a-divisao-2026.md:503 |
+| name-in-several-clubs | player_primavera_leo_passos | dados/elencos/estaduais-1a-divisao-2026.md:507 |
+| name-in-several-clubs | player_primavera_gabriel_poveda | dados/elencos/estaduais-1a-divisao-2026.md:508 |
+| name-in-several-clubs | player_primavera_neto | dados/elencos/estaduais-1a-divisao-2026.md:509 |
