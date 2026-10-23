@@ -30,6 +30,17 @@ export type {
   MatchPresentation,
   PlaybackSpeed,
 } from './presentation.js';
+export {
+  narrateMatch,
+  narrateTimeline,
+  NARRATION_VERSION,
+} from './narration.js';
+export type {
+  NarrationContext,
+  NarrationEvent,
+  NarrationKind,
+  NarrationLine,
+} from './narration.js';
 export { prepareMatch } from './preparation.js';
 export type { ApproximateStrength, MatchPreparation } from './preparation.js';
 export {
