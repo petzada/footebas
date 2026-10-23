@@ -33,7 +33,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
       <div className="w-full max-w-md">
         <div className="mb-8">
           <Brand />
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm font-semibold text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
             Sua carreira, sua história. A rodada cabe no intervalo.
           </p>
         </div>

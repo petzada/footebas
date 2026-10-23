@@ -189,9 +189,9 @@ function CardStat({
   hint?: string;
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="font-pixel text-[.5rem] text-muted-foreground">{label}</dt>
-      <dd className="font-pixel text-base leading-relaxed sm:text-xl">
+      <dd className="font-pixel text-xs leading-relaxed whitespace-nowrap min-[400px]:text-base sm:text-xl">
         {value}
         {hint && (
           <span className="ml-1 text-xs text-muted-foreground">{hint}</span>

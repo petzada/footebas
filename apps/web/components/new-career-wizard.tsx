@@ -179,7 +179,7 @@ export function NewCareerWizard({
       </div>
       <ScreenTransition
         id={`nova-carreira-${current.id}`}
-        className="mx-auto mt-6 grid max-w-5xl gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]"
+        className="mx-auto mt-6 grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]"
       >
         <nav aria-label="Etapas da nova carreira" className="hidden lg:block">
           <ol className="grid gap-2">
@@ -305,11 +305,11 @@ export function NewCareerWizard({
               </p>
             )}
 
-            <div className="grid grid-cols-[auto_1fr] gap-3 sm:flex sm:justify-between">
+            <div className="grid gap-3 sm:flex sm:justify-between">
               <Button
                 type="button"
                 variant="outline"
-                className="min-h-12"
+                className="min-h-12 whitespace-normal"
                 onClick={back}
               >
                 <ArrowLeft data-icon="inline-start" />
@@ -319,14 +319,17 @@ export function NewCareerWizard({
                 <Button
                   type="submit"
                   variant="coral"
-                  className="min-h-12 px-6 text-base font-extrabold"
+                  className="min-h-12 whitespace-normal px-6 text-base font-extrabold"
                   disabled={pending}
                 >
                   <Play data-icon="inline-start" weight="fill" />
                   {pending ? 'Criando carreira…' : 'Começar carreira'}
                 </Button>
               ) : (
-                <Button type="submit" className="min-h-12 px-6 text-base">
+                <Button
+                  type="submit"
+                  className="min-h-12 whitespace-normal px-6 text-base"
+                >
                   Continuar
                   <ArrowRight data-icon="inline-end" />
                 </Button>
