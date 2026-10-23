@@ -66,7 +66,7 @@ export function playButton(page: Page) {
   return page.getByRole('button', { name: /jogar partida/i }).first();
 }
 
-/** Rótulo "· Rodada N" do cabeçalho da Central. */
+/** Rótulo "Rodada N" do card do clube na Central. */
 export function roundLabel(page: Page) {
   return page.getByText(/rodada \d+/i).first();
 }

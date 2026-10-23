@@ -81,35 +81,43 @@ export function Phase6Shell({
         aria-busy={commandState === 'pending'}
         className="min-w-0 px-4 py-4 sm:px-6 lg:px-8 lg:py-6"
       >
-        <header className="panel-board mb-5 flex min-h-14 items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <ClubEmblem name={career.club} size={44} decorative />
-            <div className="min-w-0">
-              <p className="truncate font-pixel text-[.5rem] text-chalk/80">
-                {career.club} · Rodada {career.round}
-              </p>
-              <h1 className="led truncate text-sm leading-relaxed sm:text-xl">
-                {labels[screen]}
-              </h1>
-            </div>
+        <header
+          data-testid="shell-header"
+          className="panel-board mb-5 flex min-h-14 items-center justify-between gap-3 px-3 py-2 sm:px-4"
+        >
+          {/* Screen title stays for assistive tech; visually the header is
+              only the crest, the coach and three small icons. */}
+          <h1 className="sr-only">{labels[screen]}</h1>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <ClubEmblem name={career.club} size={40} />
+            <p className="led min-w-0 truncate text-[.6rem] leading-relaxed sm:text-sm">
+              {career.coach}
+            </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <MuteButton />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <MuteButton compact />
             {onHome && (
               <Button
                 variant="outline"
+                size="icon"
+                className="size-9 sm:size-10"
                 aria-label="Voltar ao início"
                 title="Voltar ao início"
                 onClick={onHome}
               >
-                <SoccerBall data-icon="inline-start" />
-                <span className="hidden sm:inline">Início</span>
+                <SoccerBall weight="fill" />
               </Button>
             )}
             {onSignOut && (
-              <Button variant="outline" onClick={onSignOut}>
-                <SignOut data-icon="inline-start" />
-                Sair
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-9 sm:size-10"
+                aria-label="Sair"
+                title="Sair"
+                onClick={onSignOut}
+              >
+                <SignOut weight="bold" />
               </Button>
             )}
           </div>
