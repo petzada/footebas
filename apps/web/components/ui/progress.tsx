@@ -5,21 +5,21 @@ import * as ProgressPrimitive from '@radix-ui/react-progress';
 
 import { cn } from '@/lib/utils';
 
+/** Pixel bar: stepped blocks, no smooth fill. `tone` picks the block color. */
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
->(({ className, value, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root> & {
+    tone?: 'grass' | 'bulb' | 'red';
+  }
+>(({ className, value, tone = 'grass', ...props }, ref) => (
   <ProgressPrimitive.Root
     ref={ref}
-    className={cn(
-      'relative h-2 w-full overflow-hidden rounded-full bg-popover/70 ring-1 ring-border',
-      className,
-    )}
+    data-tone={tone}
+    className={cn('bar-px w-full overflow-hidden', className)}
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 rounded-full bg-primary transition-all [background-image:var(--primary-gradient)]"
-      style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+      style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }}
     />
   </ProgressPrimitive.Root>
 ));

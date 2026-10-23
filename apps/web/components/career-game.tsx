@@ -1684,7 +1684,7 @@ function SeasonScreen({
     <div className="flex flex-col gap-4">
       <section
         aria-labelledby="temporada-em-construcao"
-        className="glass flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between"
+        className="panel flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex items-start gap-3">
           <ChartLineUp

@@ -202,7 +202,8 @@ export function ClubEmblem({
       height={size}
       // Inline size wins over parent rules such as Button's `[&_svg]:size-4`.
       style={{ width: size, height: size }}
-      className={cn('shrink-0 drop-shadow-sm', className)}
+      shapeRendering="crispEdges"
+      className={cn('shrink-0', className)}
       data-testid="club-emblem"
       data-shape={spec.shape}
       data-pattern={spec.pattern}
@@ -223,18 +224,18 @@ export function ClubEmblem({
       <path
         d={OUTLINE[spec.shape]}
         fill="none"
-        stroke={spec.secondary}
+        stroke={spec.ink}
         strokeWidth="3"
-        strokeLinejoin="round"
+        strokeLinejoin="miter"
       />
       <text
         x="32"
         y="33"
         textAnchor="middle"
         dominantBaseline="central"
-        fontFamily="system-ui, sans-serif"
-        fontWeight="700"
-        fontSize={fontSize}
+        fontFamily="'Press Start 2P', monospace"
+        fontWeight="400"
+        fontSize={fontSize - 5}
         letterSpacing="0.5"
         fill={spec.ink}
       >
