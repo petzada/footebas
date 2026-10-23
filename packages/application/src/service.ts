@@ -704,13 +704,9 @@ export class FootebasApplication {
                 'VALIDATION_ERROR',
                 'throughDate does not reach the next fixture',
               );
-            if (fixture)
-              validateLineupForMatch(
-                snapshot.lineup!,
-                this.managedClub(snapshot, snapshot.selectedClubId!),
-                snapshot.players,
-                snapshot.tactic!.formation,
-              );
+            // The assistant fields an eligible XI before the match is queued:
+            // the previous round may have injured or suspended a starter.
+            if (fixture) snapshot.lineup = this.matchdayLineup(snapshot);
             const jobId = this.deps.ids.next('job');
             snapshot.pendingJobId = jobId;
             job = {
@@ -786,6 +782,9 @@ export class FootebasApplication {
           job.fixtureId,
           job.instructions,
         );
+        // Injuries and suspensions from this round reach the saved lineup
+        // now, so the squad screen and the next command see an eligible XI.
+        settleAvailableLineup(snapshot);
         const achievements =
           job.fixtureId === undefined
             ? rollSeason(snapshot, content.competitions, save.seed)
@@ -1044,6 +1043,33 @@ export class FootebasApplication {
     });
   }
 
+  /**
+   * The lineup that takes the field: injured or suspended starters give way
+   * to the assistant's pick ({@link availableLineup}) and the result is
+   * validated for the match. Without enough eligible players the refusal is a
+   * clear Portuguese message instead of the domain's internal text.
+   */
+  private matchdayLineup(snapshot: Snapshot): Lineup {
+    const club = this.managedClub(snapshot, snapshot.selectedClubId!);
+    try {
+      const lineup = availableLineup(snapshot)!;
+      validateLineupForMatch(
+        lineup,
+        club,
+        snapshot.players,
+        snapshot.tactic!.formation,
+      );
+      return lineup;
+    } catch (error) {
+      const shortage =
+        error instanceof DomainError
+          ? eligibleShortage(snapshot, club)
+          : undefined;
+      if (shortage) throw new ApplicationError('VALIDATION_ERROR', shortage);
+      throw error;
+    }
+  }
+
   private requireMatchday(snapshot: Snapshot): void {
     if (!snapshot.selectedClubId || !snapshot.lineup || !snapshot.tactic)
       throw new ApplicationError(
@@ -1100,6 +1126,7 @@ export class FootebasApplication {
           'next managed fixture not found',
         );
       this.assertManagedInstructions(snapshot, fixture, parsed.data);
+      snapshot.lineup = this.matchdayLineup(snapshot);
       const content = this.loadContent(snapshot.contentVersion);
       const played = this.playThrough(
         snapshot,
@@ -2106,6 +2133,36 @@ export function availableLineup(snapshot: Snapshot): Lineup | undefined {
         }),
     captainId,
   };
+}
+
+/**
+ * Applies the assistant's swap to the saved lineup after a round. A squad
+ * without eleven eligible players keeps its lineup: the next match refuses it
+ * with {@link eligibleShortage} and the manager decides.
+ */
+function settleAvailableLineup(snapshot: Snapshot): void {
+  try {
+    const lineup = availableLineup(snapshot);
+    if (lineup) snapshot.lineup = lineup;
+  } catch (error) {
+    if (!(error instanceof DomainError)) throw error;
+  }
+}
+
+/** Why the managed club cannot field an eligible XI, in Portuguese. */
+function eligibleShortage(snapshot: Snapshot, club: Club): string | undefined {
+  const eligible = snapshot.players.filter(
+    (player) =>
+      player.clubId === club.id &&
+      club.squad.includes(player.id) &&
+      player.injuryRounds === 0 &&
+      player.suspensionRounds === 0,
+  );
+  if (eligible.length < 11)
+    return `Só ${String(eligible.length)} jogadores do elenco estão aptos (os demais estão lesionados ou suspensos). São necessários 11 para entrar em campo: contrate ou aguarde a recuperação.`;
+  if (!eligible.some(({ position }) => position === 'GK'))
+    return 'Nenhum goleiro apto: todos os goleiros do elenco estão lesionados ou suspensos. Contrate um goleiro para entrar em campo.';
+  return undefined;
 }
 
 /** Keeps the matchday club aligned with the manager after firings or moves. */
