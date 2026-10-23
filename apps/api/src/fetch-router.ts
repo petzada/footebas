@@ -18,6 +18,22 @@ export interface FetchHandlerOptions {
   readonly onComplete?: (completion: RequestCompletion) => void;
   /** Monotonic-ish clock in milliseconds (default `Date.now`). */
   readonly now?: () => number;
+  /**
+   * Runs after rate limiting and body parsing, before the route handler. A
+   * returned response (e.g. from the career Durable Object) is sent as is,
+   * with this router's CORS and request id headers.
+   */
+  readonly forward?: (input: ForwardInput) => Promise<Response | undefined>;
+}
+
+export interface ForwardInput {
+  readonly request: Request;
+  /** Matched route pattern, e.g. `/v1/careers/:id/home`. */
+  readonly route: string;
+  readonly params: Readonly<Record<string, string>>;
+  readonly body: unknown;
+  readonly rawBody: string;
+  readonly requestId: string;
 }
 
 interface CompiledRoute {
@@ -72,12 +88,12 @@ export function createFetchHandler(
       headers.set('vary', 'origin');
       headers.set(
         'access-control-allow-headers',
-        'authorization, content-type, idempotency-key',
+        'authorization, content-type, idempotency-key, if-none-match',
       );
       headers.set('access-control-allow-methods', 'GET, POST, OPTIONS');
       headers.set(
         'access-control-expose-headers',
-        'idempotency-key, retry-after, x-request-id',
+        'etag, idempotency-key, retry-after, x-request-id',
       );
       if (request.method === 'OPTIONS') {
         state.route = 'preflight';
@@ -152,6 +168,24 @@ export function createFetchHandler(
             decodeURIComponent(match[index + 1] ?? ''),
           ]),
         );
+        const forwarded = await options.forward?.({
+          request,
+          route: compiled.route.path,
+          params,
+          body,
+          rawBody: text,
+          requestId,
+        });
+        if (forwarded !== undefined) {
+          for (const [name, value] of forwarded.headers)
+            if (!name.startsWith('access-control-') && name !== 'vary')
+              headers.set(name, value);
+          headers.set('x-request-id', requestId);
+          return new Response(forwarded.body, {
+            status: forwarded.status,
+            headers,
+          });
+        }
         const result = await compiled.route.handler({
           params,
           query: Object.fromEntries(url.searchParams),
