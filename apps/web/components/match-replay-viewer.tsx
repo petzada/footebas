@@ -16,6 +16,7 @@ import {
   type MatchReplayInput,
   type ReplaySide,
 } from '@/lib/match-replay-model';
+import { MatchStage } from '@/components/match-stage/match-stage';
 
 export interface MatchReplayViewerProps {
   readonly match: MatchReplayInput;
@@ -304,7 +305,20 @@ export function MatchReplayViewer({
 
       <div className="grid min-w-0 gap-4 p-3 sm:p-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,.75fr)]">
         <div className="min-w-0 space-y-3">
-          <Pitch match={match} minute={minute} reducedMotion={reducedMotion} />
+          <MatchStage
+            fallback={
+              <Pitch
+                match={match}
+                minute={minute}
+                reducedMotion={reducedMotion}
+              />
+            }
+            match={match}
+            minute={minute}
+            playing={playing}
+            reducedMotion={reducedMotion}
+            speed={speed}
+          />
 
           <div className="rounded-xl border border-white/10 bg-[#0c2119] p-3">
             <div className="mb-2 flex items-center justify-between text-[.68rem] font-bold uppercase tracking-[.15em] text-[#a9c3b6]">
