@@ -62,6 +62,8 @@ export function replayFromFeed(
   let previous = { home: 0, away: 0 };
   const timeline: ReplayEvent[] = [];
   for (const update of feed) {
+    // The half-time stop is a narration line, not a play on the pitch.
+    if (update.decisionPoint && update.kind === 'save') continue;
     const score = parseScore(update.score);
     const scored: ReplaySide = score.away > previous.away ? 'away' : 'home';
     previous = score;

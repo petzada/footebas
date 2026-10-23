@@ -66,7 +66,7 @@ export type Focus = 'middle' | 'wings';
 export type Press = 'low' | 'medium' | 'high';
 export type DefensiveLine = 'deep' | 'standard' | 'high';
 export type Marking = 'light' | 'strong' | 'very-strong';
-export type MatchSpeed = 1 | 2 | 4;
+export type MatchSpeed = 0.5 | 1 | 2 | 4;
 
 export interface TacticsView {
   mentality: Mentality;
@@ -182,8 +182,19 @@ export interface MatchUpdate {
   kind: 'kickoff' | 'chance' | 'goal' | 'card' | 'save' | 'full-time';
   /** Team that owns the action; `save` belongs to the attacking side. */
   side?: 'home' | 'away';
+  /**
+   * Automatic stop (decision 18): only the half-time update. Manual pauses
+   * happen at any minute on the client.
+   */
   decisionPoint: boolean;
   done: boolean;
+  /** Minute of the following update, so the live clock can wait for it. */
+  nextMinute?: number;
+  /**
+   * The whole official timeline for the live pitch (decision 19), sent with
+   * the kickoff and again after every change made in a pause.
+   */
+  replay?: MatchReplayInput;
 }
 
 /** Public counters for the Início screen (GET /v1/public/stats). */
@@ -264,11 +275,16 @@ export interface CareerApiPort {
   validateMatchday(): Promise<void>;
   beginMatch(): Promise<MatchUpdate>;
   nextMatchEvent(): Promise<MatchUpdate>;
+  /** `minute`: the live clock where the manager paused (defaults to the current update). */
   makeSubstitution(input: {
     outgoingId: string;
     incomingId: string;
+    minute?: number;
   }): Promise<MatchUpdate>;
-  changeMatchTactics(input: Partial<TacticsView>): Promise<MatchUpdate>;
+  changeMatchTactics(
+    input: Partial<TacticsView>,
+    minute?: number,
+  ): Promise<MatchUpdate>;
   renewContract(playerId: string, months: 6 | 12 | 24): Promise<CareerView>;
   refuseContract(playerId: string): Promise<CareerView>;
   terminateContract(playerId: string): Promise<CareerView>;
@@ -666,7 +682,7 @@ const createRoster = (): PlayerView[] =>
     },
   }));
 
-const timeline: readonly MatchUpdate[] = [
+const scriptedTimeline: readonly MatchUpdate[] = [
   {
     id: 'm-00',
     progress: 1,
@@ -707,6 +723,16 @@ const timeline: readonly MatchUpdate[] = [
     score: '1 × 0',
     kind: 'goal',
     side: 'home',
+    decisionPoint: false,
+    done: false,
+  },
+  {
+    id: 'm-45',
+    progress: 50,
+    minute: 45,
+    message: 'Fim do primeiro tempo: Flamengo vence por 1 × 0.',
+    score: '1 × 0',
+    kind: 'save',
     decisionPoint: true,
     done: false,
   },
@@ -718,7 +744,7 @@ const timeline: readonly MatchUpdate[] = [
     score: '1 × 0',
     kind: 'chance',
     side: 'away',
-    decisionPoint: true,
+    decisionPoint: false,
     done: false,
   },
   {
@@ -729,7 +755,7 @@ const timeline: readonly MatchUpdate[] = [
     score: '1 × 0',
     kind: 'card',
     side: 'home',
-    decisionPoint: true,
+    decisionPoint: false,
     done: false,
   },
   {
@@ -754,6 +780,14 @@ const timeline: readonly MatchUpdate[] = [
     done: true,
   },
 ];
+
+/** The demo match stops by itself only at half time and at the end (decision 18). */
+const timeline: readonly MatchUpdate[] = scriptedTimeline.map(
+  (update, index) => {
+    const next = scriptedTimeline[index + 1];
+    return next === undefined ? update : { ...update, nextMinute: next.minute };
+  },
+);
 
 interface StoredCareer {
   readonly id: string;
@@ -1042,14 +1076,17 @@ export class InMemoryCareerApi implements CareerApiPort {
       );
   }
 
-  async beginMatch() {
+  async beginMatch(): Promise<MatchUpdate> {
     await this.validateMatchday();
     this.#eventIndex = 0;
     this.#matchPlayers = structuredClone(
       this.#require().players as PlayerView[],
     );
     this.#matchActions = [];
-    return structuredClone(timeline[0]);
+    return {
+      ...structuredClone(timeline[0]!),
+      replay: replayFromFeed(this.#require(), timeline, 'match-live-demo'),
+    };
   }
 
   async nextMatchEvent() {
@@ -1061,15 +1098,13 @@ export class InMemoryCareerApi implements CareerApiPort {
   async makeSubstitution({
     outgoingId,
     incomingId,
+    minute,
   }: {
     outgoingId: string;
     incomingId: string;
+    minute?: number;
   }) {
-    const currentEvent = this.#currentEvent();
-    if (!currentEvent.decisionPoint)
-      throw new Error(
-        'Substituições só podem ser feitas nas pausas da partida.',
-      );
+    const currentEvent = this.#pausedEvent();
     if (
       this.#matchActions.filter((action) => action.type === 'substitution')
         .length >= 5
@@ -1091,23 +1126,19 @@ export class InMemoryCareerApi implements CareerApiPort {
     outgoing.role = 'bench';
     incoming.role = 'starter';
     this.#matchActions.push({
-      minute: currentEvent.minute,
+      minute: Math.max(currentEvent.minute, minute ?? 0),
       type: 'substitution',
       description: `${incoming.name} entra no lugar de ${outgoing.name}`,
     });
     return structuredClone(currentEvent);
   }
 
-  async changeMatchTactics(input: Partial<TacticsView>) {
-    const currentEvent = this.#currentEvent();
-    if (!currentEvent.decisionPoint)
-      throw new Error(
-        'Ajustes táticos só podem ser feitos nas pausas da partida.',
-      );
+  async changeMatchTactics(input: Partial<TacticsView>, minute?: number) {
+    const currentEvent = this.#pausedEvent();
     const current = this.#require();
     this.#career = { ...current, tactics: { ...current.tactics, ...input } };
     this.#matchActions.push({
-      minute: currentEvent.minute,
+      minute: Math.max(currentEvent.minute, minute ?? 0),
       type: 'tactics',
       description: `Mentalidade alterada para ${input.mentality ?? current.tactics.mentality}`,
     });
@@ -1558,7 +1589,14 @@ export class InMemoryCareerApi implements CareerApiPort {
 
   #currentEvent() {
     if (this.#eventIndex < 0) throw new Error('A partida ainda não começou.');
-    return timeline[this.#eventIndex];
+    return timeline[this.#eventIndex]!;
+  }
+
+  /** Changes are allowed in any pause (decision 18) until the final whistle. */
+  #pausedEvent() {
+    const currentEvent = this.#currentEvent();
+    if (currentEvent.done) throw new Error('A partida já terminou.');
+    return currentEvent;
   }
 
   #require() {

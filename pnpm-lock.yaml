@@ -87,6 +87,9 @@ importers:
       '@dicebear/pixel-art':
         specifier: 9.2.4
         version: 9.2.4(@dicebear/core@9.2.4)
+      '@footebas/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@fontsource/press-start-2p':
         specifier: 5.3.0
         version: 5.3.0

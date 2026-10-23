@@ -177,6 +177,57 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
       );
   });
 
+  it('para sozinho só no intervalo e no fim e aceita ajuste em pausa manual em qualquer minuto', async () => {
+    const { client, career } = await start();
+    const kickoff = await client.beginMatch();
+    expect(kickoff.replay?.timeline.length).toBeGreaterThan(0);
+    const shown = [kickoff];
+    while (shown.at(-1)!.minute < 20 && !shown.at(-1)!.done)
+      shown.push(await client.nextMatchEvent());
+    // Manual pause a couple of minutes after the last play shown.
+    const minute = shown.at(-1)!.minute + 2;
+    const starter = career.players.find(
+      ({ role, primaryPosition }) =>
+        role === 'starter' && primaryPosition !== 'GOL',
+    )!;
+    const bench = career.players.find(({ role }) => role === 'bench')!;
+    const pause = await client.makeSubstitution({
+      outgoingId: starter.id,
+      incomingId: bench.id,
+      minute,
+    });
+    expect(pause.id).toBe(shown.at(-1)!.id);
+    expect(pause.replay?.timeline).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'substitution',
+          minute,
+          source: 'manager',
+        }),
+      ]),
+    );
+    const rest = [];
+    let update = pause;
+    while (!update.done) {
+      update = await client.nextMatchEvent();
+      rest.push(update);
+    }
+    const stops = [...shown, ...rest].filter((item) => item.decisionPoint);
+    expect(stops.map((item) => item.minute)).toEqual([45]);
+    expect(rest.every((item) => item.minute >= shown.at(-1)!.minute)).toBe(
+      true,
+    );
+    const after = await client.finishMatch();
+    expect(after.lastResult?.score).toBe(update.score);
+    expect(after.lastResult?.actions[0]).toEqual(
+      expect.objectContaining({ type: 'substitution', minute }),
+    );
+    const finalMessages = after.lastResult?.events.map(
+      ({ message }) => message,
+    );
+    for (const event of shown) expect(finalMessages).toContain(event.message);
+  });
+
   it('dá resultado instantâneo e aplica comandos do mundo na mesma versão', async () => {
     const { client } = await start();
     const played = await client.instantResult();
