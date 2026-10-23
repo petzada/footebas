@@ -11,10 +11,31 @@
 | 4 — Mundo vivo                 | concluída | economia/carreira 25 épocas; API e gates verdes  |
 | 5 — Pirâmide e calendário      | concluída | engine canônico; gate de 2.000 épocas verde      |
 | 6 — Experiência e campo 2D     | concluída | shell, PWA, replay 2D; testes e build web verdes |
-| 7–9                            | pendente  | execução estritamente sequencial pelos gates     |
+| 7–9                            | em curso  | entrega final por etapas (ver abaixo)            |
 
 Hospedagem de produção: Cloudflare nativo (ADR 0005), Supabase para Postgres/Auth/Storage, domínio
 `footebas.com.br`.
+
+## Entrega final (objetivo de 2026-10-22)
+
+Branch de integração: `mvp/fase-6-9`. Ordem das etapas: 1 nuvem → 2 telas (`docs/09`) → 3 sistemas no servidor →
+4 licença PIX (Fase 8) → 5 endurecimento (Fase 9) → 6 landing. Até três subagentes em paralelo, cada um em worktree
+próprio e com arquivos disjuntos. Para não ter dois agentes no mesmo arquivo, o trabalho corre em três trilhas:
+
+- **Trilha servidor** (serializada): `packages/domain`, `packages/engine`, `packages/application`, `packages/contracts`.
+- **Trilha web** (serializada por área): `apps/web`.
+- **Trilha infraestrutura**: `apps/api` (rotas novas), `packages/database`, `supabase/migrations`, CI, ferramentas.
+
+| Onda | Fatias                                                                 | Estado    |
+| ---- | ---------------------------------------------------------------------- | --------- |
+| 1    | login Supabase no web; web via OpenNext; API em `api.` + fumaça nuvem  | em curso  |
+
+### Estado da nuvem
+
+- Zona `footebas.com.br` ativa no Cloudflare (NS `kate`/`stanley`).
+- API publicada em `footebas-api.marciopetigrosso.workers.dev`; migration `20261023013145` ainda não aplicada no
+  Supabase remoto (aguarda autorização de deploy em produção).
+- Repositório `petzada/footebas` no GitHub está vazio (push inicial aguarda autorização).
 
 ## Decisões operacionais
 
