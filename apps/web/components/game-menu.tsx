@@ -330,9 +330,10 @@ function MenuSection({
 }
 
 const menuItemClass =
-  // `hyphens-auto` (html lang="pt-BR") breaks "Classificação" at a syllable
-  // on narrow phones instead of cutting the last letter onto its own line.
-  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-1 py-2 text-center text-[.45rem] normal-case leading-tight tracking-tight break-words hyphens-auto';
+  // Labels wrap only at spaces (`break-normal`, no hyphenation): a 3-column
+  // grid at 320px leaves ~90px per label, so below 360px the pixel font
+  // drops to .4rem (6.4px a glyph) and "Classificação" (13 glyphs) fits.
+  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-0.5 py-2 text-center text-[.4rem] normal-case leading-tight tracking-tight break-normal min-[360px]:px-1 min-[360px]:text-[.45rem]';
 
 function MenuButton({
   label,

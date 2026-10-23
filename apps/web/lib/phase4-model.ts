@@ -482,9 +482,12 @@ export function createPhase4View(coach: string, club: string): Phase4View {
       ],
     },
     news: [
+      // Deletable like the server marks them (DeleteInboxMessage), so the
+      // offline demo shows the trash too.
       {
         id: 'n-1',
         unread: true,
+        deletable: true,
         tag: 'Mercado',
         headline: 'Gustavo Scarpa entra no radar do Flamengo',
         detail: 'O relatório destaca criação por dentro e bola parada.',
@@ -492,6 +495,7 @@ export function createPhase4View(coach: string, club: string): Phase4View {
       {
         id: 'n-2',
         unread: true,
+        deletable: true,
         tag: 'Diretoria',
         headline: 'Confiança cresce após sequência invicta',
         detail: `${coach} recebe respaldo antes da rodada decisiva.`,
@@ -499,6 +503,7 @@ export function createPhase4View(coach: string, club: string): Phase4View {
       {
         id: 'n-3',
         unread: true,
+        deletable: true,
         tag: 'Base',
         headline: 'Davi Lessa chama atenção nos treinos',
         detail:

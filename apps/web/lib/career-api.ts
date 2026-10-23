@@ -845,6 +845,39 @@ export class InMemoryCareerApi implements CareerApiPort {
     this.#limit = Math.max(this.#limit, LICENSE_CAREER_LIMIT);
   }
 
+  /** Offline demo of `MarkInboxRead`: the news stop counting on the badge. */
+  public markNewsRead(ids: readonly string[]): void {
+    const current = this.#career;
+    if (!current) return;
+    const marked = new Set(ids);
+    this.#career = {
+      ...current,
+      world: {
+        ...current.world,
+        news: current.world.news.map((item) =>
+          marked.has(item.id) && item.unread
+            ? { ...item, unread: false }
+            : item,
+        ),
+      },
+    };
+  }
+
+  /** Offline demo of `DeleteInboxMessage`; refused while a decision waits. */
+  public removeNews(id: string): void {
+    const current = this.#career;
+    if (!current) return;
+    const item = current.world.news.find((entry) => entry.id === id);
+    if (item?.pending) throw new Error('Decida a mensagem antes de excluir.');
+    this.#career = {
+      ...current,
+      world: {
+        ...current.world,
+        news: current.world.news.filter((entry) => entry.id !== id),
+      },
+    };
+  }
+
   /** The active career; writes also stamp its last update. */
   get #career(): CareerView | null {
     return this.#activeId

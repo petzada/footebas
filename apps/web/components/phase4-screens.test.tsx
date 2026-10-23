@@ -12,7 +12,6 @@ import { CareerGame } from '@/components/career-game';
 import { completeNewCareer } from '@/components/testing/complete-new-career';
 import { WorldScreen } from '@/components/phase4-screens';
 import { InMemoryCareerApi, type CareerView } from '@/lib/career-api';
-import { createFakeRankingPort } from '@/lib/ranking-product';
 import { createFakeSeasonPort } from '@/lib/season-product';
 
 async function onboard(api = new InMemoryCareerApi()) {
@@ -76,37 +75,33 @@ describe('Mundo · todas as telas leem os dados gravados', () => {
     return { api, career };
   }
 
-  function renderWorld(
-    initialTab: string,
-    { api, career }: Awaited<ReturnType<typeof serverLikeCareer>>,
-  ) {
+  function renderWorld({
+    api,
+    career,
+  }: Awaited<ReturnType<typeof serverLikeCareer>>) {
     render(
       <WorldScreen
         career={career}
         api={api}
         onCareerChange={() => undefined}
         reportError={() => undefined}
-        initialTab={initialTab}
-        ports={{
-          season: createFakeSeasonPort(),
-          ranking: createFakeRankingPort(),
-        }}
+        ports={{ season: createFakeSeasonPort() }}
       />,
     );
   }
 
-  it('Notícias lista as mensagens da caixa de entrada com data e pendência', async () => {
-    renderWorld('news', await serverLikeCareer());
-    const list = screen.getByRole('list', { name: /todas as mensagens/i });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
-    expect(within(list).getByText(/diretoria quer saber/i)).toBeTruthy();
-    expect(within(list).getByText(/vitória sobre o bahia/i)).toBeTruthy();
-    expect(within(list).getByText(/decisão pendente/i)).toBeTruthy();
-    expect(within(list).getByText('09/02')).toBeTruthy();
+  it('Mundo só guarda prestígio e História: sem Notícias, Ranking nem Save (D6)', async () => {
+    renderWorld(await serverLikeCareer());
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.getByText('Prestígio')).toBeTruthy();
+    expect(screen.getByText('Títulos')).toBeTruthy();
+    expect(screen.queryByText(/ranking de treinadores/i)).toBeNull();
+    expect(screen.queryByText(/carreiras salvas/i)).toBeNull();
+    expect(screen.queryByText(/todas as mensagens/i)).toBeNull();
   });
 
   it('Histórico mostra a temporada, campeões e recordes do read model', async () => {
-    renderWorld('history', await serverLikeCareer());
+    renderWorld(await serverLikeCareer());
     expect(await screen.findByText('2026 · Flamengo')).toBeTruthy();
     expect(
       screen.getByText(
@@ -116,26 +111,6 @@ describe('Mundo · todas as telas leem os dados gravados', () => {
     expect(screen.getByText('2026 · Campeonato Carioca')).toBeTruthy();
     expect(screen.getByText(/artilheiro 2026 \(parcial\)/i)).toBeTruthy();
     expect(screen.getByText(/artilheiro do clube · 9 gols/i)).toBeTruthy();
-  });
-
-  it('Ranking usa os snapshots do servidor, não uma tabela vazia', async () => {
-    renderWorld('ranking', await serverLikeCareer());
-    expect(await screen.findByText('Tite da Várzea')).toBeTruthy();
-    expect(screen.getByText(/ranking de treinadores/i)).toBeTruthy();
-  });
-
-  it('Save lista as carreiras salvas e o que o save guarda', async () => {
-    const data = await serverLikeCareer();
-    renderWorld('save', data);
-    const saves = await screen.findByRole('list', {
-      name: /carreiras salvas/i,
-    });
-    expect(within(saves).getByText(/flamengo/i)).toBeTruthy();
-    expect(within(saves).getByText(/em uso/i)).toBeTruthy();
-    expect(screen.getByText(/o que este save guarda/i)).toBeTruthy();
-    expect(
-      screen.getByText(/decisões pendentes/i).parentElement?.textContent,
-    ).toMatch(/1$/);
   });
 });
 
@@ -282,19 +257,18 @@ describe('Fase 4 · verticais de carreira longa', () => {
     ).toBeTruthy();
   });
 
-  it('expõe notícias, rankings segmentados e estado de migração por teclado', async () => {
+  it('Histórico abre o Mundo sem abas: prestígio e memória da carreira (D6)', async () => {
     await onboard();
-    // Ranking virou tela própria; os rankings do mundo seguem em Histórico.
     navigate(/^histórico$/i);
-    expect((await screen.findAllByRole('tablist')).length).toBeGreaterThan(0);
-    await selectTab(/^ranking$/i);
-    expect(screen.getByText(/referência nacional/i)).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /ascensão/i })).toBeTruthy();
-    await selectTab(/^save$/i);
-    expect(await screen.findByText(/atualizado · schema 4/i)).toBeTruthy();
-    expect(screen.getByText(/temporadas 2023–2024 compactadas/i)).toBeTruthy();
     expect(
-      screen.getByText(/cliente exibe este estado, mas não escreve/i),
+      await screen.findByRole('heading', { level: 1, name: 'Histórico' }),
     ).toBeTruthy();
+    expect(screen.getByText('Prestígio')).toBeTruthy();
+    expect(screen.queryAllByRole('tablist')).toHaveLength(0);
+    expect(screen.queryByText(/ranking de treinadores/i)).toBeNull();
+    expect(screen.queryByText(/integridade do save/i)).toBeNull();
+    // Prestige metric and the "Temporadas" history card.
+    expect((await screen.findAllByText('Temporadas')).length).toBe(2);
+    expect(screen.getByText('Campeões')).toBeTruthy();
   });
 });

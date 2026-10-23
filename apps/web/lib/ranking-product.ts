@@ -1,8 +1,18 @@
 /**
- * Ranking global (docs/09 decision 10, ADR 0013). Mirrors `rankingReadModel`
- * (GET /v1/rankings, public) and `myRankingReadModel` (GET /v1/rankings/me).
+ * Ranking de treinadores (docs/09 decision 10, ADR 0013, ADR 0017). Mirrors
+ * `rankingReadModel` (GET /v1/rankings, public, live with up to 30 s of edge
+ * cache) and `myRankingReadModel` (GET /v1/rankings/me).
  */
-export type RankingScope = 'global' | 'rise' | 'monthly';
+export type RankingScope =
+  'general' | 'titles' | 'best_season' | 'rise' | 'monthly';
+
+export const RANKING_SCOPES: readonly RankingScope[] = [
+  'general',
+  'titles',
+  'best_season',
+  'rise',
+  'monthly',
+];
 
 export interface RankingRow {
   readonly position: number;
@@ -12,14 +22,21 @@ export interface RankingRow {
    * https URL of the coach's picture. Absent for older achievements.
    */
   readonly avatar?: string;
+  /** Points of the scope (0 for coaches who have not scored yet). */
   readonly points: number;
+  /** Titles of the career (titles scope). */
+  readonly titles?: number;
+  /** Season of the best season (best_season scope). */
+  readonly season?: number;
 }
 
 export interface RankingView {
   readonly scope: RankingScope;
-  /** `all` for global and rise, `YYYY-MM` for monthly. */
+  /** `all` for the all-time scopes, `YYYY-MM` for monthly. */
   readonly period: string;
+  /** Instant the board was read (it is live). */
   readonly generatedAt?: string;
+  /** Participants: every account, listed or not. */
   readonly total: number;
   readonly rows: readonly RankingRow[];
 }
@@ -27,8 +44,12 @@ export interface RankingView {
 export interface MyRankingEntry {
   readonly scope: RankingScope;
   readonly period: string;
+  /** Participants of the scope ("Nº de M"). */
+  readonly total?: number;
   readonly position?: number;
   readonly points?: number;
+  readonly titles?: number;
+  readonly season?: number;
   readonly displayName?: string;
   readonly avatar?: string;
 }
@@ -40,13 +61,19 @@ export interface RankingPort {
 }
 
 export const SCOPE_LABEL: Record<RankingScope, string> = {
-  global: 'Global',
+  general: 'Geral',
+  titles: 'Títulos',
+  best_season: 'Melhor temporada',
   rise: 'Ascensão',
   monthly: 'Mensal',
 };
 
-/** Snapshots change every 15 min and the edge caches 5 min; so do we. */
-export const RANKING_CACHE_TTL_MS = 5 * 60 * 1000;
+/** The board is live and the edge keeps it up to 30 s; so do we. */
+export const RANKING_CACHE_TTL_MS = 30 * 1000;
+
+const integer = new Intl.NumberFormat('pt-BR');
+/** `1234` → `1.234`. */
+export const formatCount = (value: number): string => integer.format(value);
 
 /** Real-world month (UTC) as `YYYY-MM`. */
 export function currentPeriod(now: Date = new Date()): string {
@@ -110,16 +137,25 @@ const demoNames = [
   'Rei do Drible',
 ];
 
+const DEMO_BASE: Record<RankingScope, number> = {
+  general: 420,
+  titles: 420,
+  best_season: 210,
+  rise: 260,
+  monthly: 100,
+};
+
 export function demoRankingView(
   scope: RankingScope,
   period = scope === 'monthly' ? currentPeriod() : 'all',
 ): RankingView {
-  const base = scope === 'global' ? 420 : scope === 'rise' ? 260 : 100;
+  const base = DEMO_BASE[scope];
   return {
     scope,
     period,
     generatedAt: '2026-05-01T12:00:00.000Z',
-    total: demoNames.length,
+    // Every account counts, including the ones not listed yet.
+    total: 1234,
     rows: demoNames.map((displayName, index) => ({
       position: index + 1,
       displayName,
@@ -127,7 +163,9 @@ export function demoRankingView(
       ...(index < demoNames.length - 1
         ? { avatar: `avatar-${String(index + 1).padStart(2, '0')}` }
         : {}),
-      points: base - index * (scope === 'monthly' ? 9 : 35),
+      points: Math.max(0, base - index * (scope === 'monthly' ? 9 : 35)),
+      ...(scope === 'titles' ? { titles: Math.max(0, 6 - index) } : {}),
+      ...(scope === 'best_season' ? { season: 1 + (index % 4) } : {}),
     })),
   };
 }
@@ -138,7 +176,7 @@ export function createFakeRankingPort(
   return {
     async leaderboard(scope, period) {
       const view = demoRankingView(scope, period);
-      return options.empty ? { ...view, total: 0, rows: [] } : view;
+      return options.empty ? { ...view, rows: [] } : view;
     },
     async mine() {
       return options.mine === undefined ? null : options.mine;

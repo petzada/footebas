@@ -305,14 +305,50 @@ mapa de telas (Central com e‑mails e notícias; Ranking com tela própria) e `
 antipadrão). Opções: (a) "Caixa de entrada" abre uma tela com as decisões pendentes + notícias (o mesmo
 `InboxDecisions` da Central sem limite) e "Mundo" perde as abas Ranking e Save (Save vai para Perfil); (b) renomear
 o item para "Notícias" e manter o resto; (c) manter. Recomendação: (a).
-**Aprovada (a), pendente:** fica para depois do agente que mexe na caixa de entrada.
+**Decidido: (a). Implementada (branch `ux/caixa-e-tabelas`, sobre o PR #6).** `components/inbox-screen.tsx`
+(novo): a Caixa de entrada é tela própria com o `InboxDecisions` em variante `full` (todas as mensagens, pendentes
+primeiro, sem "Ver todas"; lixeira de 44 px só no que não espera decisão) e, abaixo, as Notícias da carreira que
+não são mensagens da caixa (mesmo id), com lixeira quando o servidor marca `deletable`. Abrir a tela dispara
+`MarkInboxRead` (efeito já existente em `career-game.tsx`) e o contador do menu/barra some; no demo em memória
+`InMemoryCareerApi.markNewsRead/removeNews` espelham os comandos (`runtime-api.ts`, `inboxDemo`). "Mundo"
+(`WorldScreen`, item Histórico) ficou só com o card de prestígio e a História; as abas Notícias, Ranking e Save
+saíram (Ranking continua no menu; as carreiras salvas continuam em Perfil). A tela entra no histórico do navegador
+como qualquer outra (D1). Testes: `inbox-screen.test.tsx`, `phase6-shell.test.tsx` (contador some ao abrir),
+`game-history.test.tsx` (Voltar), `phase4-screens.test.tsx` (Mundo sem abas).
+**Respostas do responsável (2026-10-23):** o estado técnico do save (versão, migração, arquivo, compactação,
+checksum) vai para o **Perfil, recolhido** — `<details>` "Detalhes técnicos do save" em `profile-screen.tsx`,
+fechado por padrão, `summary` de 44 px (teste em `profile-screen.test.tsx`). As notícias do demo em memória passam
+a ser `deletable`, para a lixeira aparecer também offline (`phase4-model.ts`). O item "Classificação" do menu em
+320 px não hifeniza mais: rótulos quebram só em espaços (`break-normal`) e a fonte pixel cai para `.4rem` abaixo de
+360 px (`game-menu.tsx`; teste em `phase6-shell.test.tsx`).
 
 **D7 — Classificação completa mais pobre que o resumo.** Problema: a tela Classificação mostra J e Pts; o resumo da
 Central mostra J, SG, Pts (e V/E/D em ≥ 414 px). Regra: `docs/07` §2 ("números legíveis — tabela são
 protagonistas"). Opções: (a) reutilizar a tabela teletexto do resumo na tela completa, com V/E/D/GP/GC/SG e rolagem
 horizontal controlada; (b) manter. Recomendação: (a).
-**Aprovada, pendente:** o visual da liga já entrou (c163b1c); os formatos por competição dependem dos dados do
-outro agente (ver "Escopo ampliado", item 5).
+**Decidido: (a). Implementada (branch `ux/caixa-e-tabelas`).** `components/competition-tables.tsx` +
+`lib/competition-tables.ts` (novos) leem `GET /v1/careers/:id/tables` (`httpCompetitionPort(api).tables()`):
+
+- seletor de competição e de fase em abas horizontais com encaixe (`snap-x`, aba ativa rolada ao centro, setas do
+  teclado, 44 px), competições do clube marcadas "meu clube"; abre na competição que a Central acompanha
+  (`focusCompetitionId`) e na fase em disputa; "Ver tabela" nos cards de Competições abre a competição do card;
+- pontos corridos e estaduais: tabela teletexto (#, clube, J, V/E/D a partir de 414 px, SG, Pts) com faixa colorida
+  por zona (título bulb, Libertadores sky, pré-Libertadores sky claro, acesso grama, rebaixamento vermelho,
+  classificação bulb) e legenda; clube do jogador com `aria-current`;
+- mata-mata: lista de confrontos por fase, cada um como placar de duas linhas (clube · ida · volta · agregado),
+  vencedor em bulb com "Classificado: X · no desempate" quando o agregado empatou; "Volta em dd/mm" no que falta;
+- Libertadores: pré em mata-mata com "Entram direto: …", um painel por grupo (A–D, o do clube primeiro com "meu
+  grupo"), depois o mata-mata; fases sem sorteio mostram "a definir";
+- linha-resumo da competição (formato · estado · "Campeão: X · decidido em dd/mm");
+- Central: a janela de 5 linhas ganha as faixas de zona e a legenda das zonas visíveis, lendo o grupo da liga em que
+  o clube está; sem a leitura de tabelas (servidor antigo) a Classificação mostra a liga do read model como antes.
+  No demo em memória, a liga do save substitui a tabela de mesmo nome da fixture (`withCareerLeague`), para a
+  Central e a Classificação concordarem.
+  **Resposta do responsável (2026-10-23):** legenda **mantida** como está — todas as zonas da competição na tela
+  completa (mesmo sem linhas nelas), só as zonas visíveis na janela da Central.
+  Testes: `lib/competition-tables.test.ts` (zonas, confrontos, grupos, demo) e `components/competition-tables.test.tsx`
+  (liga, copa, Libertadores, campeão, fase lembrada, fallback). Verificado no navegador embutido em 320, 360 e 430 px
+  (sem rolagem lateral, alvos ≥ 44 px).
 
 ## Recomendações (não alteram fluxo; não executadas por envolverem padrão global ou direção visual)
 
