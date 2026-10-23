@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   ArrowRight,
   ArrowsClockwise,
@@ -10,6 +10,7 @@ import {
   Pause,
   Play,
   ShieldWarning,
+  SignOut,
   SoccerBall,
   Sparkle,
   Strategy,
@@ -58,7 +59,12 @@ import {
   type Screen,
   type SquadRole,
   type TacticsView,
+  InMemoryCareerApi,
 } from '@/lib/career-api';
+import type { AuthPort, AuthUser } from '@/lib/auth';
+import { SessionExpiredError } from '@/lib/http-career-api';
+import { Brand } from '@/components/brand';
+import { AuthPending, SignInScreen } from '@/components/sign-in-screen';
 import { cn } from '@/lib/utils';
 import {
   ClubScreen,
@@ -69,13 +75,101 @@ import { CompetitionScreens } from '@/components/competition-screens';
 import { Phase6Shell, PwaRuntime } from '@/components/phase6-shell';
 import { MatchReplayViewer } from '@/components/match-replay-viewer';
 import { parseScore } from '@/lib/match-replay-adapter';
-import { competitionPortFor, createCareerApi } from '@/lib/runtime-api';
+import {
+  competitionPortFor,
+  createCareerRuntime,
+  type CareerRuntime,
+} from '@/lib/runtime-api';
 
 type Stage = 'login' | 'coach' | 'club' | 'game' | 'match' | 'result';
 
-export function CareerGame({ api: provided }: { api?: CareerApiPort }) {
+const SESSION_EXPIRED = 'Sua sessão expirou. Entre novamente.';
+
+/**
+ * Entry point. With an AuthPort (Supabase over HTTP) the game sits behind
+ * the sign-in screen; without one (offline demo, dev session) it keeps the
+ * local e-mail onboarding.
+ */
+export function CareerGame({
+  api: provided,
+  auth: providedAuth,
+}: {
+  api?: CareerApiPort;
+  auth?: AuthPort | null;
+}) {
   // Created once: a fresh port per render would drop the session.
-  const [api] = useState<CareerApiPort>(() => provided ?? createCareerApi());
+  const [runtime] = useState<CareerRuntime>(() =>
+    provided || providedAuth
+      ? { api: provided ?? new InMemoryCareerApi(), auth: providedAuth ?? null }
+      : createCareerRuntime(),
+  );
+  if (!runtime.auth) return <CareerFlow api={runtime.api} />;
+  return <AuthGate auth={runtime.auth} api={runtime.api} />;
+}
+
+type GateState =
+  | { status: 'checking' }
+  | { status: 'signed-out' }
+  | { status: 'signed-in'; user: AuthUser };
+
+function AuthGate({ auth, api }: { auth: AuthPort; api: CareerApiPort }) {
+  const [state, setState] = useState<GateState>({ status: 'checking' });
+  const [notice, setNotice] = useState('');
+
+  useEffect(
+    () =>
+      auth.onChange((user) =>
+        setState(
+          user ? { status: 'signed-in', user } : { status: 'signed-out' },
+        ),
+      ),
+    [auth],
+  );
+
+  const signOut = async (message = '') => {
+    setNotice(message);
+    await auth.signOut();
+    setState({ status: 'signed-out' });
+  };
+
+  if (state.status === 'checking')
+    return (
+      <>
+        <PwaRuntime />
+        <AuthPending message="Conferindo sua sessão…" />
+      </>
+    );
+  if (state.status === 'signed-out')
+    return (
+      <>
+        <PwaRuntime />
+        <SignInScreen auth={auth} notice={notice} />
+      </>
+    );
+  return (
+    <CareerFlow
+      // A different player never inherits the previous career state.
+      key={state.user.id}
+      api={api}
+      session={state.user}
+      onSignOut={() => void signOut()}
+      onSessionExpired={() => void signOut(SESSION_EXPIRED)}
+    />
+  );
+}
+
+function CareerFlow({
+  api,
+  session,
+  onSignOut,
+  onSessionExpired,
+}: {
+  api: CareerApiPort;
+  /** Signed-in player; absent in the local e-mail flow. */
+  session?: AuthUser;
+  onSignOut?: () => void;
+  onSessionExpired?: () => void;
+}) {
   const [competitionPort] = useState(() => competitionPortFor(api));
   const [stage, setStage] = useState<Stage>('login');
   const [screen, setScreen] = useState<Screen>('home');
@@ -105,8 +199,12 @@ export function CareerGame({ api: provided }: { api?: CareerApiPort }) {
       setCommandState('success');
       return result;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Tente novamente.');
       setCommandState('idle');
+      if (caught instanceof SessionExpiredError && onSessionExpired) {
+        onSessionExpired();
+        return undefined;
+      }
+      setError(caught instanceof Error ? caught.message : 'Tente novamente.');
       return undefined;
     } finally {
       inFlight.current.delete(key);
@@ -144,27 +242,47 @@ export function CareerGame({ api: provided }: { api?: CareerApiPort }) {
       setStage('result');
     });
 
+  const login = () =>
+    attempt('login', async () => {
+      // With a real session the identity comes from the bearer.
+      await api.login(
+        session ? (session.email ?? 'jogador@footebas.app') : email,
+      );
+      const saved = await api.getCareer();
+      if (saved) {
+        setCareer(saved);
+        setStage('game');
+      } else setStage('coach');
+    });
+
+  const resumeSession = useEffectEvent(() => void login());
+  const userId = session?.id;
+  useEffect(() => {
+    if (!userId) return;
+    // Deferred so a Strict Mode remount resumes the career only once.
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) resumeSession();
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
   if (!['game', 'match', 'result'].includes(stage)) {
     return (
       <>
         <PwaRuntime />
         <Onboarding
           stage={stage}
+          signedIn={session !== undefined}
           email={email}
           coach={coach}
           error={error}
           setEmail={setEmail}
           setCoach={setCoach}
-          onLogin={() =>
-            attempt('login', async () => {
-              await api.login(email);
-              const saved = await api.getCareer();
-              if (saved) {
-                setCareer(saved);
-                setStage('game');
-              } else setStage('coach');
-            })
-          }
+          onLogin={() => void login()}
+          {...(onSignOut ? { onSignOut } : {})}
           onCoach={() =>
             attempt('coach', async () => {
               await api.createCareer({ coach });
@@ -194,6 +312,7 @@ export function CareerGame({ api: provided }: { api?: CareerApiPort }) {
         setScreen={setScreen}
         career={career}
         commandState={commandState}
+        {...(onSignOut ? { onSignOut } : {})}
       >
         {error && <InlineError message={error} />}
         {stage === 'match' && matchUpdate ? (
@@ -334,21 +453,10 @@ function InlineError({ message }: { message: string }) {
   );
 }
 
-function Brand() {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground">
-        <SoccerBall weight="fill" />
-      </span>
-      <span className="font-display text-2xl font-bold uppercase tracking-tight">
-        Footebas
-      </span>
-    </div>
-  );
-}
-
 function Onboarding(props: {
   stage: Stage;
+  /** Real session: the login step only resumes the saved career. */
+  signedIn: boolean;
   email: string;
   coach: string;
   error: string;
@@ -357,6 +465,7 @@ function Onboarding(props: {
   onLogin(): void;
   onCoach(): void;
   onClub(value: string): void;
+  onSignOut?: () => void;
 }) {
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-8">
@@ -368,7 +477,34 @@ function Onboarding(props: {
           </p>
         </div>
         <Card>
-          {props.stage === 'login' ? (
+          {props.stage === 'login' && props.signedIn ? (
+            <>
+              <CardHeader>
+                <CardTitle className="font-display text-3xl uppercase">
+                  Abrindo o vestiário
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="text-sm text-muted-foreground"
+                >
+                  {props.error
+                    ? 'Não conseguimos carregar sua carreira.'
+                    : 'Carregando sua carreira…'}
+                </p>
+              </CardContent>
+              {props.error && (
+                <CardFooter>
+                  <Button className="min-h-11 w-full" onClick={props.onLogin}>
+                    Tentar novamente
+                    <ArrowsClockwise data-icon="inline-end" />
+                  </Button>
+                </CardFooter>
+              )}
+            </>
+          ) : props.stage === 'login' ? (
             <>
               <CardHeader>
                 <Badge className="w-fit">Acesso local</Badge>
@@ -472,6 +608,16 @@ function Onboarding(props: {
             </p>
           )}
         </Card>
+        {props.onSignOut && (
+          <Button
+            variant="ghost"
+            className="mt-4 min-h-11 w-full"
+            onClick={props.onSignOut}
+          >
+            <SignOut data-icon="inline-start" />
+            Sair da conta
+          </Button>
+        )}
       </div>
     </main>
   );

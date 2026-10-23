@@ -46,10 +46,30 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** The bearer could not be renewed: the player has to sign in again. */
+export class SessionExpiredError extends ApiRequestError {
+  public constructor() {
+    super('Sua sessão expirou. Entre novamente.', 401, 'UNAUTHORIZED');
+    this.name = 'SessionExpiredError';
+  }
+}
+
+/** Supplies the API bearer; `forceRefresh` asks for a renewed one. */
+export type AccessTokenProvider = (options?: {
+  forceRefresh?: boolean;
+}) => Promise<string | null>;
+
 export interface HttpCareerApiOptions {
   readonly baseUrl: string;
-  /** Exchanges the e-mail for a bearer token (dev session or Supabase). */
-  readonly signIn?: (email: string) => Promise<string>;
+  /** Bearer source used on every call (Supabase access token). */
+  readonly getAccessToken?: AccessTokenProvider;
+  /**
+   * Local development only: `login(email)` exchanges the e-mail for a bearer
+   * at POST /v1/dev/session (NEXT_PUBLIC_AUTH_MODE=dev).
+   */
+  readonly devSession?: boolean;
+  /** Called once the bearer is rejected and could not be renewed. */
+  readonly onSessionExpired?: () => void;
   readonly fetch?: typeof fetch;
   readonly startDate?: string;
   readonly jobPollMs?: number;
@@ -361,9 +381,9 @@ export class HttpCareerApi implements CareerApiPort {
   readonly #options: HttpCareerApiOptions;
   readonly #fetch: typeof fetch;
   #bearer?: string;
-  #careerId?: string;
+  #careerId: string | undefined;
   #version = 0;
-  #squad?: SquadModel;
+  #squad: SquadModel | undefined;
   #roles = new Map<string, SquadRole>();
   #scouted = new Set<string>();
   #match: LiveMatch | undefined;
@@ -372,26 +392,45 @@ export class HttpCareerApi implements CareerApiPort {
   public constructor(options: HttpCareerApiOptions) {
     this.#options = options;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
-    const stored = options.storage?.getItem('footebas-bearer');
-    if (stored) this.#bearer = stored;
+    if (options.devSession) {
+      const stored = options.storage?.getItem('footebas-bearer');
+      if (stored) this.#bearer = stored;
+    }
   }
 
   // --- transport -----------------------------------------------------------
+  async #token(forceRefresh: boolean): Promise<string | undefined> {
+    const provider = this.#options.getAccessToken;
+    if (!provider) return this.#bearer;
+    return (
+      (await provider(forceRefresh ? { forceRefresh } : undefined)) ?? undefined
+    );
+  }
+
   async #request<T>(
     method: 'GET' | 'POST',
     path: string,
     body?: unknown,
     headers: Record<string, string> = {},
+    renewed = false,
   ): Promise<T> {
+    const bearer = await this.#token(renewed);
     const response = await this.#fetch(`${this.#options.baseUrl}${path}`, {
       method,
       headers: {
-        ...(this.#bearer ? { authorization: `Bearer ${this.#bearer}` } : {}),
+        ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         ...headers,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
+    if (response.status === 401 && path !== '/v1/dev/session') {
+      // Commands carry idempotency keys, so replaying one once is safe.
+      if (this.#options.getAccessToken && !renewed)
+        return this.#request<T>(method, path, body, headers, true);
+      this.#options.onSessionExpired?.();
+      throw new SessionExpiredError();
+    }
     const text = await response.text();
     const payload: unknown = text ? JSON.parse(text) : undefined;
     if (!response.ok) {
@@ -519,15 +558,30 @@ export class HttpCareerApi implements CareerApiPort {
   }
 
   // --- session and career --------------------------------------------------
+  /**
+   * Starts a session and forgets any career cached for a previous player.
+   * With a token provider the e-mail is ignored: identity comes from the
+   * bearer. The dev session only exists when `devSession` is enabled.
+   */
   async login(email: string) {
+    this.#careerId = undefined;
+    this.#version = 0;
+    this.#squad = undefined;
+    this.#roles = new Map();
+    this.#scouted = new Set();
+    this.#match = undefined;
+    if (this.#options.getAccessToken) {
+      if (!(await this.#token(false))) throw new SessionExpiredError();
+      return;
+    }
+    if (!this.#options.devSession)
+      throw new Error('Entre com sua conta para continuar.');
     if (!email.includes('@')) throw new Error('Informe um e-mail válido.');
-    this.#bearer = this.#options.signIn
-      ? await this.#options.signIn(email)
-      : (
-          await this.#request<{ bearer: string }>('POST', '/v1/dev/session', {
-            email,
-          })
-        ).bearer;
+    this.#bearer = (
+      await this.#request<{ bearer: string }>('POST', '/v1/dev/session', {
+        email,
+      })
+    ).bearer;
     this.#options.storage?.setItem('footebas-bearer', this.#bearer);
   }
 

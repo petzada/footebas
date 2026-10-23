@@ -13,6 +13,7 @@ import {
   House,
   ListChecks,
   Moon,
+  SignOut,
   SoccerBall,
   Storefront,
   Strategy,
@@ -57,12 +58,15 @@ export function Phase6Shell({
   setScreen,
   career,
   commandState,
+  onSignOut,
   children,
 }: {
   screen: Screen;
   setScreen(value: Screen): void;
   career: CareerView;
   commandState: CommandState;
+  /** Shown only when there is a real account session to end. */
+  onSignOut?: () => void;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -92,6 +96,12 @@ export function Phase6Shell({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ThemeButton />
+            {onSignOut && (
+              <Button variant="outline" onClick={onSignOut}>
+                <SignOut data-icon="inline-start" />
+                Sair
+              </Button>
+            )}
           </div>
         </header>
         <CommandAnnouncer state={commandState} />
