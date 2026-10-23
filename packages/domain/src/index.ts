@@ -88,3 +88,4 @@ export * from './career-world.js';
 export * from './competition.js';
 export * from './coach.js';
 export * from './transfer-window.js';
+export * from './ranking.js';
