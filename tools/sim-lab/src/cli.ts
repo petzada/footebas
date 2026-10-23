@@ -7,6 +7,7 @@ import { runSeason } from './season.js';
 import { runPhaseThreePlaythrough } from './phase3.js';
 import { runPhaseFourGate } from './phase4.js';
 import { runPhaseFiveGate } from './phase5.js';
+import { runVarianceReport, varianceMarkdown } from './variance-report.js';
 
 function numericArgument(name: string, fallback: number): number {
   const argument = process.argv.find((value) => value.startsWith(`--${name}=`));
@@ -64,6 +65,14 @@ if (process.argv.includes('--smoke')) {
   });
   process.stdout.write(`${canonicalJson(report)}\n`);
   if (!report.passed) process.exitCode = 1;
+} else if (process.argv.includes('--variance')) {
+  const label =
+    process.argv.find((value) => value.startsWith('--label='))?.slice(8) ??
+    'current';
+  const report = runVarianceReport(numericArgument('careers', 10));
+  process.stdout.write(
+    varianceMarkdown(report, `Variância do motor de partidas — ${label}`),
+  );
 } else {
   process.stderr.write(
     'Usage: sim-lab --smoke | --calibrate [--matches=10000] | --season [--seed=x] | --playthrough [--rounds=14] | --phase1-gate [--matches=10000] [--seasons=1000] | --phase3-gate [--rounds=14] | --phase4-gate [--seasons=25] [--seed=x] | --phase5-gate [--seasons=2000] [--seed=x]\n',
