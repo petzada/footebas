@@ -25,6 +25,7 @@ complementa `docs/08-mvp-fonte-de-verdade.md`; em conflito sobre telas, vale est
 | 16  | Entrosamento               | **Nas regras do mundo** (bônus pequeno de força efetiva antes do motor); motor de partida intacto.                                                                                                                                                                                                        |
 | 17  | Direção visual             | **Futebol retrô** (pixel art 16-bit, placar, giz, figurinhas), tema único, assets gerados por código ou com licença aberta, pseudo-3D no Phaser. ADR 0012 (substitui o 0009).                                                                                                                             |
 | 18  | Pausas da partida          | A partida **para sozinha só 2 vezes: no intervalo e no fim**. Velocidades 0,5×/1×/2×/4× escolhidas pelo usuário são respeitadas; ele pode **pausar manualmente a qualquer minuto** e fazer substituições e ajustes táticos nessa pausa (o motor é estável no prefixo, então o que já aconteceu não muda). |
+| 19  | Partida ao vivo            | Ao tocar em **Jogar partida**, o **campo animado (3D/Phaser/2D) roda ao vivo** desde o apito inicial, com placar e minuto por cima e a narração como legenda/letreiro sincronizada ao minuto; nada de feed só em texto antes do campo. O relatório pós-jogo vem depois do apito final.                    |
 
 ## Mapa de telas do MVP
 
