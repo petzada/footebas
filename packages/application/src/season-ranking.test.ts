@@ -89,6 +89,7 @@ describe('temporada e ranking sobre a mesma carreira', () => {
 
       let checkedMidSeason = false;
       let sawRollback = false;
+      const midSeasonTitles = new Set<string>();
       for (let step = 0; step < 220; step++) {
         const home = await app.home(token, careerId);
         if (home.season === 2) break;
@@ -182,17 +183,35 @@ describe('temporada e ranking sobre a mesma carreira', () => {
             { careerId },
           ),
         );
+        const before = unitOfWork.achievements();
         const status = await app.runNextJob();
         if (status?.state === 'failed') {
           // Rolled back: no achievement without the save that produced it.
           sawRollback = true;
-          expect(unitOfWork.achievements()).toEqual([]);
+          expect(unitOfWork.achievements()).toEqual(before);
           expect((await app.home(token, careerId)).season).toBe(1);
           expect((await app.runNextJob())?.state).toBe('succeeded');
         } else expect(status?.state).toBe('succeeded');
+        const current = await snapshotOf();
+        if (current.season !== 1) continue;
+        // ADR 0017: a title is validated in the commit of the round that
+        // ended the competition, before the season closes.
+        for (const { competitionId, outcome } of current.competition
+          .competitions) {
+          if (outcome?.championId !== 'club_flamengo') continue;
+          const title = unitOfWork
+            .achievements()
+            .find((entry) => entry.competitionId === competitionId);
+          expect(title).toMatchObject({ season: 1, careerId });
+          expect(title?.type).not.toBe('season_completed');
+          expect(title!.gameDate < '2026-12-31').toBe(true);
+          midSeasonTitles.add(competitionId);
+        }
       }
       expect(checkedMidSeason).toBe(true);
       expect(sawRollback).toBe(true);
+      // This seed gives Flamengo a title before the last round of the season.
+      expect(midSeasonTitles.size).toBeGreaterThan(0);
 
       const snapshot = await snapshotOf();
       expect(snapshot.season).toBe(2);
@@ -208,7 +227,7 @@ describe('temporada e ranking sobre a mesma carreira', () => {
           season: 1,
           competitionId: leagueId,
           points: 5,
-          rulesVersion: 'ranking-v1',
+          rulesVersion: 'ranking-v2',
           recordedAt: '2026-07-21T12:00:00.000Z',
         }),
       );
@@ -255,14 +274,25 @@ describe('temporada e ranking sobre a mesma carreira', () => {
           ledger,
         ),
       ).toBe(flamengoTitles);
+      // Every title kept the date its competition ended (ADR 0017); the
+      // season close repeated them without duplicating.
+      expect(
+        ledger
+          .filter(({ type }) => type.endsWith('_title'))
+          .every(({ gameDate }) => gameDate < '2026-12-31'),
+      ).toBe(true);
+      for (const competitionId of midSeasonTitles)
+        expect(
+          ledger.filter((entry) => entry.competitionId === competitionId),
+        ).toHaveLength(1);
 
       const rankings = new RankingService({
-        store: new InMemoryRankingStore(() => unitOfWork.achievements()),
+        store: new InMemoryRankingStore(unitOfWork),
         clock,
         auth,
       });
-      await rankings.generateSnapshots();
-      const board = await rankings.leaderboard({ scope: 'global' });
+      // Live: no snapshot job between the commit and the read.
+      const board = await rankings.leaderboard({ scope: 'general' });
       expect(board.rows).toEqual([
         {
           position: 1,
@@ -272,7 +302,11 @@ describe('temporada e ranking sobre a mesma carreira', () => {
         },
       ]);
       const mine = await rankings.mine(token);
-      expect(mine.entries[0]).toMatchObject({ scope: 'global', position: 1 });
+      expect(mine.entries[0]).toMatchObject({
+        scope: 'general',
+        position: 1,
+        total: 1,
+      });
     },
   );
 });
