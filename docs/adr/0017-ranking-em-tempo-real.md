@@ -61,8 +61,20 @@ estadual não aparece. O responsável pediu (2026-10-23):
   `total` é o número de participantes (todas as contas). O Worker guarda a resposta em `caches.default` por até
   30 s, com chave por URL e `Origin` (a resposta leva o CORS da origem e o Cache API ignora `Vary`); só funciona no
   domínio próprio (`api.footebas.com.br`).
-- **Desempate de Melhor temporada**: "temporada mais antiga" foi lido como o número da temporada da carreira
-  (temporada 1 antes da 3); persistindo o empate, quem chegou primeiro e depois o id.
+- **Desempate de Melhor temporada** (confirmado pelo responsável): "temporada mais antiga" é o número da temporada
+  na carreira (temporada 1 antes da 3); persistindo o empate, quem chegou primeiro e depois o id.
+- **Título de clube deixado antes do fim da temporada** (confirmado pelo responsável): o título vai para o clube que o
+  treinador comandava no dia em que a competição terminou e continua valendo mesmo que ele saia do clube antes do
+  fechamento da temporada.
+- **Carreiras antigas sem nome no ranking** (decisão do responsável: registrar ao abrir): na primeira ação de cada
+  vida do Durable Object da carreira, o objeto grava nome, avatar e carreira em `ranking_players`, com a regra do
+  `CreateCareer` (não troca uma carreira já registrada). Uma flag em memória evita repetir na mesma vida; a gravação
+  roda junto com a ação e uma falha não derruba a ação (tenta de novo na próxima). O caminho sem Durable Object
+  (fallback sem o binding `CAREERS`) não faz isso: lá a aplicação é criada a cada requisição e não há onde guardar a
+  flag sem uma escrita por comando; a conta é ligada à carreira na primeira conquista.
+- **Respostas do cache de borda** não passam pelo limite de requisições nem pelo log (aceito pelo responsável).
+- **Provisório:** `GET /v1/rankings/me` devolve, além dos cinco escopos, uma entrada `global` igual à `general`, para
+  clientes web antigos em cache. Remover no próximo ciclo (contrato `myRankingReadModelSchema` com 6 entradas).
 
 ## Consequências
 
