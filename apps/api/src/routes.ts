@@ -21,6 +21,7 @@ import {
 } from '@footebas/application';
 import {
   apiErrorSchema,
+  careerBundleReadModelSchema,
   careerListReadModelSchema,
   careerSeasonReadModelSchema,
   careerWorldReadModelSchema,
@@ -347,6 +348,35 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
         return json(await query(bearer(request), idOf(request)));
       },
     });
+
+  routes.push({
+    method: 'GET',
+    path: '/v1/careers/:id/bundle',
+    schema: {
+      ...withId,
+      summary:
+        'Central in one read: home, squad summary, next match, table and inbox (ETag by aggregate version)',
+    },
+    async handler(request) {
+      const { aggregateVersion, bundle } = await app.careerBundle(
+        bearer(request),
+        idOf(request),
+        bundleVersionOf(request.headers['if-none-match']),
+      );
+      const headers = {
+        etag: bundleEtag(aggregateVersion),
+        // Cacheable by the browser, revalidated with If-None-Match each time.
+        'cache-control': 'private, no-cache',
+      };
+      return bundle === undefined
+        ? { status: 304, headers, body: undefined }
+        : {
+            status: 200,
+            headers,
+            body: careerBundleReadModelSchema.parse(bundle),
+          };
+    },
+  });
 
   routes.push({
     method: 'GET',
@@ -759,6 +789,22 @@ function statusEvent(
   if (status.state === 'running')
     return { ...base, type: 'job.progress', data: status.progress };
   return { ...base, type: 'job.status', data: status };
+}
+
+/** Weak ETag of the Central bundle: shape revision and aggregate version. */
+export function bundleEtag(aggregateVersion: number): string {
+  return `W/"bundle-1-${String(aggregateVersion)}"`;
+}
+
+/** Aggregate version named by an `If-None-Match` header, if any. */
+export function bundleVersionOf(
+  header: string | undefined,
+): number | undefined {
+  for (const tag of (header ?? '').split(',')) {
+    const match = /^(?:W\/)?"bundle-1-(\d+)"$/.exec(tag.trim());
+    if (match?.[1] !== undefined) return Number(match[1]);
+  }
+  return undefined;
 }
 
 export function errorBody(

@@ -8,6 +8,7 @@ import {
   careerWorldReadModelSchema,
   careerOfficeReadModelSchema,
   careerSeasonReadModelSchema,
+  careerBundleReadModelSchema,
   commandSchema,
   homeReadModelSchema,
   matchInstructionSchema,
@@ -16,6 +17,7 @@ import {
   squadReadModelSchema,
   standingsReadModelSchema,
   type ApiError,
+  type CareerBundleReadModel,
   type CoachMessage,
   type CoachProfile,
   type Command,
@@ -1093,177 +1095,269 @@ export class FootebasApplication {
   }
 
   public async home(bearer: string, careerId: string): Promise<HomeReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
-      const next = managedFixture(s);
-      return homeReadModelSchema.parse({
-        ...base(save, now),
-        managerName: s.managerName,
-        careerName: s.careerName,
-        coach: s.coach,
-        inbox: coachInbox(s),
-        ...(s.selectedClubId === undefined
-          ? {}
-          : { chemistry: managedChemistry(s, s.selectedClubId) }),
-        club: clubSummary(s, s.selectedClubId),
-        currentDate: s.currentDate,
-        season: s.season,
-        ...(club ? { balance: club.balance } : {}),
-        nextFixtureId: next?.id,
-        pendingActions: s.pendingJobId
-          ? ['simulation_pending']
-          : next
-            ? ['prepare_match']
-            : s.selectedClubId
-              ? ['finish_season']
-              : ['select_club'],
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.homeModel(save, s, now),
+    );
   }
   public async squad(
     bearer: string,
     careerId: string,
   ): Promise<SquadReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
-      if (!club) throw new ApplicationError('NOT_FOUND', 'club not selected');
-      return squadReadModelSchema.parse({
-        ...base(save, now),
-        club: clubSummary(s, club.id),
-        players: s.players
-          .filter(({ clubId }) => clubId === club.id)
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            age: p.age,
-            position: p.position,
-            secondaryPositions: p.secondaryPositions,
-            ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
-            ...(p.shirtNumber === undefined
-              ? {}
-              : { shirtNumber: p.shirtNumber }),
-            strength: p.strength,
-            traits: p.traits,
-            condition: p.condition,
-            morale: p.morale,
-            matchSharpness: p.matchSharpness,
-            squadStatus: p.squadStatus,
-            injuryRounds: p.injuryRounds,
-            suspensionRounds: p.suspensionRounds,
-            availability:
-              p.injuryRounds > 0
-                ? 'injured'
-                : p.suspensionRounds > 0
-                  ? 'suspended'
-                  : 'available',
-            ...(p.lastMatchRating === undefined
-              ? {}
-              : { lastMatchRating: p.lastMatchRating }),
-            careerStats: {
-              appearances: p.careerStats.appearances,
-              goals: p.careerStats.goals,
-              assists: p.careerStats.assists,
-              yellowCards: p.careerStats.yellowCards,
-              redCards: p.careerStats.redCards,
-              ...(p.careerStats.ratedAppearances
-                ? {
-                    averageRating: Number(
-                      (
-                        (p.careerStats.ratingTotal ?? 0) /
-                        p.careerStats.ratedAppearances
-                      ).toFixed(2),
-                    ),
-                  }
-                : {}),
-            },
-            hiddenEstimates: hiddenEstimates(p),
-          })),
-        lineupPlayerIds: s.lineup
-          ? [
-              ...s.lineup.starters.map(({ playerId }) => playerId),
-              ...s.lineup.substitutes,
-              ...(s.lineup.reserves ?? []),
-            ]
-          : [],
-        ...(s.tactic ? { tactic: s.tactic } : {}),
-        lineup:
-          s.lineup && s.tactic
-            ? {
-                formation: s.tactic.formation,
-                starters: s.lineup.starters.map(({ playerId }) => playerId),
-                bench: s.lineup.substitutes,
-                reserves: s.lineup.reserves ?? [],
-              }
-            : undefined,
-        chemistry: managedChemistry(s, club.id),
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.squadModel(save, s, now),
+    );
   }
   public async nextMatch(
     bearer: string,
     careerId: string,
   ): Promise<NextMatchReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const f = managedFixture(s);
-      if (!f) throw new ApplicationError('NOT_FOUND', 'next fixture not found');
-      const content = this.loadContent(s.contentVersion);
-      return nextMatchReadModelSchema.parse({
-        ...base(save, now),
-        fixtureId: f.id,
-        competition: competitionName(content.competitions, s, f.competitionId),
-        round: f.round,
-        date: f.date,
-        homeClub: clubSummary(s, f.homeClubId),
-        awayClub: clubSummary(s, f.awayClubId),
-        status: s.pendingJobId
-          ? 'running'
-          : s.lineup && s.tactic
-            ? 'ready'
-            : 'scheduled',
-        preparation: matchPreparation(s, f),
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.nextMatchModel(save, s, now),
+    );
   }
   public async standings(
     bearer: string,
     careerId: string,
   ): Promise<StandingsReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const content = this.loadContent(s.contentVersion);
-      const division = (
-        Object.keys(s.competition.divisions) as MvpDivisionId[]
-      ).find((key) =>
-        s.competition.divisions[key].some(
-          (clubId) => clubId === s.selectedClubId,
-        ),
-      );
-      if (division === undefined)
-        throw new ApplicationError('NOT_FOUND', 'club not selected');
-      const competitionId = careerSeasonSystem(
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.standingsModel(save, s, now),
+    );
+  }
+  private homeModel(save: GameSave, s: Snapshot, now: string): HomeReadModel {
+    const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+    const next = managedFixture(s);
+    return homeReadModelSchema.parse({
+      ...base(save, now),
+      managerName: s.managerName,
+      careerName: s.careerName,
+      coach: s.coach,
+      inbox: coachInbox(s),
+      ...(s.selectedClubId === undefined
+        ? {}
+        : { chemistry: managedChemistry(s, s.selectedClubId) }),
+      club: clubSummary(s, s.selectedClubId),
+      currentDate: s.currentDate,
+      season: s.season,
+      ...(club ? { balance: club.balance } : {}),
+      nextFixtureId: next?.id,
+      pendingActions: s.pendingJobId
+        ? ['simulation_pending']
+        : next
+          ? ['prepare_match']
+          : s.selectedClubId
+            ? ['finish_season']
+            : ['select_club'],
+    });
+  }
+  private squadModel(save: GameSave, s: Snapshot, now: string): SquadReadModel {
+    const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+    if (!club) throw new ApplicationError('NOT_FOUND', 'club not selected');
+    return squadReadModelSchema.parse({
+      ...base(save, now),
+      club: clubSummary(s, club.id),
+      players: s.players
+        .filter(({ clubId }) => clubId === club.id)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          age: p.age,
+          position: p.position,
+          secondaryPositions: p.secondaryPositions,
+          ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
+          ...(p.shirtNumber === undefined
+            ? {}
+            : { shirtNumber: p.shirtNumber }),
+          strength: p.strength,
+          traits: p.traits,
+          condition: p.condition,
+          morale: p.morale,
+          matchSharpness: p.matchSharpness,
+          squadStatus: p.squadStatus,
+          injuryRounds: p.injuryRounds,
+          suspensionRounds: p.suspensionRounds,
+          availability:
+            p.injuryRounds > 0
+              ? 'injured'
+              : p.suspensionRounds > 0
+                ? 'suspended'
+                : 'available',
+          ...(p.lastMatchRating === undefined
+            ? {}
+            : { lastMatchRating: p.lastMatchRating }),
+          careerStats: {
+            appearances: p.careerStats.appearances,
+            goals: p.careerStats.goals,
+            assists: p.careerStats.assists,
+            yellowCards: p.careerStats.yellowCards,
+            redCards: p.careerStats.redCards,
+            ...(p.careerStats.ratedAppearances
+              ? {
+                  averageRating: Number(
+                    (
+                      (p.careerStats.ratingTotal ?? 0) /
+                      p.careerStats.ratedAppearances
+                    ).toFixed(2),
+                  ),
+                }
+              : {}),
+          },
+          hiddenEstimates: hiddenEstimates(p),
+        })),
+      lineupPlayerIds: s.lineup
+        ? [
+            ...s.lineup.starters.map(({ playerId }) => playerId),
+            ...s.lineup.substitutes,
+            ...(s.lineup.reserves ?? []),
+          ]
+        : [],
+      ...(s.tactic ? { tactic: s.tactic } : {}),
+      lineup:
+        s.lineup && s.tactic
+          ? {
+              formation: s.tactic.formation,
+              starters: s.lineup.starters.map(({ playerId }) => playerId),
+              bench: s.lineup.substitutes,
+              reserves: s.lineup.reserves ?? [],
+            }
+          : undefined,
+      chemistry: managedChemistry(s, club.id),
+    });
+  }
+  private nextMatchModel(
+    save: GameSave,
+    s: Snapshot,
+    now: string,
+  ): NextMatchReadModel {
+    const f = managedFixture(s);
+    if (!f) throw new ApplicationError('NOT_FOUND', 'next fixture not found');
+    const content = this.loadContent(s.contentVersion);
+    return nextMatchReadModelSchema.parse({
+      ...base(save, now),
+      fixtureId: f.id,
+      competition: competitionName(content.competitions, s, f.competitionId),
+      round: f.round,
+      date: f.date,
+      homeClub: clubSummary(s, f.homeClubId),
+      awayClub: clubSummary(s, f.awayClubId),
+      status: s.pendingJobId
+        ? 'running'
+        : s.lineup && s.tactic
+          ? 'ready'
+          : 'scheduled',
+      preparation: matchPreparation(s, f),
+    });
+  }
+  private standingsModel(
+    save: GameSave,
+    s: Snapshot,
+    now: string,
+  ): StandingsReadModel {
+    const content = this.loadContent(s.contentVersion);
+    const division = (
+      Object.keys(s.competition.divisions) as MvpDivisionId[]
+    ).find((key) =>
+      s.competition.divisions[key].some(
+        (clubId) => clubId === s.selectedClubId,
+      ),
+    );
+    if (division === undefined)
+      throw new ApplicationError('NOT_FOUND', 'club not selected');
+    const competitionId = careerSeasonSystem(
+      content.competitions,
+      s.competition,
+    ).ids.divisions[division];
+    return standingsReadModelSchema.parse({
+      ...base(save, now),
+      competitionId,
+      competition: competitionName(content.competitions, s, competitionId),
+      rows: liveStandings(
         content.competitions,
         s.competition,
-      ).ids.divisions[division];
-      return standingsReadModelSchema.parse({
-        ...base(save, now),
         competitionId,
-        competition: competitionName(content.competitions, s, competitionId),
-        rows: liveStandings(
-          content.competitions,
-          s.competition,
-          competitionId,
-        ).map((row, index) => ({
-          position: index + 1,
-          club: clubSummary(s, row.clubId),
-          played: row.played,
-          won: row.wins,
-          drawn: row.draws,
-          lost: row.losses,
-          goalsFor: row.goalsFor,
-          goalsAgainst: row.goalsAgainst,
-          goalDifference: row.goalDifference,
-          points: row.points,
-        })),
-      });
+      ).map((row, index) => ({
+        position: index + 1,
+        club: clubSummary(s, row.clubId),
+        played: row.played,
+        won: row.wins,
+        drawn: row.draws,
+        lost: row.losses,
+        goalsFor: row.goalsFor,
+        goalsAgainst: row.goalsAgainst,
+        goalDifference: row.goalDifference,
+        points: row.points,
+      })),
+    });
+  }
+  /**
+   * The Central in one read (ADR 0014): home, squad summary, next match,
+   * league table and inbox at one aggregate version. When `knownVersion`
+   * is the current version nothing is projected (HTTP 304 by `ETag`).
+   */
+  public async careerBundle(
+    bearer: string,
+    careerId: string,
+    knownVersion?: number,
+  ): Promise<{ aggregateVersion: number; bundle?: CareerBundleReadModel }> {
+    return this.query(bearer, careerId, (save, s, now) => {
+      if (knownVersion === save.version)
+        return { aggregateVersion: save.version };
+      const home = this.homeModel(save, s, now);
+      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+      const inLeague =
+        club !== undefined &&
+        Object.values(s.competition.divisions).some((ids) =>
+          ids.some((id) => id === club.id),
+        );
+      const lineupIds = s.lineup
+        ? [
+            ...s.lineup.starters.map(({ playerId }) => playerId),
+            ...s.lineup.substitutes,
+            ...(s.lineup.reserves ?? []),
+          ]
+        : [];
+      return {
+        aggregateVersion: save.version,
+        bundle: careerBundleReadModelSchema.parse({
+          ...base(save, now),
+          contentVersion: s.contentVersion,
+          home,
+          ...(club
+            ? {
+                squad: {
+                  club: clubSummary(s, club.id),
+                  players: s.players
+                    .filter(({ clubId }) => clubId === club.id)
+                    .map((p) => ({
+                      id: p.id,
+                      name: p.name,
+                      age: p.age,
+                      position: p.position,
+                      ...(p.shirtNumber === undefined
+                        ? {}
+                        : { shirtNumber: p.shirtNumber }),
+                      strength: p.strength,
+                      condition: p.condition,
+                      morale: p.morale,
+                      squadStatus: p.squadStatus,
+                      availability:
+                        p.injuryRounds > 0
+                          ? 'injured'
+                          : p.suspensionRounds > 0
+                            ? 'suspended'
+                            : 'available',
+                    })),
+                  lineupPlayerIds: lineupIds,
+                  ...(s.tactic ? { formation: s.tactic.formation } : {}),
+                },
+              }
+            : {}),
+          ...(managedFixture(s)
+            ? { nextMatch: this.nextMatchModel(save, s, now) }
+            : {}),
+          ...(inLeague ? { standings: this.standingsModel(save, s, now) } : {}),
+          inbox: home.inbox,
+        }),
+      };
     });
   }
   public async postMatch(
