@@ -42,6 +42,44 @@ describe('Mapa do clube', () => {
     }
   });
 
+  it('desenha o clube em SVG isométrico e cada prédio responde ao teclado', async () => {
+    const navigate = vi.fn();
+    render(
+      <ClubMapScreen
+        career={await career()}
+        navigate={navigate}
+        onNarrate={() => undefined}
+        onInstant={() => undefined}
+      />,
+    );
+    const drawing = screen.getByRole('group', {
+      name: /mapa isométrico do flamengo/i,
+    });
+    expect(drawing.tagName.toLowerCase()).toBe('svg');
+    const buildings = within(drawing).getAllByRole('button');
+    expect(buildings.map((node) => node.getAttribute('data-area'))).toEqual(
+      CLUB_AREAS.map(({ id }) => id),
+    );
+    for (const building of buildings) {
+      expect(building.getAttribute('tabindex')).toBe('0');
+      // Visible label drawn next to the building.
+      const area = CLUB_AREAS.find(
+        ({ id }) => id === building.getAttribute('data-area'),
+      )!;
+      expect(building.textContent).toContain(area.short ?? area.name);
+    }
+    const stadium = within(drawing).getByRole('button', { name: /^estádio/i });
+    fireEvent.keyDown(stadium, { key: 'Enter' });
+    expect(navigate).toHaveBeenLastCalledWith('stadium');
+    const parking = within(drawing).getByRole('button', {
+      name: /^estacionamento/i,
+    });
+    fireEvent.keyDown(parking, { key: ' ' });
+    expect(navigate).toHaveBeenLastCalledWith('market');
+    fireEvent.keyDown(parking, { key: 'Tab' });
+    expect(navigate).toHaveBeenCalledTimes(2);
+  });
+
   it('oferece a mesma navegação em lista, sem depender da ilustração', async () => {
     const navigate = vi.fn();
     render(

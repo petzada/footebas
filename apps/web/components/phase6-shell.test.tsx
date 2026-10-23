@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
+import { completeNewCareer } from '@/components/testing/complete-new-career';
 import { InMemoryCareerApi } from '@/lib/career-api';
 
 async function onboard(api = new InMemoryCareerApi()) {
@@ -10,17 +11,12 @@ async function onboard(api = new InMemoryCareerApi()) {
   fireEvent.click(
     await screen.findByRole('button', { name: /nova carreira/i }),
   );
-  await screen.findByLabelText(/nome do treinador/i);
-  fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
-  await screen.findByText(/escolha seu desafio/i);
-  fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
+  await completeNewCareer();
   await screen.findByRole('button', { name: /jogar partida/i });
   return api;
 }
 
 afterEach(() => {
-  localStorage.clear();
-  document.documentElement.classList.add('dark');
   vi.restoreAllMocks();
 });
 
@@ -79,7 +75,7 @@ describe('Fase 6 · shell mobile-first', () => {
       await screen.findByRole('button', { name: /carregar carreira/i }),
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: /abrir carreira de márcio/i }),
+      await screen.findByRole('button', { name: /abrir carreira de ana/i }),
     );
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Central' }),
@@ -105,15 +101,19 @@ describe('Fase 6 · shell mobile-first', () => {
     ).toBeNull();
   });
 
-  it('alterna e lembra o tema claro', async () => {
+  it('é só modo claro: sem botão de tema nem classe dark (ADR 0009)', async () => {
     await onboard();
-    fireEvent.click(screen.getByRole('button', { name: /ativar tema claro/i }));
+    expect(screen.queryByRole('button', { name: /tema/i })).toBeNull();
     expect(document.documentElement.classList.contains('dark')).toBe(false);
-    expect(localStorage.getItem('footebas-theme')).toBe('light');
-    fireEvent.click(
-      screen.getByRole('button', { name: /ativar tema escuro/i }),
-    );
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
+  });
+
+  it('mostra avatar e personalidade do treinador na barra lateral', async () => {
+    await onboard();
+    const sidebar = screen
+      .getByRole('navigation', { name: /navegação principal desktop/i })
+      .closest('aside')!;
+    expect(sidebar.querySelector('[data-avatar="avatar-01"]')).not.toBeNull();
+    expect(sidebar.textContent).toMatch(/estrategista/i);
   });
 
   it('mostra estado offline e de reconexão sem bloquear a tela', async () => {

@@ -98,7 +98,10 @@ describe('entrada com conta', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: /nova carreira/i }),
     );
-    expect(await screen.findByLabelText(/nome do treinador/i)).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: /como você quer jogar/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/nova carreira · 1 de 5/i)).toBeTruthy();
   });
 
   it('volta para a entrada quando a sessão expira', async () => {

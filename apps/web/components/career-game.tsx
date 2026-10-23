@@ -8,7 +8,6 @@ import React, {
   useState,
 } from 'react';
 import {
-  ArrowLeft,
   ArrowRight,
   ArrowsClockwise,
   CheckCircle,
@@ -88,6 +87,10 @@ import {
   StartScreen,
   type PlayerIdentity,
 } from '@/components/start-screens';
+import {
+  NewCareerWizard,
+  type NewCareerSubmission,
+} from '@/components/new-career-wizard';
 import { createFakeCompetitionProductPort } from '@/lib/competition-product';
 import { parseScore } from '@/lib/match-replay-adapter';
 import {
@@ -97,7 +100,7 @@ import {
 } from '@/lib/runtime-api';
 
 type Stage =
-  'login' | 'start' | 'load' | 'coach' | 'club' | 'game' | 'match' | 'result';
+  'login' | 'start' | 'load' | 'new' | 'club' | 'game' | 'match' | 'result';
 
 /** Offline demo calendar, same source the competition screens use. */
 const demoCompetitionPort = createFakeCompetitionProductPort();
@@ -195,7 +198,6 @@ function CareerFlow({
   const [limitNotice, setLimitNotice] = useState('');
   const [career, setCareer] = useState<CareerView | null>(null);
   const [email, setEmail] = useState('torcedor@footebas.com');
-  const [coach, setCoach] = useState('Márcio');
   const [matchUpdate, setMatchUpdate] = useState<MatchUpdate | null>(null);
   const [matchFeed, setMatchFeed] = useState<MatchUpdate[]>([]);
   const [error, setError] = useState('');
@@ -205,6 +207,9 @@ function CareerFlow({
   // Blocks repeated taps of the same command while it is in flight; different
   // commands (e.g. skipping during the narrated feed) are never blocked.
   const inFlight = useRef(new Set<string>());
+  // Set once CreateCareer succeeds, so retrying a failed SelectClub never
+  // creates a second career.
+  const createdCareer = useRef(false);
 
   const attempt = async <T,>(key: string, action: () => Promise<T>) => {
     if (inFlight.current.has(key)) {
@@ -277,6 +282,38 @@ function CareerFlow({
     setStage('start');
   };
 
+  const startNewCareer = () => {
+    setError('');
+    setLimitNotice('');
+    createdCareer.current = false;
+    setStage('new');
+  };
+
+  const createCareer = (submission: NewCareerSubmission) =>
+    attempt('create-career', async () => {
+      if (!createdCareer.current) {
+        try {
+          await api.createCareer({
+            coach: submission.coach,
+            careerName: submission.careerName,
+            coachProfile: submission.coachProfile,
+          });
+        } catch (caught) {
+          // The plan refused another career: show it next to the list.
+          if (!isCareerLimitError(caught)) throw caught;
+          setLimitNotice(caught.message);
+          setStage('load');
+          return;
+        }
+        createdCareer.current = true;
+      }
+      await api.selectClub(submission.club);
+      createdCareer.current = false;
+      setCareer(await api.getCareer());
+      setScreen('central');
+      setStage('game');
+    });
+
   const openCareer = (careerId: string) =>
     attempt(`open:${careerId}`, async () => {
       const opened = await api.openCareer(careerId);
@@ -336,10 +373,9 @@ function CareerFlow({
           player={player}
           loadStats={loadStats}
           error={error}
-          onNewCareer={() => {
-            setError('');
-            setStage('coach');
-          }}
+          loadCareers={listCareers}
+          onContinue={(summary) => void openCareer(summary.id)}
+          onNewCareer={startNewCareer}
           onLoadCareer={() => {
             setError('');
             setStage('load');
@@ -359,12 +395,23 @@ function CareerFlow({
           notice={limitNotice}
           error={error}
           onOpen={(summary) => void openCareer(summary.id)}
-          onNewCareer={() => {
-            setError('');
-            setLimitNotice('');
-            setStage('coach');
-          }}
+          onNewCareer={startNewCareer}
           onBack={goStart}
+          onSignOut={onSignOut}
+        />
+      </>
+    );
+
+  if (stage === 'new')
+    return (
+      <>
+        <PwaRuntime />
+        <NewCareerWizard
+          initialCoach={session?.name ?? ''}
+          pending={commandState === 'pending'}
+          error={error}
+          onCancel={goStart}
+          onSubmit={(submission) => void createCareer(submission)}
           onSignOut={onSignOut}
         />
       </>
@@ -378,27 +425,10 @@ function CareerFlow({
           stage={stage}
           signedIn={session !== undefined}
           email={email}
-          coach={coach}
           error={error}
           setEmail={setEmail}
-          setCoach={setCoach}
           onLogin={() => void login()}
           {...(onSignOut ? { onSignOut } : {})}
-          onBack={goStart}
-          onCoach={() =>
-            attempt('coach', async () => {
-              try {
-                await api.createCareer({ coach });
-              } catch (caught) {
-                // The plan refused another career: show it next to the list.
-                if (!isCareerLimitError(caught)) throw caught;
-                setLimitNotice(caught.message);
-                setStage('load');
-                return;
-              }
-              setStage('club');
-            })
-          }
           onClub={(club) =>
             attempt('club', async () => {
               await api.selectClub(club);
@@ -581,14 +611,10 @@ function Onboarding(props: {
   /** Real session: the login step only resumes the saved career. */
   signedIn: boolean;
   email: string;
-  coach: string;
   error: string;
   setEmail(value: string): void;
-  setCoach(value: string): void;
   onLogin(): void;
-  onCoach(): void;
   onClub(value: string): void;
-  onBack(): void;
   onSignOut?: () => void;
 }) {
   return (
@@ -659,57 +685,18 @@ function Onboarding(props: {
                 </Button>
               </CardFooter>
             </>
-          ) : props.stage === 'coach' ? (
-            <>
-              <CardHeader>
-                <Button
-                  variant="ghost"
-                  className="-ml-3 min-h-11 w-fit"
-                  onClick={props.onBack}
-                >
-                  <ArrowLeft data-icon="inline-start" />
-                  Voltar ao início
-                </Button>
-                <Badge variant="secondary" className="w-fit">
-                  1 de 2
-                </Badge>
-                <CardTitle className="font-display text-3xl uppercase">
-                  Como vão te chamar?
-                </CardTitle>
-                <CardDescription>
-                  Esse nome aparece nas manchetes e na prancheta.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="coach">Nome do treinador</FieldLabel>
-                    <Input
-                      id="coach"
-                      value={props.coach}
-                      onChange={(event) => props.setCoach(event.target.value)}
-                    />
-                  </Field>
-                </FieldGroup>
-              </CardContent>
-              <CardFooter>
-                <Button className="min-h-11 w-full" onClick={props.onCoach}>
-                  Conhecer os clubes
-                  <ArrowRight data-icon="inline-end" />
-                </Button>
-              </CardFooter>
-            </>
           ) : (
             <>
               <CardHeader>
                 <Badge variant="secondary" className="w-fit">
-                  2 de 2
+                  Falta o clube
                 </Badge>
                 <CardTitle className="font-display text-3xl uppercase">
                   Escolha seu desafio
                 </CardTitle>
                 <CardDescription>
-                  Comece com um elenco brasileiro real.
+                  Esta carreira ainda não tem clube. Comece com um elenco
+                  brasileiro real.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
@@ -1371,7 +1358,7 @@ function Matchday(props: {
               </Button>
             </div>
           </div>
-          <CardTitle className="pt-3 text-center font-display text-6xl uppercase sm:text-8xl">
+          <CardTitle className="scoreboard-digits pt-3 text-center text-6xl font-bold sm:text-8xl">
             {props.update.score}
           </CardTitle>
           <CardDescription className="text-center">
@@ -1534,7 +1521,7 @@ function Matchday(props: {
           <CardContent>
             <ol
               aria-label="Feed da partida"
-              className="flex max-h-56 flex-col gap-3 overflow-y-auto"
+              className="match-feed flex max-h-56 flex-col gap-3 overflow-y-auto"
             >
               {props.feed
                 .slice()
@@ -1588,7 +1575,7 @@ function Result({
         <CardHeader className="items-center text-center">
           <Trophy className="size-10 text-accent" weight="fill" />
           <Badge>Fim de jogo</Badge>
-          <CardTitle className="font-display text-6xl uppercase">
+          <CardTitle className="scoreboard-digits text-6xl font-bold">
             {result.score}
           </CardTitle>
           <CardDescription>{outcome.verdict}</CardDescription>
@@ -1697,7 +1684,7 @@ function SeasonScreen({
     <div className="flex flex-col gap-4">
       <section
         aria-labelledby="temporada-em-construcao"
-        className="arcade-panel flex flex-col gap-3 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between"
+        className="glass flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex items-start gap-3">
           <ChartLineUp

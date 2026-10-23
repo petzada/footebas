@@ -74,6 +74,11 @@ describe('HttpCareerApi · carreiras do usuário', () => {
         season: 2026,
         currentDate: '2026-04-12',
         careerName: 'Rumo ao tri',
+        coach: {
+          nationality: 'PT',
+          avatar: 'avatar-07',
+          personality: 'diplomata',
+        },
         updatedAt: '2026-10-20T15:00:00.000Z',
       },
       {
@@ -108,6 +113,11 @@ describe('HttpCareerApi · carreiras do usuário', () => {
         id: 'career_a',
         coach: 'Ana',
         name: 'Rumo ao tri',
+        coachProfile: {
+          nationality: 'PT',
+          avatar: 'avatar-07',
+          personality: 'diplomata',
+        },
         clubName: 'Flamengo',
         season: 2026,
         currentDate: '2026-04-12',
@@ -127,6 +137,46 @@ describe('HttpCareerApi · carreiras do usuário', () => {
       }),
     );
     expect(String(bodies[0]!.commandId)).toMatch(/^command_/);
+  });
+
+  it('envia CreateCareer com careerName e o perfil do treinador', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const api = client(
+      vi.fn<typeof fetch>(async (_input, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return json({ careerId: 'career_new', aggregateVersion: 1 }, 202);
+      }),
+    );
+    await api.createCareer({
+      coach: '  Ana  ',
+      careerName: ' Rumo ao tri ',
+      coachProfile: {
+        nationality: 'AR',
+        avatar: 'avatar-12',
+        personality: 'motivador',
+      },
+    });
+    expect(bodies[0]).toEqual(
+      expect.objectContaining({
+        type: 'CreateCareer',
+        expectedVersion: 0,
+        payload: {
+          managerName: 'Ana',
+          startDate: '2026-01-01',
+          careerName: 'Rumo ao tri',
+          coach: {
+            nationality: 'AR',
+            avatar: 'avatar-12',
+            personality: 'motivador',
+          },
+        },
+      }),
+    );
+    await api.createCareer({ coach: 'Bia' });
+    expect(bodies[1]!.payload).toEqual({
+      managerName: 'Bia',
+      startDate: '2026-01-01',
+    });
   });
 
   it('propaga CAREER_LIMIT_REACHED com a mensagem do servidor', async () => {

@@ -1,5 +1,3 @@
-import '@fontsource-variable/archivo';
-import '@fontsource/rajdhani/600.css';
 import './globals.css';
 
 export const metadata = {
@@ -8,19 +6,14 @@ export const metadata = {
   manifest: '/manifest.webmanifest',
 };
 
-// Applies the saved theme before paint so light mode never flashes dark.
-const themeBootstrap = `try{if(localStorage.getItem('footebas-theme')==='light')document.documentElement.classList.remove('dark')}catch{}`;
-
-export const viewport = { themeColor: '#10251b' };
+// ISOPOP is light-only (ADR 0009): the browser chrome matches the pastel sky.
+export const viewport = { themeColor: '#bee3f0', colorScheme: 'light' };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className="dark" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
-      </head>
+    <html lang="pt-BR">
       <body>{children}</body>
     </html>
   );

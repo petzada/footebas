@@ -9,6 +9,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
 import { LoadCareerScreen, StartScreen } from '@/components/start-screens';
+import { completeNewCareer } from '@/components/testing/complete-new-career';
 import { InMemoryCareerApi } from '@/lib/career-api';
 
 const player = { name: 'Ana' };
@@ -74,6 +75,45 @@ describe('Início', () => {
     await waitFor(() => expect(failing).toHaveBeenCalled());
     expect(screen.queryByRole('region', { name: /no gramado/i })).toBeNull();
     expect(screen.getByRole('button', { name: /nova carreira/i })).toBeTruthy();
+  });
+
+  it('mostra a última carreira com nome, avatar e personalidade do treinador', async () => {
+    const api = new InMemoryCareerApi();
+    await api.login('ana@footebas.com');
+    await api.createCareer({
+      coach: 'Ana',
+      careerName: 'Rumo ao tri',
+      coachProfile: {
+        nationality: 'BR',
+        avatar: 'avatar-09',
+        personality: 'motivador',
+      },
+    });
+    await api.selectClub('Flamengo');
+    const onContinue = vi.fn();
+    render(
+      <StartScreen
+        player={player}
+        loadStats={async () => null}
+        loadCareers={() => api.listCareers()}
+        onNewCareer={() => undefined}
+        onLoadCareer={() => undefined}
+        onContinue={onContinue}
+      />,
+    );
+    const latest = await screen.findByRole('region', { name: 'Rumo ao tri' });
+    expect(latest.textContent).toMatch(/motivador/i);
+    expect(latest.textContent).toMatch(/flamengo/i);
+    expect(
+      within(latest).getByRole('img', { name: /avatar do treinador ana/i }),
+    ).toBeTruthy();
+    expect(latest.querySelector('[data-avatar="avatar-09"]')).not.toBeNull();
+    fireEvent.click(
+      within(latest).getByRole('button', { name: /continuar rumo ao tri/i }),
+    );
+    expect(onContinue).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Rumo ao tri' }),
+    );
   });
 
   it('no port local usa os números do catálogo', async () => {
@@ -195,19 +235,14 @@ describe('Carregar Carreira', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: /nova carreira/i }),
     );
-    fireEvent.click(
-      await screen.findByRole('button', { name: /conhecer os clubes/i }),
-    );
-    fireEvent.click(await screen.findByRole('button', { name: /flamengo/i }));
+    await completeNewCareer();
     fireEvent.click(
       await screen.findByRole('button', { name: /voltar ao início/i }),
     );
     fireEvent.click(
       await screen.findByRole('button', { name: /nova carreira/i }),
     );
-    fireEvent.click(
-      await screen.findByRole('button', { name: /conhecer os clubes/i }),
-    );
+    await completeNewCareer({ coach: 'Bia' });
     expect(
       await screen.findByRole('heading', { name: /carregar carreira/i }),
     ).toBeTruthy();

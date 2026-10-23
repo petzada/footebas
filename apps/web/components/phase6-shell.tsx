@@ -12,23 +12,23 @@ import {
   House,
   ListNumbers,
   MapTrifold,
-  Moon,
   Ranking,
   SignOut,
   SoccerBall,
   Storefront,
   Strategy,
-  Sun,
   Trophy,
   UsersThree,
   WifiHigh,
   WifiSlash,
 } from '@phosphor-icons/react';
 import { ClubEmblem } from '@/components/club-emblem';
+import { CoachAvatar } from '@/components/coach-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { CareerView, Screen } from '@/lib/career-api';
+import { personalityLabel } from '@/lib/coach-profile';
 import { cn } from '@/lib/utils';
 
 type CommandState = 'idle' | 'pending' | 'duplicate' | 'success';
@@ -112,7 +112,7 @@ export function Phase6Shell({
         aria-busy={commandState === 'pending'}
         className="min-w-0 px-4 py-4 sm:px-6 lg:px-8 lg:py-6"
       >
-        <header className="mb-5 flex min-h-14 items-center justify-between gap-3 border-b pb-4">
+        <header className="glass mb-5 flex min-h-14 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 items-center gap-3">
             <ClubEmblem name={career.club} size={44} decorative />
             <div className="min-w-0">
@@ -136,7 +136,6 @@ export function Phase6Shell({
                 <span className="hidden sm:inline">Início</span>
               </Button>
             )}
-            <ThemeButton />
             {onSignOut && (
               <Button variant="outline" onClick={onSignOut}>
                 <SignOut data-icon="inline-start" />
@@ -187,7 +186,7 @@ export function PwaRuntime() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-xl items-center justify-between gap-3 rounded-lg border bg-popover px-4 py-3 text-sm text-popover-foreground shadow-lg"
+      className="fixed inset-x-3 top-3 z-50 mx-auto flex max-w-xl items-center justify-between gap-3 rounded-2xl border border-glass-line bg-popover px-4 py-3 text-sm text-popover-foreground shadow-lg"
     >
       <span className="flex items-center gap-2 font-medium">
         {network === 'offline' ? <WifiSlash /> : <WifiHigh />}
@@ -220,7 +219,7 @@ function DesktopSidebar({
   navigate(value: Screen): void;
 }) {
   return (
-    <aside className="sticky top-0 hidden h-dvh border-r bg-card/70 p-4 backdrop-blur lg:flex lg:flex-col">
+    <aside className="sticky top-0 hidden h-dvh border-r border-glass-line bg-card/60 p-4 lg:flex lg:flex-col">
       <Brand />
       <a
         href="#conteudo-principal"
@@ -276,10 +275,19 @@ function DesktopSidebar({
         </ul>
       </nav>
       <Separator className="my-4" />
-      <p className="text-xs text-muted-foreground">Treinador</p>
-      <p className="truncate font-display text-lg font-bold uppercase">
-        {career.coach}
-      </p>
+      <div className="flex min-w-0 items-center gap-3">
+        {career.coachProfile && (
+          <CoachAvatar avatar={career.coachProfile.avatar} size={44} />
+        )}
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">
+            Treinador
+            {career.coachProfile &&
+              ` · ${personalityLabel(career.coachProfile.personality)}`}
+          </p>
+          <p className="truncate text-base font-extrabold">{career.coach}</p>
+        </div>
+      </div>
     </aside>
   );
 }
@@ -298,7 +306,7 @@ function DesktopRail({
     maximumFractionDigits: 1,
   }).format(career.world.finances.cash);
   return (
-    <aside className="sticky top-0 hidden h-dvh border-l bg-card/45 p-5 xl:flex xl:flex-col xl:gap-5">
+    <aside className="sticky top-0 hidden h-dvh border-l border-glass-line bg-card/45 p-5 xl:flex xl:flex-col xl:gap-5">
       <section aria-labelledby="proximo-jogo">
         <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">
           Próximo jogo
@@ -346,7 +354,7 @@ function DesktopRail({
           <span className="font-display font-bold">{money}</span>
         </Button>
       </section>
-      <div className="mt-auto rounded-lg border bg-background/60 p-4">
+      <div className="surface mt-auto rounded-2xl p-4">
         <p className="text-xs font-bold uppercase tracking-[.16em] text-muted-foreground">
           Ritmo da carreira
         </p>
@@ -373,7 +381,7 @@ function MobileNavigation({
   return (
     <>
       {open && (
-        <div className="fixed inset-x-3 bottom-20 z-40 rounded-xl border bg-popover p-3 text-popover-foreground shadow-2xl lg:hidden">
+        <div className="fixed inset-x-3 bottom-24 z-40 rounded-2xl border border-glass-line bg-popover p-3 text-popover-foreground shadow-2xl lg:hidden">
           <div className="mb-2 flex items-center justify-between px-2">
             <p className="font-display text-lg font-bold uppercase">
               Todas as áreas
@@ -401,7 +409,7 @@ function MobileNavigation({
       )}
       <nav
         aria-label="Navegação principal mobile"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-background/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden"
+        className="glass-strong fixed inset-x-3 bottom-[max(.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 rounded-2xl px-1.5 py-1.5 lg:hidden"
       >
         {primaryMobile.map(([id, label, Icon]) => (
           <button
@@ -410,7 +418,7 @@ function MobileNavigation({
             className={cn(
               'flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[.66rem] font-bold uppercase tracking-wide',
               screen === id
-                ? 'bg-secondary text-primary'
+                ? 'bg-popover text-primary shadow-sm'
                 : 'text-muted-foreground',
             )}
             onClick={() => navigate(id)}
@@ -426,7 +434,9 @@ function MobileNavigation({
           aria-expanded={open}
           className={cn(
             'flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[.66rem] font-bold uppercase tracking-wide',
-            open ? 'bg-secondary text-primary' : 'text-muted-foreground',
+            open
+              ? 'bg-popover text-primary shadow-sm'
+              : 'text-muted-foreground',
           )}
           onClick={() => setOpen(!open)}
         >
@@ -435,31 +445,6 @@ function MobileNavigation({
         </button>
       </nav>
     </>
-  );
-}
-
-function ThemeButton() {
-  // The layout bootstrap script already applied the saved theme before paint.
-  const [dark, setDark] = useState(
-    () =>
-      typeof document === 'undefined' ||
-      document.documentElement.classList.contains('dark'),
-  );
-  const toggle = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    globalThis.localStorage?.setItem('footebas-theme', next ? 'dark' : 'light');
-  };
-  return (
-    <Button
-      size="icon"
-      variant="outline"
-      aria-label={dark ? 'Ativar tema claro' : 'Ativar tema escuro'}
-      onClick={toggle}
-    >
-      {dark ? <Sun /> : <Moon />}
-    </Button>
   );
 }
 
@@ -480,7 +465,7 @@ function CommandAnnouncer({ state }: { state: CommandState }) {
 function Brand() {
   return (
     <div className="flex items-center gap-2">
-      <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm">
+      <span className="btn-grass grid size-9 place-items-center rounded-xl">
         <SoccerBall weight="fill" />
       </span>
       <span className="font-display text-2xl font-bold uppercase tracking-tight">

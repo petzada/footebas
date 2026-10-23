@@ -5,6 +5,14 @@ import {
 } from '@/lib/phase4-model';
 import { replayFromFeed } from '@/lib/match-replay-adapter';
 import type { MatchReplayInput } from '@/lib/match-replay-model';
+import {
+  DEFAULT_COACH_PROFILE,
+  careerNameError,
+  defaultCareerName,
+  type CoachProfile,
+} from '@/lib/coach-profile';
+
+export type { CoachProfile } from '@/lib/coach-profile';
 
 /** Shell destinations; the first seven are the main areas of docs/09. */
 export type Screen =
@@ -114,6 +122,10 @@ export interface FixtureView {
 
 export interface CareerView {
   coach: string;
+  /** Career name (home read model); absent on older servers. */
+  careerName?: string;
+  /** Coach nationality, avatar and personality (home read model). */
+  coachProfile?: CoachProfile;
   club: string;
   /** League the club plays in (standings read model). */
   division?: string;
@@ -155,6 +167,8 @@ export interface CareerSummary {
   /** Career name chosen by the player, once the server stores it. */
   name?: string;
   coach: string;
+  /** Coach nationality, avatar and personality, once the server sends it. */
+  coachProfile?: CoachProfile;
   clubName?: string;
   season?: number;
   currentDate?: string;
@@ -188,9 +202,19 @@ export function isCareerLimitError(error: unknown): error is Error {
   );
 }
 
+/** `CreateCareer` input; the server fills defaults for omitted fields. */
+export interface CreateCareerInput {
+  /** Manager name shown in headlines (`managerName`). */
+  coach: string;
+  /** 1–40 characters; defaults to "Carreira de <coach>". */
+  careerName?: string;
+  /** Sent as the contract's `coach` profile. */
+  coachProfile?: CoachProfile;
+}
+
 export interface CareerApiPort {
   login(email: string): Promise<void>;
-  createCareer(input: { coach: string }): Promise<void>;
+  createCareer(input: CreateCareerInput): Promise<void>;
   selectClub(club: string): Promise<void>;
   getCareer(): Promise<CareerView | null>;
   /** Public counters; `null` hides them (endpoint missing or failing). */
@@ -712,9 +736,12 @@ export class InMemoryCareerApi implements CareerApiPort {
     this.#authenticated = true;
   }
 
-  async createCareer({ coach }: { coach: string }) {
+  async createCareer({ coach, careerName, coachProfile }: CreateCareerInput) {
     if (!this.#authenticated) throw new Error('Sessão necessária.');
     if (!coach.trim()) throw new Error('Informe o nome do treinador.');
+    const name = careerName?.trim() ?? defaultCareerName(coach);
+    const nameError = careerNameError(name);
+    if (nameError) throw new Error(nameError);
     if (this.#careers.size >= this.#limit)
       throw new CareerLimitReachedError(
         this.#limit === FREE_CAREER_LIMIT
@@ -728,6 +755,8 @@ export class InMemoryCareerApi implements CareerApiPort {
       updatedAt: this.#now().toISOString(),
       view: {
         coach: coach.trim(),
+        careerName: name,
+        coachProfile: { ...(coachProfile ?? DEFAULT_COACH_PROFILE) },
         club: '',
         division: 'Série A',
         fixture: { competition: 'Série A', venue: 'home' },
@@ -780,7 +809,9 @@ export class InMemoryCareerApi implements CareerApiPort {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .map(({ id, view, updatedAt }): CareerSummary => ({
         id,
+        ...(view.careerName ? { name: view.careerName } : {}),
         coach: view.coach,
+        ...(view.coachProfile ? { coachProfile: view.coachProfile } : {}),
         ...(view.club ? { clubName: view.club } : {}),
         season: 2026,
         round: view.round,
