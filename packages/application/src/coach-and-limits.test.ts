@@ -34,6 +34,7 @@ import {
   developmentQualityFor,
   phaseFourStateOf,
   withMatchPlanStrength,
+  careerSaveRepository,
 } from './index.js';
 
 function setup(entitlements?: InMemoryEntitlements) {
@@ -175,7 +176,9 @@ describe('career profile', () => {
   it('loads saves created before profiles existed with the defaults', async () => {
     const { app, token, unitOfWork } = setup();
     const created = await app.execute(token, create('command_legacy'));
-    const repos = unitOfWork.repositories();
+    const repos = {
+      saves: careerSaveRepository(unitOfWork.repositories().saves),
+    };
     const save = (await repos.saves.peek(created.careerId))!;
     const legacy = structuredClone(save.snapshot) as Record<string, unknown>;
     delete legacy.careerName;
@@ -199,9 +202,9 @@ describe('career profile', () => {
         clubId: 'club_flamengo',
       }),
     );
-    const migrated = (await unitOfWork
-      .repositories()
-      .saves.peek(created.careerId))!.snapshot as Record<string, unknown>;
+    const migrated = (await careerSaveRepository(
+      unitOfWork.repositories().saves,
+    ).peek(created.careerId))!.snapshot as Record<string, unknown>;
     expect(migrated.careerName).toBe('Carreira de Marcio');
     expect(migrated.coach).toEqual({
       nationality: 'BR',
@@ -319,7 +322,9 @@ describe('coach personality effects', () => {
   it('diplomata renews contracts for a slightly lower wage', async () => {
     const outcome = async (personality: CoachPersonality) => {
       const { world, unitOfWork, careerId } = await careerWith(personality);
-      const save = (await unitOfWork.repositories().saves.peek(careerId))!;
+      const save = (await careerSaveRepository(
+        unitOfWork.repositories().saves,
+      ).peek(careerId))!;
       const state = phaseFourStateOf(save);
       expect(state.coachPersonality).toBe(personality);
       const contract = state.contracts.find(

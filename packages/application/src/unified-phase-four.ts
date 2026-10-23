@@ -12,6 +12,11 @@ import type {
 import { PhaseFourConflictError } from './phase-four-service.js';
 import { syncManagedClub, type CareerSnapshot } from './service.js';
 import { careerProfileOf } from './coach-personality.js';
+import {
+  catalogCareerContent,
+  type CareerContentPort,
+} from './career-content.js';
+import { careerUnitOfWork } from './career-save-codec.js';
 
 const WORLD_FIELDS = [
   'manager',
@@ -66,7 +71,15 @@ export function phaseFourStateOf(save: GameSave): PhaseFourState {
 export class UnifiedPhaseFourRepository implements PhaseFourStateRepository {
   private readonly active = new Map<string, TransactionContext>();
 
-  public constructor(private readonly unitOfWork: UnitOfWork) {}
+  private readonly unitOfWork: UnitOfWork;
+
+  public constructor(
+    unitOfWork: UnitOfWork,
+    content: CareerContentPort = catalogCareerContent,
+  ) {
+    // Same full-state saves as the career commands (lean storage, ADR 0014).
+    this.unitOfWork = careerUnitOfWork(unitOfWork, content);
+  }
 
   public async withLock<T>(
     careerId: string,
