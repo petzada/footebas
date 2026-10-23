@@ -265,7 +265,7 @@ describe('phase 3 matchday core', () => {
     const presentation = createMatchPresentation(simulateMatch(input));
     expect(presentation.playback).toEqual({
       modes: ['instant', 'fast', 'feed'],
-      speeds: [1, 2, 4, 8],
+      speeds: [0.5, 1, 2, 4, 8],
       canSkip: true,
     });
     expect(presentation.feed.every(({ id }) => id.startsWith('match_'))).toBe(

@@ -254,11 +254,69 @@ describe('read models and snapshots', () => {
       tableUpdated: true,
       playback: {
         modes: ['instant', 'fast', 'feed'],
-        speeds: [1, 2, 4, 8],
+        speeds: [0.5, 1, 2, 4, 8],
         canSkip: true,
       },
     };
     expect(roundTrip(postMatchReadModelSchema, postMatch)).toEqual(postMatch);
+
+    // match-v4 chances carry shooter, assistant, play and outcome (ADR 0015).
+    const rich = {
+      ...postMatch,
+      timeline: [
+        {
+          type: 'chance',
+          minute: 12,
+          side: 'away',
+          xg: 0.18,
+          playerId: 'player_9',
+          assistId: 'player_10',
+          play: 'counter',
+          outcome: 'woodwork',
+        },
+        {
+          type: 'goal',
+          minute: 42,
+          side: 'home',
+          playerId: 'player_1',
+          assistId: 'player_7',
+          play: 'cross',
+        },
+      ],
+    };
+    expect(roundTrip(postMatchReadModelSchema, rich)).toEqual(rich);
+    // Results recorded before match-v4 have bare chances and stay valid.
+    expect(
+      postMatchReadModelSchema.safeParse({
+        ...postMatch,
+        timeline: [{ type: 'chance', minute: 30, side: 'home', xg: 0.07 }],
+      }).success,
+    ).toBe(true);
+    expect(
+      postMatchReadModelSchema.safeParse({
+        ...rich,
+        timeline: [{ ...rich.timeline[0], play: 'free_kick' }],
+      }).success,
+    ).toBe(false);
+    // 0.5× joined the speeds; the older list without it still parses, any
+    // other speed set does not.
+    expect(
+      postMatchReadModelSchema.safeParse({
+        ...postMatch,
+        playback: { ...postMatch.playback, speeds: [1, 2, 4, 8] },
+      }).success,
+    ).toBe(true);
+    for (const speeds of [
+      [0.25, 1, 2, 4, 8],
+      [0.5, 1, 2, 4],
+      [1, 0.5, 2, 4, 8],
+    ])
+      expect(
+        postMatchReadModelSchema.safeParse({
+          ...postMatch,
+          playback: { ...postMatch.playback, speeds },
+        }).success,
+      ).toBe(false);
   });
 
   it('requires complete snapshot version provenance and checksum', () => {

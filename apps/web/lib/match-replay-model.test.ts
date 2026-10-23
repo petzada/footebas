@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createMatchReplayFrame,
+  describeReplayEvent,
   nextReplayMinute,
   textualReplayAlternative,
   type MatchReplayInput,
@@ -117,6 +118,51 @@ describe('match replay render model', () => {
     expect(alternative).toContain('Bola em');
     expect(alternative).toContain('Posições de Clube Ferroviário');
     expect(alternative).toContain('CFC 9');
+  });
+
+  it('narrates the shooter, the play and the outcome of match-v4 shots', () => {
+    const input = matchFixture();
+    expect(
+      describeReplayEvent(input, {
+        type: 'chance',
+        minute: 12,
+        side: 'home',
+        xg: 0.21,
+        playerId: 'cfc-9',
+        assistId: 'cfc-7',
+        play: 'cross',
+        outcome: 'saved',
+      }),
+    ).toBe("12' · CFC: CFC 9 finaliza após cruzamento… defesa do goleiro.");
+    expect(
+      describeReplayEvent(input, {
+        type: 'goal',
+        minute: 30,
+        side: 'away',
+        playerId: 'fba-10',
+        assistId: 'fba-8',
+        play: 'counter',
+      }),
+    ).toBe("30' · FBA marca com FBA 10 em contra-ataque, passe de FBA 8.");
+    // Older results (no shooter) and unknown athletes keep the xG line.
+    expect(
+      describeReplayEvent(input, {
+        type: 'chance',
+        minute: 40,
+        side: 'away',
+        xg: 0.07,
+      }),
+    ).toBe("40' · FBA cria uma chance de 0.07 xG.");
+    expect(
+      describeReplayEvent(input, {
+        type: 'chance',
+        minute: 41,
+        side: 'away',
+        xg: 0.07,
+        playerId: 'someone-else',
+        outcome: 'off_target',
+      }),
+    ).toBe("41' · FBA cria uma chance de 0.07 xG.");
   });
 
   it('jumps from authored event to authored event before the final whistle', () => {
