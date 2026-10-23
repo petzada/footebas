@@ -76,6 +76,49 @@ Em desenvolvimento (`pnpm exec wrangler dev --config apps/api/wrangler.jsonc`), 
 O servidor Fastify local (`pnpm --filter @footebas/api dev`) usa o log próprio do Fastify e não passa por esse
 roteador.
 
+## Latência por etapa (Server-Timing) e RUM
+
+Medição da Onda 0 de `docs/10-latencia-e-escala.md`.
+
+**Server-Timing.** Toda resposta da API leva um cabeçalho `Server-Timing`, e o mesmo conteúdo vai no campo
+`timing` do log `type: "request"`:
+
+| Métrica              | Onde   | Significado                                                                |
+| -------------------- | ------ | -------------------------------------------------------------------------- |
+| `rl`                 | Worker | rate limit                                                                 |
+| `fwd`                | Worker | ida e volta até o Durable Object da carreira (inclui todo o trabalho dele) |
+| `app`                | Worker | handler que roda no próprio Worker (rotas que não vão ao objeto)           |
+| `pg;desc="n=…"`      | Worker | consultas ao Postgres que o Worker enviou                                  |
+| `edge;desc="GRU"`    | Worker | colo da borda que atendeu                                                  |
+| `do-queue`           | objeto | espera na fila de comandos do objeto                                       |
+| `do-load`            | objeto | carga/hidratação da carreira (0 quando já está em memória)                 |
+| `do-commit`          | objeto | gravação (Postgres + storage do objeto)                                    |
+| `do-app`, `do-total` | objeto | handler e total dentro do objeto                                           |
+| `do-pg;desc="n=…"`   | objeto | consultas ao Postgres que o objeto enviou nesta requisição                 |
+| `do-colo;desc="IAD"` | objeto | onde o objeto roda (aparece depois da primeira sonda do isolate)           |
+
+As métricas do objeto são deltas de contadores do objeto e ficam aproximadas quando requisições se sobrepõem
+(leituras podem). No Workers, o relógio só avança em I/O: CPU pura não aparece nas durações. Para CPU, use
+`cpuTimeMs` das invocações no Workers Logs.
+
+No navegador, a aba Network mostra o Server-Timing em "Timing" (a API manda `Timing-Allow-Origin` para as origens
+do CORS). Cada isolate de objeto também registra uma linha `type: "career_object"`, `route: "location"`, com o
+`colo` onde roda.
+
+**RUM (`type: "rum"`).** O web envia por `navigator.sendBeacon` (`POST /v1/telemetry/vitals`, anônimo, bucket
+público de rate limit) os Core Web Vitals (`LCP`, `INP`, `CLS`, `FCP`, `TTFB`, com o seletor do elemento em
+`label`) e duas medidas do jogo:
+
+- `screen-switch`: do toque até a tela nova pintada, com o id da tela em `label` (meta do ADR 0014: < 100 ms);
+- `central-visible`: a primeira Central pintada no carregamento, desde o toque que levou a ela (`label: "tap"`) ou
+  desde o início da navegação (`label: "navigation"`).
+
+Para o p75 por tela, filtre `type = rum` no Query Builder e agrupe por `metrics.name` e `metrics.label`. O Cloudflare
+Web Analytics da zona continua coletando os Web Vitals por conta própria.
+
+**Bundle.** O job `verify` do CI escreve no resumo o tamanho dos chunks do web (bruto e gzip,
+`tools/bundle-report.mjs`) e publica a análise do Turbopack como artefato `web-bundle-analysis`.
+
 ## Rate limiting (resumo)
 
 Bindings nativos do Workers (`ratelimits` em `apps/api/wrangler.jsonc`, código em `apps/api/src/rate-limit.ts`),

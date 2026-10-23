@@ -7,7 +7,8 @@ import {
   type ScreenOrigin,
 } from '@/lib/retro/transition-origin';
 import { usePrefersReducedMotion as useReducedMotion } from '@/lib/retro/use-reduced-motion';
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { markScreen } from '@/lib/rum';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 
 /**
  * Screen entrance: a short stepped rise (video-game style). With
@@ -45,6 +46,10 @@ export function ScreenTransition({
     const box = node.getBoundingClientRect();
     node.style.transformOrigin = `${px - box.left}px ${py - box.top}px`;
   }, [id, px, py]);
+  // Real-user timing: tap → this screen painted (lib/rum.ts).
+  useEffect(() => {
+    markScreen(id);
+  }, [id]);
   if (reduced)
     return (
       <div data-screen={id} data-motion="reduced" className={className}>

@@ -56,6 +56,7 @@ import {
 } from './billing/routes.js';
 import { avatarRoutes, type AvatarRouteDependencies } from './avatar-routes.js';
 import { WooviApiError } from './billing/woovi-client.js';
+import { rumRoute, type RumReport } from './rum-route.js';
 
 export interface ApiDependencies {
   readonly application: FootebasApplication;
@@ -83,6 +84,8 @@ export interface ApiDependencies {
    * not throw or block (the Worker warms the career's Durable Object).
    */
   readonly onCareerCreated?: (careerId: string) => void;
+  /** Records real-user web metrics (`POST /v1/telemetry/vitals`). */
+  readonly rum?: (report: RumReport) => void;
   /** Browser origins allowed to call the API (CORS). */
   readonly corsOrigins?: readonly string[];
   /** Serves /documentation (Swagger UI, Node only). */
@@ -726,6 +729,7 @@ export function apiRoutes(deps: ApiDependencies): readonly ApiRoute[] {
 
   if (deps.billing !== undefined) routes.push(...billingRoutes(deps.billing));
   if (deps.avatars !== undefined) routes.push(...avatarRoutes(deps.avatars));
+  if (deps.rum !== undefined) routes.push(rumRoute(deps.rum));
 
   routes.push(
     {

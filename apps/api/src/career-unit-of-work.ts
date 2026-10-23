@@ -188,6 +188,15 @@ class CareerTransaction {
  */
 export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
   public readonly [HYDRATED_SAVES] = true as const;
+  /**
+   * Wall-clock milliseconds spent so far waiting in the command chain, loading
+   * the career and committing it (Server-Timing reads per-request deltas).
+   */
+  public readonly stages: Record<'queue' | 'load' | 'commit', number> = {
+    queue: 0,
+    load: 0,
+    commit: 0,
+  };
   private current: GameSave | undefined;
   private loaded = false;
   private careerId: string | undefined;
@@ -228,8 +237,25 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
     this.current = undefined;
   }
 
+  private async timed<T>(
+    stage: keyof DurableCareerUnitOfWork['stages'],
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const started = Date.now();
+    try {
+      return await work();
+    } finally {
+      this.stages[stage] += Date.now() - started;
+    }
+  }
+
   private serialize<T>(task: () => Promise<T>): Promise<T> {
-    const turn = this.tail.then(task, task);
+    const queued = Date.now();
+    const start = () => {
+      this.stages.queue += Date.now() - queued;
+      return task();
+    };
+    const turn = this.tail.then(start, start);
     this.tail = turn.catch(() => undefined);
     return turn;
   }
@@ -284,7 +310,7 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
     work: (tx: TransactionContext) => Promise<T>,
   ): Promise<T> {
     await this.bind(careerId);
-    await this.ensureLoaded(careerId);
+    await this.timed('load', () => this.ensureLoaded(careerId));
     if (commandId !== undefined) {
       const receipt = await this.deps.storage.get<CommandReceipt>(
         receiptKey(commandId),
@@ -302,7 +328,7 @@ export class DurableCareerUnitOfWork implements HydratedUnitOfWork {
           response: result as CanonicalValue,
           createdAt: this.deps.clock.now().toISOString(),
         });
-      await this.commit(tx);
+      await this.timed('commit', () => this.commit(tx));
     } catch (error) {
       if (tx.touchedDurable || error instanceof SaveConflictError) this.reset();
       throw error;
