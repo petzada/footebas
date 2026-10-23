@@ -447,6 +447,17 @@ export function MarketScreen(props: Phase4ScreenProps) {
   );
 }
 
+/** Contract renewals, refusals and terminations (reused by the Escritório). */
+export function ContractsScreen(props: Phase4ScreenProps) {
+  const { run, notice } = useCommand(props);
+  return (
+    <>
+      {notice && <LiveNotice>{notice}</LiveNotice>}
+      <ContractsPanel {...props} run={run} />
+    </>
+  );
+}
+
 function ContractsPanel(
   props: Phase4ScreenProps & {
     run(command: () => Promise<CareerView>, success: string): Promise<void>;

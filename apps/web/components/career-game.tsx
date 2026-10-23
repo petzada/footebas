@@ -10,17 +10,14 @@ import React, {
 import {
   ArrowRight,
   ArrowsClockwise,
-  CheckCircle,
   ChartLineUp,
   Pause,
   Play,
   SignOut,
   SoccerBall,
-  Sparkle,
   Strategy,
   Trophy,
   UserSwitch,
-  UsersThree,
   WarningCircle,
 } from '@phosphor-icons/react';
 import { Badge } from '@/components/ui/badge';
@@ -44,25 +41,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
-  type AutoPickStrategy,
-  type BuildUp,
   type CareerApiPort,
   type CareerView,
-  type DefensiveLine,
-  type Focus,
-  type Formation,
-  type Marking,
   type MatchSpeed,
   type MatchUpdate,
   type Mentality,
-  type PlayerView,
-  type Press,
   type Screen,
-  type SquadRole,
-  type TacticsView,
   InMemoryCareerApi,
   isCareerLimitError,
 } from '@/lib/career-api';
@@ -71,17 +57,15 @@ import { SessionExpiredError } from '@/lib/http-career-api';
 import { Brand } from '@/components/brand';
 import { AuthPending, SignInScreen } from '@/components/sign-in-screen';
 import { cn } from '@/lib/utils';
-import {
-  ClubScreen,
-  MarketScreen,
-  WorldScreen,
-} from '@/components/phase4-screens';
+import { ClubScreen, WorldScreen } from '@/components/phase4-screens';
+import { SquadScreen } from '@/components/squad-screen';
+import { TACTIC_LABEL } from '@/lib/management-model';
+import { MarketScreen } from '@/components/market-screen';
+import { OfficeScreen } from '@/components/office-screen';
 import { CompetitionScreens } from '@/components/competition-screens';
 import { Phase6Shell, PwaRuntime } from '@/components/phase6-shell';
 import { MatchReplayViewer } from '@/components/match-replay-viewer';
 import { ClubEmblem } from '@/components/club-emblem';
-import { AthleteCard } from '@/components/athlete-card';
-import { PixelAvatar } from '@/components/retro/pixel-avatar';
 import { TickerProvider, useTicker } from '@/components/retro/ticker';
 import { useSound } from '@/lib/retro/use-sound';
 import { CentralScreen } from '@/components/central-screen';
@@ -509,29 +493,14 @@ function CareerFlow({
             onNarrate={beginNarratedMatch}
             onInstant={instantResult}
           />
-        ) : screen === 'squad' ? (
-          <Squad
+        ) : screen === 'squad' || screen === 'tactics' ? (
+          <SquadScreen
+            key={screen}
             career={career}
-            onMove={(id, role) =>
-              attempt(`role:${id}`, async () =>
-                setCareer(await api.setPlayerRole(id, role)),
-              )
-            }
-            onAuto={(strategy) =>
-              attempt('auto-pick', async () =>
-                setCareer(await api.autoPick(strategy)),
-              )
-            }
-          />
-        ) : screen === 'tactics' ? (
-          <Tactics
-            career={career}
-            onSave={(formation, tactics) =>
-              attempt('tactics', async () => {
-                setCareer(await api.setTactics({ formation, tactics }));
-                setScreen('central');
-              })
-            }
+            api={api}
+            onCareerChange={setCareer}
+            reportError={setError}
+            initialTab={screen === 'tactics' ? 'tactics' : 'board'}
           />
         ) : screen === 'table' ? (
           <Standings career={career} />
@@ -544,23 +513,23 @@ function CareerFlow({
           />
         ) : screen === 'season' ? (
           <SeasonScreen career={career} navigate={setScreen} />
-        ) : screen === 'office' || screen === 'stadium' ? (
-          <ClubScreen
+        ) : screen === 'office' || screen === 'finance' ? (
+          <OfficeScreen
+            key={screen}
             career={career}
             api={api}
             onCareerChange={setCareer}
             reportError={setError}
-            key={screen}
-            initialTab={screen === 'office' ? 'board' : 'stadium'}
+            initialTab={screen === 'finance' ? 'finance' : 'proposals'}
           />
-        ) : screen === 'finance' ? (
+        ) : screen === 'stadium' ? (
           <ClubScreen
             career={career}
             api={api}
             onCareerChange={setCareer}
             reportError={setError}
             key={screen}
-            initialTab="finance"
+            initialTab="stadium"
           />
         ) : screen === 'calendar' ? (
           <CompetitionScreens
@@ -759,530 +728,6 @@ function Onboarding(props: {
         )}
       </div>
     </main>
-  );
-}
-
-const roleLabel: Record<SquadRole, string> = {
-  starter: 'Titulares',
-  bench: 'Banco',
-  reserve: 'Reservas',
-};
-
-function Squad({
-  career,
-  onMove,
-  onAuto,
-}: {
-  career: CareerView;
-  onMove(id: string, role: SquadRole): void;
-  onAuto(strategy: AutoPickStrategy): void;
-}) {
-  const [selectedId, setSelectedId] = useState(career.players[0]?.id ?? '');
-  const selected =
-    career.players.find((player) => player.id === selectedId) ??
-    career.players[0];
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <h2 className="font-display text-xs font-bold uppercase">
-            Vestiário
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Selecione um jogador e use os botões. Arrastar não é necessário.
-          </p>
-        </div>
-        <div
-          role="group"
-          aria-label="Escalações automáticas"
-          className="grid grid-cols-3 gap-2"
-        >
-          <Button size="sm" variant="secondary" onClick={() => onAuto('best')}>
-            <Sparkle data-icon="inline-start" />
-            Melhor
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => onAuto('rest')}>
-            <ArrowsClockwise data-icon="inline-start" />
-            Poupar
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => onAuto('develop')}>
-            <UsersThree data-icon="inline-start" />
-            Desenvolver
-          </Button>
-        </div>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(19rem,.8fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-sm uppercase">
-              Grupos do elenco
-            </CardTitle>
-            <CardDescription>
-              Navegue com Tab e ative com Enter ou Espaço.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="starter">
-              <TabsList className="grid w-full grid-cols-3">
-                {(['starter', 'bench', 'reserve'] as const).map((role) => (
-                  <TabsTrigger key={role} value={role}>
-                    {roleLabel[role]} (
-                    {
-                      career.players.filter((player) => player.role === role)
-                        .length
-                    }
-                    )
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {(['starter', 'bench', 'reserve'] as const).map((role) => (
-                <TabsContent key={role} value={role}>
-                  <div
-                    role="list"
-                    aria-label={roleLabel[role]}
-                    className="grid gap-2 sm:grid-cols-2"
-                  >
-                    {career.players
-                      .filter((player) => player.role === role)
-                      .map((player) => (
-                        <PlayerRow
-                          key={player.id}
-                          player={player}
-                          selected={player.id === selected?.id}
-                          onSelect={() => setSelectedId(player.id)}
-                        />
-                      ))}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          </CardContent>
-        </Card>
-        {selected && (
-          <div className="grid content-start gap-4">
-            <AthleteCard player={selected} club={{ name: career.club }} />
-            <PlayerDetail
-              player={selected}
-              onMove={(role) => onMove(selected.id, role)}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PlayerRow({
-  player,
-  selected,
-  onSelect,
-}: {
-  player: PlayerView;
-  selected: boolean;
-  onSelect(): void;
-}) {
-  const unavailable = player.injuryRounds > 0 || player.suspended;
-  return (
-    <button
-      aria-pressed={selected}
-      className={cn(
-        'grid min-h-16 w-full grid-cols-[auto_1fr_auto] items-center gap-3 border-2 border-ink p-3 text-left',
-        selected ? 'bg-bulb/40 outline outline-4 outline-bulb' : 'bg-popover',
-      )}
-      onClick={onSelect}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') onSelect();
-      }}
-    >
-      <span className="relative">
-        <PixelAvatar seed={`atleta-${player.id}`} size={40} />
-        <span className="absolute -bottom-1 -right-1 bg-ink px-0.5 font-pixel text-[.45rem] text-chalk">
-          {player.shirt}
-        </span>
-      </span>
-      <span className="min-w-0">
-        <strong className="block truncate text-sm">{player.name}</strong>
-        <small className="text-muted-foreground">
-          {player.primaryPosition} · {player.condition}% cond.
-        </small>
-        {unavailable && (
-          <span className="mt-1 block text-xs text-accent">
-            {player.injuryRounds ? 'Lesionado' : 'Suspenso'}
-          </span>
-        )}
-      </span>
-      <span
-        className="led bg-board px-1.5 py-1 text-base"
-        aria-label={`Força ${player.strength}`}
-      >
-        {player.strength}
-      </span>
-    </button>
-  );
-}
-
-function PlayerDetail({
-  player,
-  onMove,
-}: {
-  player: PlayerView;
-  onMove(role: SquadRole): void;
-}) {
-  return (
-    <Card aria-label={`Detalhes de ${player.name}`}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="font-display text-base uppercase">
-              {player.name}
-            </CardTitle>
-            <CardDescription>
-              #{player.shirt} · {player.age} anos · {player.nationality}
-            </CardDescription>
-          </div>
-          <span className="font-display text-base font-bold text-primary">
-            {player.strength}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {player.traits.slice(0, 2).map((trait) => (
-            <Badge key={trait} variant="secondary">
-              {trait}
-            </Badge>
-          ))}
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <Info
-            label="Posições"
-            value={[player.primaryPosition, ...player.secondaryPositions].join(
-              ' · ',
-            )}
-          />
-          <Info label="Lado" value={player.side} />
-          <Info
-            label="Cartões"
-            value={`${player.yellowCards}A · ${player.redCards}V`}
-          />
-          <Info
-            label="Última nota"
-            value={player.lastRating?.toFixed(1) ?? 'Sem nota'}
-          />
-        </div>
-        <div className="flex flex-col gap-3">
-          <PlayerMetric label="Condição" value={player.condition} />
-          <PlayerMetric label="Moral" value={player.morale} />
-          <PlayerMetric label="Ritmo" value={player.sharpness} />
-        </div>
-        <div className="rounded-md bg-muted p-3 text-sm">
-          <strong>
-            {player.appearances} jogos · {player.goals} gols
-          </strong>
-          <p className="mt-1 text-muted-foreground">
-            {player.injuryRounds
-              ? `Lesionado por ${player.injuryRounds} rodada(s).`
-              : player.suspended
-                ? 'Suspenso para a próxima partida.'
-                : 'Disponível para jogar.'}
-          </p>
-        </div>
-        <section aria-labelledby={`scouting-${player.id}`}>
-          <h3
-            id={`scouting-${player.id}`}
-            className="text-xs font-bold uppercase tracking-wide text-muted-foreground"
-          >
-            Olho clínico · estimativas
-          </h3>
-          <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-            <Estimate
-              label="Potencial"
-              value={player.scoutingEstimates.potential}
-            />
-            <Estimate
-              label="Consistência"
-              value={player.scoutingEstimates.consistency}
-            />
-            <Estimate
-              label="Lesões"
-              value={player.scoutingEstimates.injuryProneness}
-            />
-            <Estimate
-              label="Adaptação"
-              value={player.scoutingEstimates.adaptation}
-            />
-            <Estimate
-              label="Profissionalismo"
-              value={player.scoutingEstimates.professionalism}
-            />
-            <Estimate
-              label="Jogo grande"
-              value={player.scoutingEstimates.bigMatches}
-            />
-          </dl>
-        </section>
-      </CardContent>
-      <CardFooter
-        className="grid grid-cols-3 gap-2"
-        role="group"
-        aria-label={`Mover ${player.name}`}
-      >
-        {(['starter', 'bench', 'reserve'] as const).map((role) => (
-          <Button
-            key={role}
-            size="sm"
-            variant={player.role === role ? 'secondary' : 'outline'}
-            disabled={player.role === role}
-            onClick={() => onMove(role)}
-          >
-            {role === 'starter'
-              ? 'Titular'
-              : role === 'bench'
-                ? 'Banco'
-                : 'Reserva'}
-          </Button>
-        ))}
-      </CardFooter>
-    </Card>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-0.5 font-medium capitalize">{value}</p>
-    </div>
-  );
-}
-
-function Estimate({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 font-medium capitalize">{value}</dd>
-    </div>
-  );
-}
-
-function PlayerMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs">
-        <span>{label}</span>
-        <strong>{value}%</strong>
-      </div>
-      <Progress value={value} aria-label={`${label}: ${value}%`} />
-    </div>
-  );
-}
-
-const tacticsLabel = {
-  mentality: {
-    cautious: 'Cautela',
-    balanced: 'Equilibrada',
-    attacking: 'Ofensiva',
-  },
-  buildUp: { short: 'Curta', mixed: 'Mista', direct: 'Direta' },
-  focus: { middle: 'Meio', wings: 'Laterais' },
-  press: { low: 'Baixa', medium: 'Média', high: 'Alta' },
-  defensiveLine: { deep: 'Recuada', standard: 'Normal', high: 'Alta' },
-  marking: { light: 'Leve', strong: 'Forte', 'very-strong': 'Muito forte' },
-} as const;
-
-function Tactics({
-  career,
-  onSave,
-}: {
-  career: CareerView;
-  onSave(formation: Formation, tactics: TacticsView): void;
-}) {
-  const [formation, setFormation] = useState(career.formation);
-  const [tactics, setTactics] = useState(career.tactics);
-  const change = <K extends keyof TacticsView>(key: K, value: TacticsView[K]) =>
-    setTactics((current) => ({ ...current, [key]: value }));
-  const starters = career.players.filter((player) => player.role === 'starter');
-  return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)]">
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-base uppercase">
-            Prancheta compacta
-          </CardTitle>
-          <CardDescription>
-            Sete decisões, sem menus escondidos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FieldGroup>
-            <TacticalChoice<Formation>
-              label="Formação"
-              value={formation}
-              options={['4-3-3', '4-4-2', '3-5-2', '5-3-2']}
-              labels={{
-                '4-3-3': '4-3-3',
-                '4-4-2': '4-4-2',
-                '3-5-2': '3-5-2',
-                '5-3-2': '5-3-2',
-              }}
-              onChange={setFormation}
-            />
-            <TacticalChoice
-              label="Mentalidade"
-              value={tactics.mentality}
-              options={['cautious', 'balanced', 'attacking'] as Mentality[]}
-              labels={tacticsLabel.mentality}
-              onChange={(value) => change('mentality', value)}
-            />
-            <TacticalChoice
-              label="Construção"
-              value={tactics.buildUp}
-              options={['short', 'mixed', 'direct'] as BuildUp[]}
-              labels={tacticsLabel.buildUp}
-              onChange={(value) => change('buildUp', value)}
-            />
-            <TacticalChoice
-              label="Foco ofensivo"
-              value={tactics.focus}
-              options={['middle', 'wings'] as Focus[]}
-              labels={tacticsLabel.focus}
-              onChange={(value) => change('focus', value)}
-            />
-            <TacticalChoice
-              label="Pressão"
-              value={tactics.press}
-              options={['low', 'medium', 'high'] as Press[]}
-              labels={tacticsLabel.press}
-              onChange={(value) => change('press', value)}
-            />
-            <TacticalChoice
-              label="Linha defensiva"
-              value={tactics.defensiveLine}
-              options={['deep', 'standard', 'high'] as DefensiveLine[]}
-              labels={tacticsLabel.defensiveLine}
-              onChange={(value) => change('defensiveLine', value)}
-            />
-            <TacticalChoice
-              label="Marcação"
-              value={tactics.marking}
-              options={['light', 'strong', 'very-strong'] as Marking[]}
-              labels={tacticsLabel.marking}
-              onChange={(value) => change('marking', value)}
-            />
-          </FieldGroup>
-        </CardContent>
-        <CardFooter>
-          <Button
-            className="min-h-11 w-full sm:w-auto"
-            onClick={() => onSave(formation, tactics)}
-          >
-            <CheckCircle data-icon="inline-start" />
-            Salvar tática
-          </Button>
-        </CardFooter>
-      </Card>
-      <Pitch formation={formation} players={starters} />
-    </div>
-  );
-}
-
-function TacticalChoice<T extends string>({
-  label,
-  value,
-  options,
-  labels,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: readonly T[];
-  labels: Record<T, string>;
-  onChange(value: T): void;
-}) {
-  const id = `choice-${label.toLowerCase().replaceAll(' ', '-')}`;
-  return (
-    <Field>
-      <FieldLabel id={id}>{label}</FieldLabel>
-      <ToggleGroup
-        aria-labelledby={id}
-        type="single"
-        value={value}
-        onValueChange={(next) => next && onChange(next as T)}
-        className={cn(
-          'grid',
-          options.length === 2
-            ? 'grid-cols-2'
-            : options.length === 4
-              ? 'grid-cols-4'
-              : 'grid-cols-3',
-        )}
-      >
-        {options.map((option) => (
-          <ToggleGroupItem
-            key={option}
-            className="min-h-11 px-2"
-            value={option}
-          >
-            {labels[option]}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    </Field>
-  );
-}
-
-function Pitch({
-  formation,
-  players,
-}: {
-  formation: Formation;
-  players: readonly PlayerView[];
-}) {
-  const rows = formation.split('-').map(Number).reverse().concat(1);
-  let index = 0;
-  return (
-    <Card className="xl:sticky xl:top-6 xl:self-start">
-      <CardHeader>
-        <CardTitle className="font-display text-sm uppercase">
-          {formation} em campo
-        </CardTitle>
-        <CardDescription>Os nomes refletem os 11 titulares.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="pitch relative aspect-[3/4] overflow-hidden rounded-lg border-2 border-primary/45">
-          <div
-            className="relative z-10 grid h-full place-items-center py-6"
-            style={{
-              gridTemplateRows: `repeat(${rows.length}, minmax(0, 1fr))`,
-            }}
-          >
-            {rows.map((count, row) => (
-              <div
-                key={`${row}-${count}`}
-                className="flex w-full justify-evenly"
-              >
-                {Array.from({ length: count }).map(() => {
-                  const player = players[index++];
-                  return (
-                    <span
-                      key={`${row}-${index}`}
-                      className="flex w-16 flex-col items-center text-center"
-                    >
-                      <span className="grid size-8 place-items-center rounded-full border-2 border-background bg-primary font-display text-xs font-bold text-primary-foreground shadow">
-                        {player?.shirt ?? '?'}
-                      </span>
-                      <small className="mt-1 w-full truncate text-[.62rem] font-bold">
-                        {player?.name.split(' ').at(-1) ?? 'Vaga'}
-                      </small>
-                    </span>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -1506,7 +951,7 @@ function Matchday(props: {
                   setLiveMentality(event.target.value as Mentality)
                 }
               >
-                {Object.entries(tacticsLabel.mentality).map(
+                {Object.entries(TACTIC_LABEL.mentality).map(
                   ([value, label]) => (
                     <option key={value} value={value}>
                       {label}

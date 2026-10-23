@@ -38,28 +38,44 @@ describe('elenco e matchday mobile-first', () => {
     expect((await screen.findAllByText(/rodada 2/i)).length).toBeGreaterThan(0);
   });
 
-  it('oferece controles sem drag e seleção operável por teclado', async () => {
+  it('oferece alternativa ao arrastar: selecionar e escolher o destino pelo teclado', async () => {
     await onboard();
     fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
-    expect(await screen.findByText(/arrastar não é necessário/i)).toBeTruthy();
-    const player = screen.getByRole('button', { name: /emerson royal/i });
-    player.focus();
-    fireEvent.keyDown(player, { key: 'Enter' });
-    expect(player.getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByLabelText(/detalhes de emerson royal/i)).toBeTruthy();
     expect(
-      screen.getByRole('group', { name: /mover emerson royal/i }),
+      await screen.findByText(/arraste um jogador ou toque nele/i),
+    ).toBeTruthy();
+    const player = screen.getByRole('button', {
+      name: /lateral direito: emerson royal/i,
+    });
+    player.focus();
+    fireEvent.click(player);
+    expect(player.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('status').textContent).toMatch(/selecionado/i);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /mandar emerson royal para o banco/i,
+      }),
+    );
+    expect(
+      screen.getByRole('button', { name: /^emerson royal, ld.*no banco/i }),
     ).toBeTruthy();
   });
 
-  it('expõe feedback acessível para ação inválida', async () => {
+  it('expõe feedback acessível para escalação pendente', async () => {
     await onboard();
     fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
-    fireEvent.click(screen.getByRole('button', { name: /emerson royal/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^banco$/i }));
-    expect((await screen.findByRole('alert')).textContent).toMatch(
-      /banco aceita no máximo/i,
+    fireEvent.click(
+      await screen.findByRole('button', { name: /goleiro: agustín rossi/i }),
     );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /mandar agustín rossi para as reservas/i,
+      }),
+    );
+    expect(
+      screen.getByRole('list', { name: /pendências da escalação/i })
+        .textContent,
+    ).toMatch(/faltam 1 titular/i);
   });
 
   it('mostra preparação, controles de velocidade, feed e skip em um toque', async () => {
