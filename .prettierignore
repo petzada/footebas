@@ -23,3 +23,5 @@ docs/07-marca-e-design.md
 docs/08-mvp-fonte-de-verdade.md
 packages/content/src/generated
 packages/content/catalog-report.md
+pnpm-lock.yaml
+supabase/.temp

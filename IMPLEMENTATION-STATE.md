@@ -26,9 +26,9 @@ próprio e com arquivos disjuntos. Para não ter dois agentes no mesmo arquivo, 
 - **Trilha web** (serializada por área): `apps/web`.
 - **Trilha infraestrutura**: `apps/api` (rotas novas), `packages/database`, `supabase/migrations`, CI, ferramentas.
 
-| Onda | Fatias                                                                 | Estado    |
-| ---- | ---------------------------------------------------------------------- | --------- |
-| 1    | login Supabase no web; web via OpenNext; API em `api.` + fumaça nuvem  | em curso  |
+| Onda | Fatias                                                                | Estado   |
+| ---- | --------------------------------------------------------------------- | -------- |
+| 1    | login Supabase no web; web via OpenNext; API em `api.` + fumaça nuvem | em curso |
 
 ### Estado da nuvem
 
