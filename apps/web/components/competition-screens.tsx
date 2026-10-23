@@ -69,19 +69,16 @@ export function CompetitionScreens({
   if (error) return <p role="alert">{error}</p>;
   if (!model)
     return (
-      <p
-        role="status"
-        aria-live="polite"
-        className="text-sm text-muted-foreground"
-      >
+      <p role="status" aria-live="polite" className="text-sm text-chalk">
         Carregando calendário…
       </p>
     );
 
   return (
     <section aria-labelledby="competition-title">
-      <header className="mb-4">
-        <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">
+      {/* On the grass, not on a panel: chalk tones keep AA contrast. */}
+      <header className="mb-4 text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
+        <p className="text-xs font-bold uppercase tracking-[.18em] text-chalk/90">
           Temporada {model.season}
         </p>
         <h2
@@ -90,7 +87,7 @@ export function CompetitionScreens({
         >
           Competições
         </h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <p className="mt-1 max-w-2xl text-sm">
           A pirâmide brasileira, as copas simultâneas e a passagem de temporada
           em uma visão rápida.
         </p>

@@ -15,6 +15,10 @@ export const LEGAL_PLACEHOLDER = {
   updatedOn: '[preencher: data da última atualização]',
 } as const;
 
+/** Small text link with a 44px tall tap area (WCAG 2.5.5). */
+const legalLink =
+  'inline-flex min-h-11 items-center underline underline-offset-4';
+
 /** Public static page frame for Termos de uso and Política de privacidade. */
 export function LegalPage({
   title,
@@ -31,7 +35,7 @@ export function LegalPage({
         <Brand />
         <Link
           href="/"
-          className="font-pixel text-[.5rem] uppercase text-chalk underline underline-offset-4 drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]"
+          className="inline-flex min-h-11 items-center font-pixel text-[.5rem] uppercase text-chalk underline underline-offset-4 drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]"
         >
           Voltar ao jogo
         </Link>
@@ -54,11 +58,11 @@ export function LegalPage({
           {children}
         </div>
         <footer className="mt-8 border-t-2 border-ink pt-4 text-xs text-muted-foreground">
-          <nav aria-label="Documentos legais" className="flex gap-4">
-            <a className="underline underline-offset-4" href="/termos">
+          <nav aria-label="Documentos legais" className="flex flex-wrap gap-4">
+            <a className={legalLink} href="/termos">
               Termos de uso
             </a>
-            <a className="underline underline-offset-4" href="/privacidade">
+            <a className={legalLink} href="/privacidade">
               Política de privacidade
             </a>
           </nav>
@@ -79,10 +83,10 @@ export function LegalLinks({ className = '' }: { className?: string }) {
       aria-label="Documentos legais"
       className={`flex flex-wrap justify-center gap-4 text-xs ${className}`}
     >
-      <a className="underline underline-offset-4" href="/termos">
+      <a className={legalLink} href="/termos">
         Termos de uso
       </a>
-      <a className="underline underline-offset-4" href="/privacidade">
+      <a className={legalLink} href="/privacidade">
         Política de privacidade
       </a>
     </nav>

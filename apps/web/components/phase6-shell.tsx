@@ -100,11 +100,12 @@ export function Phase6Shell({
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <MuteButton compact />
+            {/* 44px targets (WCAG 2.5.5) on the only header controls. */}
             {onHome && (
               <Button
                 variant="outline"
                 size="icon"
-                className="size-9 sm:size-10"
+                className="size-11"
                 aria-label="Voltar ao início"
                 title="Voltar ao início"
                 onClick={onHome}
@@ -116,7 +117,7 @@ export function Phase6Shell({
               <Button
                 variant="outline"
                 size="icon"
-                className="size-9 sm:size-10"
+                className="size-11"
                 aria-label="Sair"
                 title="Sair"
                 onClick={onSignOut}
