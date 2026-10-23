@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "footebas-web",
+  // Gerados por `pnpm --filter @footebas/web cf:build` (OpenNext).
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": { "enabled": true },
+  // www também aponta para este Worker; o next.config redireciona (308) para o apex.
+  "routes": [
+    { "pattern": "footebas.com.br", "custom_domain": true },
+    { "pattern": "www.footebas.com.br", "custom_domain": true },
+  ],
+}
