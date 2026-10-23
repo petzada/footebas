@@ -320,6 +320,8 @@ describe('Nova Carreira: plano grátis e licença', () => {
     expect(flamengo.closest('label')?.textContent).toMatch(/licença/i);
     fireEvent.click(flamengo);
     const sheet = dialog();
+    // The paywall is a white, lighter sheet (not the dark scoreboard).
+    expect(sheet.getAttribute('data-tone')).toBe('light');
     expect(sheet.textContent).toMatch(/elenco do flamengo/i);
     expect(within(sheet).getByText('Goleiros')).toBeTruthy();
     expect(

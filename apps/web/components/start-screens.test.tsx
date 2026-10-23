@@ -227,8 +227,54 @@ describe('Carregar Carreira', () => {
     expect((await api.listCareers()).careers).toHaveLength(0);
   });
 
-  it('leva ao Carregar com a mensagem quando o plano recusa outra carreira', async () => {
-    render(<CareerGame api={new InMemoryCareerApi()} />);
+  it('mostra carreira bloqueada com cadeado, CTA de licença e exclusão liberada', async () => {
+    const onUnlock = vi.fn();
+    const remove = vi.fn(async () => undefined);
+    render(
+      <LoadCareerScreen
+        load={async () => ({
+          careers: [
+            { id: 'c1', coach: 'Ana', clubName: 'Ituano' },
+            { id: 'c2', coach: 'Ana', clubName: 'Flamengo', locked: true },
+          ],
+          limit: 1,
+        })}
+        remove={remove}
+        onOpen={() => undefined}
+        onUnlock={onUnlock}
+        onNewCareer={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const list = await screen.findByRole('list', { name: /suas carreiras/i });
+    const [open, locked] = within(list).getAllByRole('listitem');
+    expect(within(open!).getByRole('button', { name: /^abrir/i })).toBeTruthy();
+    expect(locked!.textContent).toMatch(/bloqueada/i);
+    expect(
+      within(locked!).queryByRole('button', { name: /^abrir/i }),
+    ).toBeNull();
+    fireEvent.click(
+      within(locked!).getByRole('button', { name: /desbloquear .* licença/i }),
+    );
+    expect(onUnlock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'c2' }),
+    );
+    fireEvent.click(
+      within(locked!).getByRole('button', { name: /excluir carreira de ana/i }),
+    );
+    fireEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: /sim, excluir carreira/i,
+      }),
+    );
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('c2'));
+  });
+});
+
+describe('Paywall de saves (plano grátis esgotado)', () => {
+  async function withOneCareer() {
+    const api = new InMemoryCareerApi();
+    render(<CareerGame api={api} />);
     fireEvent.click(
       screen.getByRole('button', { name: /entrar no vestiário/i }),
     );
@@ -239,17 +285,72 @@ describe('Carregar Carreira', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: /voltar ao início/i }),
     );
+    // The title screen reads the saves (1 of 1) before the next tap.
+    await screen.findByRole('region', { name: /carreira de ana/i });
     fireEvent.click(
       await screen.findByRole('button', { name: /nova carreira/i }),
     );
-    await completeNewCareer({ coach: 'Bia' });
+    return api;
+  }
+
+  it('abre ao tentar criar outro save, mantém o aviso e "Voltar" fecha', async () => {
+    await withOneCareer();
+    const sheet = await screen.findByTestId('career-paywall');
+    expect(sheet.getAttribute('data-tone')).toBe('light');
+    expect(sheet.textContent).toMatch(/limite de 1 save/i);
+    expect(sheet.textContent).toMatch(/exclua um save/i);
+    expect(sheet.textContent).toMatch(/até 5 saves/i);
+    expect(sheet.textContent).toMatch(/qualquer clube/i);
+    // The inline notice stays on the saves screen behind the sheet.
     expect(
-      await screen.findByRole('heading', { name: /carregar carreira/i }),
+      screen.getByRole('heading', { name: /carregar carreira/i }),
     ).toBeTruthy();
     expect(
-      (await screen.findAllByRole('alert'))
+      screen
+        .getAllByRole('alert')
         .map((node) => node.textContent)
         .join(' '),
     ).toMatch(/plano grátis permite 1 carreira/i);
+    fireEvent.click(within(sheet).getByRole('button', { name: /^voltar$/i }));
+    await waitFor(() =>
+      expect(screen.queryByTestId('career-paywall')).toBeNull(),
+    );
+    expect(
+      screen.getByRole('heading', { name: /carregar carreira/i }),
+    ).toBeTruthy();
+  });
+
+  it('"Continuar com licença" abre o PIX e, pago, libera criar outra carreira', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const api = await withOneCareer();
+      const sheet = await screen.findByTestId('career-paywall');
+      fireEvent.click(
+        within(sheet).getByRole('button', { name: /continuar com licença/i }),
+      );
+      const checkout = await within(sheet).findByRole('region', {
+        name: /pagamento pix/i,
+      });
+      expect(await within(checkout).findByText('R$ 29,90')).toBeTruthy();
+      const qrOrder = [
+        ...checkout.querySelectorAll('p, label, textarea, button'),
+      ].map((node) => node.textContent ?? node.tagName);
+      expect(qrOrder.findIndex((text) => /expira em/i.test(text))).toBeLessThan(
+        qrOrder.findIndex((text) => /pix copia e cola/i.test(text)),
+      );
+      expect(
+        within(checkout).getByRole('button', { name: /pagar depois/i }),
+      ).toBeTruthy();
+      // The fake provider confirms after a few polls.
+      await vi.advanceTimersByTimeAsync(15_000);
+      await screen.findByRole('heading', { name: /como você quer jogar/i });
+      expect(screen.queryByTestId('career-paywall')).toBeNull();
+      await completeNewCareer({ coach: 'Bia' });
+      await waitFor(async () =>
+        expect((await api.listCareers()).careers).toHaveLength(2),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

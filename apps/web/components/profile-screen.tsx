@@ -229,7 +229,9 @@ export function ProfileScreen({
             now={now}
             onPaid={(order) => {
               setNotice(
-                `Pagamento confirmado. Licença ativada: agora são 5 carreiras e qualquer clube. Pedido ${order.orderId} · ${formatCents(order.amountCents)}.`,
+                order === null
+                  ? 'Sua licença já está ativa: 5 carreiras e qualquer clube.'
+                  : `Pagamento confirmado. Licença ativada: agora são 5 carreiras e qualquer clube. Pedido ${order.orderId} · ${formatCents(order.amountCents)}.`,
               );
               void reload();
               setCheckingOut(false);

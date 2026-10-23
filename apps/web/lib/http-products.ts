@@ -1,6 +1,7 @@
 import type { CareerApiPort } from '@/lib/career-api';
 import { ApiRequestError, type HttpCareerApi } from '@/lib/http-career-api';
 import {
+  LicenseAlreadyActiveError,
   PaymentProviderUnavailableError,
   type AccountPort,
   type CheckoutView,
@@ -88,7 +89,20 @@ export function httpAccountPort(api: HttpCareerApi): AccountPort {
   return {
     me: () => api.call<ProfileView>('GET', '/v1/me'),
     checkout: () =>
-      providerAware(api.call<CheckoutView>('POST', '/v1/billing/checkout')),
+      providerAware(
+        api.call<CheckoutView>('POST', '/v1/billing/checkout'),
+      ).catch(async (error: unknown) => {
+        if (!(error instanceof ApiRequestError) || error.status !== 409)
+          throw error;
+        // 409 is either "license already active" (the payment went through,
+        // maybe in another tab) or a charge that could not be opened; the
+        // profile tells them apart without parsing server messages.
+        const profile = await api
+          .call<ProfileView>('GET', '/v1/me')
+          .catch(() => undefined);
+        if (profile?.plan === 'licensed') throw new LicenseAlreadyActiveError();
+        throw new Error('Não foi possível gerar o PIX agora. Tente de novo.');
+      }),
     order: (orderId) =>
       providerAware(
         api.call<OrderView>(

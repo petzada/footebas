@@ -12,6 +12,8 @@ const FOCUSABLE =
  * Modal sheet in the retro style: ~3/4 of the screen rising from the bottom
  * on phones, a centered dialog from `sm` up. Traps focus, Esc closes and the
  * focus goes back to whatever opened it. `footer` stays pinned at the bottom.
+ * `tone="light"` is the paper sheet used by paywalls and the PIX checkout:
+ * white surface, dark text, the same pixel border and title font.
  */
 export function BottomSheet({
   title,
@@ -20,6 +22,7 @@ export function BottomSheet({
   footer,
   testId = 'bottom-sheet',
   className,
+  tone = 'board',
 }: {
   title: React.ReactNode;
   onClose(): void;
@@ -27,7 +30,9 @@ export function BottomSheet({
   footer?: React.ReactNode;
   testId?: string;
   className?: string;
+  tone?: 'board' | 'light';
 }) {
+  const light = tone === 'light';
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const opener = useRef<Element | null>(null);
@@ -91,17 +96,27 @@ export function BottomSheet({
         aria-modal="true"
         aria-labelledby={titleId}
         data-testid={testId}
+        data-tone={tone}
         className={cn(
-          'panel-board px-rise fixed inset-x-0 bottom-0 z-50 flex h-[75dvh] w-full min-w-0 flex-col overflow-hidden',
+          light ? 'px-border bg-white text-ink' : 'panel-board',
+          'px-rise fixed inset-x-0 bottom-0 z-50 flex h-[75dvh] w-full min-w-0 flex-col overflow-hidden',
           'sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[85dvh] sm:w-[min(32rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:-translate-y-1/2',
           className,
         )}
         onKeyDown={onKeyDown}
       >
-        <header className="flex shrink-0 items-start justify-between gap-3 p-4 pb-2 sm:p-5 sm:pb-2">
+        <header
+          className={cn(
+            'flex shrink-0 items-start justify-between gap-3 p-4 pb-2 sm:p-5 sm:pb-2',
+            light && 'border-b-2 border-ink/10',
+          )}
+        >
           <h2
             id={titleId}
-            className="led min-w-0 flex-1 text-sm leading-relaxed break-words sm:text-base"
+            className={cn(
+              'min-w-0 flex-1 text-sm leading-relaxed break-words sm:text-base',
+              light ? 'font-pixel text-ink' : 'led',
+            )}
           >
             {title}
           </h2>
@@ -115,11 +130,23 @@ export function BottomSheet({
             <X weight="bold" aria-hidden="true" />
           </button>
         </header>
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-2 sm:px-5">
+        <div
+          className={cn(
+            'min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-2 sm:px-5',
+            // Lets a sticky action inside the body (PIX "Pagar depois") sit
+            // on the bottom edge even when the content is short.
+            light && 'flex flex-col',
+          )}
+        >
           {children}
         </div>
         {footer && (
-          <footer className="grid shrink-0 gap-2 border-t-2 border-chalk/20 bg-ink/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
+          <footer
+            className={cn(
+              'grid shrink-0 gap-2 border-t-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5',
+              light ? 'border-ink/10 bg-white' : 'border-chalk/20 bg-ink/40',
+            )}
+          >
             {footer}
           </footer>
         )}

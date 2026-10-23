@@ -224,6 +224,11 @@ export interface CareerSummary {
   round?: number;
   /** ISO timestamp of the last change, once the server exposes it. */
   updatedAt?: string;
+  /**
+   * Saved but locked: the license was refunded and the plan keeps only the
+   * oldest career playable. Buying the license again unlocks it.
+   */
+  locked?: boolean;
 }
 
 export interface CareerList {
@@ -811,7 +816,7 @@ export class InMemoryCareerApi implements CareerApiPort {
   readonly #careers = new Map<string, StoredCareer>();
   #activeId: string | undefined;
   #sequence = 0;
-  readonly #limit: number;
+  #limit: number;
   readonly #now: () => Date;
   /** Career date of the demo world (drives the transfer window). */
   readonly #startDate: string;
@@ -829,6 +834,11 @@ export class InMemoryCareerApi implements CareerApiPort {
     this.#limit = options.careerLimit ?? FREE_CAREER_LIMIT;
     this.#now = options.now ?? (() => new Date());
     this.#startDate = options.startDate ?? '2026-01-20';
+  }
+
+  /** Offline demo: the fake PIX was paid, the plan now allows 5 careers. */
+  public grantLicense(): void {
+    this.#limit = Math.max(this.#limit, LICENSE_CAREER_LIMIT);
   }
 
   /** The active career; writes also stamp its last update. */

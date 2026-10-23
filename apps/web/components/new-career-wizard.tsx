@@ -775,9 +775,12 @@ function ClubSheet({
   const [upsell, setUpsell] = useState(false);
   const [paid, setPaid] = useState(false);
   const unlocked = !locked || paid;
+  // The paywall (locked club, upsell, PIX) is a white, friendlier sheet.
+  const paywall = upsell || !unlocked;
   return (
     <BottomSheet
       testId="club-sheet"
+      tone={paywall ? 'light' : 'board'}
       title={
         <span className="flex min-w-0 items-center gap-2">
           <ClubEmblem name={club.name} id={club.id} size={28} decorative />
@@ -808,9 +811,9 @@ function ClubSheet({
           </>
         ) : (
           <>
-            <p className="flex items-start gap-2 text-xs text-chalk/80">
+            <p className="flex items-start gap-2 text-xs text-ink">
               <Lock
-                className="mt-0.5 size-4 shrink-0 text-bulb"
+                className="mt-0.5 size-4 shrink-0 text-primary"
                 weight="fill"
                 aria-hidden
               />
@@ -860,13 +863,24 @@ function ClubSheet({
           onBack={() => setUpsell(false)}
         />
       ) : (
-        <SquadPreview club={club} />
+        <SquadPreview club={club} tone={paywall ? 'light' : 'board'} />
       )}
     </BottomSheet>
   );
 }
 
-function SquadPreview({ club }: { club: ClubPreview }) {
+function SquadPreview({
+  club,
+  tone = 'board',
+}: {
+  club: ClubPreview;
+  /** `light`: on the white paywall sheet (locked club). */
+  tone?: 'board' | 'light';
+}) {
+  const light = tone === 'light';
+  const soft = light ? 'text-muted-foreground' : 'text-chalk/80';
+  const softer = light ? 'text-muted-foreground' : 'text-chalk/70';
+  const digits = light ? 'font-pixel text-primary' : 'led';
   return (
     <section
       aria-labelledby="elenco-previa"
@@ -875,17 +889,27 @@ function SquadPreview({ club }: { club: ClubPreview }) {
       <h3 id="elenco-previa" className="sr-only">
         Elenco do {club.name}
       </h3>
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-chalk/80">
+      <p
+        className={cn(
+          'flex flex-wrap items-center gap-x-3 gap-y-1 text-xs',
+          soft,
+        )}
+      >
         <span>{club.note}</span>
         <span className="font-pixel text-[.5rem]">
-          Força <span className="led text-sm">{club.strength}</span>
+          Força <span className={cn(digits, 'text-sm')}>{club.strength}</span>
         </span>
         <span>{club.squadSize} atletas</span>
       </p>
       <div className="grid min-w-0 gap-3 sm:grid-cols-[repeat(2,minmax(0,1fr))]">
         {club.groups.map((group) => (
           <div key={group.group} className="grid min-w-0 gap-1">
-            <h4 className="flex items-baseline justify-between font-pixel text-[.5rem] text-chalk/70">
+            <h4
+              className={cn(
+                'flex items-baseline justify-between font-pixel text-[.5rem]',
+                softer,
+              )}
+            >
               {POSITION_GROUP_LABEL[group.group]}
               <span>{group.count}</span>
             </h4>
@@ -893,10 +917,18 @@ function SquadPreview({ club }: { club: ClubPreview }) {
               {group.highlights.map((player) => (
                 <li
                   key={player.name}
-                  className="flex min-w-0 items-center justify-between gap-2 border-b border-wood-deep px-1 py-1.5 text-sm"
+                  className={cn(
+                    'flex min-w-0 items-center justify-between gap-2 border-b px-1 py-1.5 text-sm',
+                    light ? 'border-ink/10' : 'border-wood-deep',
+                  )}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="w-9 shrink-0 font-pixel text-[.5rem] text-chalk/70">
+                    <span
+                      className={cn(
+                        'w-9 shrink-0 font-pixel text-[.5rem]',
+                        softer,
+                      )}
+                    >
                       {positionLabel(player.position)}
                     </span>
                     <span className="min-w-0 truncate font-semibold">
@@ -918,7 +950,7 @@ function SquadPreview({ club }: { club: ClubPreview }) {
                       </Badge>
                     )}
                   </span>
-                  <span className="led shrink-0 text-xs">
+                  <span className={cn(digits, 'shrink-0 text-xs')}>
                     <span className="sr-only">Força </span>
                     {player.strength}
                   </span>
