@@ -46,8 +46,10 @@ const defaultCompetitionPort = createFakeCompetitionProductPort();
 
 export function CompetitionScreens({
   port = defaultCompetitionPort,
+  initialTab = 'pyramid',
 }: {
   port?: CompetitionProductPort;
+  initialTab?: 'pyramid' | 'calendar' | 'next';
 }) {
   const [model, setModel] = useState<CompetitionProductView>();
   const [error, setError] = useState('');
@@ -84,7 +86,7 @@ export function CompetitionScreens({
         </p>
         <h2
           id="competition-title"
-          className="font-display text-3xl font-bold uppercase sm:text-4xl"
+          className="font-display text-xs font-bold uppercase sm:text-sm"
         >
           Competições
         </h2>
@@ -93,7 +95,7 @@ export function CompetitionScreens({
           em uma visão rápida.
         </p>
       </header>
-      <Tabs defaultValue="pyramid">
+      <Tabs defaultValue={initialTab}>
         <TabsList className="grid w-full grid-cols-3 sm:w-fit">
           <TabsTrigger value="pyramid">Pirâmide</TabsTrigger>
           <TabsTrigger value="calendar">Calendário</TabsTrigger>
@@ -106,7 +108,7 @@ export function CompetitionScreens({
             ))}
           </div>
           <div>
-            <h3 className="mb-3 font-display text-2xl font-bold uppercase">
+            <h3 className="mb-3 font-display text-base font-bold uppercase">
               Copas e identidade brasileira
             </h3>
             <div className="grid gap-3 lg:grid-cols-3">
@@ -124,7 +126,7 @@ export function CompetitionScreens({
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="font-display text-2xl uppercase">
+                  <CardTitle className="font-display text-base uppercase">
                     Datas que não se atropelam
                   </CardTitle>
                   <CardDescription>
@@ -180,7 +182,7 @@ export function CompetitionScreens({
                 <div>
                   <Badge>Transição pronta</Badge>
                   <CardTitle>
-                    <h3 className="font-display text-4xl uppercase">
+                    <h3 className="font-display text-sm uppercase">
                       Temporada {model.nextSeason.season}
                     </h3>
                   </CardTitle>
@@ -195,7 +197,7 @@ export function CompetitionScreens({
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="font-display text-xl uppercase">
+                <CardTitle className="font-display text-sm uppercase">
                   Acesso e rebaixamento
                 </CardTitle>
               </CardHeader>
@@ -229,7 +231,7 @@ export function CompetitionScreens({
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="font-display text-xl uppercase">
+                <CardTitle className="font-display text-sm uppercase">
                   Vagas conquistadas
                 </CardTitle>
               </CardHeader>
@@ -249,7 +251,7 @@ export function CompetitionScreens({
           </div>
           <Card>
             <CardHeader>
-              <CardTitle className="font-display text-xl uppercase">
+              <CardTitle className="font-display text-sm uppercase">
                 Premiação e prestígio
               </CardTitle>
             </CardHeader>
@@ -279,7 +281,7 @@ function CompetitionCard({ competition }: { competition: CompetitionView }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle>
-              <h3 className="font-display text-2xl uppercase">
+              <h3 className="font-display text-base uppercase">
                 {competition.name}
               </h3>
             </CardTitle>

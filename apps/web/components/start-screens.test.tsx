@@ -1,0 +1,356 @@
+import React from 'react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { CareerGame } from '@/components/career-game';
+import { LoadCareerScreen, StartScreen } from '@/components/start-screens';
+import { completeNewCareer } from '@/components/testing/complete-new-career';
+import { InMemoryCareerApi } from '@/lib/career-api';
+
+const player = { name: 'Ana' };
+
+async function careerFor(api: InMemoryCareerApi, coach: string) {
+  await api.login('ana@footebas.com');
+  await api.createCareer({ coach });
+  await api.selectClub('Flamengo');
+}
+
+describe('Início', () => {
+  it('mostra avatar, ações e contadores vindos do endpoint', async () => {
+    const onNew = vi.fn();
+    const onLoad = vi.fn();
+    render(
+      <StartScreen
+        player={player}
+        loadStats={async () => ({ coaches: 1234, clubs: 98, athletes: 2560 })}
+        onNewCareer={onNew}
+        onLoadCareer={onLoad}
+      />,
+    );
+    expect(screen.getByRole('img', { name: /avatar de ana/i })).toBeTruthy();
+    const counters = await screen.findByRole('region', {
+      name: /no gramado agora/i,
+    });
+    expect(within(counters).getByText('1.234')).toBeTruthy();
+    expect(within(counters).getByText('treinadores')).toBeTruthy();
+    expect(within(counters).getByText('98')).toBeTruthy();
+    expect(within(counters).getByText('clubes')).toBeTruthy();
+    expect(within(counters).getByText('2.560')).toBeTruthy();
+    expect(within(counters).getByText('atletas')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /nova carreira/i }));
+    fireEvent.click(screen.getByRole('button', { name: /carregar carreira/i }));
+    expect(onNew).toHaveBeenCalledTimes(1);
+    expect(onLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('esconde os contadores quando o endpoint não existe ou falha', async () => {
+    const missing = vi.fn(async () => null);
+    const { unmount } = render(
+      <StartScreen
+        player={player}
+        loadStats={missing}
+        onNewCareer={() => undefined}
+        onLoadCareer={() => undefined}
+      />,
+    );
+    await waitFor(() => expect(missing).toHaveBeenCalled());
+    expect(screen.queryByRole('region', { name: /no gramado/i })).toBeNull();
+    unmount();
+    const failing = vi.fn(async () => {
+      throw new Error('404');
+    });
+    render(
+      <StartScreen
+        player={player}
+        loadStats={failing}
+        onNewCareer={() => undefined}
+        onLoadCareer={() => undefined}
+      />,
+    );
+    await waitFor(() => expect(failing).toHaveBeenCalled());
+    expect(screen.queryByRole('region', { name: /no gramado/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /nova carreira/i })).toBeTruthy();
+  });
+
+  it('mostra a última carreira com nome, avatar e personalidade do treinador', async () => {
+    const api = new InMemoryCareerApi();
+    await api.login('ana@footebas.com');
+    await api.createCareer({
+      coach: 'Ana',
+      careerName: 'Rumo ao tri',
+      coachProfile: {
+        nationality: 'BR',
+        avatar: 'avatar-09',
+        personality: 'motivador',
+      },
+    });
+    await api.selectClub('Flamengo');
+    const onContinue = vi.fn();
+    render(
+      <StartScreen
+        player={player}
+        loadStats={async () => null}
+        loadCareers={() => api.listCareers()}
+        onNewCareer={() => undefined}
+        onLoadCareer={() => undefined}
+        onContinue={onContinue}
+      />,
+    );
+    const latest = await screen.findByRole('region', { name: 'Rumo ao tri' });
+    expect(latest.textContent).toMatch(/motivador/i);
+    expect(latest.textContent).toMatch(/flamengo/i);
+    expect(
+      within(latest).getByRole('img', { name: /avatar do treinador ana/i }),
+    ).toBeTruthy();
+    expect(latest.querySelector('[data-avatar="avatar-09"]')).not.toBeNull();
+    fireEvent.click(
+      within(latest).getByRole('button', { name: /continuar rumo ao tri/i }),
+    );
+    expect(onContinue).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Rumo ao tri' }),
+    );
+  });
+
+  it('no port local usa os números do catálogo', async () => {
+    render(<CareerGame api={new InMemoryCareerApi()} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /entrar no vestiário/i }),
+    );
+    const counters = await screen.findByRole('region', {
+      name: /no gramado agora/i,
+    });
+    expect(within(counters).getByText('atletas')).toBeTruthy();
+    expect(within(counters).getByText('20')).toBeTruthy();
+  });
+});
+
+describe('Carregar Carreira', () => {
+  it('lista as carreiras com clube, temporada e última atualização e abre', async () => {
+    const api = new InMemoryCareerApi({
+      careerLimit: 5,
+      now: () => new Date('2026-10-20T15:30:00.000Z'),
+    });
+    await careerFor(api, 'Ana');
+    const onOpen = vi.fn();
+    render(
+      <LoadCareerScreen
+        load={() => api.listCareers()}
+        remove={(id) => api.deleteCareer(id)}
+        onOpen={onOpen}
+        onNewCareer={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const list = await screen.findByRole('list', { name: /suas carreiras/i });
+    const item = within(list).getByRole('listitem');
+    expect(within(item).getByText('Carreira de Ana')).toBeTruthy();
+    expect(within(item).getByText(/flamengo · ana/i)).toBeTruthy();
+    expect(within(item).getByText(/temporada 2026/i)).toBeTruthy();
+    expect(within(item).getByText(/atualizada em/i)).toBeTruthy();
+    expect(item.querySelector('[data-testid="club-emblem"]')).not.toBeNull();
+    expect(screen.getByText(/1 de 5 carreiras/i)).toBeTruthy();
+    fireEvent.click(
+      within(item).getByRole('button', { name: /abrir carreira de ana/i }),
+    );
+    expect(onOpen).toHaveBeenCalledWith(
+      expect.objectContaining({ coach: 'Ana', clubName: 'Flamengo' }),
+    );
+  });
+
+  it('mostra o estado vazio e o aviso do plano', async () => {
+    const onNew = vi.fn();
+    render(
+      <LoadCareerScreen
+        load={async () => ({ careers: [] })}
+        remove={async () => undefined}
+        onOpen={() => undefined}
+        onNewCareer={onNew}
+        onBack={() => undefined}
+      />,
+    );
+    expect(await screen.findByText(/nenhuma carreira salva/i)).toBeTruthy();
+    expect(screen.getByText(/plano grátis: 1 carreira/i)).toBeTruthy();
+    expect(screen.getByText(/licença única: até 5/i)).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: /começar nova carreira/i }),
+    );
+    expect(onNew).toHaveBeenCalledTimes(1);
+  });
+
+  it('só exclui depois da confirmação', async () => {
+    const api = new InMemoryCareerApi();
+    await careerFor(api, 'Bia');
+    const remove = vi.fn((id: string) => api.deleteCareer(id));
+    render(
+      <LoadCareerScreen
+        load={() => api.listCareers()}
+        remove={remove}
+        onOpen={() => undefined}
+        onNewCareer={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const askDelete = await screen.findByRole('button', {
+      name: /excluir carreira de bia/i,
+    });
+    fireEvent.click(askDelete);
+    const dialog = screen.getByRole('alertdialog', {
+      name: /excluir carreira\?/i,
+    });
+    expect(dialog.textContent).toMatch(/não pode ser desfeita/i);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(dialog).getByRole('button', { name: /cancelar/i }),
+      ),
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: /cancelar/i }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(remove).not.toHaveBeenCalled();
+
+    fireEvent.click(askDelete);
+    fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+
+    fireEvent.click(askDelete);
+    fireEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: /sim, excluir carreira/i,
+      }),
+    );
+    expect(await screen.findByText(/nenhuma carreira salva/i)).toBeTruthy();
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect((await api.listCareers()).careers).toHaveLength(0);
+  });
+
+  it('mostra carreira bloqueada com cadeado, CTA de licença e exclusão liberada', async () => {
+    const onUnlock = vi.fn();
+    const remove = vi.fn(async () => undefined);
+    render(
+      <LoadCareerScreen
+        load={async () => ({
+          careers: [
+            { id: 'c1', coach: 'Ana', clubName: 'Ituano' },
+            { id: 'c2', coach: 'Ana', clubName: 'Flamengo', locked: true },
+          ],
+          limit: 1,
+        })}
+        remove={remove}
+        onOpen={() => undefined}
+        onUnlock={onUnlock}
+        onNewCareer={() => undefined}
+        onBack={() => undefined}
+      />,
+    );
+    const list = await screen.findByRole('list', { name: /suas carreiras/i });
+    const [open, locked] = within(list).getAllByRole('listitem');
+    expect(within(open!).getByRole('button', { name: /^abrir/i })).toBeTruthy();
+    expect(locked!.textContent).toMatch(/bloqueada/i);
+    expect(
+      within(locked!).queryByRole('button', { name: /^abrir/i }),
+    ).toBeNull();
+    fireEvent.click(
+      within(locked!).getByRole('button', { name: /desbloquear .* licença/i }),
+    );
+    expect(onUnlock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'c2' }),
+    );
+    fireEvent.click(
+      within(locked!).getByRole('button', { name: /excluir carreira de ana/i }),
+    );
+    fireEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: /sim, excluir carreira/i,
+      }),
+    );
+    await waitFor(() => expect(remove).toHaveBeenCalledWith('c2'));
+  });
+});
+
+describe('Paywall de saves (plano grátis esgotado)', () => {
+  async function withOneCareer() {
+    const api = new InMemoryCareerApi();
+    render(<CareerGame api={api} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /entrar no vestiário/i }),
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /nova carreira/i }),
+    );
+    await completeNewCareer();
+    fireEvent.click(
+      await screen.findByRole('button', { name: /voltar ao início/i }),
+    );
+    // The title screen reads the saves (1 of 1) before the next tap.
+    await screen.findByRole('region', { name: /carreira de ana/i });
+    fireEvent.click(
+      await screen.findByRole('button', { name: /nova carreira/i }),
+    );
+    return api;
+  }
+
+  it('abre ao tentar criar outro save, mantém o aviso e "Voltar" fecha', async () => {
+    await withOneCareer();
+    const sheet = await screen.findByTestId('career-paywall');
+    expect(sheet.getAttribute('data-tone')).toBe('light');
+    expect(sheet.textContent).toMatch(/limite de 1 save/i);
+    expect(sheet.textContent).toMatch(/exclua um save/i);
+    expect(sheet.textContent).toMatch(/até 5 saves/i);
+    expect(sheet.textContent).toMatch(/qualquer clube/i);
+    // The inline notice stays on the saves screen behind the sheet.
+    expect(
+      screen.getByRole('heading', { name: /carregar carreira/i }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole('alert')
+        .map((node) => node.textContent)
+        .join(' '),
+    ).toMatch(/plano grátis permite 1 carreira/i);
+    fireEvent.click(within(sheet).getByRole('button', { name: /^voltar$/i }));
+    await waitFor(() =>
+      expect(screen.queryByTestId('career-paywall')).toBeNull(),
+    );
+    expect(
+      screen.getByRole('heading', { name: /carregar carreira/i }),
+    ).toBeTruthy();
+  });
+
+  it('"Continuar com licença" abre o PIX e, pago, libera criar outra carreira', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const api = await withOneCareer();
+      const sheet = await screen.findByTestId('career-paywall');
+      fireEvent.click(
+        within(sheet).getByRole('button', { name: /continuar com licença/i }),
+      );
+      const checkout = await within(sheet).findByRole('region', {
+        name: /pagamento pix/i,
+      });
+      expect(await within(checkout).findByText('R$ 29,90')).toBeTruthy();
+      const qrOrder = [
+        ...checkout.querySelectorAll('p, label, textarea, button'),
+      ].map((node) => node.textContent ?? node.tagName);
+      expect(qrOrder.findIndex((text) => /expira em/i.test(text))).toBeLessThan(
+        qrOrder.findIndex((text) => /pix copia e cola/i.test(text)),
+      );
+      expect(
+        within(checkout).getByRole('button', { name: /pagar depois/i }),
+      ).toBeTruthy();
+      // The fake provider confirms after a few polls.
+      await vi.advanceTimersByTimeAsync(15_000);
+      await screen.findByRole('heading', { name: /como você quer jogar/i });
+      expect(screen.queryByTestId('career-paywall')).toBeNull();
+      await completeNewCareer({ coach: 'Bia' });
+      await waitFor(async () =>
+        expect((await api.listCareers()).careers).toHaveLength(2),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

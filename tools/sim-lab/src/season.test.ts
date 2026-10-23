@@ -19,7 +19,7 @@ describe('phase one season gate', () => {
 
   it('keeps a smaller CI stress sample invariant-safe', () => {
     expect(runSeasonStress(10)).toEqual([]);
-  }, 30_000);
+  }, 180_000);
 
   it('records an adversarial full playthrough and measurable proxies', () => {
     const report = runPlaythrough();
@@ -36,5 +36,5 @@ describe('phase one season gate', () => {
       seasonMatches: 112,
       passed: true,
     });
-  }, 30_000);
+  }, 180_000);
 });

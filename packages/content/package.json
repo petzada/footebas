@@ -1,0 +1,27 @@
+{
+  "name": "@footebas/content",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "generate": "tsx scripts/generate-catalog.ts",
+    "lint": "eslint src --max-warnings=0",
+    "test": "vitest run --config ../../vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@footebas/domain": "workspace:*",
+    "@footebas/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.1",
+    "vitest": "4.1.10"
+  }
+}

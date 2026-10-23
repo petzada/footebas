@@ -54,6 +54,12 @@ export class SequentialIdGenerator implements IdGenerator {
     return `${kind}_${String(this.value)}`;
   }
 }
+/** Collision-free ids for multi-instance deployments (Workers, queues). */
+export class RandomIdGenerator implements IdGenerator {
+  public next(kind: string): string {
+    return `${kind}_${crypto.randomUUID().replaceAll('-', '')}`;
+  }
+}
 export class FakeBearerAuth implements AuthPort {
   private readonly identities = new Map<string, FakeAuthIdentity>();
   public issue(identity: Omit<FakeAuthIdentity, 'version'>): string {

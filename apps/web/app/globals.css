@@ -1,8 +1,23 @@
 @import 'tailwindcss';
 
+/*
+ * Futebol Retrô (ADR 0012): one theme only, no light/dark switch. These
+ * tokens are the single source of colors, pixel borders and motion;
+ * components never define their own colors. Three materials:
+ *   - grass: the page itself (striped pitch);
+ *   - chalk board ("prancheta"): cream panels with ink text for reading;
+ *   - scoreboard ("placar"): near-black panels with amber bulb digits.
+ * Contrast (WCAG AA, text >= 4.5:1): ink on chalk 14.6:1, muted on chalk
+ * 6.1:1, chalk on grass 5.2:1, chalk on board 15.9:1, bulb on board 12.4:1,
+ * chalk on primary 5.4:1, ink on bulb 11.9:1, chalk on accent 6.2:1.
+ */
 @theme inline {
-  --font-sans: 'Archivo Variable', sans-serif;
-  --font-display: 'Rajdhani', sans-serif;
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  /* Pixel font (OFL, @fontsource): titles, numbers and labels only. */
+  --font-pixel: 'Press Start 2P', 'Courier New', monospace;
+  --font-display: var(--font-pixel);
+  --font-mono: 'Courier New', Courier, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -18,116 +33,502 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-ink: var(--ink);
+  --color-chalk: var(--chalk);
+  --color-grass: var(--grass);
+  --color-grass-deep: var(--grass-deep);
+  --color-board: var(--board);
+  --color-board-foreground: var(--board-foreground);
+  --color-bulb: var(--bulb);
+  --color-bulb-foreground: var(--bulb-foreground);
+  --color-wood: var(--wood);
+  --color-wood-deep: var(--wood-deep);
+  --color-sky: var(--sky);
+  /* Kept for older screens: "coral" now means the scoreboard bulb. */
+  --color-coral: var(--bulb);
+  --color-coral-foreground: var(--bulb-foreground);
+  /* Pixel look: no rounded corners anywhere. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
 }
 
 :root {
-  --radius: 0.65rem;
-  --background: oklch(0.14 0.025 155);
-  --foreground: oklch(0.96 0.015 105);
-  --card: oklch(0.18 0.03 155);
-  --card-foreground: oklch(0.96 0.015 105);
-  --popover: oklch(0.18 0.03 155);
-  --popover-foreground: oklch(0.96 0.015 105);
-  --primary: oklch(0.72 0.17 145);
-  --primary-foreground: oklch(0.14 0.03 155);
-  --secondary: oklch(0.25 0.035 155);
-  --secondary-foreground: oklch(0.94 0.015 105);
-  --muted: oklch(0.23 0.025 155);
-  --muted-foreground: oklch(0.7 0.025 145);
-  --accent: oklch(0.74 0.18 55);
-  --accent-foreground: oklch(0.16 0.025 45);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(0.31 0.035 150);
-  --input: oklch(0.27 0.035 150);
-  --ring: oklch(0.72 0.17 145);
+  color-scheme: light;
+  /* One pixel of the 16-bit grid. */
+  --px: 3px;
+
+  --ink: #15201a;
+  --chalk: #f4efe2;
+  --chalk-deep: #e6dcc3;
+  --grass: #2f7d3a;
+  --grass-deep: #246630;
+  --grass-light: #3a9447;
+  --board: #121a15;
+  --board-foreground: #f4efe2;
+  --bulb: #ffd23f;
+  --bulb-foreground: #15201a;
+  --wood: #a0672f;
+  --wood-deep: #6b4119;
+  --sky: #7cc4ea;
+  --card-red: #c8322b;
+
+  --background: var(--grass);
+  --foreground: var(--chalk);
+  --card: var(--chalk);
+  --card-foreground: var(--ink);
+  --popover: #fbf8ef;
+  --popover-foreground: var(--ink);
+  --primary: #246630;
+  --primary-foreground: var(--chalk);
+  --secondary: var(--chalk-deep);
+  --secondary-foreground: var(--ink);
+  --muted: #e9e2cf;
+  --muted-foreground: #514b3d;
+  --accent: #a3261f;
+  --accent-foreground: var(--chalk);
+  --destructive: #a3261f;
+  --destructive-foreground: var(--chalk);
+  --border: var(--ink);
+  --input: #514b3d;
+  --ring: #ff6a13;
+
+  /* Motion tokens: short, snappy, never blocking. */
+  --tick: 90ms;
+  --beat: 220ms;
 }
 
 * {
   border-color: var(--border);
 }
 html {
-  background: var(--background);
+  background: var(--grass-deep);
 }
 body {
+  position: relative;
+  isolation: isolate;
   min-height: 100dvh;
-  background:
-    radial-gradient(
-      circle at 50% -20%,
-      oklch(0.3 0.08 145 / 0.45),
-      transparent 42%
-    ),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
-  font-family: 'Archivo Variable', sans-serif;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
-.match-banner,
-.scoreboard {
-  background:
-    linear-gradient(135deg, oklch(0.27 0.075 150 / 0.72), transparent 58%),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 3rem,
-      oklch(0.95 0.02 105 / 0.025) 3rem 3.08rem
-    );
-}
-.pitch {
-  background:
-    linear-gradient(
-      transparent 49.7%,
-      oklch(0.95 0.02 105 / 0.23) 49.7% 50.3%,
-      transparent 50.3%
-    ),
-    radial-gradient(
-      circle at center,
-      transparent 0 14%,
-      oklch(0.95 0.02 105 / 0.22) 14.3% 14.8%,
-      transparent 15%
-    ),
-    repeating-linear-gradient(
-      90deg,
-      oklch(0.32 0.09 145) 0 18%,
-      oklch(0.29 0.085 145) 18% 36%
-    );
-}
-.pitch::before,
-.pitch::after {
-  position: absolute;
-  left: 25%;
-  width: 50%;
-  height: 14%;
-  border: 1px solid oklch(0.95 0.02 105 / 0.22);
+/* Mowed pitch stripes behind every screen; fixed so long pages stay cheap. */
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   content: '';
+  background: repeating-linear-gradient(
+    180deg,
+    var(--grass) 0 56px,
+    var(--grass-light) 56px 112px
+  );
 }
-.pitch::before {
-  top: -1px;
+/* Faint CRT scanlines: static, very light, decorative. */
+body::after {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  content: '';
+  opacity: 0.07;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 2px,
+    var(--ink) 2px 3px
+  );
 }
-.pitch::after {
-  bottom: -1px;
+h1,
+h2,
+h3 {
+  overflow-wrap: anywhere;
 }
+.font-pixel,
+.font-display {
+  font-weight: 400;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+@layer components {
+  /* Stepped pixel border drawn with box-shadow (no radius, no blur). */
+  .px-border {
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink);
+  }
+  .px-border-chalk {
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--chalk),
+      0 var(--px) 0 0 var(--chalk),
+      calc(var(--px) * -1) 0 0 0 var(--chalk),
+      var(--px) 0 0 0 var(--chalk);
+  }
+
+  /* Prancheta: cream reading panel. `.surface` is its older name. */
+  .panel,
+  .surface {
+    margin: var(--px);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink),
+      inset 0 calc(var(--px) * -1) 0 0 var(--chalk-deep);
+  }
+  /* Placar: dark stadium scoreboard with bulb digits. */
+  .panel-board {
+    margin: var(--px);
+    background:
+      radial-gradient(
+        circle at 1px 1px,
+        rgb(255 255 255 / 0.05) 1px,
+        transparent 1.5px
+      ),
+      var(--board);
+    background-size: 6px 6px;
+    color: var(--board-foreground);
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink),
+      inset 0 0 0 var(--px) var(--wood-deep);
+  }
+  /* Prancheta de giz: pitch green with a dashed chalk frame. */
+  .panel-chalk {
+    margin: var(--px);
+    background: var(--grass-deep);
+    color: var(--chalk);
+    outline: var(--px) dashed var(--chalk);
+    outline-offset: calc(var(--px) * -2);
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink);
+  }
+  /* Banco de reservas: wood bar for navigation. */
+  .panel-wood {
+    background: repeating-linear-gradient(
+      90deg,
+      var(--wood) 0 44px,
+      var(--wood-deep) 44px 47px
+    );
+    color: var(--chalk);
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink);
+  }
+
+  /* Amber scoreboard digits. */
+  .led {
+    font-family: var(--font-pixel);
+    color: var(--bulb);
+    text-shadow: 0 0 6px rgb(255 210 63 / 0.55);
+  }
+  .scoreboard-digits,
+  .match-feed {
+    font-family: var(--font-pixel);
+  }
+
+  /* Video game buttons: pixel border and a raised base that presses down. */
+  .btn-px {
+    position: relative;
+    margin: var(--px) var(--px) calc(var(--px) * 2);
+    border: 0;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    line-height: 1.2;
+    transition:
+      transform var(--tick) steps(2, end),
+      box-shadow var(--tick) steps(2, end);
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink),
+      0 calc(var(--px) * 2) 0 0 var(--ink);
+  }
+  .btn-px:hover {
+    filter: brightness(1.06);
+  }
+  .btn-px:active,
+  .btn-px[data-pressed='true'] {
+    transform: translateY(var(--px));
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink);
+  }
+  .btn-px:disabled {
+    transform: none;
+    filter: saturate(0.4);
+  }
+  .btn-grass {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-chalk {
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+  .btn-board {
+    background: var(--board);
+    color: var(--board-foreground);
+  }
+  .btn-red {
+    background: var(--destructive);
+    color: var(--destructive-foreground);
+  }
+  /* The big "play" button: bulb yellow with a blinking arrow. */
+  .btn-play,
+  .play-button {
+    background: var(--bulb);
+    color: var(--bulb-foreground);
+  }
+  .play-button {
+    position: relative;
+    margin: var(--px) var(--px) calc(var(--px) * 2);
+    border: 0;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    line-height: 1.2;
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink),
+      0 calc(var(--px) * 2) 0 0 var(--ink);
+  }
+  .play-button:active {
+    transform: translateY(var(--px));
+  }
+
+  /* Figurinha: sticker card with the club stripe on top. */
+  .sticker {
+    margin: var(--px);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink),
+      inset 0 0 0 var(--px) var(--chalk),
+      inset 0 0 0 calc(var(--px) * 2) var(--chalk-deep);
+  }
+  /* Pixel progress bar: stepped blocks instead of a smooth fill. */
+  .bar-px {
+    position: relative;
+    height: 10px;
+    background: var(--muted);
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+  .bar-px > span {
+    display: block;
+    height: 100%;
+    background: var(--primary);
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0 6px,
+      rgb(21 32 26 / 0.35) 6px 8px
+    );
+  }
+  .bar-px[data-tone='bulb'] > span {
+    background-color: var(--bulb);
+  }
+  .bar-px[data-tone='red'] > span {
+    background-color: var(--card-red);
+  }
+
+  /* Letreiro: scoreboard ticker for toasts. */
+  .ticker {
+    overflow: hidden;
+    background: var(--board);
+    color: var(--bulb);
+    font-family: var(--font-pixel);
+    box-shadow:
+      0 calc(var(--px) * -1) 0 0 var(--ink),
+      0 var(--px) 0 0 var(--ink),
+      calc(var(--px) * -1) 0 0 0 var(--ink),
+      var(--px) 0 0 0 var(--ink),
+      inset 0 0 0 var(--px) var(--wood-deep);
+  }
+  .ticker-text {
+    display: inline-block;
+    white-space: nowrap;
+    padding-left: 100%;
+    animation: ticker-run 9s linear infinite;
+  }
+
+  /* Teletext table rows. */
+  .teletext {
+    font-family: var(--font-pixel);
+    font-size: 0.6rem;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+  .teletext tr:nth-child(even) td {
+    background: rgb(255 255 255 / 0.05);
+  }
+
+  /* Pixel art: no smoothing when scaled. */
+  .pixelated {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+
+  /* Chalk pitch drawing (2D field). */
+  .pitch {
+    background:
+      linear-gradient(
+        transparent 49.7%,
+        rgb(244 239 226 / 0.8) 49.7% 50.3%,
+        transparent 50.3%
+      ),
+      radial-gradient(
+        circle at center,
+        transparent 0 14%,
+        rgb(244 239 226 / 0.8) 14.3% 14.8%,
+        transparent 15%
+      ),
+      repeating-linear-gradient(
+        90deg,
+        var(--grass-light) 0 18%,
+        var(--grass) 18% 36%
+      );
+  }
+  .pitch::before,
+  .pitch::after {
+    position: absolute;
+    left: 25%;
+    width: 50%;
+    height: 14%;
+    border: 2px solid rgb(244 239 226 / 0.8);
+    content: '';
+  }
+  .pitch::before {
+    top: -1px;
+  }
+  .pitch::after {
+    bottom: -1px;
+  }
+}
+
 button,
 a,
-input {
+input,
+select,
+textarea,
+[role='button'],
+[role='radio'] {
   touch-action: manipulation;
 }
-button:focus-visible,
-a:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
 }
+
+/* Game motion: blinking cursor, ticker, stepped entrances, bounce. */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes ticker-run {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes px-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes px-bounce {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes px-shake {
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.blink {
+  animation: blink 1s steps(2, start) infinite;
+}
+.px-rise {
+  animation: px-rise var(--beat) steps(4, end) both;
+}
+.px-bounce {
+  animation: px-bounce 1.2s steps(2, end) infinite;
+}
+.px-shake {
+  animation: px-shake 240ms steps(4, end) 2;
+}
+
+/* Clickable buildings on the club map. */
+.map-building {
+  cursor: pointer;
+  outline: none;
+}
+.map-building .map-lift {
+  transition: transform var(--tick) steps(2, end);
+}
+.map-building:hover .map-lift,
+.map-building:focus-visible .map-lift {
+  transform: translateY(-3px);
+}
+.map-building .map-focus {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 3;
+}
+.map-building:hover .map-focus {
+  stroke: var(--bulb);
+}
+.map-building:focus-visible .map-focus {
+  stroke: var(--ring);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
+    animation: none !important;
     transition-duration: 0.01ms !important;
+  }
+  .ticker-text {
+    padding-left: 0;
+    white-space: normal;
+  }
+  .map-building:hover .map-lift,
+  .map-building:focus-visible .map-lift {
+    transform: none;
   }
 }

@@ -6,6 +6,14 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.*.example
 .DS_Store
 Thumbs.db
 
+.wrangler/
+.wrangler-dry/
+.dev.vars
+.open-next/
+tools/e2e/dist
+tools/e2e/test-results
+tools/e2e/playwright-report

@@ -30,7 +30,7 @@ O custo de simulação por usuário grátis vira **custo de aquisição**, cober
 - Sem anúncios no loop (idealmente nenhum anúncio no lançamento).
 
 ### Licença completa — pagamento único
-Faixa a testar: **R$ 39,90 / 49,90 / 59,90.** Inclui:
+Preço de lançamento: **R$ 29,90** (decisão do responsável em 2026-10-23; antes, faixa a testar R$ 39,90 / 49,90 / 59,90), PIX dinâmico da AbacatePay gerado por usuário, válido por 15 minutos, taxa de R$ 0,54 por transação. Inclui:
 - carreiras ilimitadas;
 - **editor completo** (clubes, jogadores, atributos, ligas, competições, regras, estádios, import/export);
 - competições avançadas; mais universos;

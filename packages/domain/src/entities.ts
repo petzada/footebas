@@ -35,6 +35,8 @@ export interface Player {
   readonly id: PlayerId;
   readonly name: string;
   readonly age: number;
+  /** Researched shirt number, absent when the research has none. */
+  readonly shirtNumber?: number;
   readonly nationalityId?: string;
   readonly position: Position;
   readonly secondaryPositions: readonly Position[];

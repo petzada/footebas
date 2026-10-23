@@ -271,6 +271,8 @@ async function setup() {
     nextMatch() {},
     standings() {},
     postMatch() {},
+    // Locked careers (after a refund) are covered in the application tests.
+    async assertCareerUnlocked() {},
   };
   const jobs = { status: async () => undefined };
   const api = await buildApi({

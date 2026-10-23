@@ -1,18 +1,37 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion -- lookups follow explicit guards and fixture invariants */
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- lookups follow explicit guards and content invariants */
 import {
+  apiErrorSchema,
   commandAcceptedSchema,
+  careerListReadModelSchema,
+  careerMarketQuerySchema,
+  publicStatsSchema,
+  careerWorldReadModelSchema,
+  careerOfficeReadModelSchema,
+  careerSeasonReadModelSchema,
+  careerBundleReadModelSchema,
   commandSchema,
   homeReadModelSchema,
+  matchInstructionSchema,
   nextMatchReadModelSchema,
   postMatchReadModelSchema,
   squadReadModelSchema,
   standingsReadModelSchema,
+  type ApiError,
+  type CareerBundleReadModel,
+  type CoachMessage,
+  type CoachProfile,
   type Command,
+  type CareerListReadModel,
+  type CareerMarketReadModel,
+  type CareerWorldReadModel,
+  type CareerOfficeReadModel,
+  type CareerSeasonReadModel,
   type CommandAccepted,
   type HomeReadModel,
   type JobStatus,
   type NextMatchReadModel,
   type PostMatchReadModel,
+  type PublicStats,
   type SquadReadModel,
   type StandingsReadModel,
 } from '@footebas/contracts';
@@ -20,15 +39,18 @@ import {
   SaveConflictError,
   SaveNotFoundError,
   SaveOwnershipError,
-  verifyChecksum,
   type GameSave,
   type TransactionContext,
   type UnitOfWork,
 } from '@footebas/database';
 import {
-  GameDate,
   FORMATION_POSITIONS,
   DomainError,
+  coachEffects,
+  followsMatchPlan,
+  renderCoachVoice,
+  type ApproximateStrength,
+  clubCashBalance,
   createLineup,
   createMatchInput,
   createTactic,
@@ -36,8 +58,12 @@ import {
   validateLineupForMatch,
   type CanonicalValue,
   type Club,
-  type Fixture,
+  type CompetitionCalendarFixture,
+  type CompetitionDefinition,
+  type CompetitionId,
+  type CompetitionMatchResult,
   type Lineup,
+  type Position,
   type MatchResult,
   type MatchInstruction,
   type MatchInput,
@@ -45,19 +71,96 @@ import {
   type Tactic,
 } from '@footebas/domain';
 import {
+  CAREER_SEASON_VERSION,
   ENGINE_VERSION,
   autoSelectLineup,
+  careerSeasonSystem,
+  closeCareerSeason,
+  createCareerSeason,
   createMatchPresentation,
-  generateDoubleRoundRobin,
+  fixturesOn,
+  isSeasonComplete,
+  liveStandings,
+  nextMatchDate,
+  pendingFixtures,
+  recordSeasonResults,
   simulateMatch,
+  type CareerSeasonState,
+  type MvpCompetitionConfig,
+  type MvpDivisionId,
 } from '@footebas/engine';
-import { createHash } from 'node:crypto';
 import {
-  FIXTURE_CONTENT_VERSION,
-  createFixtureContent,
-  defaultLineup,
-  defaultTactic,
-} from './fixture.js';
+  projectCalendar,
+  projectPyramid,
+  projectTransition,
+  type SeasonSummary,
+} from './career-competitions.js';
+import {
+  closeSeasonWorld,
+  coachedMatchDeltas,
+  createCareerWorld,
+  withMatchPlanStrength,
+  employManager,
+  clubWageBill,
+  recordGate,
+  settleMonths,
+  type CareerWorldState,
+  type WorldContext,
+} from './career-world-rules.js';
+import { runMarketDay } from './career-market.js';
+import {
+  OfficeRuleError,
+  configureMembership,
+  counterSponsorOffer,
+  decideSponsorOffer,
+  runOfficeDay,
+} from './career-office.js';
+import {
+  chemistryFactor,
+  chemistryOf,
+  chemistryView,
+  recordChemistry,
+  withStrengthFactor,
+} from './career-chemistry.js';
+import { projectCareerOffice, sponsorOfferMessages } from './office-read.js';
+import { projectCareerMarket, transferOfferMessages } from './market-read.js';
+import {
+  catalogCareerContent,
+  type CareerContent,
+  type CareerContentPort,
+} from './career-content.js';
+import { defaultTactic } from './tactics.js';
+import {
+  CAREER_SAVE_SCHEMA,
+  SaveCodecError,
+  careerUnitOfWork,
+} from './career-save-codec.js';
+import {
+  LEAGUE_TIERS,
+  closeSeasonStats,
+  ensureStats,
+  projectSeason,
+  recordMatchStats,
+  recordRoundPosition,
+  type CareerStatsState,
+  type StatsNames,
+} from './career-stats.js';
+import {
+  InboxRuleError,
+  generatedMessages,
+  resolveInboxDecision,
+  runInboxDay,
+  type CareerInboxState,
+} from './career-inbox.js';
+import { seasonAchievements, type SeasonAchievement } from './rankings.js';
+import { careerProfileOf } from './coach-personality.js';
+import {
+  InMemoryEntitlements,
+  isCareerLocked,
+  type CareerSlotsPort,
+  type Entitlements,
+  type EntitlementsPort,
+} from './entitlements.js';
 import {
   AuthenticationError,
   type AuthPort,
@@ -69,39 +172,84 @@ import {
   type TelemetryPort,
 } from './ports.js';
 
-const VERSIONS = {
-  schema: 'game-save-v1',
-  engine: ENGINE_VERSION,
-  rules: 'league-v1',
-  content: FIXTURE_CONTENT_VERSION,
-} as const;
-const COMPETITION_ID = entityId('competition_fixture_league', 'competition');
+const RULES_VERSION = CAREER_SEASON_VERSION;
+/** Full match detail kept for the managed club; older scores live in the season. */
+const KEPT_MANAGED_MATCHES = 10;
 const asCanonical = (value: unknown): CanonicalValue => value as CanonicalValue;
 
-interface Standing {
-  clubId: string;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  points: number;
+export interface ManagedMatch {
+  fixture: CompetitionCalendarFixture;
+  result: MatchResult;
 }
-interface Snapshot {
+/** The single career aggregate: world, competitions and matchday in one save. */
+export interface CareerSnapshot {
   managerName: string;
+  /** Career name shown in the career list (1–40 characters). */
+  careerName: string;
+  /** Coach profile; its personality tilts world rules (ADR 0007). */
+  coach: CoachProfile;
   currentDate: string;
   season: number;
+  contentVersion: string;
   selectedClubId?: string;
   clubs: Club[];
   players: Player[];
-  fixtures: (Omit<Fixture, 'date'> & { date: string })[];
+  competition: CareerSeasonState;
   lineup?: Lineup;
   tactic?: Tactic;
-  results: MatchResult[];
-  standings: Standing[];
-  contentProvenance: ReturnType<typeof createFixtureContent>['provenance'];
+  matches: ManagedMatch[];
+  history: SeasonSummary[];
+  world: CareerWorldState;
   pendingJobId?: string;
+  /** Season statistics (Temporada); absent in saves created before them. */
+  stats?: CareerStatsState;
+  /** Generated inbox with decisions; absent in saves created before it. */
+  inbox?: CareerInboxState;
+}
+
+type Snapshot = CareerSnapshot;
+
+/** Fills the profile of saves created before careers had one. */
+function withProfile(snapshot: Snapshot): Snapshot {
+  return { ...snapshot, ...careerProfileOf(snapshot) };
+}
+function snapshotOf(save: GameSave): Snapshot {
+  return withProfile(save.snapshot as unknown as Snapshot);
+}
+
+/** Results of the last five managed matches, oldest first. */
+export function recentManagedForm(snapshot: Snapshot): ('W' | 'D' | 'L')[] {
+  return snapshot.matches.slice(-5).map(({ fixture, result }) => {
+    const home = fixture.homeClubId === snapshot.selectedClubId;
+    const goalsFor = home ? result.homeGoals : result.awayGoals;
+    const goalsAgainst = home ? result.awayGoals : result.homeGoals;
+    return goalsFor > goalsAgainst
+      ? ('W' as const)
+      : goalsFor < goalsAgainst
+        ? ('L' as const)
+        : ('D' as const);
+  });
+}
+
+/** World context of a snapshot (reads must not mutate it). */
+export function worldContextOf(snapshot: Snapshot): WorldContext {
+  return {
+    clubs: snapshot.clubs,
+    players: snapshot.players,
+    world: snapshot.world,
+    personality: careerProfileOf(snapshot).coach.personality,
+    divisions: snapshot.competition.divisions,
+    managedForm: recentManagedForm(snapshot),
+  };
+}
+
+/** Runs world rules over the snapshot and writes the results back. */
+function withWorld(snapshot: Snapshot, work: (context: WorldContext) => void) {
+  const context = worldContextOf(snapshot);
+  work(context);
+  snapshot.clubs = context.clubs;
+  snapshot.players = context.players;
+  snapshot.world = context.world;
 }
 
 export interface ApplicationDependencies {
@@ -112,6 +260,20 @@ export interface ApplicationDependencies {
   readonly storage: StoragePort;
   readonly telemetry: TelemetryPort;
   readonly unitOfWork: UnitOfWork;
+  readonly content?: CareerContentPort;
+  /** Plan limits; defaults to everyone on the free plan. */
+  readonly entitlements?: EntitlementsPort;
+  /**
+   * Creation order of the user's active careers (locked careers). Without
+   * it the unit of work's `listByUser` is used, which the career Durable
+   * Object does not support, so production passes the Postgres adapter.
+   */
+  readonly careerSlots?: CareerSlotsPort;
+  /**
+   * Free plan picks only Série C clubs at the start (docs/05 §5). On in
+   * production; off by default so local demos and tests can pick any club.
+   */
+  readonly enforceStartingDivision?: boolean;
   readonly failPoint?: (
     point: 'before-persist-result',
     job: SimulationJob,
@@ -132,8 +294,75 @@ export class ApplicationError extends Error {
   }
 }
 
+/**
+ * CreateCareer refused by the plan limit. It is a FORBIDDEN application
+ * error for existing transports; `toApiError` gives the contract body with
+ * the dedicated `CAREER_LIMIT_REACHED` code.
+ */
+export class CareerLimitReachedError extends ApplicationError {
+  public readonly contractCode = 'CAREER_LIMIT_REACHED' as const;
+
+  public constructor(
+    public readonly entitlements: Entitlements,
+    public readonly activeCareers: number,
+  ) {
+    super(
+      'FORBIDDEN',
+      `plan ${entitlements.plan} allows ${String(entitlements.maxCareers)} active career(s); delete one to create another`,
+    );
+  }
+
+  public toApiError(requestId: string): ApiError {
+    return apiErrorSchema.parse({
+      version: 1,
+      requestId,
+      code: this.contractCode,
+      message: this.message,
+      plan: this.entitlements.plan,
+      maxCareers: this.entitlements.maxCareers,
+    });
+  }
+}
+
+/**
+ * The career is beyond the plan's limit (license refunded or revoked): it
+ * stays saved but cannot be loaded, played or receive commands until the
+ * license is bought again. Deleting it is still allowed.
+ */
+export class CareerLockedError extends ApplicationError {
+  public constructor(
+    public readonly careerId: string,
+    public readonly entitlements: Entitlements,
+  ) {
+    super(
+      'FORBIDDEN',
+      `career ${careerId} is locked: plan ${entitlements.plan} keeps ${String(entitlements.maxCareers)} career(s) playable; buy the license to unlock it or delete it`,
+    );
+  }
+}
+
+async function careerIdFor(userId: string, key: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`${userId}:${key}`),
+  );
+  return `career_${[...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 20)}`;
+}
+
 export class FootebasApplication {
-  public constructor(private readonly deps: ApplicationDependencies) {}
+  private readonly content: CareerContentPort;
+  private readonly entitlements: EntitlementsPort;
+  /** Saves with the full career state (lean storage behind it, ADR 0014). */
+  private readonly unitOfWork: UnitOfWork;
+
+  public constructor(private readonly deps: ApplicationDependencies) {
+    this.content = deps.content ?? catalogCareerContent;
+    this.entitlements = deps.entitlements ?? new InMemoryEntitlements();
+    this.unitOfWork = careerUnitOfWork(deps.unitOfWork, this.content);
+  }
 
   public async execute(
     bearer: string,
@@ -147,7 +376,9 @@ export class FootebasApplication {
     try {
       return command.type === 'CreateCareer'
         ? await this.createCareer(identity.userId, command)
-        : await this.mutate(identity.userId, command);
+        : command.type === 'DeleteCareer'
+          ? await this.deleteCareer(identity.userId, command)
+          : await this.mutate(identity.userId, command);
     } catch (error) {
       throw this.translate(error);
     }
@@ -163,6 +394,16 @@ export class FootebasApplication {
     }
   }
 
+  private loadContent(version?: string): CareerContent {
+    const content = this.content.load();
+    if (version !== undefined && content.version !== version)
+      throw new ApplicationError(
+        'VERSION_CONFLICT',
+        `save uses content ${version}; ${content.version} requires migration`,
+      );
+    return content;
+  }
+
   private async createCareer(
     userId: string,
     command: Extract<Command, { type: 'CreateCareer' }>,
@@ -172,50 +413,95 @@ export class FootebasApplication {
         'VERSION_CONFLICT',
         'new careers require expectedVersion 0',
       );
-    const careerId = `career_${createHash('sha256')
-      .update(`${userId}:${command.idempotencyKey}`)
-      .digest('hex')
-      .slice(0, 20)}`;
-    const response = await this.deps.unitOfWork.executeIdempotent(
+    const careerId = await careerIdFor(userId, command.idempotencyKey);
+    // The plan does not depend on the career lock: read it while the
+    // transaction opens instead of after (one round trip less). An
+    // idempotent replay does not need it; its failure is then ignored.
+    const plan = this.entitlements.forUser(userId);
+    plan.catch(() => undefined);
+    const response = await this.unitOfWork.executeIdempotent(
       careerId,
       command.idempotencyKey,
       async (tx) => {
-        const content = createFixtureContent();
-        const firstDate = GameDate.parse(command.payload.startDate).addDays(7);
-        const fixtures = generateDoubleRoundRobin(
-          COMPETITION_ID,
-          content.clubs.map(({ id }) => id),
-          firstDate,
-        ).map((fixture) => ({ ...fixture, date: fixture.date.toString() }));
+        const active = await tx.saves.countActiveByUser(userId);
+        const entitlements = await plan;
+        if (active >= entitlements.maxCareers)
+          throw new CareerLimitReachedError(entitlements, active);
+        const content = this.loadContent();
+        const seed = `career-seed:${careerId}`;
+        const year = Number(command.payload.startDate.slice(0, 4));
         const snapshot: Snapshot = {
           managerName: command.payload.managerName,
+          ...careerProfileOf({
+            managerName: command.payload.managerName,
+            ...(command.payload.careerName === undefined
+              ? {}
+              : { careerName: command.payload.careerName }),
+            ...(command.payload.coach === undefined
+              ? {}
+              : { coach: command.payload.coach }),
+          }),
           currentDate: command.payload.startDate,
           season: 1,
+          contentVersion: content.version,
           clubs: [...content.clubs],
           players: [...content.players],
-          fixtures,
-          results: [],
-          contentProvenance: content.provenance,
-          standings: content.clubs.map(({ id }) => ({
-            clubId: id,
-            played: 0,
-            won: 0,
-            drawn: 0,
-            lost: 0,
-            goalsFor: 0,
-            goalsAgainst: 0,
-            points: 0,
-          })),
+          competition: createCareerSeason(content.competitions, {
+            season: 1,
+            year,
+            seed,
+            divisions: content.divisions,
+            continentalDirect: content.continentalDirect,
+            continentalPreliminary: content.continentalPreliminary,
+          }),
+          matches: [],
+          history: [],
+          world: createCareerWorld(
+            content.clubs,
+            content.players,
+            command.payload.startDate,
+            `manager_${careerId.slice('career_'.length)}`,
+          ),
         };
         const save = await tx.saves.create({
           id: careerId,
           userId,
           snapshot: asCanonical(snapshot),
-          seed: `career-seed:${careerId}`,
-          versions: VERSIONS,
+          seed,
+          versions: {
+            schema: CAREER_SAVE_SCHEMA,
+            engine: ENGINE_VERSION,
+            rules: RULES_VERSION,
+            content: content.version,
+          },
         });
         this.deps.telemetry.event('career.created', { careerId });
         return asCanonical(this.accepted(command, save));
+      },
+      { countsCareersOf: userId },
+    );
+    return commandAcceptedSchema.parse(response);
+  }
+
+  /** Owner-only soft delete; frees the career's slot in the plan limit. */
+  private async deleteCareer(
+    userId: string,
+    command: Extract<Command, { type: 'DeleteCareer' }>,
+  ): Promise<CommandAccepted> {
+    const careerId = command.payload.careerId;
+    const response = await this.unitOfWork.executeIdempotent(
+      careerId,
+      command.idempotencyKey,
+      async (tx) => {
+        const save = await tx.saves.load(careerId, userId);
+        if (!save) throw new SaveNotFoundError(`save ${careerId} not found`);
+        if (save.version !== command.expectedVersion)
+          throw new SaveConflictError(
+            `expected version ${String(command.expectedVersion)}, found ${String(save.version)}`,
+          );
+        const archived = await tx.saves.archive(careerId, userId, save.version);
+        this.deps.telemetry.event('career.deleted', { careerId });
+        return asCanonical(this.accepted(command, archived));
       },
     );
     return commandAcceptedSchema.parse(response);
@@ -223,11 +509,11 @@ export class FootebasApplication {
 
   private async mutate(
     userId: string,
-    command: Exclude<Command, { type: 'CreateCareer' }>,
+    command: Exclude<Command, { type: 'CreateCareer' | 'DeleteCareer' }>,
   ): Promise<CommandAccepted> {
     const careerId = command.payload.careerId;
     let jobToEnqueue: SimulationJob | undefined;
-    const response = await this.deps.unitOfWork.executeIdempotent(
+    const response = await this.unitOfWork.executeIdempotent(
       careerId,
       command.idempotencyKey,
       async (tx) => {
@@ -236,7 +522,9 @@ export class FootebasApplication {
           throw new SaveConflictError(
             `expected version ${String(command.expectedVersion)}, found ${String(save.version)}`,
           );
-        const snapshot = structuredClone(save.snapshot) as unknown as Snapshot;
+        const snapshot = withProfile(
+          structuredClone(save.snapshot) as unknown as Snapshot,
+        );
         let job: SimulationJob | undefined;
         switch (command.type) {
           case 'SelectClub': {
@@ -245,20 +533,98 @@ export class FootebasApplication {
             );
             if (!club)
               throw new ApplicationError('NOT_FOUND', 'club not found');
-            snapshot.selectedClubId = club.id;
-            snapshot.lineup = defaultLineup(club, snapshot.players);
-            snapshot.tactic = defaultTactic();
-            break;
-          }
-          case 'SetLineup': {
-            if (snapshot.selectedClubId !== command.payload.clubId)
+            const manager = snapshot.world.manager;
+            if (
+              manager.employmentStatus === 'employed' &&
+              manager.currentClubId !== club.id
+            )
               throw new ApplicationError(
                 'FORBIDDEN',
-                'lineup club is not managed by this career',
+                'career already manages a club; accept a job proposal to move',
               );
-            const club = snapshot.clubs.find(
-              ({ id }) => id === command.payload.clubId,
-            )!;
+            const division = divisionOf(snapshot, club.id);
+            // Free plan starts at the bottom; the license picks any club
+            // (docs/05 §5, docs/09 decision 5).
+            if (
+              this.deps.enforceStartingDivision === true &&
+              manager.employmentStatus !== 'employed' &&
+              division !== 'serie-c' &&
+              !(await this.entitlements.forUser(userId)).anyClub
+            )
+              throw new ApplicationError(
+                'FORBIDDEN',
+                'o plano grátis começa na Série C; a licença libera qualquer clube',
+              );
+            const rank =
+              [...snapshot.competition.divisions[division]]
+                .map((id) => snapshot.clubs.find((item) => item.id === id)!)
+                .sort(
+                  (left, right) =>
+                    Number(right.reputation) - Number(left.reputation),
+                )
+                .findIndex(({ id }) => id === club.id) + 1;
+            if (manager.employmentStatus !== 'employed')
+              withWorld(snapshot, (context) =>
+                employManager(
+                  context,
+                  club.id,
+                  snapshot.currentDate,
+                  division,
+                  rank,
+                ),
+              );
+            snapshot.selectedClubId = club.id;
+            snapshot.lineup = autoSelectLineup({
+              club,
+              players: snapshot.players,
+              formation: '4-4-2',
+              mode: 'best',
+            });
+            snapshot.tactic = defaultTactic();
+            withWorld(snapshot, (context) =>
+              runOfficeDay(
+                context,
+                snapshot.currentDate,
+                save.seed,
+                snapshot.season,
+              ),
+            );
+            break;
+          }
+          case 'DecideSponsorshipOffer':
+            decideSponsorOffer(
+              snapshot.world,
+              command.payload.offerId,
+              command.payload.decision,
+              snapshot.currentDate,
+            );
+            break;
+          case 'CounterSponsorshipOffer':
+            counterSponsorOffer(
+              snapshot.world,
+              command.payload.offerId,
+              command.payload.monthlyValue,
+              snapshot.currentDate,
+              save.seed,
+            );
+            break;
+          case 'ResolveInboxDecision':
+            resolveInboxDecision(
+              snapshot,
+              command.payload.messageId,
+              command.payload.optionId,
+            );
+            break;
+          case 'ConfigureFanMembership':
+            withWorld(snapshot, (context) =>
+              configureMembership(context, {
+                monthlyPrice: command.payload.monthlyPrice,
+                tier: command.payload.tier,
+              }),
+            );
+            break;
+          case 'SetLineup': {
+            const club = this.managedClub(snapshot, command.payload.clubId);
             const memberIds = new Set(club.squad);
             if (
               [
@@ -298,14 +664,7 @@ export class FootebasApplication {
             break;
           }
           case 'AutoPickLineup': {
-            if (snapshot.selectedClubId !== command.payload.clubId)
-              throw new ApplicationError(
-                'FORBIDDEN',
-                'lineup club is not managed by this career',
-              );
-            const club = snapshot.clubs.find(
-              ({ id }) => id === command.payload.clubId,
-            )!;
+            const club = this.managedClub(snapshot, command.payload.clubId);
             snapshot.lineup = autoSelectLineup({
               club,
               players: snapshot.players,
@@ -352,40 +711,23 @@ export class FootebasApplication {
             break;
           case 'AdvanceDate':
           case 'SimulateMatch': {
-            if (
-              !snapshot.selectedClubId ||
-              !snapshot.lineup ||
-              !snapshot.tactic
-            )
-              throw new ApplicationError(
-                'VALIDATION_ERROR',
-                'select a club and confirm lineup/tactics first',
-              );
+            this.requireMatchday(snapshot);
             if (snapshot.pendingJobId)
               throw new ApplicationError(
                 'VERSION_CONFLICT',
                 'a simulation is already pending',
               );
-            const fixture =
-              command.type === 'SimulateMatch'
-                ? snapshot.fixtures.find(
-                    ({ id }) =>
-                      id === command.payload.fixtureId &&
-                      statusOf(snapshot, command.payload.fixtureId) ===
-                        'scheduled',
-                  )
-                : nextFixture(snapshot);
-            if (
-              !fixture ||
-              (fixture.homeClubId !== snapshot.selectedClubId &&
-                fixture.awayClubId !== snapshot.selectedClubId)
-            )
-              throw new ApplicationError(
-                'NOT_FOUND',
-                'next managed fixture not found',
-              );
-            if (
-              command.type === 'AdvanceDate' &&
+            const fixture = managedFixture(snapshot);
+            if (command.type === 'SimulateMatch') {
+              if (fixture?.id !== command.payload.fixtureId)
+                throw new ApplicationError(
+                  'NOT_FOUND',
+                  'next managed fixture not found',
+                );
+              const instructions = command.payload.instructions ?? [];
+              this.assertManagedInstructions(snapshot, fixture, instructions);
+            } else if (
+              fixture &&
               command.payload.throughDate &&
               command.payload.throughDate < fixture.date
             )
@@ -393,27 +735,9 @@ export class FootebasApplication {
                 'VALIDATION_ERROR',
                 'throughDate does not reach the next fixture',
               );
-            if (command.type === 'SimulateMatch') {
-              const managedSide =
-                fixture.homeClubId === snapshot.selectedClubId
-                  ? 'home'
-                  : 'away';
-              if (
-                command.payload.instructions?.some(
-                  ({ side }) => side !== managedSide,
-                )
-              )
-                throw new ApplicationError(
-                  'FORBIDDEN',
-                  'match instructions can only target the managed club',
-                );
-            }
-            const instructions =
-              command.type === 'SimulateMatch'
-                ? (command.payload.instructions as
-                    readonly MatchInstruction[] | undefined)
-                : undefined;
-            this.matchInput(snapshot, fixture, save.seed, instructions);
+            // The assistant fields an eligible XI before the match is queued:
+            // the previous round may have injured or suspended a starter.
+            if (fixture) snapshot.lineup = this.matchdayLineup(snapshot);
             const jobId = this.deps.ids.next('job');
             snapshot.pendingJobId = jobId;
             job = {
@@ -422,7 +746,7 @@ export class FootebasApplication {
               careerId,
               userId,
               expectedVersion: save.version + 1,
-              fixtureId: fixture.id,
+              ...(fixture ? { fixtureId: fixture.id } : {}),
               ...(command.type === 'SimulateMatch' &&
               command.payload.instructions
                 ? {
@@ -453,40 +777,66 @@ export class FootebasApplication {
   public async runNextJob(): Promise<JobStatus | undefined> {
     const job = await this.deps.jobs.take();
     if (!job) return undefined;
+    return this.runJob(job);
+  }
+
+  /**
+   * Runs one simulation job. With `requeueOnFailure` false the caller (e.g. a
+   * Cloudflare Queues consumer) owns retries and dead-lettering.
+   */
+  public async runJob(
+    job: SimulationJob,
+    options: Readonly<{ requeueOnFailure?: boolean }> = {},
+  ): Promise<JobStatus> {
     const prior = await this.deps.jobs.status(job.id);
     if (prior?.state === 'succeeded') return prior;
     const attempt =
       prior?.state === 'failed' ? prior.attempt + 1 : (prior?.attempt ?? 1);
     await this.setJobStatus(job, 'running', attempt);
     try {
-      await this.deps.unitOfWork.withCareerLock(job.careerId, async (tx) => {
-        const save = await this.load(tx, job.careerId, job.userId);
-        const snapshot = structuredClone(save.snapshot) as unknown as Snapshot;
-        if (
-          snapshot.results.some(({ fixtureId }) => fixtureId === job.fixtureId)
-        )
-          return;
-        if (
-          save.version !== job.expectedVersion ||
-          snapshot.pendingJobId !== job.id
-        )
-          throw new SaveConflictError('job snapshot version is stale');
-        const fixtureData = snapshot.fixtures.find(
-          ({ id }) => id === job.fixtureId,
+      await this.unitOfWork.withCareerLock(job.careerId, async (tx) => {
+        // A job already accepted finishes even if the career got locked
+        // meanwhile; only new commands and reads are refused.
+        const save = await this.load(tx, job.careerId, job.userId, false);
+        const snapshot = withProfile(
+          structuredClone(save.snapshot) as unknown as Snapshot,
         );
-        if (!fixtureData) throw new Error('fixture missing');
-        const fixture = {
-          ...fixtureData,
-          date: GameDate.parse(fixtureData.date),
-        } as Fixture;
-        const result = this.simulate(
+        if (snapshot.pendingJobId !== job.id) {
+          if (save.version > job.expectedVersion) return;
+          throw new SaveConflictError('job snapshot version is stale');
+        }
+        if (save.version !== job.expectedVersion)
+          throw new SaveConflictError('job snapshot version is stale');
+        const content = this.loadContent(snapshot.contentVersion);
+        this.playThrough(
           snapshot,
-          fixture,
           save.seed,
+          content.competitions,
+          job.fixtureId,
           job.instructions,
         );
-        applyResult(snapshot, fixture, result);
+        // Injuries and suspensions from this round reach the saved lineup
+        // now, so the squad screen and the next command see an eligible XI.
+        settleAvailableLineup(snapshot);
+        const achievements =
+          job.fixtureId === undefined
+            ? rollSeason(snapshot, content.competitions, save.seed)
+            : [];
         delete snapshot.pendingJobId;
+        // Validated achievements commit with the save that produced them
+        // (ADR 0013): a rolled back transaction records none.
+        if (achievements.length > 0)
+          await tx.achievements.record(
+            achievements.map((achievement) => ({
+              ...achievement,
+              careerId: job.careerId,
+              userId: job.userId,
+              displayName: snapshot.managerName.slice(0, 80),
+              // Shown next to the name on the ranking (ADR 0013).
+              avatar: snapshot.coach.avatar,
+              recordedAt: this.deps.clock.now().toISOString(),
+            })),
+          );
         this.deps.failPoint?.('before-persist-result', job);
         await tx.saves.update(job.careerId, job.userId, save.version, {
           snapshot: asCanonical(snapshot),
@@ -501,7 +851,15 @@ export class FootebasApplication {
       );
     } catch (error) {
       this.deps.telemetry.error(error, { jobId: job.id });
-      await this.deps.jobs.enqueue(job);
+      // A deleted career never comes back: fail the job without retrying.
+      if (error instanceof SaveNotFoundError)
+        return await this.setJobStatus(
+          job,
+          'failed',
+          (await this.deps.jobs.status(job.id))?.attempt ?? 1,
+          'CAREER_NOT_FOUND',
+        );
+      if (options.requeueOnFailure ?? true) await this.deps.jobs.enqueue(job);
       return await this.setJobStatus(
         job,
         'failed',
@@ -511,275 +869,933 @@ export class FootebasApplication {
     }
   }
 
-  private simulate(
+  /**
+   * Plays every pending fixture in date order up to the managed fixture (or
+   * to the end of the season). The same deterministic path backs both the
+   * committed job and the non-committing preview, so a preview is exact.
+   */
+  private playThrough(
     snapshot: Snapshot,
-    fixture: Fixture,
     seed: string,
+    config: MvpCompetitionConfig,
+    targetId?: string,
     instructions: readonly MatchInstruction[] = [],
-  ): MatchResult {
-    return simulateMatch(
-      this.matchInput(snapshot, fixture, seed, instructions),
+  ): ManagedMatch | undefined {
+    const target =
+      targetId === undefined
+        ? undefined
+        : snapshot.competition.fixtures.find(({ id }) => id === targetId);
+    if (targetId !== undefined && !target)
+      throw new ApplicationError('NOT_FOUND', 'fixture not found');
+    let managed: ManagedMatch | undefined;
+    const tiers = new Map(
+      careerSeasonSystem(config, snapshot.competition).definitions.map(
+        (definition) => [definition.id, definition.tier],
+      ),
     );
+    const stats = ensureStats(
+      snapshot.stats,
+      snapshot.season,
+      snapshot.players,
+      Object.keys(snapshot.competition.results).length,
+    );
+    snapshot.stats = stats;
+    for (
+      let date = nextMatchDate(snapshot.competition);
+      date !== undefined && (target === undefined || date <= target.date);
+      date = nextMatchDate(snapshot.competition)
+    ) {
+      withWorld(snapshot, (context) => {
+        settleMonths(context, date);
+        runOfficeDay(context, date, seed, snapshot.season);
+        runMarketDay(context, date, seed);
+      });
+      syncManagedClub(snapshot);
+      const today = fixturesOn(snapshot.competition, date);
+      const scores: CompetitionMatchResult[] = [];
+      const playing = new Set<string>();
+      let managedToday: ManagedMatch | undefined;
+      for (const fixture of today) {
+        const isTarget = fixture.id === target?.id;
+        const result = simulateMatch(
+          this.matchInput(
+            snapshot,
+            fixture,
+            seed,
+            isTarget ? instructions : [],
+          ),
+        );
+        applyPerformances(snapshot, fixture, result);
+        recordMatchStats(stats, fixture, result);
+        if (
+          fixture.homeClubId === snapshot.selectedClubId ||
+          fixture.awayClubId === snapshot.selectedClubId
+        )
+          managedToday = { fixture, result };
+        if (
+          snapshot.lineup !== undefined &&
+          (fixture.homeClubId === snapshot.selectedClubId ||
+            fixture.awayClubId === snapshot.selectedClubId)
+        )
+          recordChemistry(
+            snapshot.world,
+            snapshot.selectedClubId,
+            snapshot.lineup.starters.map(({ playerId }) => playerId),
+          );
+        withWorld(snapshot, (context) =>
+          recordGate(context, fixture, tiers.get(fixture.competitionId)!),
+        );
+        playing.add(fixture.homeClubId).add(fixture.awayClubId);
+        scores.push({
+          fixtureId: fixture.id,
+          homeGoals: result.homeGoals,
+          awayGoals: result.awayGoals,
+        });
+        if (isTarget) managed = { fixture, result };
+      }
+      recoverIdlePlayers(snapshot, playing);
+      snapshot.competition = recordSeasonResults(
+        config,
+        snapshot.competition,
+        scores,
+      );
+      snapshot.currentDate = date;
+      const league =
+        managedToday === undefined
+          ? undefined
+          : this.recordPosition(snapshot, config, tiers, managedToday);
+      runInboxDay(snapshot, {
+        date,
+        ...(managedToday === undefined
+          ? {}
+          : { played: playedManagedMatch(snapshot, managedToday) }),
+        ...(league === undefined ? {} : { league }),
+      });
+    }
+    if (managed) {
+      snapshot.matches = [...snapshot.matches, managed].slice(
+        -KEPT_MANAGED_MATCHES,
+      );
+    }
+    return managed;
+  }
+
+  /**
+   * Managed club position after a league round (season statistics). Returns
+   * the national league standing the board judges objectives by.
+   */
+  private recordPosition(
+    snapshot: Snapshot,
+    config: MvpCompetitionConfig,
+    tiers: ReadonlyMap<string, CompetitionDefinition['tier']>,
+    played: ManagedMatch,
+  ): { position: number; rounds: number } | undefined {
+    const { fixture } = played;
+    const tier = tiers.get(fixture.competitionId);
+    if (
+      snapshot.stats === undefined ||
+      tier === undefined ||
+      !LEAGUE_TIERS.has(tier)
+    )
+      return undefined;
+    const index = liveStandings(
+      config,
+      snapshot.competition,
+      fixture.competitionId,
+    ).findIndex(({ clubId }) => clubId === snapshot.selectedClubId);
+    if (index < 0) return undefined;
+    recordRoundPosition(snapshot.stats, fixture.competitionId, {
+      round: fixture.round,
+      date: fixture.date,
+      position: index + 1,
+    });
+    return tier === 'national_league'
+      ? {
+          position: index + 1,
+          rounds: snapshot.stats.positions[fixture.competitionId]?.length ?? 0,
+        }
+      : undefined;
   }
 
   private matchInput(
     snapshot: Snapshot,
-    fixture: Pick<Fixture, 'id' | 'homeClubId' | 'awayClubId'>,
+    fixture: CompetitionCalendarFixture,
     seed: string,
-    instructions: readonly MatchInstruction[] = [],
+    instructions: readonly MatchInstruction[],
   ): MatchInput {
-    const side = (clubId: string) => {
+    const personality = snapshot.coach.personality;
+    const side = (clubId: string, opponentId: string) => {
       const club = snapshot.clubs.find(({ id }) => id === clubId)!;
       const managed = clubId === snapshot.selectedClubId;
+      const players = snapshot.players.filter(
+        (player) => player.clubId === club.id,
+      );
+      // Estrategista (ADR 0007): small effective-strength edge, assembled
+      // here by the application, when the mentality follows the plan.
+      const planned =
+        managed &&
+        coachEffects(personality).matchPlanStrength !== 1 &&
+        followsMatchPlan(
+          snapshot.tactic!.mentality,
+          opponentStrength(snapshot, clubId, opponentId),
+        );
+      // Chemistry (ADR 0011): up to +3% for the managed club, same path.
+      const chemistry = managed
+        ? chemistryFactor(chemistryOf(snapshot.world, clubId).value)
+        : 1;
+      const matchPlayers =
+        chemistry !== 1
+          ? withStrengthFactor(
+              players,
+              (planned ? coachEffects(personality).matchPlanStrength : 1) *
+                chemistry,
+            )
+          : planned
+            ? withMatchPlanStrength(players, personality)
+            : players;
       return {
         club,
         lineup: managed
-          ? snapshot.lineup!
-          : defaultLineup(club, snapshot.players),
+          ? availableLineup(snapshot)!
+          : autoSelectLineup({
+              club,
+              players: snapshot.players,
+              formation: '4-4-2',
+              mode: 'best',
+            }),
         tactic: managed ? snapshot.tactic! : defaultTactic(),
-        players: snapshot.players.filter((player) => player.clubId === club.id),
+        players: matchPlayers,
       };
     };
+    return createMatchInput({
+      fixtureId: entityId(fixture.id, 'fixture'),
+      seed: `${seed}:${fixture.id}`,
+      engineVersion: ENGINE_VERSION,
+      rulesVersion: RULES_VERSION,
+      home: side(fixture.homeClubId, fixture.awayClubId),
+      away: side(fixture.awayClubId, fixture.homeClubId),
+      instructions,
+    });
+  }
+
+  /**
+   * The lineup that takes the field: injured or suspended starters give way
+   * to the assistant's pick ({@link availableLineup}) and the result is
+   * validated for the match. Without enough eligible players the refusal is a
+   * clear Portuguese message instead of the domain's internal text.
+   */
+  private matchdayLineup(snapshot: Snapshot): Lineup {
+    const club = this.managedClub(snapshot, snapshot.selectedClubId!);
+    try {
+      const lineup = availableLineup(snapshot)!;
+      validateLineupForMatch(
+        lineup,
+        club,
+        snapshot.players,
+        snapshot.tactic!.formation,
+      );
+      return lineup;
+    } catch (error) {
+      const shortage =
+        error instanceof DomainError
+          ? eligibleShortage(snapshot, club)
+          : undefined;
+      if (shortage) throw new ApplicationError('VALIDATION_ERROR', shortage);
+      throw error;
+    }
+  }
+
+  private requireMatchday(snapshot: Snapshot): void {
+    if (!snapshot.selectedClubId || !snapshot.lineup || !snapshot.tactic)
+      throw new ApplicationError(
+        'VALIDATION_ERROR',
+        'select a club and confirm lineup/tactics first',
+      );
+  }
+
+  private managedClub(snapshot: Snapshot, clubId: string): Club {
+    if (snapshot.selectedClubId !== clubId)
+      throw new ApplicationError(
+        'FORBIDDEN',
+        'lineup club is not managed by this career',
+      );
+    return snapshot.clubs.find(({ id }) => id === clubId)!;
+  }
+
+  private assertManagedInstructions(
+    snapshot: Snapshot,
+    fixture: CompetitionCalendarFixture,
+    instructions: readonly { side: 'home' | 'away' }[],
+  ): void {
     const managedSide =
       fixture.homeClubId === snapshot.selectedClubId ? 'home' : 'away';
     if (instructions.some(({ side }) => side !== managedSide))
       throw new ApplicationError(
         'FORBIDDEN',
-        'match instructions can only control the managed club',
+        'match instructions can only target the managed club',
       );
-    const managedClub = snapshot.clubs.find(
-      ({ id }) => id === snapshot.selectedClubId,
-    )!;
-    validateLineupForMatch(
-      snapshot.lineup!,
-      managedClub,
-      snapshot.players,
-      snapshot.tactic!.formation,
-    );
-    return createMatchInput({
-      fixtureId: fixture.id,
-      seed: `${seed}:${fixture.id}`,
-      engineVersion: ENGINE_VERSION,
-      rulesVersion: VERSIONS.rules,
-      home: side(fixture.homeClubId),
-      away: side(fixture.awayClubId),
-      instructions,
+  }
+
+  /**
+   * Simulates the next managed match with tentative instructions without
+   * committing anything. Feeds the narrated feed and tactical pauses.
+   */
+  public async previewMatch(
+    bearer: string,
+    careerId: string,
+    rawInstructions: unknown,
+  ): Promise<PostMatchReadModel> {
+    const parsed = matchInstructionSchema
+      .array()
+      .max(12)
+      .safeParse(rawInstructions ?? []);
+    if (!parsed.success)
+      throw new ApplicationError('VALIDATION_ERROR', parsed.error.message);
+    return this.query(bearer, careerId, (save, stored, now) => {
+      const snapshot = structuredClone(stored);
+      this.requireMatchday(snapshot);
+      const fixture = managedFixture(snapshot);
+      if (!fixture)
+        throw new ApplicationError(
+          'NOT_FOUND',
+          'next managed fixture not found',
+        );
+      this.assertManagedInstructions(snapshot, fixture, parsed.data);
+      snapshot.lineup = this.matchdayLineup(snapshot);
+      const content = this.loadContent(snapshot.contentVersion);
+      const played = this.playThrough(
+        snapshot,
+        save.seed,
+        content.competitions,
+        fixture.id,
+        parsed.data as readonly MatchInstruction[],
+      )!;
+      return postMatchModel(save, snapshot, played, now, false);
     });
   }
 
   public async home(bearer: string, careerId: string): Promise<HomeReadModel> {
     return this.query(bearer, careerId, (save, s, now) =>
-      homeReadModelSchema.parse({
-        ...base(save, now),
-        managerName: s.managerName,
-        club: clubSummary(s, s.selectedClubId),
-        currentDate: s.currentDate,
-        season: s.season,
-        nextFixtureId: nextFixture(s)?.id,
-        pendingActions: s.pendingJobId
-          ? ['simulation_pending']
-          : nextFixture(s)
-            ? ['prepare_match']
-            : [],
-      }),
+      this.homeModel(save, s, now),
     );
   }
   public async squad(
     bearer: string,
     careerId: string,
   ): Promise<SquadReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
-      if (!club) throw new ApplicationError('NOT_FOUND', 'club not selected');
-      return squadReadModelSchema.parse({
-        ...base(save, now),
-        club: clubSummary(s, club.id),
-        players: s.players
-          .filter(({ clubId }) => clubId === club.id)
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            age: p.age,
-            position: p.position,
-            secondaryPositions: p.secondaryPositions,
-            ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
-            strength: p.strength,
-            traits: p.traits,
-            condition: p.condition,
-            morale: p.morale,
-            matchSharpness: p.matchSharpness,
-            squadStatus: p.squadStatus,
-            injuryRounds: p.injuryRounds,
-            suspensionRounds: p.suspensionRounds,
-            availability:
-              p.injuryRounds > 0
-                ? 'injured'
-                : p.suspensionRounds > 0
-                  ? 'suspended'
-                  : 'available',
-            ...(p.lastMatchRating === undefined
-              ? {}
-              : { lastMatchRating: p.lastMatchRating }),
-            careerStats: {
-              appearances: p.careerStats.appearances,
-              goals: p.careerStats.goals,
-              assists: p.careerStats.assists,
-              yellowCards: p.careerStats.yellowCards,
-              redCards: p.careerStats.redCards,
-              ...(p.careerStats.ratedAppearances
-                ? {
-                    averageRating: Number(
-                      (
-                        (p.careerStats.ratingTotal ?? 0) /
-                        p.careerStats.ratedAppearances
-                      ).toFixed(2),
-                    ),
-                  }
-                : {}),
-            },
-            hiddenEstimates: hiddenEstimates(p),
-          })),
-        lineupPlayerIds: s.lineup
-          ? [
-              ...s.lineup.starters.map(({ playerId }) => playerId),
-              ...s.lineup.substitutes,
-              ...(s.lineup.reserves ?? []),
-            ]
-          : [],
-        lineup:
-          s.lineup && s.tactic
-            ? {
-                formation: s.tactic.formation,
-                starters: s.lineup.starters.map(({ playerId }) => playerId),
-                bench: s.lineup.substitutes,
-                reserves: s.lineup.reserves ?? [],
-              }
-            : undefined,
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.squadModel(save, s, now),
+    );
   }
   public async nextMatch(
     bearer: string,
     careerId: string,
   ): Promise<NextMatchReadModel> {
-    return this.query(bearer, careerId, (save, s, now) => {
-      const f = nextFixture(s);
-      if (!f) throw new ApplicationError('NOT_FOUND', 'next fixture not found');
-      return nextMatchReadModelSchema.parse({
-        ...base(save, now),
-        fixtureId: f.id,
-        competition: 'Liga Fixture',
-        round: f.round,
-        date: f.date,
-        homeClub: clubSummary(s, f.homeClubId),
-        awayClub: clubSummary(s, f.awayClubId),
-        status: s.pendingJobId
-          ? 'running'
-          : s.lineup && s.tactic
-            ? 'ready'
-            : 'scheduled',
-        preparation: matchPreparation(s, f),
-      });
-    });
+    return this.query(bearer, careerId, (save, s, now) =>
+      this.nextMatchModel(save, s, now),
+    );
   }
   public async standings(
     bearer: string,
     careerId: string,
   ): Promise<StandingsReadModel> {
     return this.query(bearer, careerId, (save, s, now) =>
-      standingsReadModelSchema.parse({
-        ...base(save, now),
-        competitionId: COMPETITION_ID,
-        competition: 'Liga Fixture',
-        rows: sortedStandings(s).map((r, index) => ({
-          position: index + 1,
-          club: clubSummary(s, r.clubId),
-          played: r.played,
-          won: r.won,
-          drawn: r.drawn,
-          lost: r.lost,
-          goalsFor: r.goalsFor,
-          goalsAgainst: r.goalsAgainst,
-          goalDifference: r.goalsFor - r.goalsAgainst,
-          points: r.points,
-        })),
-      }),
+      this.standingsModel(save, s, now),
     );
+  }
+  private homeModel(save: GameSave, s: Snapshot, now: string): HomeReadModel {
+    const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+    const next = managedFixture(s);
+    return homeReadModelSchema.parse({
+      ...base(save, now),
+      managerName: s.managerName,
+      careerName: s.careerName,
+      coach: s.coach,
+      inbox: coachInbox(s),
+      ...(s.selectedClubId === undefined
+        ? {}
+        : { chemistry: managedChemistry(s, s.selectedClubId) }),
+      club: clubSummary(s, s.selectedClubId),
+      currentDate: s.currentDate,
+      season: s.season,
+      ...(club ? { balance: club.balance } : {}),
+      nextFixtureId: next?.id,
+      pendingActions: s.pendingJobId
+        ? ['simulation_pending']
+        : next
+          ? ['prepare_match']
+          : s.selectedClubId
+            ? ['finish_season']
+            : ['select_club'],
+    });
+  }
+  private squadModel(save: GameSave, s: Snapshot, now: string): SquadReadModel {
+    const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+    if (!club) throw new ApplicationError('NOT_FOUND', 'club not selected');
+    return squadReadModelSchema.parse({
+      ...base(save, now),
+      club: clubSummary(s, club.id),
+      players: s.players
+        .filter(({ clubId }) => clubId === club.id)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          age: p.age,
+          position: p.position,
+          secondaryPositions: p.secondaryPositions,
+          ...(p.preferredSide ? { preferredSide: p.preferredSide } : {}),
+          ...(p.shirtNumber === undefined
+            ? {}
+            : { shirtNumber: p.shirtNumber }),
+          strength: p.strength,
+          traits: p.traits,
+          condition: p.condition,
+          morale: p.morale,
+          matchSharpness: p.matchSharpness,
+          squadStatus: p.squadStatus,
+          injuryRounds: p.injuryRounds,
+          suspensionRounds: p.suspensionRounds,
+          availability:
+            p.injuryRounds > 0
+              ? 'injured'
+              : p.suspensionRounds > 0
+                ? 'suspended'
+                : 'available',
+          ...(p.lastMatchRating === undefined
+            ? {}
+            : { lastMatchRating: p.lastMatchRating }),
+          careerStats: {
+            appearances: p.careerStats.appearances,
+            goals: p.careerStats.goals,
+            assists: p.careerStats.assists,
+            yellowCards: p.careerStats.yellowCards,
+            redCards: p.careerStats.redCards,
+            ...(p.careerStats.ratedAppearances
+              ? {
+                  averageRating: Number(
+                    (
+                      (p.careerStats.ratingTotal ?? 0) /
+                      p.careerStats.ratedAppearances
+                    ).toFixed(2),
+                  ),
+                }
+              : {}),
+          },
+          hiddenEstimates: hiddenEstimates(p),
+        })),
+      lineupPlayerIds: s.lineup
+        ? [
+            ...s.lineup.starters.map(({ playerId }) => playerId),
+            ...s.lineup.substitutes,
+            ...(s.lineup.reserves ?? []),
+          ]
+        : [],
+      ...(s.tactic ? { tactic: s.tactic } : {}),
+      lineup:
+        s.lineup && s.tactic
+          ? {
+              formation: s.tactic.formation,
+              starters: s.lineup.starters.map(({ playerId }) => playerId),
+              bench: s.lineup.substitutes,
+              reserves: s.lineup.reserves ?? [],
+            }
+          : undefined,
+      chemistry: managedChemistry(s, club.id),
+    });
+  }
+  private nextMatchModel(
+    save: GameSave,
+    s: Snapshot,
+    now: string,
+  ): NextMatchReadModel {
+    const f = managedFixture(s);
+    if (!f) throw new ApplicationError('NOT_FOUND', 'next fixture not found');
+    const content = this.loadContent(s.contentVersion);
+    return nextMatchReadModelSchema.parse({
+      ...base(save, now),
+      fixtureId: f.id,
+      competition: competitionName(content.competitions, s, f.competitionId),
+      round: f.round,
+      date: f.date,
+      homeClub: clubSummary(s, f.homeClubId),
+      awayClub: clubSummary(s, f.awayClubId),
+      status: s.pendingJobId
+        ? 'running'
+        : s.lineup && s.tactic
+          ? 'ready'
+          : 'scheduled',
+      preparation: matchPreparation(s, f),
+    });
+  }
+  private standingsModel(
+    save: GameSave,
+    s: Snapshot,
+    now: string,
+  ): StandingsReadModel {
+    const content = this.loadContent(s.contentVersion);
+    const division = (
+      Object.keys(s.competition.divisions) as MvpDivisionId[]
+    ).find((key) =>
+      s.competition.divisions[key].some(
+        (clubId) => clubId === s.selectedClubId,
+      ),
+    );
+    if (division === undefined)
+      throw new ApplicationError('NOT_FOUND', 'club not selected');
+    const competitionId = careerSeasonSystem(
+      content.competitions,
+      s.competition,
+    ).ids.divisions[division];
+    return standingsReadModelSchema.parse({
+      ...base(save, now),
+      competitionId,
+      competition: competitionName(content.competitions, s, competitionId),
+      rows: liveStandings(
+        content.competitions,
+        s.competition,
+        competitionId,
+      ).map((row, index) => ({
+        position: index + 1,
+        club: clubSummary(s, row.clubId),
+        played: row.played,
+        won: row.wins,
+        drawn: row.draws,
+        lost: row.losses,
+        goalsFor: row.goalsFor,
+        goalsAgainst: row.goalsAgainst,
+        goalDifference: row.goalDifference,
+        points: row.points,
+      })),
+    });
+  }
+  /**
+   * The Central in one read (ADR 0014): home, squad summary, next match,
+   * league table and inbox at one aggregate version. When `knownVersion`
+   * is the current version nothing is projected (HTTP 304 by `ETag`).
+   */
+  public async careerBundle(
+    bearer: string,
+    careerId: string,
+    knownVersion?: number,
+  ): Promise<{ aggregateVersion: number; bundle?: CareerBundleReadModel }> {
+    return this.query(bearer, careerId, (save, s, now) => {
+      if (knownVersion === save.version)
+        return { aggregateVersion: save.version };
+      const home = this.homeModel(save, s, now);
+      const club = s.clubs.find(({ id }) => id === s.selectedClubId);
+      const inLeague =
+        club !== undefined &&
+        Object.values(s.competition.divisions).some((ids) =>
+          ids.some((id) => id === club.id),
+        );
+      const lineupIds = s.lineup
+        ? [
+            ...s.lineup.starters.map(({ playerId }) => playerId),
+            ...s.lineup.substitutes,
+            ...(s.lineup.reserves ?? []),
+          ]
+        : [];
+      return {
+        aggregateVersion: save.version,
+        bundle: careerBundleReadModelSchema.parse({
+          ...base(save, now),
+          contentVersion: s.contentVersion,
+          home,
+          ...(club
+            ? {
+                squad: {
+                  club: clubSummary(s, club.id),
+                  players: s.players
+                    .filter(({ clubId }) => clubId === club.id)
+                    .map((p) => ({
+                      id: p.id,
+                      name: p.name,
+                      age: p.age,
+                      position: p.position,
+                      ...(p.shirtNumber === undefined
+                        ? {}
+                        : { shirtNumber: p.shirtNumber }),
+                      strength: p.strength,
+                      condition: p.condition,
+                      morale: p.morale,
+                      squadStatus: p.squadStatus,
+                      availability:
+                        p.injuryRounds > 0
+                          ? 'injured'
+                          : p.suspensionRounds > 0
+                            ? 'suspended'
+                            : 'available',
+                    })),
+                  lineupPlayerIds: lineupIds,
+                  ...(s.tactic ? { formation: s.tactic.formation } : {}),
+                },
+              }
+            : {}),
+          ...(managedFixture(s)
+            ? { nextMatch: this.nextMatchModel(save, s, now) }
+            : {}),
+          ...(inLeague ? { standings: this.standingsModel(save, s, now) } : {}),
+          inbox: home.inbox,
+        }),
+      };
+    });
   }
   public async postMatch(
     bearer: string,
     careerId: string,
   ): Promise<PostMatchReadModel> {
     return this.query(bearer, careerId, (save, s, now) => {
-      const result = s.results.at(-1);
-      if (!result) throw new ApplicationError('NOT_FOUND', 'no match result');
-      const f = s.fixtures.find(({ id }) => id === result.fixtureId)!;
-      const timeline: Record<string, unknown>[] = [];
-      for (const event of result.timeline) {
-        if (event.type === 'goal')
-          timeline.push({
-            type: 'goal',
-            minute: event.minute,
-            side: event.side,
-            playerId: event.scorerId,
-          });
-        else if (event.type === 'chance')
-          timeline.push({
-            type: 'chance',
-            minute: event.minute,
-            side: event.side,
-            xg: event.xg,
-          });
-        else if (event.type === 'card')
-          timeline.push({
-            type: 'card',
-            minute: event.minute,
-            side: event.side,
-            playerId: event.playerId,
-            card: event.card,
-          });
-        else if (event.type === 'injury')
-          timeline.push({
-            type: 'injury',
-            minute: event.minute,
-            side: event.side,
-            playerId: event.playerId,
-            rounds: event.rounds,
-          });
-        else if (event.type === 'substitution')
-          timeline.push({
-            type: 'substitution',
-            minute: event.minute,
-            side: event.side,
-            playerOutId: event.playerOutId,
-            playerInId: event.playerInId,
-            ...(event.source ? { source: event.source } : {}),
-          });
-        else
-          timeline.push({
-            type: 'tactical_change',
-            minute: event.minute,
-            side: event.side,
-            formation: event.tactic.formation,
-            mentality: event.tactic.mentality,
-          });
-      }
-      return postMatchReadModelSchema.parse({
+      const played = s.matches.at(-1);
+      if (!played) throw new ApplicationError('NOT_FOUND', 'no match result');
+      return postMatchModel(save, s, played, now, true);
+    });
+  }
+  public async careers(bearer: string): Promise<CareerListReadModel> {
+    const user = await this.identity(bearer);
+    const saves = await this.unitOfWork.withCareerLock(
+      `user:${user.userId}`,
+      (tx) => tx.saves.listByUser(user.userId),
+    );
+    const entitlements = await this.entitlements.forUser(user.userId);
+    const order =
+      this.deps.careerSlots === undefined
+        ? saves.map(({ id }) => id)
+        : await this.deps.careerSlots.activeCareerIds(user.userId);
+    return careerListReadModelSchema.parse({
+      version: 1,
+      limits: {
+        plan: entitlements.plan,
+        maxCareers: entitlements.maxCareers,
+        anyClub: entitlements.anyClub,
+        activeCareers: saves.length,
+      },
+      careers: saves
+        .filter((save) => save.versions.schema === CAREER_SAVE_SCHEMA)
+        .map((save) => {
+          const snapshot = snapshotOf(save);
+          const club = snapshot.clubs.find(
+            ({ id }) => id === snapshot.selectedClubId,
+          );
+          return {
+            careerId: save.id,
+            aggregateVersion: save.version,
+            managerName: snapshot.managerName,
+            careerName: snapshot.careerName,
+            coach: snapshot.coach,
+            ...(club ? { clubId: club.id, clubName: club.name } : {}),
+            season: snapshot.season,
+            currentDate: snapshot.currentDate,
+            locked: isCareerLocked(order, save.id, entitlements),
+          };
+        }),
+    });
+  }
+
+  /** Public counters for the Início screen; no authentication. */
+  public async publicStats(): Promise<PublicStats> {
+    const content = this.content.load();
+    const coaches = await this.unitOfWork.withCareerLock('public:stats', (tx) =>
+      tx.saves.countActiveUsers(),
+    );
+    return publicStatsSchema.parse({
+      version: 1,
+      coaches,
+      clubs: content.clubs.length,
+      athletes: content.players.length,
+    });
+  }
+
+  /** Plan entitlements of the authenticated user. */
+  public async entitlementsFor(bearer: string): Promise<Entitlements> {
+    const user = await this.identity(bearer);
+    return this.entitlements.forUser(user.userId);
+  }
+
+  public async careerWorld(
+    bearer: string,
+    careerId: string,
+  ): Promise<CareerWorldReadModel> {
+    return this.query(bearer, careerId, (save, s, now) => {
+      const content = this.loadContent(s.contentVersion);
+      const { world } = s;
+      const names = new Map(s.clubs.map(({ id, name }) => [id, name]));
+      const playerNames = new Map(s.players.map(({ id, name }) => [id, name]));
+      const competitions = new Map(
+        careerSeasonSystem(content.competitions, s.competition).definitions.map(
+          ({ id, name }) => [id, name],
+        ),
+      );
+      const clubId = world.manager.currentClubId;
+      const club = s.clubs.find(({ id }) => id === clubId);
+      const stadium = world.stadiums.find((item) => item.clubId === clubId);
+      const cashAccount = `club:${clubId ?? ''}:cash`;
+      const ledger = world.ledger.entries
+        .flatMap((entry) => {
+          const posting = entry.postings.find(
+            ({ account }) => account === cashAccount,
+          );
+          if (!posting) return [];
+          const source = entry.source;
+          const label =
+            source.type === 'wages'
+              ? `Folha salarial · ${source.period}`
+              : source.type === 'gate'
+                ? `Bilheteria · ${source.matchId.replace('month_', '')}`
+                : source.type === 'sponsor'
+                  ? `Patrocínio · ${source.period}`
+                  : source.type === 'prize'
+                    ? `Premiação · ${competitions.get(source.competitionId as CompetitionId) ?? source.competitionId}`
+                    : source.type === 'transfer'
+                      ? `Transferência · ${playerNames.get(source.playerId as Player['id']) ?? source.playerId}`
+                      : source.type === 'membership'
+                        ? `${Number(posting.amount) < 0 ? 'Benefícios do sócio-torcedor' : 'Sócio-torcedor'} · ${source.period}`
+                        : source.type === 'sponsor_termination'
+                          ? 'Multa rescisória de patrocínio'
+                          : 'Estádio';
+          return [
+            {
+              id: entry.id,
+              occurredAt: entry.occurredAt,
+              kind: source.type,
+              amount: Number(posting.amount),
+              label,
+            },
+          ];
+        })
+        .reverse()
+        .slice(0, 200);
+      return careerWorldReadModelSchema.parse({
         ...base(save, now),
-        matchId: result.matchId,
-        fixtureId: result.fixtureId,
-        homeClub: clubSummary(s, f.homeClubId),
-        awayClub: clubSummary(s, f.awayClubId),
-        score: { home: result.homeGoals, away: result.awayGoals },
-        timeline,
-        tableUpdated: true,
-        playback: createMatchPresentation(result).playback,
+        season: s.season,
+        currentDate: s.currentDate,
+        manager: {
+          managerId: world.manager.managerId,
+          employmentStatus: world.manager.employmentStatus,
+          ...(clubId === undefined ? {} : { clubId }),
+          boardConfidence: world.manager.boardConfidence,
+          fanConfidence: world.manager.fanConfidence,
+          prestige: world.manager.prestige,
+          seasons: world.manager.seasons,
+        },
+        ...(club && stadium
+          ? {
+              club: {
+                id: club.id,
+                name: club.name,
+                cash: Number(
+                  clubCashBalance(world.ledger, club.id, club.balance),
+                ),
+                openingBalance: Number(club.balance),
+                monthlyWageBill: clubWageBill(world, club.id),
+                stadium: {
+                  capacity: stadium.capacity,
+                  ticketPrice: Number(stadium.ticketPrice),
+                  maintenance: Number(stadium.maintenance),
+                  quality: stadium.quality,
+                  ...(stadium.expansion
+                    ? {
+                        expansion: {
+                          addedCapacity: stadium.expansion.addedCapacity,
+                          cost: Number(stadium.expansion.cost),
+                          completesOn: stadium.expansion.completesOn,
+                        },
+                      }
+                    : {}),
+                },
+              },
+            }
+          : {}),
+        ledger,
+        objectives: world.objectives.map(
+          ({ id, metric, target, progress, status }) => ({
+            id,
+            metric,
+            target,
+            progress,
+            status,
+          }),
+        ),
+        jobProposals: world.jobProposals.map((proposal) => ({
+          id: proposal.id,
+          clubId: proposal.clubId,
+          clubName: names.get(proposal.clubId) ?? proposal.clubId,
+          expiresOn: proposal.expiresOn,
+          minimumPrestige: proposal.minimumPrestige,
+          status: proposal.status,
+        })),
+        contracts: world.contracts
+          .filter((contract) => contract.clubId === clubId)
+          .map((contract) => ({
+            contractId: contract.id,
+            playerId: contract.playerId,
+            playerName: playerNames.get(contract.playerId) ?? contract.playerId,
+            endsOn: contract.endsOn,
+            wage: Number(contract.wage),
+            status: contract.status,
+          })),
+        offers: world.offers
+          .filter(
+            (offer) => offer.toClubId === clubId || offer.fromClubId === clubId,
+          )
+          .map((offer) => ({
+            id: offer.id,
+            playerId: offer.playerId,
+            playerName: playerNames.get(offer.playerId) ?? offer.playerId,
+            kind: offer.kind,
+            fee: Number(offer.fee),
+            wage: Number(offer.wage),
+            status: offer.status,
+            expiresOn: offer.expiresOn,
+            ...(offer.counterOf === undefined
+              ? {}
+              : { counterOf: offer.counterOf }),
+          })),
+        youth: world.youth
+          .filter(({ player }) => player.clubId === clubId)
+          .map(({ player, estimate, status }) => ({
+            playerId: player.id,
+            name: player.name,
+            position: player.position,
+            age: player.age,
+            estimate,
+            status,
+          })),
+        history: world.history
+          .slice(-200)
+          .reverse()
+          .map((event) => ({
+            id: event.id,
+            type: event.type,
+            season: event.season,
+            occurredOn: event.occurredOn,
+            ...(event.clubId === undefined
+              ? {}
+              : { clubName: names.get(event.clubId) ?? event.clubId }),
+            ...(event.competitionId === undefined
+              ? {}
+              : { competitionId: event.competitionId }),
+            ...(event.playerId === undefined
+              ? {}
+              : {
+                  playerName: playerNames.get(event.playerId) ?? event.playerId,
+                }),
+          })),
       });
     });
   }
+
+  /**
+   * Market screen (docs/adr/0008): cash, transfer window, squad status,
+   * transfer list, offers sent and received, loans and catalog search.
+   */
+  public async careerMarket(
+    bearer: string,
+    careerId: string,
+    rawQuery: unknown = {},
+  ): Promise<CareerMarketReadModel> {
+    const parsed = careerMarketQuerySchema.safeParse(rawQuery);
+    if (!parsed.success)
+      throw new ApplicationError('VALIDATION_ERROR', parsed.error.message);
+    return this.query(bearer, careerId, (save, snapshot, now) =>
+      projectCareerMarket({
+        careerId: save.id,
+        aggregateVersion: save.version,
+        projectedAt: now,
+        snapshot,
+        query: parsed.data,
+        origins: new Map(
+          Object.entries(
+            this.loadContent(snapshot.contentVersion).clubOrigins ?? {},
+          ),
+        ),
+      }),
+    );
+  }
+
+  /**
+   * Office screen (docs/adr/0011): proposals (sponsorship, jobs, transfers),
+   * sponsorship contract, fan membership, finances by category from the
+   * ledger, player contracts and the coach career.
+   */
+  public async careerOffice(
+    bearer: string,
+    careerId: string,
+  ): Promise<CareerOfficeReadModel> {
+    return this.query(bearer, careerId, (save, snapshot, now) =>
+      careerOfficeReadModelSchema.parse(
+        projectCareerOffice({
+          careerId: save.id,
+          aggregateVersion: save.version,
+          projectedAt: now,
+          seed: save.seed,
+          snapshot,
+          context: worldContextOf(snapshot),
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Season screen (Temporada): scorers, assists, ratings, managed position
+   * per league round, champions and awards, current and archived.
+   */
+  public async careerSeason(
+    bearer: string,
+    careerId: string,
+  ): Promise<CareerSeasonReadModel> {
+    return this.query(bearer, careerId, (save, s, now) => {
+      const content = this.loadContent(s.contentVersion);
+      return careerSeasonReadModelSchema.parse({
+        ...base(save, now),
+        currentDate: s.currentDate,
+        ...projectSeason({
+          stats: s.stats,
+          competition: s.competition,
+          ...(s.selectedClubId === undefined
+            ? {}
+            : { managedClubId: s.selectedClubId }),
+          names: statsNames(
+            s,
+            careerSeasonSystem(content.competitions, s.competition).definitions,
+          ),
+        }),
+      });
+    });
+  }
+
+  private competitionView<T>(
+    bearer: string,
+    careerId: string,
+    project: (input: Parameters<typeof projectPyramid>[0]) => T,
+  ): Promise<T> {
+    return this.query(bearer, careerId, (save, s, now) =>
+      project({
+        careerId: save.id,
+        aggregateVersion: save.version,
+        projectedAt: now,
+        config: this.loadContent(s.contentVersion).competitions,
+        competition: s.competition,
+        clubNames: new Map(s.clubs.map(({ id, name }) => [id, name])),
+        ...(s.selectedClubId === undefined
+          ? {}
+          : { managedClubId: s.selectedClubId }),
+        history: s.history,
+      }),
+    );
+  }
+  public competitions(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, projectPyramid);
+  }
+  public calendar(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, projectCalendar);
+  }
+  public seasonTransition(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, projectTransition);
+  }
+
   public async checksum(bearer: string, careerId: string): Promise<string> {
     const user = await this.identity(bearer);
-    const save = await this.deps.unitOfWork.withCareerLock(careerId, (tx) =>
+    const save = await this.unitOfWork.withCareerLock(careerId, (tx) =>
       this.load(tx, careerId, user.userId),
     );
     return save.checksum;
@@ -792,11 +1808,11 @@ export class FootebasApplication {
   ): Promise<T> {
     const user = await this.identity(bearer);
     try {
-      return await this.deps.unitOfWork.withCareerLock(careerId, async (tx) => {
+      return await this.unitOfWork.withCareerLock(careerId, async (tx) => {
         const save = await this.load(tx, careerId, user.userId);
         return project(
           save,
-          save.snapshot as unknown as Snapshot,
+          snapshotOf(save),
           this.deps.clock.now().toISOString(),
         );
       });
@@ -804,15 +1820,69 @@ export class FootebasApplication {
       throw this.translate(e);
     }
   }
+  /** Owned, playable save: missing, foreign and locked careers fail here. */
   private async load(
     tx: TransactionContext,
     id: string,
     userId: string,
+    guard = true,
   ): Promise<GameSave> {
     const save = await tx.saves.load(id, userId);
+    // The checksum of what was stored is verified while hydrating it.
     if (!save) throw new SaveNotFoundError(`save ${id} not found`);
-    if (!verifyChecksum(save)) throw new Error('save checksum mismatch');
+    if (save.versions.schema !== CAREER_SAVE_SCHEMA)
+      throw new ApplicationError(
+        'VERSION_CONFLICT',
+        `save schema ${save.versions.schema} requires migration`,
+      );
+    if (guard) await this.assertUnlocked(tx, userId, id);
     return save;
+  }
+
+  /** Ids of the user's active careers, oldest first. */
+  private async activeCareerIds(
+    tx: TransactionContext | undefined,
+    userId: string,
+  ): Promise<readonly string[]> {
+    if (this.deps.careerSlots !== undefined)
+      return this.deps.careerSlots.activeCareerIds(userId);
+    if (tx === undefined)
+      return this.unitOfWork.withCareerLock(`user:${userId}`, (inner) =>
+        this.activeCareerIds(inner, userId),
+      );
+    return (await tx.saves.listByUser(userId)).map(({ id }) => id);
+  }
+
+  /**
+   * Locked careers (beyond the plan's limit, by creation order) cannot be
+   * loaded or receive commands; buying the license unlocks them again.
+   */
+  private async assertUnlocked(
+    tx: TransactionContext | undefined,
+    userId: string,
+    careerId: string,
+  ): Promise<void> {
+    // A dedicated slots port is read alongside the plan (one round trip
+    // instead of two); a licensed plan ignores its answer and its failure.
+    const slots = this.deps.careerSlots?.activeCareerIds(userId);
+    slots?.catch(() => undefined);
+    const entitlements = await this.entitlements.forUser(userId);
+    // The license allows as many careers as can be created.
+    if (entitlements.plan === 'licensed') return;
+    const ids = await (slots ?? this.activeCareerIds(tx, userId));
+    if (isCareerLocked(ids, careerId, entitlements))
+      throw new CareerLockedError(careerId, entitlements);
+  }
+
+  /**
+   * Guard for career routes served by other services (phase four): the
+   * authenticated owner may only touch an unlocked career.
+   */
+  public async assertCareerUnlocked(
+    userId: string,
+    careerId: string,
+  ): Promise<void> {
+    await this.assertUnlocked(undefined, userId, careerId);
   }
   private accepted(
     command: Command,
@@ -829,6 +1899,10 @@ export class FootebasApplication {
   }
   private translate(error: unknown): Error {
     if (error instanceof ApplicationError) return error;
+    if (error instanceof SaveCodecError)
+      return new ApplicationError('VERSION_CONFLICT', error.message);
+    if (error instanceof OfficeRuleError || error instanceof InboxRuleError)
+      return new ApplicationError(error.code, error.message);
     if (error instanceof DomainError)
       return new ApplicationError('VALIDATION_ERROR', error.message);
     if (error instanceof SaveOwnershipError)
@@ -882,26 +1956,425 @@ function clubSummary(snapshot: Snapshot, id?: string) {
   const club = snapshot.clubs.find((candidate) => candidate.id === id);
   return club && { id: club.id, name: club.name, shortName: club.shortName };
 }
-function statusOf(snapshot: Snapshot, fixtureId: string) {
-  return snapshot.results.some((result) => result.fixtureId === fixtureId)
-    ? 'played'
-    : 'scheduled';
-}
-function nextFixture(snapshot: Snapshot) {
-  return snapshot.fixtures.find(
+function managedFixture(
+  snapshot: Snapshot,
+): CompetitionCalendarFixture | undefined {
+  if (!snapshot.selectedClubId) return undefined;
+  return pendingFixtures(snapshot.competition).find(
     (f) =>
-      statusOf(snapshot, f.id) === 'scheduled' &&
-      (f.homeClubId === snapshot.selectedClubId ||
-        f.awayClubId === snapshot.selectedClubId),
+      f.homeClubId === snapshot.selectedClubId ||
+      f.awayClubId === snapshot.selectedClubId,
   );
 }
-function sortedStandings(snapshot: Snapshot) {
-  return [...snapshot.standings].sort(
-    (a, b) =>
-      b.points - a.points ||
-      b.goalsFor - b.goalsAgainst - (a.goalsFor - a.goalsAgainst) ||
-      a.clubId.localeCompare(b.clubId),
+function competitionName(
+  config: MvpCompetitionConfig,
+  snapshot: Snapshot,
+  competitionId: CompetitionId,
+): string {
+  return (
+    careerSeasonSystem(config, snapshot.competition).definitions.find(
+      ({ id }) => id === competitionId,
+    )?.name ?? competitionId
   );
+}
+function divisionOf(snapshot: Snapshot, clubId: string): MvpDivisionId {
+  const division = (
+    Object.keys(snapshot.competition.divisions) as MvpDivisionId[]
+  ).find((key) =>
+    snapshot.competition.divisions[key].some((id) => id === clubId),
+  );
+  if (division === undefined)
+    throw new ApplicationError('NOT_FOUND', 'club is outside the pyramid');
+  return division;
+}
+/** Closes a finished season, runs the world's season end and opens the next. */
+function rollSeason(
+  snapshot: Snapshot,
+  config: MvpCompetitionConfig,
+  seed: string,
+): SeasonAchievement[] {
+  if (!isSeasonComplete(snapshot.competition)) return [];
+  const closure = closeCareerSeason(config, snapshot.competition);
+  const system = careerSeasonSystem(config, snapshot.competition);
+  // Ranking and statistics read the season before retirements and moves.
+  const managedClubId = snapshot.world.manager.currentClubId;
+  const managedDivision =
+    managedClubId === undefined
+      ? undefined
+      : (Object.keys(snapshot.competition.divisions) as MvpDivisionId[]).find(
+          (key) =>
+            snapshot.competition.divisions[key].some(
+              (id) => id === managedClubId,
+            ),
+        );
+  const achievements = seasonAchievements({
+    season: snapshot.season,
+    year: snapshot.competition.year,
+    ...(managedClubId === undefined ? {} : { managedClubId }),
+    clubReputation: Number(
+      snapshot.clubs.find(({ id }) => id === managedClubId)?.reputation ?? 0,
+    ),
+    outcomes: closure.outcomes,
+    definitions: system.definitions,
+    divisionCompetitionIds: system.ids.divisions,
+    promotions: closure.generation.events.flatMap((event) =>
+      event.type === 'ClubPromoted'
+        ? [{ clubId: event.clubId, toCompetitionId: event.toCompetitionId }]
+        : [],
+    ),
+    ...(managedDivision === undefined
+      ? {}
+      : { leagueCompetitionId: system.ids.divisions[managedDivision] }),
+  });
+  snapshot.stats = closeSeasonStats(
+    ensureStats(
+      snapshot.stats,
+      snapshot.season,
+      snapshot.players,
+      Number.MAX_SAFE_INTEGER,
+    ),
+    {
+      competition: snapshot.competition,
+      ...(managedClubId === undefined ? {} : { managedClubId }),
+      champions: closure.outcomes,
+      names: statsNames(snapshot, system.definitions),
+    },
+    closure.next.season,
+  );
+  snapshot.history = [
+    ...snapshot.history,
+    {
+      season: snapshot.season,
+      year: snapshot.competition.year,
+      movements: closure.generation.events.flatMap((event) =>
+        event.type === 'ClubPromoted' || event.type === 'ClubRelegated'
+          ? [
+              {
+                clubId: event.clubId,
+                fromCompetitionId: event.fromCompetitionId,
+                toCompetitionId: event.toCompetitionId,
+                kind:
+                  event.type === 'ClubPromoted'
+                    ? ('promoted' as const)
+                    : ('relegated' as const),
+              },
+            ]
+          : [],
+      ),
+      qualifiers: closure.generation.events.flatMap((event) =>
+        event.type === 'ClubQualified'
+          ? [
+              {
+                clubId: event.clubId,
+                fromCompetitionId: event.fromCompetitionId,
+                toCompetitionId: event.toCompetitionId,
+              },
+            ]
+          : [],
+      ),
+      champions: closure.outcomes.map((outcome) => ({
+        competitionId: outcome.competitionId,
+        championId: outcome.championId,
+        ...(outcome.runnerUpId === undefined
+          ? {}
+          : { runnerUpId: outcome.runnerUpId }),
+      })),
+    },
+  ];
+  const managedForm = recentManagedForm(snapshot);
+  withWorld(snapshot, (context) =>
+    closeSeasonWorld(context, {
+      season: snapshot.season,
+      year: snapshot.competition.year,
+      seed,
+      outcomes: closure.outcomes,
+      definitions: system.definitions,
+      generation: closure.generation,
+      divisionCompetitionIds: system.ids.divisions,
+      managedForm,
+      pyramidClubIds: Object.values(closure.next.divisions).flat(),
+      continentalClubIds: [
+        ...closure.next.continentalDirect,
+        ...closure.next.continentalPreliminary,
+      ],
+    }),
+  );
+  snapshot.competition = createCareerSeason(config, closure.next);
+  snapshot.season = closure.next.season;
+  snapshot.currentDate = `${String(closure.next.year)}-01-01`;
+  syncManagedClub(snapshot);
+  // The new season's sponsorship proposals arrive on day one (ADR 0011).
+  withWorld(snapshot, (context) =>
+    runOfficeDay(context, snapshot.currentDate, seed, snapshot.season),
+  );
+  return achievements;
+}
+/** Names the season statistics resolve ids with. */
+function statsNames(
+  snapshot: Snapshot,
+  definitions: readonly { id: string; name: string }[],
+): StatsNames {
+  return {
+    clubs: new Map(snapshot.clubs.map(({ id, name }) => [id, name])),
+    players: new Map(snapshot.players.map(({ id, name }) => [id, name])),
+    competitions: new Map(definitions.map(({ id, name }) => [id, name])),
+  };
+}
+/** The managed match of a date as the inbox rules read it. */
+function playedManagedMatch(snapshot: Snapshot, played: ManagedMatch) {
+  const outcome = managedOutcome(snapshot, played);
+  const form = [
+    ...recentManagedForm(snapshot),
+    outcome?.situation === 'win'
+      ? ('W' as const)
+      : outcome?.situation === 'loss'
+        ? ('L' as const)
+        : ('D' as const),
+  ].slice(-5);
+  return {
+    fixture: played.fixture,
+    result: played.result,
+    form,
+    opponentName:
+      snapshot.clubs.find(({ id }) => id === outcome?.opponentId)?.name ??
+      'adversário',
+  };
+}
+/**
+ * The assistant's fix for the saved lineup: injured or suspended starters give
+ * way to the strongest available player for the same position (bench first,
+ * then reserves, then anyone fit), and unavailable substitutes leave the bench.
+ * Everything else the manager chose stays as it was.
+ */
+export function availableLineup(snapshot: Snapshot): Lineup | undefined {
+  const lineup = snapshot.lineup;
+  const clubId = snapshot.selectedClubId;
+  if (!lineup || clubId === undefined) return lineup;
+  const byId = new Map<string, Snapshot['players'][number]>(
+    snapshot.players.map((player) => [player.id, player]),
+  );
+  const fit = (id: string) => {
+    const player = byId.get(id);
+    return player?.injuryRounds === 0 && player.suspensionRounds === 0;
+  };
+  const used = new Set(lineup.starters.map(({ playerId }) => playerId));
+  if (
+    lineup.starters.every(({ playerId }) => fit(playerId)) &&
+    lineup.substitutes.every(fit)
+  )
+    return lineup;
+  const club = snapshot.clubs.find(({ id }) => id === clubId);
+  if (!club) return lineup;
+  const pool = [
+    ...lineup.substitutes,
+    ...(lineup.reserves ?? []),
+    ...club.squad.filter(
+      (id) =>
+        !lineup.substitutes.includes(id) && !lineup.reserves?.includes(id),
+    ),
+  ].filter((id) => !used.has(id) && fit(id));
+  const strength = (id: string) => Number(byId.get(id)?.strength ?? 0);
+  const take = (position: Position): string | undefined => {
+    const natural = pool.filter((id) => byId.get(id)?.position === position);
+    const secondary = pool.filter((id) =>
+      byId.get(id)?.secondaryPositions.includes(position),
+    );
+    const outfield = pool.filter((id) =>
+      position === 'GK' ? false : byId.get(id)?.position !== 'GK',
+    );
+    const choice = [natural, secondary, outfield]
+      .map((group) => [...group].sort((a, b) => strength(b) - strength(a))[0])
+      .find((id) => id !== undefined);
+    if (choice !== undefined) pool.splice(pool.indexOf(choice), 1);
+    return choice;
+  };
+  const starters = lineup.starters.map((slot) => {
+    if (fit(slot.playerId)) return slot;
+    const replacement = take(slot.position);
+    return replacement === undefined
+      ? slot
+      : { ...slot, playerId: entityId(replacement, 'player') };
+  });
+  if (starters.some(({ playerId }) => !fit(playerId)))
+    return autoSelectLineup({
+      club,
+      players: snapshot.players,
+      formation: snapshot.tactic?.formation ?? '4-4-2',
+      mode: 'best',
+    });
+  const onPitch = new Set(starters.map(({ playerId }) => playerId));
+  const substitutes = lineup.substitutes.filter(
+    (id) => fit(id) && !onPitch.has(id),
+  );
+  const captainId = onPitch.has(lineup.captainId)
+    ? lineup.captainId
+    : starters[0]!.playerId;
+  return {
+    ...lineup,
+    starters,
+    substitutes,
+    ...(lineup.reserves === undefined
+      ? {}
+      : {
+          reserves: lineup.reserves.filter(
+            (id) => !onPitch.has(id) && !substitutes.includes(id),
+          ),
+        }),
+    captainId,
+  };
+}
+
+/**
+ * Applies the assistant's swap to the saved lineup after a round. A squad
+ * without eleven eligible players keeps its lineup: the next match refuses it
+ * with {@link eligibleShortage} and the manager decides.
+ */
+function settleAvailableLineup(snapshot: Snapshot): void {
+  try {
+    const lineup = availableLineup(snapshot);
+    if (lineup) snapshot.lineup = lineup;
+  } catch (error) {
+    if (!(error instanceof DomainError)) throw error;
+  }
+}
+
+/** Why the managed club cannot field an eligible XI, in Portuguese. */
+function eligibleShortage(snapshot: Snapshot, club: Club): string | undefined {
+  const eligible = snapshot.players.filter(
+    (player) =>
+      player.clubId === club.id &&
+      club.squad.includes(player.id) &&
+      player.injuryRounds === 0 &&
+      player.suspensionRounds === 0,
+  );
+  if (eligible.length < 11)
+    return `Só ${String(eligible.length)} jogadores do elenco estão aptos (os demais estão lesionados ou suspensos). São necessários 11 para entrar em campo: contrate ou aguarde a recuperação.`;
+  if (!eligible.some(({ position }) => position === 'GK'))
+    return 'Nenhum goleiro apto: todos os goleiros do elenco estão lesionados ou suspensos. Contrate um goleiro para entrar em campo.';
+  return undefined;
+}
+
+/** Keeps the matchday club aligned with the manager after firings or moves. */
+export function syncManagedClub(snapshot: Snapshot): void {
+  const clubId = snapshot.world.manager.currentClubId;
+  if (clubId === snapshot.selectedClubId) {
+    if (snapshot.lineup && clubId !== undefined) {
+      const club = snapshot.clubs.find(({ id }) => id === clubId)!;
+      const squad = new Set<string>(club.squad);
+      const lineup = snapshot.lineup;
+      const ids = [
+        ...lineup.starters.map(({ playerId }) => playerId),
+        ...lineup.substitutes,
+      ];
+      if (ids.some((id) => !squad.has(id)))
+        snapshot.lineup = autoSelectLineup({
+          club,
+          players: snapshot.players,
+          formation: snapshot.tactic?.formation ?? '4-4-2',
+          mode: 'best',
+        });
+      else snapshot.lineup = availableLineup(snapshot) ?? lineup;
+    }
+    return;
+  }
+  if (clubId === undefined) {
+    delete snapshot.selectedClubId;
+    delete snapshot.lineup;
+    return;
+  }
+  const club = snapshot.clubs.find(({ id }) => id === clubId)!;
+  snapshot.selectedClubId = clubId;
+  snapshot.tactic = snapshot.tactic ?? defaultTactic();
+  snapshot.lineup = autoSelectLineup({
+    club,
+    players: snapshot.players,
+    formation: snapshot.tactic.formation,
+    mode: 'best',
+  });
+}
+function postMatchModel(
+  save: GameSave,
+  s: Snapshot,
+  played: ManagedMatch,
+  now: string,
+  committed: boolean,
+): PostMatchReadModel {
+  const { fixture: f, result } = played;
+  const timeline: Record<string, unknown>[] = [];
+  for (const event of result.timeline) {
+    // Shooter, assistant, play and outcome (match-v4) feed the narration;
+    // results recorded by older engines simply lack them.
+    if (event.type === 'goal')
+      timeline.push({
+        type: 'goal',
+        minute: event.minute,
+        side: event.side,
+        playerId: event.scorerId,
+        ...(event.assistId ? { assistId: event.assistId } : {}),
+        ...(event.play ? { play: event.play } : {}),
+      });
+    else if (event.type === 'chance')
+      timeline.push({
+        type: 'chance',
+        minute: event.minute,
+        side: event.side,
+        xg: event.xg,
+        ...(event.playerId ? { playerId: event.playerId } : {}),
+        ...(event.assistId ? { assistId: event.assistId } : {}),
+        ...(event.play ? { play: event.play } : {}),
+        ...(event.outcome ? { outcome: event.outcome } : {}),
+      });
+    else if (event.type === 'card')
+      timeline.push({
+        type: 'card',
+        minute: event.minute,
+        side: event.side,
+        playerId: event.playerId,
+        card: event.card,
+      });
+    else if (event.type === 'injury')
+      timeline.push({
+        type: 'injury',
+        minute: event.minute,
+        side: event.side,
+        playerId: event.playerId,
+        rounds: event.rounds,
+      });
+    else if (event.type === 'substitution')
+      timeline.push({
+        type: 'substitution',
+        minute: event.minute,
+        side: event.side,
+        playerOutId: event.playerOutId,
+        playerInId: event.playerInId,
+        ...(event.source ? { source: event.source } : {}),
+      });
+    else
+      timeline.push({
+        type: 'tactical_change',
+        minute: event.minute,
+        side: event.side,
+        formation: event.tactic.formation,
+        mentality: event.tactic.mentality,
+      });
+  }
+  return postMatchReadModelSchema.parse({
+    ...base(save, now),
+    matchId: result.matchId,
+    fixtureId: result.fixtureId,
+    homeClub: clubSummary(s, f.homeClubId),
+    awayClub: clubSummary(s, f.awayClubId),
+    score: { home: result.homeGoals, away: result.awayGoals },
+    timeline,
+    participants: (result.playerPerformances ?? []).flatMap((performance) => {
+      const player = s.players.find(({ id }) => id === performance.playerId);
+      return player
+        ? [{ id: player.id, name: player.name, side: performance.side }]
+        : [];
+    }),
+    tableUpdated: committed,
+    playback: createMatchPresentation(result).playback,
+  });
 }
 function reformLineup(
   lineup: Lineup,
@@ -957,27 +2430,23 @@ function hiddenEstimates(player: Player) {
 }
 function matchPreparation(
   snapshot: Snapshot,
-  fixture: Snapshot['fixtures'][number],
+  fixture: CompetitionCalendarFixture,
 ) {
   const opponentId =
     fixture.homeClubId === snapshot.selectedClubId
       ? fixture.awayClubId
       : fixture.homeClubId;
   const opponent = clubSummary(snapshot, opponentId)!;
-  const recentForm = snapshot.results
-    .filter((result) => {
-      const played = snapshot.fixtures.find(
-        ({ id }) => id === result.fixtureId,
-      );
-      return (
-        played?.homeClubId === opponentId || played?.awayClubId === opponentId
-      );
-    })
+  const { fixtures, results } = snapshot.competition;
+  const recentForm = fixtures
+    .filter(
+      (played) =>
+        results[played.id] !== undefined &&
+        (played.homeClubId === opponentId || played.awayClubId === opponentId),
+    )
     .slice(-5)
-    .map((result) => {
-      const played = snapshot.fixtures.find(
-        ({ id }) => id === result.fixtureId,
-      )!;
+    .map((played) => {
+      const result = results[played.id]!;
       const goalsFor =
         played.homeClubId === opponentId ? result.homeGoals : result.awayGoals;
       const goalsAgainst =
@@ -988,30 +2457,11 @@ function matchPreparation(
           ? ('L' as const)
           : ('D' as const);
     });
-  const mean = (clubId: string) => {
-    const values = snapshot.players
-      .filter(
-        (player) =>
-          player.clubId === clubId &&
-          player.injuryRounds === 0 &&
-          player.suspensionRounds === 0,
-      )
-      .map(({ strength }) => Number(strength));
-    return (
-      values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
-    );
-  };
-  const difference = mean(opponentId) - mean(snapshot.selectedClubId!);
-  const approximateStrength =
-    difference < -7
-      ? ('much_weaker' as const)
-      : difference < -2
-        ? ('weaker' as const)
-        : difference <= 2
-          ? ('similar' as const)
-          : difference <= 7
-            ? ('stronger' as const)
-            : ('much_stronger' as const);
+  const approximateStrength = opponentStrength(
+    snapshot,
+    snapshot.selectedClubId!,
+    opponentId,
+  );
   const absences = snapshot.players
     .filter(
       (player) =>
@@ -1036,43 +2486,150 @@ function matchPreparation(
     absences,
   };
 }
-function applyResult(
+/** Opponent strength relative to `clubId`: mean of the 16 best available. */
+function opponentStrength(
   snapshot: Snapshot,
-  fixture: Fixture,
+  clubId: string,
+  opponentId: string,
+): ApproximateStrength {
+  const mean = (id: string) => {
+    const values = snapshot.players
+      .filter(
+        (player) =>
+          player.clubId === id &&
+          player.injuryRounds === 0 &&
+          player.suspensionRounds === 0,
+      )
+      .map(({ strength }) => Number(strength))
+      .sort((left, right) => right - left)
+      .slice(0, 16);
+    return (
+      values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
+    );
+  };
+  const difference = mean(opponentId) - mean(clubId);
+  return difference < -7
+    ? 'much_weaker'
+    : difference < -2
+      ? 'weaker'
+      : difference <= 2
+        ? 'similar'
+        : difference <= 7
+          ? 'stronger'
+          : 'much_stronger';
+}
+function managedOutcome(
+  snapshot: Snapshot,
+  played: ManagedMatch,
+):
+  | { situation: 'win' | 'draw' | 'loss'; score: string; opponentId: string }
+  | undefined {
+  const { fixture, result } = played;
+  const home = fixture.homeClubId === snapshot.selectedClubId;
+  if (!home && fixture.awayClubId !== snapshot.selectedClubId) return undefined;
+  const goalsFor = home ? result.homeGoals : result.awayGoals;
+  const goalsAgainst = home ? result.awayGoals : result.homeGoals;
+  return {
+    situation:
+      goalsFor > goalsAgainst
+        ? 'win'
+        : goalsFor < goalsAgainst
+          ? 'loss'
+          : 'draw',
+    score: `${String(goalsFor)} x ${String(goalsAgainst)}`,
+    opponentId: home ? fixture.awayClubId : fixture.homeClubId,
+  };
+}
+/**
+ * Inbox, newest first: match reports in the coach personality's tone,
+ * transfer and sponsorship proposals that wait for a decision (docs/adr/0008,
+ * 0011) and the generated board, athlete, press and notice messages.
+ */
+function coachInbox(snapshot: Snapshot): CoachMessage[] {
+  return [
+    ...transferOfferMessages(snapshot),
+    ...sponsorOfferMessages(snapshot),
+    ...generatedMessages(snapshot),
+    ...matchReports(snapshot),
+  ]
+    .sort(
+      (left, right) =>
+        right.occurredOn.localeCompare(left.occurredOn) ||
+        left.id.localeCompare(right.id),
+    )
+    .slice(0, 20);
+}
+function managedChemistry(snapshot: Snapshot, clubId: string) {
+  return chemistryView(
+    snapshot.world,
+    clubId,
+    snapshot.lineup?.starters.map(({ playerId }) => playerId),
+  );
+}
+function matchReports(snapshot: Snapshot): CoachMessage[] {
+  const clubName = (id: string) =>
+    snapshot.clubs.find((club) => club.id === id)?.name;
+  return snapshot.matches
+    .slice(-5)
+    .reverse()
+    .flatMap((played) => {
+      const outcome = managedOutcome(snapshot, played);
+      if (!outcome) return [];
+      const club = clubName(snapshot.selectedClubId!);
+      const opponent = clubName(outcome.opponentId);
+      const voice = renderCoachVoice(
+        snapshot.coach.personality,
+        outcome.situation,
+        {
+          coach: snapshot.managerName,
+          score: outcome.score,
+          ...(club === undefined ? {} : { club }),
+          ...(opponent === undefined ? {} : { opponent }),
+        },
+      );
+      return [
+        {
+          id: `mail_${played.fixture.id
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')}`,
+          kind: 'match_report' as const,
+          situation: outcome.situation,
+          subject: voice.subject,
+          body: voice.body,
+          occurredOn: played.fixture.date,
+        },
+      ];
+    });
+}
+/** Applies one match to both squads; absences count down per club match. */
+function applyPerformances(
+  snapshot: Snapshot,
+  fixture: CompetitionCalendarFixture,
   result: MatchResult,
 ): void {
-  snapshot.results.push(result);
-  snapshot.currentDate = fixture.date.toString();
-  const home = snapshot.standings.find(
-    ({ clubId }) => clubId === fixture.homeClubId,
-  )!;
-  const away = snapshot.standings.find(
-    ({ clubId }) => clubId === fixture.awayClubId,
-  )!;
-  home.played += 1;
-  away.played += 1;
-  home.goalsFor += result.homeGoals;
-  home.goalsAgainst += result.awayGoals;
-  away.goalsFor += result.awayGoals;
-  away.goalsAgainst += result.homeGoals;
-  if (result.homeGoals > result.awayGoals) {
-    home.won += 1;
-    away.lost += 1;
-    home.points += 3;
-  } else if (result.homeGoals < result.awayGoals) {
-    away.won += 1;
-    home.lost += 1;
-    away.points += 3;
-  } else {
-    home.drawn += 1;
-    away.drawn += 1;
-    home.points += 1;
-    away.points += 1;
-  }
   const performance = new Map(
     (result.playerPerformances ?? []).map((item) => [item.playerId, item]),
   );
+  // Coach personality (ADR 0007) only touches the managed squad.
+  const managedId = snapshot.selectedClubId;
+  const previous = snapshot.matches.at(-1);
+  const lossStreak =
+    previous !== undefined &&
+    managedOutcome(snapshot, previous)?.situation === 'loss';
+  const coached = (
+    player: Player,
+    played: { conditionDelta: number; moraleDelta: number },
+  ) =>
+    player.clubId === managedId
+      ? coachedMatchDeltas(snapshot.coach.personality, played, {
+          lossStreak,
+          key: `${fixture.id}|${player.id}`,
+        })
+      : played;
+  const clubs = new Set<string>([fixture.homeClubId, fixture.awayClubId]);
   snapshot.players = snapshot.players.map((player) => {
+    if (player.clubId === undefined || !clubs.has(player.clubId)) return player;
     const played = performance.get(player.id);
     if (!played)
       return {
@@ -1082,15 +2639,16 @@ function applyResult(
         condition: Math.min(100, Number(player.condition) + 3),
       } as Player;
     const ratedAppearances = (player.careerStats.ratedAppearances ?? 0) + 1;
+    const deltas = coached(player, played);
     return {
       ...player,
       condition: Math.max(
         0,
-        Math.min(100, Number(player.condition) + played.conditionDelta),
+        Math.min(100, Number(player.condition) + deltas.conditionDelta),
       ),
       morale: Math.max(
         0,
-        Math.min(100, Number(player.morale) + played.moraleDelta),
+        Math.min(100, Number(player.morale) + deltas.moraleDelta),
       ),
       matchSharpness: Math.min(
         100,
@@ -1119,4 +2677,20 @@ function applyResult(
       },
     } as Player;
   });
+}
+/** Clubs without a match on a date still recover a little condition. */
+function recoverIdlePlayers(
+  snapshot: Snapshot,
+  playing: ReadonlySet<string>,
+): void {
+  snapshot.players = snapshot.players.map((player) =>
+    player.clubId !== undefined &&
+    !playing.has(player.clubId) &&
+    Number(player.condition) < 100
+      ? ({
+          ...player,
+          condition: Math.min(100, Number(player.condition) + 2),
+        } as Player)
+      : player,
+  );
 }

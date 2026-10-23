@@ -1,0 +1,131 @@
+// Local development server: the whole authoritative stack in one process with
+// in-memory persistence, fake sign-in and an in-process job runner.
+// Usage: pnpm --filter @footebas/api dev  (PORT defaults to 8787)
+import {
+  FakeBearerAuth,
+  FootebasApplication,
+  FREE_ENTITLEMENTS,
+  LICENSED_ENTITLEMENTS,
+  InMemoryArchiveStorage,
+  InMemoryJobQueue,
+  InMemoryStorage,
+  Mulberry32RandomFactory,
+  NoopTelemetry,
+  PhaseFourApplicationService,
+  RankingService,
+  SequentialIdGenerator,
+  UnifiedPhaseFourRepository,
+} from '@footebas/application';
+import {
+  InMemoryRankingStore,
+  InMemoryUnitOfWork,
+  SystemClock,
+} from '@footebas/database';
+import { InMemoryBillingRepository } from './billing/billing-repository-memory.js';
+import { BillingService } from './billing/service.js';
+import {
+  parsePublicKeyPems,
+  RemotePublicKeys,
+  StaticPublicKeys,
+} from './billing/webhook-signature.js';
+import { FakeWooviClient } from './billing/woovi-fake.js';
+import { WOOVI_SANDBOX_URL, WooviHttpClient } from './billing/woovi-client.js';
+import { buildApi } from './index.js';
+import { withSmokeAuth } from './smoke-auth.js';
+
+const clock = new SystemClock();
+const auth = new FakeBearerAuth();
+const ids = new SequentialIdGenerator();
+const jobs = new InMemoryJobQueue();
+const unitOfWork = new InMemoryUnitOfWork(clock);
+// SMOKE_TOKEN (optional) lets tools/cloud-smoke run locally with the same
+// `smoke:<token>` bearer used against the cloud.
+const appAuth = withSmokeAuth(auth, process.env.SMOKE_TOKEN);
+const application = new FootebasApplication({
+  auth: appAuth,
+  clock,
+  ids,
+  jobs,
+  storage: new InMemoryStorage(),
+  telemetry: new NoopTelemetry(),
+  unitOfWork,
+  // Local play and E2E pick any club; DEV_PLAN=free shows the free plan.
+  entitlements: {
+    forUser: () =>
+      Promise.resolve(
+        process.env.DEV_PLAN === 'free'
+          ? FREE_ENTITLEMENTS
+          : LICENSED_ENTITLEMENTS,
+      ),
+  },
+});
+const phaseFour = new PhaseFourApplicationService({
+  repository: new UnifiedPhaseFourRepository(unitOfWork),
+  archives: new InMemoryArchiveStorage(),
+  clock,
+  ids,
+  random: new Mulberry32RandomFactory(),
+});
+
+// Ranking snapshots over the in-memory ledger, regenerated every minute here
+// (the Worker uses a 15-minute Cron Trigger).
+const rankings = new RankingService({
+  store: new InMemoryRankingStore(() => unitOfWork.achievements()),
+  clock,
+  auth: appAuth,
+});
+setInterval(() => {
+  void rankings.generateSnapshots();
+}, 60_000);
+
+// Billing: offline fake by default; WOOVI_APP_ID (sandbox) switches to the
+// real Woovi API so the PIX flow can be exercised end to end locally.
+const wooviUrl = process.env.WOOVI_API_URL ?? WOOVI_SANDBOX_URL;
+const wooviAppId = process.env.WOOVI_APP_ID?.trim() ?? '';
+const pinnedKeys = parsePublicKeyPems(
+  process.env.WOOVI_WEBHOOK_PUBLIC_KEYS ?? '',
+);
+const billingRepository = new InMemoryBillingRepository();
+const billing = new BillingService({
+  repository: billingRepository,
+  woovi:
+    wooviAppId === ''
+      ? new FakeWooviClient()
+      : new WooviHttpClient({ apiUrl: wooviUrl, appId: wooviAppId }),
+  entitlements: billingRepository.entitlements,
+  webhookKeys:
+    pinnedKeys.length > 0
+      ? new StaticPublicKeys(pinnedKeys)
+      : new RemotePublicKeys({ apiUrl: wooviUrl }),
+  ...(process.env.WOOVI_WEBHOOK_SECRET === undefined
+    ? {}
+    : { webhookSecret: process.env.WOOVI_WEBHOOK_SECRET }),
+});
+
+const api = await buildApi({
+  application,
+  jobs,
+  phaseFour: { application: phaseFour, auth: appAuth },
+  rankings,
+  billing: { service: billing, auth: appAuth },
+  devAuth: auth,
+  health: { version: 'dev' },
+  corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(','),
+});
+
+let running = false;
+setInterval(() => {
+  if (running) return;
+  running = true;
+  void (async () => {
+    try {
+      while ((await application.runNextJob()) !== undefined);
+    } finally {
+      running = false;
+    }
+  })();
+}, 150);
+
+const port = Number(process.env.PORT ?? 8787);
+await api.listen({ port, host: '127.0.0.1' });
+console.log(`Footebas API em http://127.0.0.1:${String(port)}`);

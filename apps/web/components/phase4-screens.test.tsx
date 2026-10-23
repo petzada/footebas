@@ -9,16 +9,21 @@ import {
 } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { CareerGame } from '@/components/career-game';
-import { InMemoryCareerApi } from '@/lib/career-api';
+import { completeNewCareer } from '@/components/testing/complete-new-career';
+import { WorldScreen } from '@/components/phase4-screens';
+import { InMemoryCareerApi, type CareerView } from '@/lib/career-api';
+import { createFakeRankingPort } from '@/lib/ranking-product';
+import { createFakeSeasonPort } from '@/lib/season-product';
 
 async function onboard(api = new InMemoryCareerApi()) {
   render(<CareerGame api={api} />);
   fireEvent.click(screen.getByRole('button', { name: /entrar no vestiário/i }));
-  await screen.findByLabelText(/nome do treinador/i);
-  fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
-  await screen.findByText(/escolha seu desafio/i);
-  fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
-  await screen.findByRole('button', { name: /narrar partida/i });
+  fireEvent.click(
+    await screen.findByRole('button', { name: /nova carreira/i }),
+  );
+  // Same coach name the old two-step onboarding prefilled.
+  await completeNewCareer({ coach: 'Márcio' });
+  await screen.findByRole('button', { name: /jogar partida/i });
   return api;
 }
 
@@ -35,59 +40,122 @@ async function selectTab(name: RegExp) {
   });
 }
 
+describe('Mundo · todas as telas leem os dados gravados', () => {
+  /** World as the HTTP adapter used to deliver it: no demo filler. */
+  async function serverLikeCareer() {
+    const api = new InMemoryCareerApi();
+    await api.login('ana@footebas.com');
+    await api.createCareer({ coach: 'Ana' });
+    await api.selectClub('Flamengo');
+    const view = (await api.getCareer())!;
+    const career: CareerView = {
+      ...view,
+      world: {
+        ...view.world,
+        news: [
+          {
+            id: 'mail_board',
+            tag: 'Diretoria',
+            headline: 'A diretoria quer saber do reforço',
+            detail: 'Buscar um meia agora ou poupar o caixa?',
+            date: '2026-02-09',
+            pending: true,
+          },
+          {
+            id: 'mail_report',
+            tag: 'Relatório',
+            headline: 'Vitória sobre o Bahia',
+            detail: '2 a 0 no Maracanã.',
+            date: '2026-02-07',
+          },
+        ],
+        history: { seasons: [], champions: [], records: [], idols: [] },
+        leaderboards: { global: [], underdog: [], monthly: [] },
+      },
+    };
+    return { api, career };
+  }
+
+  function renderWorld(
+    initialTab: string,
+    { api, career }: Awaited<ReturnType<typeof serverLikeCareer>>,
+  ) {
+    render(
+      <WorldScreen
+        career={career}
+        api={api}
+        onCareerChange={() => undefined}
+        reportError={() => undefined}
+        initialTab={initialTab}
+        ports={{
+          season: createFakeSeasonPort(),
+          ranking: createFakeRankingPort(),
+        }}
+      />,
+    );
+  }
+
+  it('Notícias lista as mensagens da caixa de entrada com data e pendência', async () => {
+    renderWorld('news', await serverLikeCareer());
+    const list = screen.getByRole('list', { name: /todas as mensagens/i });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(list).getByText(/diretoria quer saber/i)).toBeTruthy();
+    expect(within(list).getByText(/vitória sobre o bahia/i)).toBeTruthy();
+    expect(within(list).getByText(/decisão pendente/i)).toBeTruthy();
+    expect(within(list).getByText('09/02')).toBeTruthy();
+  });
+
+  it('Histórico mostra a temporada, campeões e recordes do read model', async () => {
+    renderWorld('history', await serverLikeCareer());
+    expect(await screen.findByText('2026 · Flamengo')).toBeTruthy();
+    expect(
+      screen.getByText(
+        /1º na série a · 7v 2e 1d · em andamento · pedro · 9 gols/i,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('2026 · Campeonato Carioca')).toBeTruthy();
+    expect(screen.getByText(/artilheiro 2026 \(parcial\)/i)).toBeTruthy();
+    expect(screen.getByText(/artilheiro do clube · 9 gols/i)).toBeTruthy();
+  });
+
+  it('Ranking usa os snapshots do servidor, não uma tabela vazia', async () => {
+    renderWorld('ranking', await serverLikeCareer());
+    expect(await screen.findByText('Tite da Várzea')).toBeTruthy();
+    expect(screen.getByText(/ranking de treinadores/i)).toBeTruthy();
+  });
+
+  it('Save lista as carreiras salvas e o que o save guarda', async () => {
+    const data = await serverLikeCareer();
+    renderWorld('save', data);
+    const saves = await screen.findByRole('list', {
+      name: /carreiras salvas/i,
+    });
+    expect(within(saves).getByText(/flamengo/i)).toBeTruthy();
+    expect(within(saves).getByText(/em uso/i)).toBeTruthy();
+    expect(screen.getByText(/o que este save guarda/i)).toBeTruthy();
+    expect(
+      screen.getByText(/decisões pendentes/i).parentElement?.textContent,
+    ).toMatch(/1$/);
+  });
+});
+
 describe('Fase 4 · verticais de carreira longa', () => {
-  it('busca, observa e compara atletas reais sem revelar dimensões ocultas', async () => {
-    await onboard();
-    navigate(/^mercado$/i);
-    expect(
-      await screen.findByRole('heading', { name: /^mercado$/i }),
-    ).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(/^nome$/i), {
-      target: { value: 'Scarpa' },
-    });
-    expect(screen.getByText('Gustavo Scarpa')).toBeTruthy();
-    expect(screen.queryByText('Lucas Esquivel')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /comparar/i }));
-    expect(screen.getByText(/comparação \(1\/2\)/i)).toBeTruthy();
-    expect(
-      screen.getAllByText(/dimensões ocultas permanecem estimativas/i),
-    ).toHaveLength(1);
-  });
-
-  it('negocia contraproposta, conclui a compra e cria lançamento com fonte', async () => {
-    const api = await onboard();
-    navigate(/^mercado$/i);
-    await screen.findByRole('tab', { name: /^oferta$/i });
-    await selectTab(/^oferta$/i);
-    expect(
-      ((await screen.findByLabelText(/^atleta$/i)) as HTMLSelectElement).value,
-    ).toBe('m-scarpa');
-    fireEvent.change(await screen.findByLabelText(/valor total/i), {
-      target: { value: '8000000' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /enviar oferta/i }));
-    fireEvent.click(
-      await screen.findByRole('button', { name: /aceitar contraproposta/i }),
-    );
-    expect(
-      await screen.findByText(/negócio concluído e auditado/i),
-    ).toBeTruthy();
-    const career = await api.getCareer();
-    expect(
-      career?.world.market.find((player) => player.id === 'm-scarpa')
-        ?.offerStatus,
-    ).toBe('accepted');
-    expect(career?.world.finances.ledger[0]?.sourceLabel).toMatch(
-      /transferência · gustavo scarpa · atlético mineiro/i,
-    );
-  });
-
   it('mostra alertas e renova um contrato pelo port autoritativo', async () => {
     const api = await onboard();
-    navigate(/^mercado$/i);
+    navigate(/^escritório$/i);
+    await screen.findByRole('tab', { name: /^contratos$/i });
     await selectTab(/^contratos$/i);
-    expect(screen.getByText(/pode assinar pré-contrato/i)).toBeTruthy();
-    const contract = screen.getByText('Bruno Henrique').closest('.rounded-xl');
+    expect(await screen.findByText(/pode assinar pré-contrato/i)).toBeTruthy();
+    const contract = screen
+      .getAllByText('Bruno Henrique')
+      .map((element) => element.closest('.panel'))
+      .find(
+        (panel) =>
+          panel &&
+          within(panel as HTMLElement).queryByRole('button', {
+            name: /^renovar$/i,
+          }),
+      );
     expect(contract).not.toBeNull();
     fireEvent.click(
       within(contract as HTMLElement).getByRole('button', {
@@ -104,7 +172,9 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('oferece feedback inválido acessível e preserva o ledger', async () => {
     await onboard();
-    navigate(/^clube$/i);
+    navigate(/^estádio$/i);
+    await screen.findByRole('tab', { name: /finanças/i });
+    await selectTab(/finanças/i);
     expect(await screen.findByText(/ledger imutável/i)).toBeTruthy();
     expect(screen.getByText('Bilheteria · Flamengo × Bahia')).toBeTruthy();
     expect(screen.getByText('Folha salarial · Rodada 7')).toBeTruthy();
@@ -122,14 +192,14 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('marca jovens como gerados e permite desenvolver e promover', async () => {
     const api = await onboard();
-    navigate(/^clube$/i);
+    navigate(/^estádio$/i);
     await screen.findByRole('tab', { name: /^base$/i });
     await selectTab(/^base$/i);
     expect(
       (await screen.findByText(/todos os atletas abaixo são/i)).textContent,
     ).toMatch(/gerados pelo universo/i);
     expect(screen.getAllByText(/base · gerado/i)).toHaveLength(3);
-    const card = screen.getByText('Davi Lessa').closest('.rounded-xl');
+    const card = screen.getByText('Davi Lessa').closest('.panel');
     expect(card).not.toBeNull();
     fireEvent.click(
       within(card as HTMLElement).getByRole('button', { name: /desenvolver/i }),
@@ -154,7 +224,7 @@ describe('Fase 4 · verticais de carreira longa', () => {
   it('troca de clube preserva treinador, prestígio e histórico', async () => {
     const api = await onboard();
     const before = await api.getCareer();
-    navigate(/^clube$/i);
+    navigate(/^estádio$/i);
     await screen.findByRole('tab', { name: /diretoria/i });
     await selectTab(/diretoria/i);
     fireEvent.click(
@@ -180,8 +250,9 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('expõe notícias, rankings segmentados e estado de migração por teclado', async () => {
     await onboard();
-    navigate(/^mundo$/i);
-    expect(await screen.findByRole('tablist')).toBeTruthy();
+    // Ranking virou tela própria; os rankings do mundo seguem em Histórico.
+    navigate(/^histórico$/i);
+    expect((await screen.findAllByRole('tablist')).length).toBeGreaterThan(0);
     await selectTab(/^ranking$/i);
     expect(screen.getByText(/referência nacional/i)).toBeTruthy();
     expect(screen.getByRole('tab', { name: /ascensão/i })).toBeTruthy();

@@ -48,6 +48,8 @@ export interface MvpContinentalConfig {
   readonly name: string;
   readonly initialDirectClubIds: readonly string[];
   readonly initialPreliminaryClubIds: readonly string[];
+  /** Clubs outside the national pyramid (e.g. foreign) seeded into groups every season. */
+  readonly fixedClubIds: readonly string[];
   readonly directSlots: number;
   readonly preliminarySlots: number;
   readonly groupCount: number;
@@ -247,6 +249,10 @@ function parseContinental(value: unknown): MvpContinentalConfig {
       item.initialPreliminaryClubIds,
       'continental.initialPreliminaryClubIds',
     ),
+    fixedClubIds:
+      item.fixedClubIds === undefined
+        ? []
+        : strings(item.fixedClubIds, 'continental.fixedClubIds'),
     directSlots: integer(item.directSlots, 'continental.directSlots', 1),
     preliminarySlots: integer(
       item.preliminarySlots,
@@ -273,14 +279,18 @@ function parseContinental(value: unknown): MvpContinentalConfig {
     ),
   };
   unique(
-    [...parsed.initialDirectClubIds, ...parsed.initialPreliminaryClubIds],
+    [
+      ...parsed.initialDirectClubIds,
+      ...parsed.initialPreliminaryClubIds,
+      ...parsed.fixedClubIds,
+    ],
     'continental initial participants',
   );
   const preliminaryWinners = parsed.preliminarySlots / 2;
   if (!Number.isInteger(preliminaryWinners))
     throw new Error('continental.preliminarySlots must be even');
   if (
-    parsed.directSlots + preliminaryWinners !==
+    parsed.directSlots + parsed.fixedClubIds.length + preliminaryWinners !==
     parsed.groupCount * parsed.groupSize
   )
     throw new Error(

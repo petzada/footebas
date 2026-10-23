@@ -1,0 +1,90 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "footebas-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "limits": { "cpu_ms": 120000 },
+  "observability": { "enabled": true },
+  // Custom domain (zone footebas.com.br); workers.dev stays on as fallback.
+  "workers_dev": true,
+  "routes": [{ "pattern": "api.footebas.com.br", "custom_domain": true }],
+  // Exposes the deployed version id in GET /health.
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  // Secrets (never in the repo), via `wrangler secret put`: SMOKE_TOKEN,
+  // ABACATEPAY_API_KEY and ABACATEPAY_WEBHOOK_SECRET (PIX via AbacatePay, ADR
+  // 0016; see src/billing/README.md). Woovi secrets only if PAYMENT_PROVIDER=woovi.
+  "vars": {
+    "SUPABASE_URL": "https://wjisqiiwsuykfbmqglfb.supabase.co",
+    "CORS_ORIGINS": "https://game.footebas.com.br,https://lp.footebas.com.br,https://footebas.com.br,https://www.footebas.com.br,http://localhost:3000",
+    // AbacatePay: the API key decides dev mode vs production (same URL).
+    "PAYMENT_PROVIDER": "abacatepay",
+    // Public base of the avatars bucket (custom domain on R2).
+    "AVATAR_PUBLIC_URL": "https://cdn.footebas.com.br",
+    // Fallback provider (PAYMENT_PROVIDER=woovi): sandbox until launch.
+    "WOOVI_API_URL": "https://api.woovi-sandbox.com",
+    "LICENSE_PRICE_CENTS": "2990",
+    "LICENSE_CHARGE_EXPIRES_IN": "900",
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "865d2096b8454b47a3bdd4bbb0fce828",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    },
+  ],
+  // Rate Limiting bindings (src/rate-limit.ts). Keys: hash of the bearer for
+  // signed-in callers, hash of cf-connecting-ip for anonymous ones. Counters
+  // are per Cloudflare location and eventually consistent (protection against
+  // abuse, not exact accounting). `/health` and the Woovi webhook are exempt.
+  // namespace_id must be unique per account; keep RATE_LIMITS in sync.
+  "ratelimits": [
+    {
+      // POST writes (commands, checkout) per user.
+      "name": "RATE_LIMIT_COMMANDS",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 },
+    },
+    {
+      // Authenticated GETs per user (job polling runs at ~4 req/s).
+      "name": "RATE_LIMIT_READS",
+      "namespace_id": "1002",
+      "simple": { "limit": 600, "period": 60 },
+    },
+    {
+      // Anonymous requests per IP (public stats, unauthenticated calls).
+      "name": "RATE_LIMIT_PUBLIC",
+      "namespace_id": "1003",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
+  // Career Durable Objects (ADR 0014): one SQLite-backed object per career
+  // keeps the hydrated aggregate in memory, serializes its commands, stores
+  // idempotency receipts and writes each change to Postgres (game_saves).
+  // Without this binding the Worker falls back to Postgres directly.
+  // Coach avatars uploaded in Nova Carreira (public via cdn.footebas.com.br).
+  "r2_buckets": [{ "binding": "AVATARS", "bucket_name": "footebas-avatars" }],
+  "durable_objects": {
+    "bindings": [{ "name": "CAREERS", "class_name": "CareerDurableObject" }],
+  },
+  // Durable Object migrations are append-only: never edit or reorder a tag.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CareerDurableObject"] },
+  ],
+  // Ranking snapshots (ADR 0013): the `scheduled` handler of src/worker.ts
+  // aggregates validated achievements into footebas.ranking_snapshots.
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "queues": {
+    "producers": [
+      { "binding": "SIMULATION_QUEUE", "queue": "footebas-simulation" },
+    ],
+    "consumers": [
+      {
+        "queue": "footebas-simulation",
+        "max_batch_size": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "footebas-simulation-dlq",
+      },
+    ],
+  },
+}

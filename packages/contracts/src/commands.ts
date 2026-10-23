@@ -18,6 +18,12 @@ import {
   transportVersionSchema,
   versionSchema,
 } from './primitives.js';
+import { careerNameSchema, coachProfileSchema } from './coach.js';
+import {
+  configureFanMembershipCommandSchema,
+  counterSponsorshipOfferCommandSchema,
+  decideSponsorshipOfferCommandSchema,
+} from './office.js';
 
 const envelopeFields = {
   version: transportVersionSchema,
@@ -32,7 +38,17 @@ export const createCareerCommandSchema = z.strictObject({
   payload: z.strictObject({
     managerName: nonEmptyTextSchema,
     startDate: gameDateSchema,
+    /** Optional for compatibility; defaults to "Carreira de <managerName>". */
+    careerName: careerNameSchema.optional(),
+    /** Optional for compatibility; defaults to BR, avatar-01, estrategista. */
+    coach: coachProfileSchema.optional(),
   }),
+});
+/** Archives the career (owner only) and frees its slot in the plan limit. */
+export const deleteCareerCommandSchema = z.strictObject({
+  ...envelopeFields,
+  type: z.literal('DeleteCareer'),
+  payload: z.strictObject({ careerId: entityIdSchema }),
 });
 export const selectClubCommandSchema = z.strictObject({
   ...envelopeFields,
@@ -92,16 +108,15 @@ const tacticSchema = z.strictObject({
   defensiveLine: defensiveLineSchema.optional(),
   markingStyle: markingStyleSchema.optional(),
 });
-const matchInstructionSchema = z.discriminatedUnion('type', [
+/**
+ * Decision 18 (docs/09): the manager may pause at any minute, so an
+ * instruction can target any whole minute of the match (ADR 0015).
+ */
+const matchInstructionMinuteSchema = z.int().min(0).max(93);
+export const matchInstructionSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('substitution'),
-    minute: z.union([
-      z.literal(15),
-      z.literal(30),
-      z.literal(45),
-      z.literal(60),
-      z.literal(75),
-    ]),
+    minute: matchInstructionMinuteSchema,
     side: z.enum(['home', 'away']),
     playerOutId: entityIdSchema,
     playerInId: entityIdSchema,
@@ -109,13 +124,7 @@ const matchInstructionSchema = z.discriminatedUnion('type', [
   }),
   z.strictObject({
     type: z.literal('tactical_change'),
-    minute: z.union([
-      z.literal(15),
-      z.literal(30),
-      z.literal(45),
-      z.literal(60),
-      z.literal(75),
-    ]),
+    minute: matchInstructionMinuteSchema,
     side: z.enum(['home', 'away']),
     tactic: tacticSchema,
   }),
@@ -126,6 +135,20 @@ export const advanceDateCommandSchema = z.strictObject({
   payload: z.strictObject({
     careerId: entityIdSchema,
     throughDate: gameDateSchema.optional(),
+  }),
+});
+/**
+ * Answers a generated inbox message (board, athletes, press, contract end).
+ * Idempotent: repeating the chosen option changes nothing; a different
+ * option on a resolved message, or any option after `expiresOn`, is refused.
+ */
+export const resolveInboxDecisionCommandSchema = z.strictObject({
+  ...envelopeFields,
+  type: z.literal('ResolveInboxDecision'),
+  payload: z.strictObject({
+    careerId: entityIdSchema,
+    messageId: entityIdSchema,
+    optionId: entityIdSchema,
   }),
 });
 export const simulateMatchCommandSchema = z.strictObject({
@@ -140,12 +163,17 @@ export const simulateMatchCommandSchema = z.strictObject({
 
 export const commandSchema = z.discriminatedUnion('type', [
   createCareerCommandSchema,
+  deleteCareerCommandSchema,
   selectClubCommandSchema,
   setLineupCommandSchema,
   autoPickLineupCommandSchema,
   setTacticsCommandSchema,
   advanceDateCommandSchema,
   simulateMatchCommandSchema,
+  decideSponsorshipOfferCommandSchema,
+  counterSponsorshipOfferCommandSchema,
+  configureFanMembershipCommandSchema,
+  resolveInboxDecisionCommandSchema,
 ]);
 export const commandAcceptedSchema = z.strictObject({
   version: transportVersionSchema,
@@ -156,11 +184,15 @@ export const commandAcceptedSchema = z.strictObject({
 });
 
 export type CreateCareerCommand = z.infer<typeof createCareerCommandSchema>;
+export type DeleteCareerCommand = z.infer<typeof deleteCareerCommandSchema>;
 export type SelectClubCommand = z.infer<typeof selectClubCommandSchema>;
 export type SetLineupCommand = z.infer<typeof setLineupCommandSchema>;
 export type SetTacticsCommand = z.infer<typeof setTacticsCommandSchema>;
 export type AutoPickLineupCommand = z.infer<typeof autoPickLineupCommandSchema>;
 export type AdvanceDateCommand = z.infer<typeof advanceDateCommandSchema>;
 export type SimulateMatchCommand = z.infer<typeof simulateMatchCommandSchema>;
+export type ResolveInboxDecisionCommand = z.infer<
+  typeof resolveInboxDecisionCommandSchema
+>;
 export type Command = z.infer<typeof commandSchema>;
 export type CommandAccepted = z.infer<typeof commandAcceptedSchema>;

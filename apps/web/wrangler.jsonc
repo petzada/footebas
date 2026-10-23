@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "footebas-web",
+  // Gerados por `pnpm --filter @footebas/web cf:build` (OpenNext).
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": { "enabled": true },
+  // Um Worker, quatro hosts; o next.config separa: lp = landing, game = jogo,
+  // apex e www redirecionam (308) para a landing.
+  "routes": [
+    { "pattern": "lp.footebas.com.br", "custom_domain": true },
+    { "pattern": "game.footebas.com.br", "custom_domain": true },
+    { "pattern": "footebas.com.br", "custom_domain": true },
+    { "pattern": "www.footebas.com.br", "custom_domain": true },
+  ],
+}

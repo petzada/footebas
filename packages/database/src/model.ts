@@ -27,11 +27,13 @@ export interface GameSave {
   readonly version: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+  /** Set when the owner deleted the career; archived saves are invisible. */
+  readonly archivedAt?: string;
 }
 
 export type NewGameSave = Omit<
   GameSave,
-  'checksum' | 'version' | 'createdAt' | 'updatedAt'
+  'checksum' | 'version' | 'createdAt' | 'updatedAt' | 'archivedAt'
 >;
 export type SaveUpdate = Pick<GameSave, 'snapshot' | 'seed' | 'versions'>;
 

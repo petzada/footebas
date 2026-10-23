@@ -8,16 +8,17 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CareerGame } from '@/components/career-game';
+import { completeNewCareer } from '@/components/testing/complete-new-career';
 import { InMemoryCareerApi } from '@/lib/career-api';
 
 async function onboard(api = new InMemoryCareerApi()) {
   render(<CareerGame api={api} />);
   fireEvent.click(screen.getByRole('button', { name: /entrar no vestiário/i }));
-  await screen.findByLabelText(/nome do treinador/i);
-  fireEvent.click(screen.getByRole('button', { name: /conhecer os clubes/i }));
-  await screen.findByText(/escolha seu desafio/i);
-  fireEvent.click(screen.getByRole('button', { name: /flamengo/i }));
-  await screen.findByRole('button', { name: /narrar partida/i });
+  fireEvent.click(
+    await screen.findByRole('button', { name: /nova carreira/i }),
+  );
+  await completeNewCareer();
+  await screen.findByRole('button', { name: /jogar partida/i });
   return api;
 }
 
@@ -26,59 +27,77 @@ afterEach(() => vi.useRealTimers());
 describe('elenco e matchday mobile-first', () => {
   it('chega à rodada em poucos toques, pula o feed e prepara a próxima', async () => {
     await onboard();
-    fireEvent.click(screen.getByRole('button', { name: /narrar partida/i }));
+    fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
     fireEvent.click(
-      await screen.findByRole('button', { name: /pular resultado/i }),
+      await screen.findByRole('button', { name: /pular para o resultado/i }),
     );
     expect(await screen.findByText(/fim de jogo/i)).toBeTruthy();
     fireEvent.click(
       screen.getByRole('button', { name: /preparar próxima rodada/i }),
     );
-    expect(await screen.findByText(/rodada 2/i)).toBeTruthy();
+    expect((await screen.findAllByText(/rodada 2/i)).length).toBeGreaterThan(0);
   });
 
-  it('oferece controles sem drag e seleção operável por teclado', async () => {
+  it('oferece alternativa ao arrastar: selecionar e escolher o destino pelo teclado', async () => {
     await onboard();
     fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
-    expect(await screen.findByText(/arrastar não é necessário/i)).toBeTruthy();
-    const player = screen.getByRole('button', { name: /emerson royal/i });
-    player.focus();
-    fireEvent.keyDown(player, { key: 'Enter' });
-    expect(player.getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByLabelText(/detalhes de emerson royal/i)).toBeTruthy();
     expect(
-      screen.getByRole('group', { name: /mover emerson royal/i }),
+      await screen.findByText(/arraste um jogador ou toque nele/i),
+    ).toBeTruthy();
+    const player = screen.getByRole('button', {
+      name: /lateral direito: emerson royal/i,
+    });
+    player.focus();
+    fireEvent.click(player);
+    expect(player.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('status').textContent).toMatch(/selecionado/i);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /mandar emerson royal para o banco/i,
+      }),
+    );
+    expect(
+      screen.getByRole('button', { name: /^emerson royal, ld.*no banco/i }),
     ).toBeTruthy();
   });
 
-  it('expõe feedback acessível para ação inválida', async () => {
+  it('expõe feedback acessível para escalação pendente', async () => {
     await onboard();
     fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
-    fireEvent.click(screen.getByRole('button', { name: /emerson royal/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^banco$/i }));
-    expect((await screen.findByRole('alert')).textContent).toMatch(
-      /banco aceita no máximo/i,
+    fireEvent.click(
+      await screen.findByRole('button', { name: /goleiro: agustín rossi/i }),
     );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /mandar agustín rossi para as reservas/i,
+      }),
+    );
+    expect(
+      screen.getByRole('list', { name: /pendências da escalação/i })
+        .textContent,
+    ).toMatch(/faltam 1 titular/i);
   });
 
   it('mostra preparação, controles de velocidade, feed e skip em um toque', async () => {
     await onboard();
     expect(screen.getByText(/raio-x do rival/i)).toBeTruthy();
-    expect(screen.getByText('≈ 82')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /narrar partida/i }));
+    // Opponent strength is shown as a plain number (no "≈").
+    expect(document.body.textContent).toMatch(/82/);
+    expect(document.body.textContent).not.toMatch(/≈ 82/);
+    fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
     expect(await screen.findByLabelText(/velocidade 4 vezes/i)).toBeTruthy();
     expect(
       screen.getByRole('list', { name: /feed da partida/i }).textContent,
     ).toMatch(/bola rolando/i);
     expect(
-      screen.getByRole('button', { name: /pular resultado/i }),
+      screen.getByRole('button', { name: /pular para o resultado/i }),
     ).toBeTruthy();
   });
 
   it('aplica escalação automática e mantém até duas características visíveis', async () => {
     const api = await onboard();
     fireEvent.click(screen.getAllByRole('button', { name: /elenco/i })[0]!);
-    fireEvent.click(await screen.findByRole('button', { name: /^poupar$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^poupar/i }));
     await waitFor(async () => {
       const career = await api.getCareer();
       expect(
@@ -133,28 +152,34 @@ describe('CareerApiPort autoritativo', () => {
     );
   });
 
-  it('registra substituições e mudanças táticas em ponto discreto', async () => {
+  it('registra substituições e mudanças táticas em qualquer pausa até o apito final', async () => {
     const api = new InMemoryCareerApi();
     await api.login('a@b.com');
     await api.createCareer({ coach: 'Bia' });
     await api.selectClub('Flamengo');
-    await api.beginMatch();
+    const kickoff = await api.beginMatch();
+    expect(kickoff.replay?.timeline.length).toBeGreaterThan(0);
+    // Decision 18: a manual pause at any minute accepts changes.
+    await api.makeSubstitution({
+      outgoingId: 'fla-22',
+      incomingId: 'fla-13',
+      minute: 7,
+    });
+    const stops: number[] = [];
+    let update = kickoff;
+    while (!update.done) {
+      update = await api.nextMatchEvent();
+      if (update.decisionPoint) stops.push(update.minute);
+    }
+    // It stops by itself only at half time (and at the end).
+    expect(stops).toEqual([45]);
     await expect(
-      api.makeSubstitution({ outgoingId: 'fla-22', incomingId: 'fla-13' }),
-    ).rejects.toThrow(/pausas/i);
-    await api.nextMatchEvent();
-    await api.nextMatchEvent();
-    const pause = await api.nextMatchEvent();
-    expect(pause.decisionPoint).toBe(true);
-    await api.makeSubstitution({ outgoingId: 'fla-22', incomingId: 'fla-13' });
-    await api.changeMatchTactics({ mentality: 'attacking' });
+      api.changeMatchTactics({ mentality: 'attacking' }),
+    ).rejects.toThrow(/terminou/i);
     const finished = await api.finishMatch();
-    expect(finished.lastResult?.actions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'substitution' }),
-        expect.objectContaining({ type: 'tactics' }),
-      ]),
-    );
+    expect(finished.lastResult?.actions).toEqual([
+      expect.objectContaining({ type: 'substitution', minute: 7 }),
+    ]);
   });
 
   it('produz resultado instantâneo completo', async () => {

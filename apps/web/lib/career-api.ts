@@ -3,16 +3,61 @@ import {
   type Phase4View,
   type TransferKind,
 } from '@/lib/phase4-model';
+import { replayFromFeed } from '@/lib/match-replay-adapter';
+import type { MatchReplayInput } from '@/lib/match-replay-model';
+import {
+  DEFAULT_COACH_PROFILE,
+  careerNameError,
+  defaultCareerName,
+  type CoachProfile,
+} from '@/lib/coach-profile';
+import {
+  createDemoManagement,
+  demoChemistry,
+  demoConfigureMembership,
+  demoCounterOffer,
+  demoCounterSponsorship,
+  demoDecideOffer,
+  demoDecideSponsorship,
+  demoListPlayer,
+  demoMarketView,
+  demoOfficeView,
+  demoSubmitOffer,
+  demoWithdrawListing,
+  type DemoManagement,
+  type SquadChange,
+} from '@/lib/management-demo';
+import type {
+  ChemistryView,
+  LineupInput,
+  ListingInput,
+  MarketOfferInput,
+  MarketQuery,
+  MarketView,
+  MembershipTier,
+  OfficeView,
+} from '@/lib/management-model';
 
+export type { CoachProfile } from '@/lib/coach-profile';
+
+/** Shell destinations; the first seven are the main areas of docs/09. */
 export type Screen =
-  | 'home'
+  | 'central'
+  | 'map'
   | 'squad'
+  | 'market'
+  | 'office'
+  | 'season'
+  | 'ranking'
+  | 'inbox'
+  | 'calendar'
   | 'tactics'
   | 'table'
-  | 'market'
-  | 'club'
   | 'competitions'
-  | 'world';
+  | 'stadium'
+  | 'finance'
+  | 'history'
+  | 'profile';
 export type Formation = '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2';
 export type SquadRole = 'starter' | 'bench' | 'reserve';
 export type AutoPickStrategy = 'best' | 'rest' | 'develop';
@@ -22,7 +67,7 @@ export type Focus = 'middle' | 'wings';
 export type Press = 'low' | 'medium' | 'high';
 export type DefensiveLine = 'deep' | 'standard' | 'high';
 export type Marking = 'light' | 'strong' | 'very-strong';
-export type MatchSpeed = 1 | 2 | 4;
+export type MatchSpeed = 0.5 | 1 | 2 | 4;
 
 export interface TacticsView {
   mentality: Mentality;
@@ -55,6 +100,8 @@ export interface PlayerView {
   goals: number;
   appearances: number;
   lastRating: number | null;
+  /** Slot the starter occupies in the saved lineup (client position code). */
+  lineupPosition?: string | undefined;
   scoutingEstimates: {
     potential: 'limitado' | 'bom' | 'alto';
     consistency: 'irregular' | 'estável' | 'muito estável';
@@ -70,6 +117,11 @@ export interface StandingView {
   club: string;
   played: number;
   points: number;
+  /** Record and goal difference (absent on older read models). */
+  won?: number;
+  drawn?: number;
+  lost?: number;
+  goalDifference?: number;
 }
 
 export interface OpponentView {
@@ -92,11 +144,29 @@ export interface MatchResultView {
   headline: string;
   events: readonly MatchUpdate[];
   actions: readonly MatchActionView[];
+  replay?: MatchReplayInput;
+}
+
+export interface FixtureView {
+  competition: string;
+  /** ISO game date, when the server exposes it. */
+  date?: string;
+  venue: 'home' | 'away';
 }
 
 export interface CareerView {
+  /** Server career id; keys client-side data such as saved lineups. */
+  careerId?: string;
   coach: string;
+  /** Career name (home read model); absent on older servers. */
+  careerName?: string;
+  /** Coach nationality, avatar and personality (home read model). */
+  coachProfile?: CoachProfile;
   club: string;
+  /** League the club plays in (standings read model). */
+  division?: string;
+  /** Next fixture metadata (next-match read model). */
+  fixture?: FixtureView;
   round: number;
   formation: Formation;
   tactics: TacticsView;
@@ -105,6 +175,8 @@ export interface CareerView {
   opponent: OpponentView;
   world: Phase4View;
   lastResult?: MatchResultView;
+  /** Chemistry of the managed eleven (ADR 0011), when the server sends it. */
+  chemistry?: ChemistryView;
 }
 
 export interface MatchUpdate {
@@ -114,15 +186,99 @@ export interface MatchUpdate {
   message: string;
   score: string;
   kind: 'kickoff' | 'chance' | 'goal' | 'card' | 'save' | 'full-time';
+  /** Team that owns the action; `save` belongs to the attacking side. */
+  side?: 'home' | 'away';
+  /**
+   * Automatic stop (decision 18): only the half-time update. Manual pauses
+   * happen at any minute on the client.
+   */
   decisionPoint: boolean;
   done: boolean;
+  /** Minute of the following update, so the live clock can wait for it. */
+  nextMinute?: number;
+  /**
+   * The whole official timeline for the live pitch (decision 19), sent with
+   * the kickoff and again after every change made in a pause.
+   */
+  replay?: MatchReplayInput;
+}
+
+/** Public counters for the Início screen (GET /v1/public/stats). */
+export interface PublicStats {
+  coaches: number;
+  clubs: number;
+  athletes: number;
+}
+
+/** One saved career of the signed-in player. */
+export interface CareerSummary {
+  id: string;
+  /** Career name chosen by the player, once the server stores it. */
+  name?: string;
+  coach: string;
+  /** Coach nationality, avatar and personality, once the server sends it. */
+  coachProfile?: CoachProfile;
+  clubName?: string;
+  season?: number;
+  currentDate?: string;
+  round?: number;
+  /** ISO timestamp of the last change, once the server exposes it. */
+  updatedAt?: string;
+  /**
+   * Saved but locked: the license was refunded and the plan keeps only the
+   * oldest career playable. Buying the license again unlocks it.
+   */
+  locked?: boolean;
+}
+
+export interface CareerList {
+  careers: readonly CareerSummary[];
+  /** Careers allowed by the plan (free: 1, license: 5), when known. */
+  limit?: number;
+  /** License lets the coach pick any club; free starts in Série C (docs/05). */
+  anyClub?: boolean;
+}
+
+export const FREE_CAREER_LIMIT = 1;
+export const LICENSE_CAREER_LIMIT = 5;
+
+/** Mirrors the server refusal `CAREER_LIMIT_REACHED`. */
+export class CareerLimitReachedError extends Error {
+  public readonly code = 'CAREER_LIMIT_REACHED';
+  public constructor(message: string) {
+    super(message);
+    this.name = 'CareerLimitReachedError';
+  }
+}
+
+export function isCareerLimitError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    (error as { code?: unknown }).code === 'CAREER_LIMIT_REACHED'
+  );
+}
+
+/** `CreateCareer` input; the server fills defaults for omitted fields. */
+export interface CreateCareerInput {
+  /** Manager name shown in headlines (`managerName`). */
+  coach: string;
+  /** 1–40 characters; defaults to "Carreira de <coach>". */
+  careerName?: string;
+  /** Sent as the contract's `coach` profile. */
+  coachProfile?: CoachProfile;
 }
 
 export interface CareerApiPort {
   login(email: string): Promise<void>;
-  createCareer(input: { coach: string }): Promise<void>;
+  createCareer(input: CreateCareerInput): Promise<void>;
   selectClub(club: string): Promise<void>;
   getCareer(): Promise<CareerView | null>;
+  /** Public counters; `null` hides them (endpoint missing or failing). */
+  getPublicStats(): Promise<PublicStats | null>;
+  listCareers(): Promise<CareerList>;
+  /** Activates a career; `null` when it still needs a club. */
+  openCareer(careerId: string): Promise<CareerView | null>;
+  deleteCareer(careerId: string): Promise<void>;
   setPlayerRole(playerId: string, role: SquadRole): Promise<CareerView>;
   autoPick(strategy: AutoPickStrategy): Promise<CareerView>;
   setTactics(input: {
@@ -132,11 +288,16 @@ export interface CareerApiPort {
   validateMatchday(): Promise<void>;
   beginMatch(): Promise<MatchUpdate>;
   nextMatchEvent(): Promise<MatchUpdate>;
+  /** `minute`: the live clock where the manager paused (defaults to the current update). */
   makeSubstitution(input: {
     outgoingId: string;
     incomingId: string;
+    minute?: number;
   }): Promise<MatchUpdate>;
-  changeMatchTactics(input: Partial<TacticsView>): Promise<MatchUpdate>;
+  changeMatchTactics(
+    input: Partial<TacticsView>,
+    minute?: number,
+  ): Promise<MatchUpdate>;
   renewContract(playerId: string, months: 6 | 12 | 24): Promise<CareerView>;
   refuseContract(playerId: string): Promise<CareerView>;
   terminateContract(playerId: string): Promise<CareerView>;
@@ -160,6 +321,36 @@ export interface CareerApiPort {
   acceptJobProposal(proposalId: string): Promise<CareerView>;
   finishMatch(): Promise<CareerView>;
   instantResult(): Promise<CareerView>;
+  // --- management screens (docs/09: Elenco, Mercado, Escritório) ---------
+  /** `SetLineup`: the whole board (slots with positions, bench, reserves). */
+  setLineup(input: LineupInput): Promise<CareerView>;
+  /** `GET /v1/careers/:id/market` with search filters. */
+  getMarket(query?: MarketQuery): Promise<MarketView>;
+  listForTransfer(input: ListingInput): Promise<MarketView>;
+  withdrawListing(playerId: string): Promise<MarketView>;
+  submitMarketOffer(input: MarketOfferInput): Promise<MarketView>;
+  decideMarketOffer(
+    offerId: string,
+    decision: 'accept' | 'reject',
+  ): Promise<MarketView>;
+  counterMarketOffer(
+    offerId: string,
+    terms: { fee: number; wage: number },
+  ): Promise<MarketView>;
+  /** `GET /v1/careers/:id/office`. */
+  getOffice(): Promise<OfficeView>;
+  decideSponsorship(
+    offerId: string,
+    decision: 'accept' | 'reject',
+  ): Promise<OfficeView>;
+  counterSponsorship(
+    offerId: string,
+    monthlyValue: number,
+  ): Promise<OfficeView>;
+  configureMembership(input: {
+    monthlyPrice: number;
+    tier: MembershipTier;
+  }): Promise<OfficeView>;
 }
 
 const defaultTactics: TacticsView = {
@@ -504,7 +695,7 @@ const createRoster = (): PlayerView[] =>
     },
   }));
 
-const timeline: readonly MatchUpdate[] = [
+const scriptedTimeline: readonly MatchUpdate[] = [
   {
     id: 'm-00',
     progress: 1,
@@ -522,6 +713,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Samuel Lino acelera pela esquerda e cruza com perigo',
     score: '0 × 0',
     kind: 'chance',
+    side: 'home',
     decisionPoint: false,
     done: false,
   },
@@ -532,6 +724,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Rossi fecha o ângulo e salva o Flamengo',
     score: '0 × 0',
     kind: 'save',
+    side: 'away',
     decisionPoint: false,
     done: false,
   },
@@ -542,6 +735,17 @@ const timeline: readonly MatchUpdate[] = [
     message: 'GOL! Paquetá completa a jogada de Arrascaeta',
     score: '1 × 0',
     kind: 'goal',
+    side: 'home',
+    decisionPoint: false,
+    done: false,
+  },
+  {
+    id: 'm-45',
+    progress: 50,
+    minute: 45,
+    message: 'Fim do primeiro tempo: Flamengo vence por 1 × 0.',
+    score: '1 × 0',
+    kind: 'save',
     decisionPoint: true,
     done: false,
   },
@@ -552,7 +756,8 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Palmeiras sobe a pressão pelo corredor central',
     score: '1 × 0',
     kind: 'chance',
-    decisionPoint: true,
+    side: 'away',
+    decisionPoint: false,
     done: false,
   },
   {
@@ -562,7 +767,8 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Léo Ortiz recebe amarelo ao parar o contra-ataque',
     score: '1 × 0',
     kind: 'card',
-    decisionPoint: true,
+    side: 'home',
+    decisionPoint: false,
     done: false,
   },
   {
@@ -572,6 +778,7 @@ const timeline: readonly MatchUpdate[] = [
     message: 'Luiz Araújo acerta a trave em chute cruzado',
     score: '1 × 0',
     kind: 'chance',
+    side: 'home',
     decisionPoint: false,
     done: false,
   },
@@ -587,37 +794,118 @@ const timeline: readonly MatchUpdate[] = [
   },
 ];
 
+/** The demo match stops by itself only at half time and at the end (decision 18). */
+const timeline: readonly MatchUpdate[] = scriptedTimeline.map(
+  (update, index) => {
+    const next = scriptedTimeline[index + 1];
+    return next === undefined ? update : { ...update, nextMinute: next.minute };
+  },
+);
+
+interface StoredCareer {
+  readonly id: string;
+  view: CareerView;
+  updatedAt: string;
+  management: DemoManagement;
+}
+
+const LOCAL_CLUBS = ['Flamengo', 'Fluminense', 'Atlético Mineiro'] as const;
+
 export class InMemoryCareerApi implements CareerApiPort {
   #authenticated = false;
-  #career: CareerView | null = null;
+  readonly #careers = new Map<string, StoredCareer>();
+  #activeId: string | undefined;
+  #sequence = 0;
+  #limit: number;
+  readonly #now: () => Date;
+  /** Career date of the demo world (drives the transfer window). */
+  readonly #startDate: string;
   #eventIndex = -1;
   #matchPlayers: PlayerView[] = [];
   #matchActions: MatchActionView[] = [];
+
+  public constructor(
+    options: {
+      careerLimit?: number;
+      now?: () => Date;
+      startDate?: string;
+    } = {},
+  ) {
+    this.#limit = options.careerLimit ?? FREE_CAREER_LIMIT;
+    this.#now = options.now ?? (() => new Date());
+    this.#startDate = options.startDate ?? '2026-01-20';
+  }
+
+  /** Offline demo: the fake PIX was paid, the plan now allows 5 careers. */
+  public grantLicense(): void {
+    this.#limit = Math.max(this.#limit, LICENSE_CAREER_LIMIT);
+  }
+
+  /** The active career; writes also stamp its last update. */
+  get #career(): CareerView | null {
+    return this.#activeId
+      ? (this.#careers.get(this.#activeId)?.view ?? null)
+      : null;
+  }
+
+  set #career(view: CareerView) {
+    const stored = this.#activeId && this.#careers.get(this.#activeId);
+    if (!stored) throw new Error('Carreira não encontrada.');
+    stored.view = view;
+    stored.updatedAt = this.#now().toISOString();
+  }
 
   async login(email: string) {
     if (!email.includes('@')) throw new Error('Informe um e-mail válido.');
     this.#authenticated = true;
   }
 
-  async createCareer({ coach }: { coach: string }) {
+  async createCareer({ coach, careerName, coachProfile }: CreateCareerInput) {
     if (!this.#authenticated) throw new Error('Sessão necessária.');
     if (!coach.trim()) throw new Error('Informe o nome do treinador.');
-    this.#career = {
-      coach: coach.trim(),
-      club: '',
-      round: 1,
-      formation: '4-3-3',
-      tactics: { ...defaultTactics },
-      players: createRoster(),
-      standings: initialTable,
-      opponent: opponents[0],
-      world: createPhase4View(coach.trim(), ''),
-    };
+    const name = careerName?.trim() ?? defaultCareerName(coach);
+    const nameError = careerNameError(name);
+    if (nameError) throw new Error(nameError);
+    if (this.#careers.size >= this.#limit)
+      throw new CareerLimitReachedError(
+        this.#limit === FREE_CAREER_LIMIT
+          ? 'O plano grátis permite 1 carreira. Exclua a atual ou ative a licença para ter até 5.'
+          : `Você chegou ao limite de ${this.#limit} carreiras. Exclua uma para começar outra.`,
+      );
+    this.#sequence += 1;
+    const id = `career-${this.#sequence}`;
+    const players = createRoster();
+    this.#careers.set(id, {
+      id,
+      updatedAt: this.#now().toISOString(),
+      management: createDemoManagement(
+        this.#startDate,
+        players.filter((player) => player.role === 'starter').map((p) => p.id),
+      ),
+      view: {
+        careerId: id,
+        coach: coach.trim(),
+        careerName: name,
+        coachProfile: { ...(coachProfile ?? DEFAULT_COACH_PROFILE) },
+        club: '',
+        division: 'Série A',
+        fixture: { competition: 'Série A', venue: 'home' },
+        round: 1,
+        formation: '4-3-3',
+        tactics: { ...defaultTactics },
+        players,
+        standings: initialTable,
+        opponent: opponents[0],
+        world: createPhase4View(coach.trim(), ''),
+      },
+    });
+    this.#activeId = id;
+    this.#eventIndex = -1;
   }
 
   async selectClub(club: string) {
     this.#require();
-    if (!['Flamengo', 'Fluminense', 'Atlético Mineiro'].includes(club))
+    if (!(LOCAL_CLUBS as readonly string[]).includes(club))
       throw new Error('Clube indisponível.');
     this.#career = {
       ...this.#career!,
@@ -627,7 +915,84 @@ export class InMemoryCareerApi implements CareerApiPort {
   }
 
   async getCareer() {
-    return this.#career ? structuredClone(this.#career) : null;
+    return this.#career ? structuredClone(this.#withChemistry()) : null;
+  }
+
+  /** Active demo state of the market and the office. */
+  get #management(): DemoManagement {
+    const stored = this.#activeId && this.#careers.get(this.#activeId);
+    if (!stored) throw new Error('Carreira não encontrada.');
+    return stored.management;
+  }
+
+  #withChemistry(): CareerView {
+    const view = this.#require();
+    return {
+      ...view,
+      chemistry: demoChemistry(
+        this.#management,
+        view.players.filter((p) => p.role === 'starter').map((p) => p.id),
+      ),
+    };
+  }
+
+  #applySquadChange(change: SquadChange) {
+    const current = this.#require();
+    let players = current.players;
+    if (change.removeId)
+      players = players.filter((player) => player.id !== change.removeId);
+    if (change.add) players = [...players, change.add];
+    if (players !== current.players) this.#career = { ...current, players };
+  }
+
+  async getPublicStats(): Promise<PublicStats> {
+    const clubs = new Set<string>([
+      ...LOCAL_CLUBS,
+      ...initialTable.map(({ club }) => club),
+      ...opponents.map(({ club }) => club),
+    ]);
+    const coaches = new Set(
+      [...this.#careers.values()].map(({ view }) => view.coach),
+    );
+    return {
+      coaches: Math.max(1, coaches.size),
+      clubs: clubs.size,
+      athletes: rosterSeeds.length,
+    };
+  }
+
+  async listCareers(): Promise<CareerList> {
+    const careers = [...this.#careers.values()]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(({ id, view, updatedAt }): CareerSummary => ({
+        id,
+        ...(view.careerName ? { name: view.careerName } : {}),
+        coach: view.coach,
+        ...(view.coachProfile ? { coachProfile: view.coachProfile } : {}),
+        ...(view.club ? { clubName: view.club } : {}),
+        season: 2026,
+        round: view.round,
+        updatedAt,
+      }));
+    return { careers, limit: this.#limit, anyClub: true };
+  }
+
+  async openCareer(careerId: string) {
+    if (!this.#careers.has(careerId))
+      throw new Error('Carreira não encontrada.');
+    this.#activeId = careerId;
+    this.#eventIndex = -1;
+    const view = this.#career!;
+    return view.club ? structuredClone(view) : null;
+  }
+
+  async deleteCareer(careerId: string) {
+    if (!this.#careers.delete(careerId))
+      throw new Error('Carreira não encontrada.');
+    if (this.#activeId === careerId) {
+      this.#activeId = undefined;
+      this.#eventIndex = -1;
+    }
   }
 
   async setPlayerRole(playerId: string, role: SquadRole) {
@@ -690,6 +1055,8 @@ export class InMemoryCareerApi implements CareerApiPort {
           : bench.has(player.id)
             ? 'bench'
             : 'reserve',
+        // Slots belonged to the previous lineup: let the board re-fit them.
+        lineupPosition: undefined,
       })),
     };
     return structuredClone(this.#career);
@@ -729,14 +1096,17 @@ export class InMemoryCareerApi implements CareerApiPort {
       );
   }
 
-  async beginMatch() {
+  async beginMatch(): Promise<MatchUpdate> {
     await this.validateMatchday();
     this.#eventIndex = 0;
     this.#matchPlayers = structuredClone(
       this.#require().players as PlayerView[],
     );
     this.#matchActions = [];
-    return structuredClone(timeline[0]);
+    return {
+      ...structuredClone(timeline[0]!),
+      replay: replayFromFeed(this.#require(), timeline, 'match-live-demo'),
+    };
   }
 
   async nextMatchEvent() {
@@ -748,15 +1118,13 @@ export class InMemoryCareerApi implements CareerApiPort {
   async makeSubstitution({
     outgoingId,
     incomingId,
+    minute,
   }: {
     outgoingId: string;
     incomingId: string;
+    minute?: number;
   }) {
-    const currentEvent = this.#currentEvent();
-    if (!currentEvent.decisionPoint)
-      throw new Error(
-        'Substituições só podem ser feitas nas pausas da partida.',
-      );
+    const currentEvent = this.#pausedEvent();
     if (
       this.#matchActions.filter((action) => action.type === 'substitution')
         .length >= 5
@@ -778,23 +1146,19 @@ export class InMemoryCareerApi implements CareerApiPort {
     outgoing.role = 'bench';
     incoming.role = 'starter';
     this.#matchActions.push({
-      minute: currentEvent.minute,
+      minute: Math.max(currentEvent.minute, minute ?? 0),
       type: 'substitution',
       description: `${incoming.name} entra no lugar de ${outgoing.name}`,
     });
     return structuredClone(currentEvent);
   }
 
-  async changeMatchTactics(input: Partial<TacticsView>) {
-    const currentEvent = this.#currentEvent();
-    if (!currentEvent.decisionPoint)
-      throw new Error(
-        'Ajustes táticos só podem ser feitos nas pausas da partida.',
-      );
+  async changeMatchTactics(input: Partial<TacticsView>, minute?: number) {
+    const currentEvent = this.#pausedEvent();
     const current = this.#require();
     this.#career = { ...current, tactics: { ...current.tactics, ...input } };
     this.#matchActions.push({
-      minute: currentEvent.minute,
+      minute: Math.max(currentEvent.minute, minute ?? 0),
       type: 'tactics',
       description: `Mentalidade alterada para ${input.mentality ?? current.tactics.mentality}`,
     });
@@ -1208,11 +1572,13 @@ export class InMemoryCareerApi implements CareerApiPort {
 
   #commitResult() {
     const current = this.#require();
+    const events = timeline.map((event) => structuredClone(event));
     const result: MatchResultView = {
       score: '1 × 0',
       headline: 'Vitória com cara de time grande',
-      events: timeline.map((event) => structuredClone(event)),
+      events,
       actions: structuredClone(this.#matchActions),
+      replay: replayFromFeed(current, events, `match-${current.round + 1}`),
     };
     this.#career = {
       ...current,
@@ -1232,6 +1598,8 @@ export class InMemoryCareerApi implements CareerApiPort {
               ...row,
               played: row.played + 1,
               points: row.points + 3,
+              won: (row.won ?? 0) + 1,
+              goalDifference: (row.goalDifference ?? 0) + 1,
               position: 2,
             }
           : row,
@@ -1243,12 +1611,132 @@ export class InMemoryCareerApi implements CareerApiPort {
 
   #currentEvent() {
     if (this.#eventIndex < 0) throw new Error('A partida ainda não começou.');
-    return timeline[this.#eventIndex];
+    return timeline[this.#eventIndex]!;
+  }
+
+  /** Changes are allowed in any pause (decision 18) until the final whistle. */
+  #pausedEvent() {
+    const currentEvent = this.#currentEvent();
+    if (currentEvent.done) throw new Error('A partida já terminou.');
+    return currentEvent;
   }
 
   #require() {
     if (!this.#career) throw new Error('Carreira não encontrada.');
     return this.#career;
+  }
+
+  // --- management screens ---------------------------------------------------
+  async setLineup(input: LineupInput) {
+    const current = this.#require();
+    const byId = new Map(current.players.map((player) => [player.id, player]));
+    if (input.starters.length !== 11)
+      throw new Error('A escalação precisa de exatamente 11 titulares.');
+    for (const { playerId } of input.starters) {
+      const player = byId.get(playerId);
+      if (!player) throw new Error('Jogador não encontrado.');
+      if (player.injuryRounds > 0)
+        throw new Error(
+          `${player.name} está lesionado e não pode ser titular.`,
+        );
+      if (player.suspended)
+        throw new Error(`${player.name} está suspenso e não pode ser titular.`);
+    }
+    if (input.bench.length > 7)
+      throw new Error('O banco aceita no máximo 7 jogadores.');
+    const slot = new Map(input.starters.map((s) => [s.playerId, s.position]));
+    const bench = new Set(input.bench);
+    this.#career = {
+      ...current,
+      formation: input.formation,
+      players: current.players.map((player) => ({
+        ...player,
+        role: slot.has(player.id)
+          ? 'starter'
+          : bench.has(player.id)
+            ? 'bench'
+            : 'reserve',
+        lineupPosition: slot.get(player.id),
+      })),
+    };
+    return structuredClone(this.#withChemistry());
+  }
+
+  async getMarket(query: MarketQuery = {}) {
+    const view = this.#require();
+    return structuredClone(
+      demoMarketView(this.#management, view.club, view.players, query),
+    );
+  }
+
+  async listForTransfer(input: ListingInput) {
+    demoListPlayer(this.#management, this.#require().players, input);
+    return this.getMarket();
+  }
+
+  async withdrawListing(playerId: string) {
+    demoWithdrawListing(this.#management, playerId);
+    return this.getMarket();
+  }
+
+  async submitMarketOffer(input: MarketOfferInput) {
+    this.#applySquadChange(
+      demoSubmitOffer(this.#management, this.#require().players, input),
+    );
+    return this.getMarket();
+  }
+
+  async decideMarketOffer(offerId: string, decision: 'accept' | 'reject') {
+    this.#applySquadChange(
+      demoDecideOffer(
+        this.#management,
+        this.#require().players,
+        offerId,
+        decision,
+      ),
+    );
+    return this.getMarket();
+  }
+
+  async counterMarketOffer(
+    offerId: string,
+    terms: { fee: number; wage: number },
+  ) {
+    this.#applySquadChange(demoCounterOffer(this.#management, offerId, terms));
+    return this.getMarket();
+  }
+
+  async getOffice() {
+    const view = this.#require();
+    return structuredClone(
+      demoOfficeView(this.#management, {
+        coach: view.coach,
+        club: view.club,
+        players: view.players,
+        contracts: view.world.contracts,
+        jobs: view.world.board.proposals,
+        board: view.world.board,
+        prestige: view.world.prestige,
+      }),
+    );
+  }
+
+  async decideSponsorship(offerId: string, decision: 'accept' | 'reject') {
+    demoDecideSponsorship(this.#management, offerId, decision);
+    return this.getOffice();
+  }
+
+  async counterSponsorship(offerId: string, monthlyValue: number) {
+    demoCounterSponsorship(this.#management, offerId, monthlyValue);
+    return this.getOffice();
+  }
+
+  async configureMembership(input: {
+    monthlyPrice: number;
+    tier: MembershipTier;
+  }) {
+    demoConfigureMembership(this.#management, input);
+    return this.getOffice();
   }
 }
 
@@ -1264,11 +1752,44 @@ function acceptedMarketPlayer(
 }
 
 const initialTable: StandingView[] = [
-  { position: 1, club: 'Palmeiras', played: 1, points: 3 },
-  { position: 2, club: 'Flamengo', played: 0, points: 0 },
-  { position: 3, club: 'Atlético Mineiro', played: 1, points: 1 },
-  { position: 4, club: 'Fluminense', played: 1, points: 0 },
+  {
+    position: 1,
+    club: 'Palmeiras',
+    played: 1,
+    points: 3,
+    ...record(1, 0, 0, 2),
+  },
+  {
+    position: 2,
+    club: 'Flamengo',
+    played: 0,
+    points: 0,
+    ...record(0, 0, 0, 0),
+  },
+  {
+    position: 3,
+    club: 'Atlético Mineiro',
+    played: 1,
+    points: 1,
+    ...record(0, 1, 0, 0),
+  },
+  {
+    position: 4,
+    club: 'Fluminense',
+    played: 1,
+    points: 0,
+    ...record(0, 0, 1, -2),
+  },
 ];
+
+function record(
+  won: number,
+  drawn: number,
+  lost: number,
+  goalDifference: number,
+) {
+  return { won, drawn, lost, goalDifference };
+}
 
 const opponents: readonly OpponentView[] = [
   {

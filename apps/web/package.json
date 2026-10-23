@@ -8,11 +8,19 @@
     "build": "next build",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "clubs:generate": "node scripts/generate-club-previews.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "stadium:convert": "node scripts/convert-stadium.mjs"
   },
   "dependencies": {
-    "@fontsource-variable/archivo": "5.3.0",
-    "@fontsource/rajdhani": "5.3.0",
+    "@dicebear/core": "9.2.4",
+    "@dicebear/pixel-art": "9.2.4",
+    "@fontsource/press-start-2p": "5.3.0",
+    "@footebas/engine": "workspace:*",
+    "@opennextjs/cloudflare": "1.20.2",
     "@phosphor-icons/react": "2.1.10",
     "@radix-ui/react-label": "2.1.12",
     "@radix-ui/react-progress": "1.1.13",
@@ -21,25 +29,36 @@
     "@radix-ui/react-tabs": "1.1.13",
     "@radix-ui/react-toggle": "1.1.15",
     "@radix-ui/react-toggle-group": "1.1.11",
+    "@supabase/supabase-js": "2.117.3",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
-    "next": "16.2.10",
+    "motion": "14.6.0",
+    "next": "16.2.12",
+    "phaser": "4.2.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "tailwind-merge": "3.3.1"
+    "tailwind-merge": "3.3.1",
+    "three": "0.186.1",
+    "zzfx": "1.4.0"
   },
   "devDependencies": {
+    "@footebas/api": "workspace:*",
+    "@footebas/application": "workspace:*",
+    "@footebas/contracts": "workspace:*",
+    "@footebas/database": "workspace:*",
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.0",
     "@types/node": "24.0.15",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "0.186.0",
     "eslint": "9.31.0",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.2.12",
     "jsdom": "26.1.0",
     "tailwindcss": "4.3.3",
     "typescript": "5.8.3",
-    "vitest": "3.2.4"
+    "vitest": "3.2.4",
+    "wrangler": "4.152.0"
   }
 }

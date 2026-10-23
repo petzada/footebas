@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "footebas-extra-clubs-v1",
+  "minimumPlayers": 18,
+  "minimumGoalkeepers": 2,
+  "maximumSquad": 35,
+  "clubs": [
+    {
+      "id": "foreign:estudiantes",
+      "name": "Estudiantes",
+      "heading": "Estudiantes (ARG) — 2º Gr. A",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "ARG",
+      "tier": "B",
+      "tierBounds": [66, 70],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:independiente-rivadavia",
+      "name": "Independiente Rivadavia",
+      "heading": "Independiente Rivadavia (ARG) — 1º Gr. C",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "ARG",
+      "tier": "A",
+      "tierBounds": [70, 74],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:universidad-catolica",
+      "name": "Universidad Católica",
+      "heading": "Universidad Católica (CHI) — 1º Gr. D [parcial — Sofascore]",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "CHI",
+      "tier": "A",
+      "tierBounds": [70, 74],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:coquimbo-unido",
+      "name": "Coquimbo Unido",
+      "heading": "Coquimbo Unido (CHI) — 1º Gr. B",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "CHI",
+      "tier": "A",
+      "tierBounds": [70, 74],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:cerro-porteno",
+      "name": "Cerro Porteño",
+      "heading": "Cerro Porteño (PAR) — 1º Gr. F",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "PAR",
+      "tier": "A",
+      "tierBounds": [70, 74],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:ldu-quito",
+      "name": "LDU Quito",
+      "heading": "LDU Quito (EQU) — 1º Gr. G",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "EQU",
+      "tier": "A",
+      "tierBounds": [70, 74],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:independiente-del-valle",
+      "name": "Independiente del Valle",
+      "heading": "Independiente del Valle (EQU) — 1º Gr. H",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "EQU",
+      "tier": "A",
+      "tierBounds": [70, 74],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:rosario-central",
+      "name": "Rosario Central",
+      "heading": "Rosario Central (ARG) — 2º Gr. H",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "ARG",
+      "tier": "B",
+      "tierBounds": [66, 70],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:platense",
+      "name": "Platense",
+      "heading": "Platense (ARG) — 2º Gr. E",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "ARG",
+      "tier": "B",
+      "tierBounds": [66, 70],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "foreign:deportes-tolima",
+      "name": "Deportes Tolima",
+      "heading": "Deportes Tolima (COL) — 2º Gr. B",
+      "source": "dados/elencos/copa-libertadores-2026.md",
+      "origin": "foreign",
+      "country": "COL",
+      "tier": "B",
+      "tierBounds": [66, 70],
+      "tierBasis": "Libertadores 2026: 1º do grupo → A; 2º do grupo → B"
+    },
+    {
+      "id": "state:primavera",
+      "name": "Primavera",
+      "heading": "Primavera",
+      "source": "dados/elencos/estaduais-1a-divisao-2026.md",
+      "origin": "state",
+      "country": "BRA",
+      "tier": "E",
+      "tierBounds": [48, 53],
+      "tierBasis": "Cola: clube estadual sem divisão nacional → E"
+    }
+  ]
+}

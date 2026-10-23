@@ -87,7 +87,10 @@ describe('Footebas HTTP boundary', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/commands',
-      headers: { authorization: 'Bearer owner' },
+      headers: {
+        authorization: 'Bearer owner',
+        'idempotency-key': 'create:0001',
+      },
       payload: {
         version: 1,
         commandId: 'command_create',
@@ -98,10 +101,33 @@ describe('Footebas HTTP boundary', () => {
       },
     });
     expect(response.statusCode).toBe(202);
+    expect(response.headers['idempotency-key']).toBe('create:0001');
     expect(response.json()).toMatchObject({
       commandId: 'command_create',
       careerId: 'career_one',
     });
+  });
+
+  it('rejects an idempotency header that can replay a different body', async () => {
+    const app = await api();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/commands',
+      headers: {
+        authorization: 'Bearer owner',
+        'idempotency-key': 'create:different',
+      },
+      payload: {
+        version: 1,
+        commandId: 'command_create',
+        idempotencyKey: 'create:0001',
+        expectedVersion: 0,
+        type: 'CreateCareer',
+        payload: { managerName: 'Ada', startDate: '2026-01-01' },
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
   it('requires bearer auth, rejects unknown input and never leaks stacks', async () => {

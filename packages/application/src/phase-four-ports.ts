@@ -2,6 +2,7 @@ import type {
   BoardObjective,
   Club,
   ClubId,
+  CoachPersonality,
   FinancialLedger,
   HistoryEvent,
   JobProposal,
@@ -11,6 +12,7 @@ import type {
   PlayerContract,
   PrestigeAchievement,
   Stadium,
+  TransferListing,
   TransferOffer,
   YouthCandidate,
 } from '@footebas/domain';
@@ -46,6 +48,16 @@ export interface PhaseFourState {
   readonly achievements: readonly PrestigeAchievement[];
   readonly events: readonly PhaseFourEvent[];
   readonly archiveKeys: readonly string[];
+  /** Coach personality of the career (ADR 0007); absent means the default. */
+  readonly coachPersonality?: CoachPersonality;
+  /**
+   * Career market (docs/adr/0008): present only on the unified career save,
+   * where transfer windows, the transfer list and the AI seller apply.
+   */
+  readonly market?: Readonly<{
+    seed: string;
+    listings: readonly TransferListing[];
+  }>;
   /** Canonical engine state used only for whole-season orchestration. */
   readonly seasonWorld?: CareerWorldSave;
   /** Explicit boundary mapping from engine provenance ids to transport-safe ids. */

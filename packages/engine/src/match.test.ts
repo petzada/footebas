@@ -10,6 +10,7 @@ import {
   percentage,
   strength,
   type Formation,
+  type MatchEvent,
   type MatchInput,
   type Mentality,
   type Player,
@@ -20,6 +21,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
   calculateEffectiveStrength,
+  calculateMatchExpectation,
   calculateMatchup,
   ENGINE_VERSION,
   simulateMatch,
@@ -145,6 +147,9 @@ function match(
 }
 
 describe('simulateMatch', () => {
+  // Golden regenerated explicitly for match-v4 (ADR 0015): minute-by-minute
+  // engine with day form, named shooters and play types. v3 values: 0 × 2,
+  // 7 × 19 shots, 40 events.
   it('keeps a golden result stable by seed', () => {
     const result = simulateMatch(match('golden-match-v1', 76, 68));
     expect({
@@ -158,41 +163,53 @@ describe('simulateMatch', () => {
         "events": 43,
         "first": [
           {
-            "minute": 4,
-            "side": "away",
-            "type": "chance",
-            "xg": 0.111,
-          },
-          {
-            "minute": 9,
+            "assistId": "home_player_10",
+            "minute": 11,
+            "outcome": "saved",
+            "play": "individual",
+            "playerId": "home_player_7",
             "side": "home",
             "type": "chance",
-            "xg": 0.151,
+            "xg": 0.134,
           },
           {
-            "minute": 10,
+            "minute": 13,
+            "outcome": "goal",
+            "play": "build_up",
+            "playerId": "home_player_3",
             "side": "home",
             "type": "chance",
-            "xg": 0.356,
+            "xg": 0.489,
           },
           {
-            "minute": 10,
-            "scorerId": "home_player_5",
+            "minute": 13,
+            "play": "build_up",
+            "scorerId": "home_player_3",
             "side": "home",
             "type": "goal",
           },
+          {
+            "assistId": "home_player_5",
+            "minute": 17,
+            "outcome": "off_target",
+            "play": "build_up",
+            "playerId": "home_player_10",
+            "side": "home",
+            "type": "chance",
+            "xg": 0.474,
+          },
         ],
         "score": [
+          4,
           3,
-          0,
         ],
         "shots": [
-          14,
-          10,
+          13,
+          17,
         ],
         "xg": [
-          2.799,
-          1.542,
+          3.093,
+          2.578,
         ],
       }
     `);
@@ -344,5 +361,221 @@ describe('simulateMatch', () => {
     expect(attackingGoals).toBeGreaterThan(balancedGoals);
     expect(attackLosses).toBeGreaterThan(0);
     expect(heavyCards).toBeGreaterThan(lightCards);
+  });
+
+  it('gives decisive (high big-game) forwards a damped edge in goals', () => {
+    // match-v4 (ADR 0015): big-game still helps, but it no longer
+    // monopolises finishing (v3 required star > other × 1.4).
+    const decisive = (seed: string) => {
+      const input = match(seed);
+      const tune = (player: Player) =>
+        player.id === 'home_player_9' || player.id === 'home_player_10'
+          ? createPlayer({
+              ...player,
+              hidden: {
+                ...player.hidden,
+                bigGame: percentage(player.id === 'home_player_9' ? 95 : 30),
+              },
+            })
+          : player;
+      return createMatchInput({
+        ...input,
+        home: { ...input.home, players: input.home.players.map(tune) },
+      });
+    };
+    let star = 0;
+    let other = 0;
+    for (let index = 0; index < 400; index++)
+      for (const event of simulateMatch(decisive(`decisive-${String(index)}`))
+        .timeline)
+        if (event.type === 'goal') {
+          if (event.scorerId === 'home_player_9') star++;
+          if (event.scorerId === 'home_player_10') other++;
+        }
+    expect(star).toBeGreaterThan(other * 1.05);
+    expect(star).toBeLessThan(other * 1.6);
+  });
+
+  it('keeps finishing spread across the side (no monopoly)', () => {
+    const goalsBy = new Map<string, number>();
+    let teamGoals = 0;
+    let hatTricks = 0;
+    const matches = 400;
+    for (let index = 0; index < matches; index++) {
+      const input = match(`spread-${String(index)}`, 72, 72);
+      const tuned = createMatchInput({
+        ...input,
+        home: {
+          ...input.home,
+          players: input.home.players.map((player) =>
+            player.id === 'home_player_9'
+              ? createPlayer({
+                  ...player,
+                  strength: strength(90),
+                  hidden: { ...player.hidden, bigGame: percentage(95) },
+                })
+              : player,
+          ),
+        },
+      });
+      const perMatch = new Map<string, number>();
+      for (const event of simulateMatch(tuned).timeline)
+        if (event.type === 'goal' && event.side === 'home') {
+          teamGoals++;
+          goalsBy.set(event.scorerId, (goalsBy.get(event.scorerId) ?? 0) + 1);
+          perMatch.set(event.scorerId, (perMatch.get(event.scorerId) ?? 0) + 1);
+        }
+      if ([...perMatch.values()].some((goals) => goals >= 3)) hatTricks++;
+    }
+    const shares = [...goalsBy.values()].map((goals) => goals / teamGoals);
+    const hhi = shares.reduce((sum, share) => sum + share ** 2, 0);
+    // The 90-rated, decisive striker leads, without taking over.
+    expect(goalsBy.get('home_player_9')! / teamGoals).toBeLessThan(0.33);
+    expect(Math.max(...shares)).toBe(goalsBy.get('home_player_9')! / teamGoals);
+    expect(hhi).toBeLessThan(0.17);
+    expect(goalsBy.size).toBeGreaterThanOrEqual(10);
+    expect(hatTricks / matches).toBeLessThan(0.05);
+  });
+
+  it('names shooters and builds chances in varied ways', () => {
+    const plays = new Map<string, number>();
+    let counterNormal = 0;
+    let counterReactive = 0;
+    for (let index = 0; index < 150; index++) {
+      for (const event of simulateMatch(match(`plays-${String(index)}`))
+        .timeline) {
+        if (event.type !== 'chance') continue;
+        expect(event.playerId).toBeDefined();
+        expect(event.outcome).toBeDefined();
+        plays.set(event.play!, (plays.get(event.play!) ?? 0) + 1);
+        if (event.side === 'home' && event.play === 'counter') counterNormal++;
+      }
+      for (const event of simulateMatch(
+        match(`plays-${String(index)}`, 70, 70, {
+          homeMentality: 'counter_attack',
+          awayMentality: 'all_out_attack',
+        }),
+      ).timeline)
+        if (
+          event.type === 'chance' &&
+          event.side === 'home' &&
+          event.play === 'counter'
+        )
+          counterReactive++;
+    }
+    expect([...plays.keys()].sort()).toEqual([
+      'build_up',
+      'counter',
+      'cross',
+      'defensive_error',
+      'individual',
+      'long_shot',
+    ]);
+    expect(counterReactive).toBeGreaterThan(counterNormal * 1.5);
+  });
+
+  it('varies the pre-match expectation by the day form, not the nominal matchup', () => {
+    const expectations = Array.from(
+      { length: 40 },
+      (_, index) =>
+        calculateMatchExpectation(match(`form-${String(index)}`, 72, 72))
+          .expectedGoals.home,
+    );
+    const nominal = Array.from(
+      { length: 5 },
+      (_, index) =>
+        calculateMatchup(match(`form-${String(index)}`, 72, 72)).expectedGoals
+          .home,
+    );
+    expect(new Set(nominal).size).toBe(1);
+    expect(new Set(expectations).size).toBeGreaterThan(30);
+    expect(Math.max(...expectations) - Math.min(...expectations)).toBeLessThan(
+      0.9,
+    );
+    expect(calculateMatchExpectation(match('form-0', 72, 72))).toEqual(
+      calculateMatchExpectation(match('form-0', 72, 72)),
+    );
+  });
+
+  it('keeps everything up to minute m unchanged for an instruction at any minute m', () => {
+    const managerEvent = (event: MatchEvent) =>
+      event.type === 'tactical_change' ||
+      (event.type === 'substitution' && event.source === 'manager');
+    let changedLater = 0;
+    for (let index = 0; index < 80; index++) {
+      const input = match(`prefix-${String(index)}`, 72, 70);
+      const minute = 1 + ((index * 37) % 92);
+      const before = (events: readonly MatchEvent[]) =>
+        events.filter(
+          (event) => event.minute <= minute && !managerEvent(event),
+        );
+      const plain = simulateMatch(input);
+      const decided = simulateMatch(
+        createMatchInput({
+          ...input,
+          instructions:
+            index % 2 === 0
+              ? [
+                  {
+                    type: 'substitution',
+                    minute,
+                    side: 'home',
+                    playerOutId: input.home.lineup.starters[9]!.playerId,
+                    playerInId: input.home.lineup.substitutes[0]!,
+                    position: 'ST',
+                  },
+                ]
+              : [
+                  {
+                    type: 'tactical_change',
+                    minute,
+                    side: 'home',
+                    tactic: createTactic({
+                      ...input.home.tactic,
+                      mentality: 'all_out_attack',
+                      press: 'high',
+                    }),
+                  },
+                ],
+        }),
+      );
+      expect(before(decided.timeline)).toEqual(before(plain.timeline));
+      // The decision appears right after everything already played at m.
+      // (A substitution is skipped when an automatic change or a red card
+      // already took one of the players off before m.)
+      const firstManager = decided.timeline.findIndex(managerEvent);
+      if (firstManager >= 0) {
+        expect(decided.timeline[firstManager]!.minute).toBe(minute);
+        expect(
+          decided.timeline
+            .slice(firstManager + 1)
+            .every((event) => event.minute > minute),
+        ).toBe(true);
+      }
+      if (JSON.stringify(decided.timeline) !== JSON.stringify(plain.timeline))
+        changedLater++;
+    }
+    expect(changedLater).toBeGreaterThan(60);
+  });
+
+  it('accepts instructions at any whole minute and rejects the rest', () => {
+    const input = match('minutes');
+    const at = (minute: number) =>
+      createMatchInput({
+        ...input,
+        instructions: [
+          {
+            type: 'substitution',
+            minute,
+            side: 'home',
+            playerOutId: input.home.lineup.starters[9]!.playerId,
+            playerInId: input.home.lineup.substitutes[0]!,
+            position: 'ST',
+          },
+        ],
+      });
+    for (const minute of [0, 1, 37, 45, 52, 89, 93])
+      expect(() => simulateMatch(at(minute))).not.toThrow();
+    for (const minute of [-1, 94, 12.5]) expect(() => at(minute)).toThrow();
   });
 });

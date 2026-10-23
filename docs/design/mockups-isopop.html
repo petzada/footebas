@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Footebas — mockups ISOPOP</title>
+    <style>
+      :root {
+        --sky-1: #bee3f0;
+        --sky-2: #e4eef7;
+        --mint: #dff3f1;
+        --sand: #fdf1e3;
+        --rose: #f9e2e7;
+        --ink: #17263a;
+        --ink-2: #4a5b70;
+        --ink-3: #7a8aa0;
+        --grass: #2e9e62;
+        --grass-deep: #1f7a4a;
+        --coral: #ff7a59;
+        --gold: #f4b740;
+        --glass: rgba(255, 255, 255, 0.52);
+        --glass-strong: rgba(255, 255, 255, 0.72);
+        --glass-line: rgba(255, 255, 255, 0.75);
+        --glass-shadow: 0 10px 30px -12px rgba(40, 70, 110, 0.35);
+        --blur: blur(18px) saturate(150%);
+        --r-sm: 8px;
+        --r-md: 16px;
+        --r-lg: 24px;
+      }
+      .night {
+        --sky-1: #1b2340;
+        --sky-2: #2a2f5a;
+        --mint: #1e3a44;
+        --sand: #3a2e3f;
+        --rose: #43284a;
+        --ink: #eef3fa;
+        --ink-2: #b9c4d6;
+        --ink-3: #8592aa;
+        --glass: rgba(30, 38, 70, 0.45);
+        --glass-strong: rgba(36, 46, 84, 0.7);
+        --glass-line: rgba(255, 255, 255, 0.14);
+        --glass-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        color: #17263a;
+        background:
+          radial-gradient(1200px 700px at 10% 0%, #f9e2e7 0%, transparent 60%),
+          radial-gradient(1000px 700px at 90% 10%, #bee3f0 0%, transparent 55%),
+          linear-gradient(180deg, #e4eef7, #fdf1e3);
+        min-height: 100vh;
+      }
+      header.page {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 28px 20px 8px;
+      }
+      header.page h1 {
+        margin: 0;
+        font-size: 1.6rem;
+        letter-spacing: -0.01em;
+      }
+      header.page p {
+        margin: 6px 0 0;
+        color: #4a5b70;
+        max-width: 760px;
+        line-height: 1.5;
+      }
+      .board {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 20px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 28px;
+      }
+      figure {
+        margin: 0;
+        display: grid;
+        gap: 10px;
+        justify-items: center;
+      }
+      figcaption {
+        font-size: 0.85rem;
+        color: #4a5b70;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      .phone {
+        width: 300px;
+        height: 620px;
+        border-radius: 42px;
+        padding: 10px;
+        background: #0e1626;
+        box-shadow: 0 30px 60px -25px rgba(20, 40, 80, 0.55);
+      }
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 34px;
+        overflow: hidden;
+        color: var(--ink);
+        background:
+          radial-gradient(260px 200px at 15% 10%, var(--rose), transparent 70%),
+          radial-gradient(
+            280px 220px at 90% 25%,
+            var(--sky-1),
+            transparent 70%
+          ),
+          radial-gradient(
+            300px 240px at 50% 100%,
+            var(--mint),
+            transparent 70%
+          ),
+          linear-gradient(180deg, var(--sky-2), var(--sand));
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      .status {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 22px 4px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .content {
+        padding: 6px 14px 10px;
+        display: grid;
+        gap: 10px;
+        align-content: start;
+        overflow: hidden;
+      }
+
+      .glass {
+        background: var(--glass);
+        border: 1px solid var(--glass-line);
+        border-radius: var(--r-md);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        box-shadow: var(--glass-shadow);
+      }
+      .glass.strong {
+        background: var(--glass-strong);
+      }
+      .pad {
+        padding: 12px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .between {
+        justify-content: space-between;
+      }
+      .muted {
+        color: var(--ink-2);
+      }
+      .tiny {
+        font-size: 10.5px;
+        color: var(--ink-3);
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+        font-weight: 800;
+      }
+      .mono {
+        font-family: 'Courier New', monospace;
+      }
+      h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+      .btn {
+        border: 0;
+        border-radius: 14px;
+        padding: 12px 14px;
+        font: inherit;
+        font-weight: 700;
+        color: #fff;
+        cursor: pointer;
+        background: linear-gradient(180deg, #38b474, var(--grass-deep));
+        box-shadow:
+          0 8px 18px -8px rgba(31, 122, 74, 0.7),
+          inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      }
+      .btn.ghost {
+        color: var(--ink);
+        background: var(--glass-strong);
+        border: 1px solid var(--glass-line);
+        box-shadow: var(--glass-shadow);
+      }
+      .btn.coral {
+        background: linear-gradient(180deg, #ff9473, #f0603e);
+        box-shadow:
+          0 8px 18px -8px rgba(240, 96, 62, 0.7),
+          inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      }
+      .pill {
+        font-size: 10.5px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--glass-strong);
+        border: 1px solid var(--glass-line);
+      }
+
+      .emblem {
+        width: 38px;
+        height: 38px;
+        flex: none;
+      }
+      nav.tabs {
+        margin: 0 12px 12px;
+        padding: 8px 6px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        text-align: center;
+        font-size: 9.5px;
+        font-weight: 700;
+        color: var(--ink-2);
+        border-radius: 20px;
+      }
+      nav.tabs span {
+        display: grid;
+        gap: 3px;
+        justify-items: center;
+      }
+      nav.tabs i {
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        display: block;
+        background: currentColor;
+        opacity: 0.25;
+      }
+      nav.tabs .on {
+        color: var(--grass-deep);
+      }
+      nav.tabs .on i {
+        opacity: 1;
+        background: linear-gradient(180deg, #38b474, var(--grass-deep));
+      }
+
+      .float {
+        animation: float 6s ease-in-out infinite;
+      }
+      @keyframes float {
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .float {
+          animation: none;
+        }
+      }
+
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .stat {
+        padding: 10px 6px;
+        text-align: center;
+      }
+      .stat .num {
+        font-size: 1.1rem;
+        display: block;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+      }
+      td {
+        padding: 4px 2px;
+      }
+      tr.me td {
+        font-weight: 800;
+        color: var(--grass-deep);
+      }
+      .night tr.me td {
+        color: #6ee7a8;
+      }
+
+      .pitch-wrap {
+        perspective: 700px;
+        height: 250px;
+        display: grid;
+        place-items: center;
+      }
+      .pitch {
+        width: 230px;
+        height: 300px;
+        transform: rotateX(42deg);
+        transform-origin: center 60%;
+        position: relative;
+        border-radius: 14px;
+        background: repeating-linear-gradient(
+          180deg,
+          #57c285 0 30px,
+          #4db67a 30px 60px
+        );
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 30px 40px -20px rgba(31, 122, 74, 0.6);
+      }
+      .pitch::before {
+        content: '';
+        position: absolute;
+        inset: 50% 0 auto;
+        border-top: 2px solid rgba(255, 255, 255, 0.8);
+      }
+      .pitch::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 60px;
+        height: 60px;
+        margin: -30px;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        border-radius: 50%;
+      }
+      .chip {
+        position: absolute;
+        transform: translate(-50%, -50%) rotateX(-42deg);
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        font-size: 9px;
+        font-weight: 800;
+        color: #17263a;
+      }
+      .chip b {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 10px;
+        color: #fff;
+        background: linear-gradient(180deg, #ff9473, #e8553a);
+        border: 2px solid #fff;
+        box-shadow: 0 6px 10px -4px rgba(0, 0, 0, 0.4);
+      }
+      .chip span {
+        background: rgba(255, 255, 255, 0.85);
+        padding: 1px 5px;
+        border-radius: 6px;
+      }
+      .note {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 0 20px 40px;
+        color: #4a5b70;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page">
+      <h1>Footebas × ISOPOP — mockups das telas</h1>
+      <p>
+        Proposta: base pastel do design.md (céu #BEE3F0/#E4EEF7, menta, areia,
+        rosa), vidro com um único token de blur (18px) em todos os componentes,
+        layout em CSS Grid e o verde-gramado + coral da marca só nas ações.
+        Dados ilustrativos.
+      </p>
+    </header>
+
+    <main class="board">
+      <!-- INÍCIO -->
+      <figure>
+        <div class="phone">
+          <div class="screen">
+            <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
+            <div class="content">
+              <div class="row between">
+                <strong style="letter-spacing: 0.08em">FOOTEBAS</strong
+                ><span class="pill">Grátis · 1 carreira</span>
+              </div>
+              <svg
+                viewBox="0 0 260 170"
+                class="float"
+                aria-hidden="true"
+                id="hero-iso"
+              ></svg>
+              <div
+                class="glass strong pad"
+                style="display: grid; gap: 10px; text-align: center"
+              >
+                <div
+                  style="
+                    width: 86px;
+                    height: 86px;
+                    margin: -52px auto 0;
+                    border-radius: 28px;
+                    background: linear-gradient(160deg, #ffd6c2, #f9e2e7);
+                    border: 3px solid #fff;
+                    display: grid;
+                    place-items: center;
+                    font-size: 2rem;
+                    font-weight: 800;
+                    color: #c2553b;
+                    box-shadow: var(--glass-shadow);
+                  "
+                >
+                  MP
+                </div>
+                <h2>Bem-vindo de volta, Marcio</h2>
+                <button class="btn">Nova carreira</button>
+                <button class="btn ghost">Carregar carreira</button>
+              </div>
+              <div class="grid-3">
+                <div class="glass stat">
+                  <span class="num">1.284</span
+                  ><span class="tiny">treinadores</span>
+                </div>
+                <div class="glass stat">
+                  <span class="num">71</span><span class="tiny">clubes</span>
+                </div>
+                <div class="glass stat">
+                  <span class="num">2.310</span
+                  ><span class="tiny">atletas</span>
+                </div>
+              </div>
+            </div>
+            <div></div>
+          </div>
+        </div>
+        <figcaption>Início</figcaption>
+      </figure>
+
+      <!-- NOVA CARREIRA: TREINADOR -->
+      <figure>
+        <div class="phone">
+          <div class="screen">
+            <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
+            <div class="content">
+              <div class="row between">
+                <span class="tiny">Nova carreira · 4 de 5</span
+                ><span class="tiny">Treinador</span>
+              </div>
+              <div
+                style="
+                  height: 6px;
+                  border-radius: 9px;
+                  background: rgba(255, 255, 255, 0.6);
+                "
+              >
+                <div
+                  style="
+                    width: 80%;
+                    height: 100%;
+                    border-radius: 9px;
+                    background: linear-gradient(90deg, #38b474, #1f7a4a);
+                  "
+                ></div>
+              </div>
+              <div class="glass pad" style="display: grid; gap: 8px">
+                <span class="tiny">Avatar</span>
+                <div
+                  class="grid-3"
+                  style="grid-template-columns: repeat(4, 1fr)"
+                  id="avatars"
+                ></div>
+              </div>
+              <div class="glass pad row between">
+                <div>
+                  <span class="tiny">Nome</span>
+                  <div style="font-weight: 700">Marcio Petigrosso</div>
+                </div>
+                <div style="text-align: right">
+                  <span class="tiny">Nacionalidade</span>
+                  <div style="font-weight: 700">🇧🇷 Brasil</div>
+                </div>
+              </div>
+              <span class="tiny">Personalidade</span>
+              <div class="grid-2">
+                <div class="glass pad" style="outline: 2px solid var(--grass)">
+                  <b>Motivador</b>
+                  <div class="muted" style="font-size: 11px">
+                    Moral sobe mais após vitórias
+                  </div>
+                </div>
+                <div class="glass pad">
+                  <b>Disciplinador</b>
+                  <div class="muted" style="font-size: 11px">
+                    Jovens evoluem mais rápido
+                  </div>
+                </div>
+                <div class="glass pad">
+                  <b>Diplomata</b>
+                  <div class="muted" style="font-size: 11px">
+                    Diretoria mais paciente
+                  </div>
+                </div>
+                <div class="glass pad">
+                  <b>Estrategista</b>
+                  <div class="muted" style="font-size: 11px">
+                    Bônus tático no plano
+                  </div>
+                </div>
+              </div>
+              <button class="btn">Continuar</button>
+            </div>
+            <div></div>
+          </div>
+        </div>
+        <figcaption>Nova carreira — treinador</figcaption>
+      </figure>
+
+      <!-- CENTRAL -->
+      <figure>
+        <div class="phone">
+          <div class="screen">
+            <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
+            <div class="content">
+              <div class="glass strong pad row">
+                <svg
+                  class="emblem"
+                  data-emblem="FLA"
+                  data-c1="#C8102E"
+                  data-c2="#111"
+                ></svg>
+                <div style="flex: 1">
+                  <b>Flamengo</b>
+                  <div class="muted" style="font-size: 11px">
+                    Série A · 4º · Diretoria 72%
+                  </div>
+                </div>
+                <div style="text-align: right">
+                  <span class="tiny">Caixa</span>
+                  <div class="num">R$ 48,2 mi</div>
+                </div>
+              </div>
+              <div
+                class="glass pad"
+                style="display: grid; gap: 8px; text-align: center"
+              >
+                <span class="tiny">Próximo jogo · Carioca · sáb 03/01</span>
+                <div class="row" style="justify-content: center; gap: 16px">
+                  <div>
+                    <svg
+                      class="emblem"
+                      data-emblem="FLA"
+                      data-c1="#C8102E"
+                      data-c2="#111"
+                    ></svg>
+                    <div style="font-size: 11px; font-weight: 700">
+                      Flamengo
+                    </div>
+                  </div>
+                  <div class="mono num" style="font-size: 1.4rem">VS</div>
+                  <div>
+                    <svg
+                      class="emblem"
+                      data-emblem="VR"
+                      data-c1="#F4D03F"
+                      data-c2="#1E5AA8"
+                    ></svg>
+                    <div style="font-size: 11px; font-weight: 700">
+                      Volta Redonda
+                    </div>
+                  </div>
+                </div>
+                <button class="btn coral" style="font-size: 1rem">
+                  Jogar rodada ▶
+                </button>
+                <span class="muted" style="font-size: 10.5px"
+                  >Pular para o resultado a um toque</span
+                >
+              </div>
+              <div class="grid-2">
+                <div class="glass pad">
+                  <span class="tiny">Tabela</span>
+                  <table>
+                    <tr>
+                      <td>3</td>
+                      <td>Palmeiras</td>
+                      <td class="num">31</td>
+                    </tr>
+                    <tr class="me">
+                      <td>4</td>
+                      <td>Flamengo</td>
+                      <td class="num">30</td>
+                    </tr>
+                    <tr>
+                      <td>5</td>
+                      <td>Bahia</td>
+                      <td class="num">28</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="glass pad">
+                  <span class="tiny">Caixa de entrada</span>
+                  <div style="font-size: 11px; margin-top: 4px">
+                    <b>Proposta</b> por Gerson
+                  </div>
+                  <div style="font-size: 11px"><b>Patrocínio</b> renovar?</div>
+                  <div class="row" style="gap: 4px; margin-top: 6px">
+                    <span class="pill" style="background: #dcf5e6">Aceitar</span
+                    ><span class="pill">Recusar</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <nav class="tabs glass strong">
+              <span class="on"><i></i>Central</span><span><i></i>Mapa</span
+              ><span><i></i>Elenco</span><span><i></i>Mercado</span
+              ><span><i></i>Mais</span>
+            </nav>
+          </div>
+        </div>
+        <figcaption>Central</figcaption>
+      </figure>
+
+      <!-- MAPA ISOMÉTRICO -->
+      <figure>
+        <div class="phone">
+          <div class="screen">
+            <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
+            <div class="content">
+              <div class="row between">
+                <h2>Seu clube</h2>
+                <span class="pill">Toque num prédio</span>
+              </div>
+              <svg
+                viewBox="0 0 280 300"
+                id="iso-map"
+                role="img"
+                aria-label="Mapa isométrico do clube"
+              ></svg>
+              <div
+                class="glass pad"
+                style="font-size: 11.5px; display: grid; gap: 4px"
+              >
+                <span class="tiny">Ou escolha na lista</span>
+                <div class="row between">
+                  <span>CT → Elenco e táticas</span><span>›</span>
+                </div>
+                <div class="row between">
+                  <span>Estádio → Partida</span><span>›</span>
+                </div>
+                <div class="row between">
+                  <span>Sede → Escritório</span><span>›</span>
+                </div>
+              </div>
+            </div>
+            <nav class="tabs glass strong">
+              <span><i></i>Central</span><span class="on"><i></i>Mapa</span
+              ><span><i></i>Elenco</span><span><i></i>Mercado</span
+              ><span><i></i>Mais</span>
+            </nav>
+          </div>
+        </div>
+        <figcaption>Mapa — ilustração isométrica clicável</figcaption>
+      </figure>
+
+      <!-- ELENCO -->
+      <figure>
+        <div class="phone">
+          <div class="screen">
+            <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
+            <div class="content">
+              <div class="row between">
+                <h2>Elenco</h2>
+                <div class="row" style="gap: 4px">
+                  <span class="pill">4-3-3</span
+                  ><span class="pill">Escalação A</span>
+                </div>
+              </div>
+              <div class="pitch-wrap"><div class="pitch" id="pitch"></div></div>
+              <div
+                class="glass pad"
+                style="display: grid; gap: 6px; font-size: 11.5px"
+              >
+                <div class="row between">
+                  <span class="tiny">Banco</span><span class="tiny">Força</span>
+                </div>
+                <div class="row between">
+                  <span>Gerson · MC</span><span class="num">78</span>
+                </div>
+                <div class="row between">
+                  <span>Bruno Henrique · AT</span><span class="num">76</span>
+                </div>
+                <div class="muted" style="font-size: 10.5px">
+                  Arraste para trocar, ou toque e escolha a posição.
+                </div>
+              </div>
+            </div>
+            <nav class="tabs glass strong">
+              <span><i></i>Central</span><span><i></i>Mapa</span
+              ><span class="on"><i></i>Elenco</span><span><i></i>Mercado</span
+              ><span><i></i>Mais</span>
+            </nav>
+          </div>
+        </div>
+        <figcaption>Elenco — campo com perspectiva</figcaption>
+      </figure>
+
+      <!-- PARTIDA -->
+      <figure>
+        <div class="phone">
+          <div class="screen">
+            <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
+            <div class="content">
+              <div class="glass strong pad row between">
+                <svg
+                  class="emblem"
+                  data-emblem="FLA"
+                  data-c1="#C8102E"
+                  data-c2="#111"
+                ></svg>
+                <div style="text-align: center">
+                  <div class="mono num" style="font-size: 1.8rem">2 × 1</div>
+                  <span class="tiny">67' · 2º tempo</span>
+                </div>
+                <svg
+                  class="emblem"
+                  data-emblem="VR"
+                  data-c1="#F4D03F"
+                  data-c2="#1E5AA8"
+                ></svg>
+              </div>
+              <div class="glass pad">
+                <span class="tiny">Momento</span>
+                <div
+                  style="
+                    height: 8px;
+                    border-radius: 8px;
+                    margin-top: 6px;
+                    background: linear-gradient(
+                      90deg,
+                      #38b474 62%,
+                      #f4d03f 62%
+                    );
+                  "
+                ></div>
+              </div>
+              <div
+                class="glass pad mono"
+                style="font-size: 11.5px; display: grid; gap: 6px"
+              >
+                <div><b>67'</b> GOL! Pedro de cabeça após cruzamento.</div>
+                <div class="muted">
+                  <b>58'</b> Cartão amarelo para o volante visitante.
+                </div>
+                <div class="muted">
+                  <b>41'</b> Gol do Volta Redonda em contra-ataque.
+                </div>
+              </div>
+              <div class="grid-3">
+                <button class="btn ghost">1×</button
+                ><button class="btn ghost">Pausa tática</button
+                ><button class="btn">Resultado</button>
+              </div>
+            </div>
+            <div></div>
+          </div>
+        </div>
+        <figcaption>Partida — feed com placar retrô</figcaption>
+      </figure>
+
+      <!-- CENTRAL NOITE -->
+      <figure>
+        <div class="phone">
+          <div class="screen night">
+            <div class="status"><span>21:12</span><span>5G ▮▮▮</span></div>
+            <div class="content">
+              <div class="glass strong pad row">
+                <svg
+                  class="emblem"
+                  data-emblem="FLA"
+                  data-c1="#C8102E"
+                  data-c2="#111"
+                ></svg>
+                <div style="flex: 1">
+                  <b>Flamengo</b>
+                  <div class="muted" style="font-size: 11px">
+                    Série A · 4º · Diretoria 72%
+                  </div>
+                </div>
+                <div style="text-align: right">
+                  <span class="tiny">Caixa</span>
+                  <div class="num">R$ 48,2 mi</div>
+                </div>
+              </div>
+              <div
+                class="glass pad"
+                style="display: grid; gap: 8px; text-align: center"
+              >
+                <span class="tiny">Próximo jogo · Carioca</span>
+                <div class="mono num" style="font-size: 1.2rem">FLA vs VRE</div>
+                <button class="btn coral">Jogar rodada ▶</button>
+              </div>
+              <div class="glass pad">
+                <span class="tiny">Tabela</span>
+                <table>
+                  <tr>
+                    <td>3</td>
+                    <td>Palmeiras</td>
+                    <td class="num">31</td>
+                  </tr>
+                  <tr class="me">
+                    <td>4</td>
+                    <td>Flamengo</td>
+                    <td class="num">30</td>
+                  </tr>
+                  <tr>
+                    <td>5</td>
+                    <td>Bahia</td>
+                    <td class="num">28</td>
+                  </tr>
+                </table>
+              </div>
+              <div class="glass pad" style="font-size: 11px">
+                <span class="tiny">Notícias</span>
+                <div style="margin-top: 4px">
+                  “Time respondeu bem à cobrança”, diz o treinador motivador.
+                </div>
+              </div>
+            </div>
+            <nav class="tabs glass strong">
+              <span class="on"><i></i>Central</span><span><i></i>Mapa</span
+              ><span><i></i>Elenco</span><span><i></i>Mercado</span
+              ><span><i></i>Mais</span>
+            </nav>
+          </div>
+        </div>
+        <figcaption>Central — variante noturna (modo escuro)</figcaption>
+      </figure>
+    </main>
+    <p class="note">
+      Mockup estático para decisão de direção visual; não é código de produção.
+      Emblemas são genéricos (cores + iniciais).
+    </p>
+
+    <script>
+      const NS = 'http://www.w3.org/2000/svg';
+      const el = (tag, attrs, parent) => {
+        const n = document.createElementNS(NS, tag);
+        for (const k in attrs) n.setAttribute(k, attrs[k]);
+        parent && parent.appendChild(n);
+        return n;
+      };
+
+      document.querySelectorAll('svg[data-emblem]').forEach((s) => {
+        s.setAttribute('viewBox', '0 0 40 40');
+        el(
+          'path',
+          {
+            d: 'M20 2 L36 8 V20 C36 30 28 36 20 38 C12 36 4 30 4 20 V8 Z',
+            fill: s.dataset.c1,
+            stroke: '#fff',
+            'stroke-width': 2,
+          },
+          s,
+        );
+        el(
+          'path',
+          {
+            d: 'M4 20 H36 V22 C35 29 28 35 20 37 C12 35 5 29 4 22 Z',
+            fill: s.dataset.c2,
+            opacity: 0.9,
+          },
+          s,
+        );
+        const t = el(
+          'text',
+          {
+            x: 20,
+            y: 19,
+            'text-anchor': 'middle',
+            'font-size': s.dataset.emblem.length > 2 ? 9 : 11,
+            'font-weight': 800,
+            fill: '#fff',
+            'font-family': 'system-ui',
+          },
+          s,
+        );
+        t.textContent = s.dataset.emblem;
+      });
+
+      const av = document.getElementById('avatars');
+      const tones = [
+        '#FFD6C2',
+        '#F2C6A0',
+        '#C98E66',
+        '#8D5A3B',
+        '#FFE3D3',
+        '#E7B48F',
+        '#B07A55',
+        '#6E4630',
+      ];
+      tones.forEach((c, i) => {
+        const d = document.createElement('div');
+        d.style.cssText = `aspect-ratio:1;border-radius:14px;background:linear-gradient(160deg,${c},#F9E2E7);border:2px solid ${i === 2 ? '#2E9E62' : '#fff'};box-shadow:var(--glass-shadow)`;
+        av.appendChild(d);
+      });
+
+      const ISO = { x: 140, y: 70, s: 16 };
+      const P = (x, y, z) => [
+        ISO.x + (x - y) * ISO.s * 0.87,
+        ISO.y + (x + y) * ISO.s * 0.5 - z * ISO.s,
+      ];
+      const pts = (arr) => arr.map((p) => p.join(',')).join(' ');
+      function box(svg, x, y, w, d, h, top, left, right) {
+        const g = el('g', {}, svg);
+        el(
+          'polygon',
+          {
+            points: pts([
+              P(x, y + d, 0),
+              P(x + w, y + d, 0),
+              P(x + w, y + d, h),
+              P(x, y + d, h),
+            ]),
+            fill: left,
+          },
+          g,
+        );
+        el(
+          'polygon',
+          {
+            points: pts([
+              P(x + w, y, 0),
+              P(x + w, y + d, 0),
+              P(x + w, y + d, h),
+              P(x + w, y, h),
+            ]),
+            fill: right,
+          },
+          g,
+        );
+        el(
+          'polygon',
+          {
+            points: pts([
+              P(x, y, h),
+              P(x + w, y, h),
+              P(x + w, y + d, h),
+              P(x, y + d, h),
+            ]),
+            fill: top,
+          },
+          g,
+        );
+        return g;
+      }
+      function tile(svg, x, y, w, d, fill) {
+        el(
+          'polygon',
+          {
+            points: pts([
+              P(x, y, 0),
+              P(x + w, y, 0),
+              P(x + w, y + d, 0),
+              P(x, y + d, 0),
+            ]),
+            fill,
+          },
+          svg,
+        );
+      }
+      function label(svg, x, y, z, text) {
+        const [cx, cy] = P(x, y, z);
+        const g = el('g', {}, svg);
+        el(
+          'rect',
+          {
+            x: cx - text.length * 3.3 - 6,
+            y: cy - 22,
+            width: text.length * 6.6 + 12,
+            height: 16,
+            rx: 8,
+            fill: 'rgba(255,255,255,.85)',
+            stroke: '#fff',
+          },
+          g,
+        );
+        const t = el(
+          'text',
+          {
+            x: cx,
+            y: cy - 11,
+            'text-anchor': 'middle',
+            'font-size': 9,
+            'font-weight': 800,
+            fill: '#17263A',
+            'font-family': 'system-ui',
+          },
+          g,
+        );
+        t.textContent = text;
+      }
+
+      const map = document.getElementById('iso-map');
+      ISO.x = 140;
+      ISO.y = 60;
+      ISO.s = 15;
+      tile(map, 0, 0, 10, 10, '#DFF3F1');
+      tile(map, 0.3, 0.3, 9.4, 9.4, '#CDEBE6');
+      tile(map, 4.5, 0, 1, 10, '#F3E6D3');
+      tile(map, 0, 4.5, 10, 1, '#F3E6D3');
+      box(map, 0.6, 0.6, 3.4, 3.4, 0.25, '#57C285', '#3E9E67', '#46AE73');
+      box(map, 6, 0.6, 3.4, 3.4, 1.6, '#BEE3F0', '#8FC3D8', '#A6D3E5');
+      box(map, 6.3, 0.9, 2.8, 2.8, 1.62, '#57C285', '#57C285', '#57C285');
+      box(map, 0.8, 6, 2.8, 3, 2.6, '#FDF1E3', '#E9CFB2', '#F3DEC5');
+      box(map, 6.2, 6.2, 1.6, 1.6, 1.2, '#F9E2E7', '#E5BCC6', '#EFCBD3');
+      box(map, 8.1, 6.3, 1.2, 1.4, 0.9, '#E4EEF7', '#BCCADB', '#CFDBE9');
+      box(map, 6.2, 8.3, 3, 1.2, 0.05, '#C9D3DF', '#AEB9C7', '#BCC6D3');
+      label(map, 2.3, 2.3, 0.4, 'CT');
+      label(map, 7.7, 2.3, 1.8, 'Estádio');
+      label(map, 2.2, 7.5, 2.8, 'Sede');
+      label(map, 7, 7, 1.4, 'Imprensa');
+      label(map, 8.7, 7, 1.0, 'Casa');
+      label(map, 7.7, 8.9, 0.3, 'Estacionamento');
+
+      const hero = document.getElementById('hero-iso');
+      ISO.x = 130;
+      ISO.y = 30;
+      ISO.s = 13;
+      tile(hero, 0, 0, 8, 8, 'rgba(255,255,255,.55)');
+      box(hero, 0.5, 0.5, 7, 7, 0.3, '#57C285', '#3E9E67', '#46AE73');
+      box(hero, 0.5, 0.5, 7, 0.6, 1.4, '#E4EEF7', '#BCCADB', '#CFDBE9');
+      box(hero, 0.5, 1.1, 0.6, 6.4, 1.4, '#FDF1E3', '#E9CFB2', '#F3DEC5');
+      box(hero, 3.6, 3.6, 0.8, 0.8, 0.9, '#FF9473', '#E8553A', '#F0603E');
+
+      const pitch = document.getElementById('pitch');
+      [
+        ['GK', 50, 92, 'Rossi'],
+        ['LD', 85, 72, 'Varela'],
+        ['ZG', 62, 76, 'Léo O.'],
+        ['ZG', 38, 76, 'Danilo'],
+        ['LE', 15, 72, 'Alex S.'],
+        ['MC', 50, 52, 'Pulgar'],
+        ['MC', 72, 46, 'De la Cruz'],
+        ['MC', 28, 46, 'Arrascaeta'],
+        ['PD', 82, 22, 'Plata'],
+        ['CA', 50, 14, 'Pedro'],
+        ['PE', 18, 22, 'Luiz A.'],
+      ].forEach(([pos, x, y, n]) => {
+        const c = document.createElement('div');
+        c.className = 'chip';
+        c.style.left = x + '%';
+        c.style.top = y + '%';
+        c.innerHTML = `<b>${pos}</b><span>${n}</span>`;
+        pitch.appendChild(c);
+      });
+    </script>
+  </body>
+</html>

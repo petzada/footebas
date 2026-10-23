@@ -2,7 +2,6 @@
 import {
   createClub,
   createPlayer,
-  createTactic,
   entityId,
   money,
   percentage,
@@ -12,7 +11,6 @@ import {
   type Player,
   type PlayerTrait,
   type Position,
-  type Tactic,
 } from '@footebas/domain';
 import { autoSelectLineup } from '@footebas/engine';
 import { readFileSync } from 'node:fs';
@@ -267,16 +265,4 @@ export function createFixtureContent(): FixtureContent {
 export function defaultLineup(club: Club, players: readonly Player[]): Lineup {
   return autoSelectLineup({ club, players, formation: '4-4-2', mode: 'best' });
 }
-export function defaultTactic(): Tactic {
-  return createTactic({
-    formation: '4-4-2',
-    mentality: 'balanced',
-    attackDirection: 'center',
-    marking: 'heavy',
-    buildUp: 'mixed',
-    focus: 'balanced',
-    press: 'medium',
-    defensiveLine: 'normal',
-    markingStyle: 'mixed',
-  });
-}
+export { defaultTactic } from './tactics.js';

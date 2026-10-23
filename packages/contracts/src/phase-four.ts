@@ -72,6 +72,29 @@ export const decideTransferOfferCommandSchema = z.strictObject({
     decision: z.enum(['accept', 'reject']),
   }),
 });
+/** Puts a managed player on the transfer list (sale with asking price or loan). */
+export const listPlayerForTransferCommandSchema = z.strictObject({
+  ...envelope,
+  type: z.literal('ListPlayerForTransfer'),
+  payload: z.discriminatedUnion('mode', [
+    z.strictObject({
+      playerId: entityIdSchema,
+      mode: z.literal('sale'),
+      askingPrice: moneySchema,
+    }),
+    z.strictObject({
+      playerId: entityIdSchema,
+      mode: z.literal('loan'),
+      durationMonths: z.int().min(1).max(12),
+      wageSharePercentage: z.int().min(0).max(100),
+    }),
+  ]),
+});
+export const withdrawTransferListingCommandSchema = z.strictObject({
+  ...envelope,
+  type: z.literal('WithdrawTransferListing'),
+  payload: z.strictObject({ playerId: entityIdSchema }),
+});
 export const setTicketPriceCommandSchema = z.strictObject({
   ...envelope,
   type: z.literal('SetTicketPrice'),
@@ -138,6 +161,8 @@ export const phaseFourCommandSchema = z.discriminatedUnion('type', [
   submitTransferOfferCommandSchema,
   counterTransferOfferCommandSchema,
   decideTransferOfferCommandSchema,
+  listPlayerForTransferCommandSchema,
+  withdrawTransferListingCommandSchema,
   setTicketPriceCommandSchema,
   expandStadiumCommandSchema,
   generateYouthCommandSchema,
@@ -181,6 +206,8 @@ export const phaseFourEventSchema = z.strictObject({
     'TRANSFER_REJECTED',
     'TRANSFER_COMPLETED',
     'LOAN_STARTED',
+    'TRANSFER_LISTED',
+    'TRANSFER_UNLISTED',
     'TICKET_PRICE_CHANGED',
     'STADIUM_EXPANSION_STARTED',
     'YOUTH_GENERATED',

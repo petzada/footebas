@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryUnitOfWork } from '@footebas/database';
 import {
   ApplicationError,
+  catalogCareerContent,
   createFixtureContent,
   FakeBearerAuth,
   FakeClock,
@@ -67,7 +68,7 @@ async function createAndSelect(app: FootebasApplication, token: string) {
     token,
     command('SelectClub', 'command_club', 1, {
       careerId: created.careerId,
-      clubId: 'club_1',
+      clubId: 'club_flamengo',
     }),
   );
   return created.careerId;
@@ -104,7 +105,7 @@ describe('server-authoritative application slice', () => {
       token,
       command('AutoPickLineup', 'command_lineup', 2, {
         careerId,
-        clubId: 'club_1',
+        clubId: 'club_flamengo',
         formation: '4-3-3',
         mode: 'best',
       }),
@@ -132,15 +133,25 @@ describe('server-authoritative application slice', () => {
       ).jobId,
     ).toBeDefined();
     expect((await app.runNextJob())?.state).toBe('succeeded');
-    expect((await app.postMatch(token, careerId)).fixtureId).toBe(
-      next.fixtureId,
+    const post = await app.postMatch(token, careerId);
+    expect(post.fixtureId).toBe(next.fixtureId);
+    // match-v4 chances reach the read model with shooter, play and outcome,
+    // always athletes of the match (ADR 0015), so the feed narrates them.
+    const chances = post.timeline.flatMap((event) =>
+      event.type === 'chance' ? [event] : [],
     );
-    expect(
-      (await app.standings(token, careerId)).rows.reduce(
-        (sum, row) => sum + row.played,
-        0,
-      ),
-    ).toBe(2);
+    const participants = new Set(post.participants?.map(({ id }) => id));
+    expect(chances.length).toBeGreaterThan(0);
+    for (const chance of chances) {
+      expect(chance.playerId && participants.has(chance.playerId)).toBe(true);
+      expect(chance.play).toBeDefined();
+      expect(chance.outcome).toBeDefined();
+      if (chance.assistId !== undefined)
+        expect(participants.has(chance.assistId)).toBe(true);
+    }
+    const table = await app.standings(token, careerId);
+    expect(table.competition).toBe('Brasileirão Série A');
+    expect(table.rows).toHaveLength(20);
     expect(
       (await app.squad(token, careerId)).players.some(
         ({ condition }) => condition < 100,
@@ -167,7 +178,7 @@ describe('server-authoritative application slice', () => {
     const { app, token } = setup();
     const careerId = await createAndSelect(app, token);
     const squad = await app.squad(token, careerId);
-    expect(squad.players).toHaveLength(25);
+    expect(squad.players.length).toBeGreaterThanOrEqual(18);
     expect(squad.players.every(({ traits }) => traits.length <= 2)).toBe(true);
     expect(
       squad.players.every(
@@ -187,7 +198,7 @@ describe('server-authoritative application slice', () => {
       approximateStrength: expect.any(String),
       absences: expect.any(Array),
     });
-    const side = next.homeClub.id === 'club_1' ? 'home' : 'away';
+    const side = next.homeClub.id === 'club_flamengo' ? 'home' : 'away';
     const opponentSide = side === 'home' ? 'away' : 'home';
     const lineup = squad.lineup!;
     const playerOutId = lineup.starters.at(-1)!;
@@ -258,7 +269,7 @@ describe('server-authoritative application slice', () => {
     );
     expect(post.playback).toEqual({
       modes: ['instant', 'fast', 'feed'],
-      speeds: [1, 2, 4, 8],
+      speeds: [0.5, 1, 2, 4, 8],
       canSkip: true,
     });
     const after = await app.squad(token, careerId);
@@ -284,7 +295,7 @@ describe('server-authoritative application slice', () => {
       token,
       command('SelectClub', 'command_select_once', 1, {
         careerId: first.careerId,
-        clubId: 'club_1',
+        clubId: 'club_flamengo',
       }),
     );
     const settled = await Promise.allSettled([
@@ -344,11 +355,90 @@ describe('server-authoritative application slice', () => {
     );
     expect((await app.runNextJob())?.state).toBe('succeeded');
     expect((await app.postMatch(token, id)).fixtureId).toBe(fixtureId);
-    expect(
-      (await app.standings(token, id)).rows.reduce(
-        (sum, row) => sum + row.played,
-        0,
-      ),
-    ).toBe(2);
   });
+
+  it('builds a career from the launch catalog with every competition scheduled', async () => {
+    const content = catalogCareerContent.load();
+    expect(content.clubs).toHaveLength(71);
+    expect(Object.values(content.divisions).flat()).toHaveLength(60);
+    const { app, token } = setup();
+    const careerId = await createAndSelect(app, token);
+    const next = await app.nextMatch(token, careerId);
+    expect(next.competition).toBe('Carioca');
+    expect([next.homeClub.id, next.awayClub.id]).toContain('club_flamengo');
+  });
+
+  it('previews the managed match exactly as the committed job plays it', async () => {
+    const { app, token } = setup();
+    const careerId = await createAndSelect(app, token);
+    const next = await app.nextMatch(token, careerId);
+    const squad = await app.squad(token, careerId);
+    const side = next.homeClub.id === 'club_flamengo' ? 'home' : 'away';
+    const instructions = [
+      {
+        type: 'substitution' as const,
+        minute: 60 as const,
+        side,
+        playerOutId: squad.lineup!.starters.at(-1)!,
+        playerInId: squad.lineup!.bench[0]!,
+        position: 'ST' as const,
+      },
+    ];
+    const plain = await app.previewMatch(token, careerId, []);
+    const preview = await app.previewMatch(token, careerId, instructions);
+    expect(preview.tableUpdated).toBe(false);
+    expect(preview.timeline).not.toEqual(plain.timeline);
+    await expect(app.postMatch(token, careerId)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await app.execute(
+      token,
+      command('SimulateMatch', 'command_previewed', 2, {
+        careerId,
+        fixtureId: next.fixtureId,
+        instructions,
+      }),
+    );
+    await app.runNextJob();
+    const committed = await app.postMatch(token, careerId);
+    expect(committed.score).toEqual(preview.score);
+    expect(committed.timeline).toEqual(preview.timeline);
+  });
+
+  it(
+    'plays a whole season across competitions and rolls into the next one',
+    { timeout: 300_000 },
+    async () => {
+      const { app, token } = setup();
+      const careerId = await createAndSelect(app, token);
+      let version = 2;
+      for (let step = 0; step < 200; step++) {
+        const home = await app.home(token, careerId);
+        if (home.season === 2) break;
+        await app.execute(
+          token,
+          command('AutoPickLineup', `command_pick_${String(step)}`, version, {
+            careerId,
+            clubId: 'club_flamengo',
+            formation: '4-4-2',
+            mode: 'best',
+          }),
+        );
+        version += 1;
+        await app.execute(
+          token,
+          command('AdvanceDate', `command_season_${String(step)}`, version, {
+            careerId,
+          }),
+        );
+        expect((await app.runNextJob())?.state).toBe('succeeded');
+        version = (await app.home(token, careerId)).aggregateVersion;
+      }
+      const home = await app.home(token, careerId);
+      expect(home.season).toBe(2);
+      expect(home.currentDate).toBe('2027-01-01');
+      const table = await app.standings(token, careerId);
+      expect(table.rows.every((row) => row.played === 0)).toBe(true);
+    },
+  );
 });

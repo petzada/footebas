@@ -1,0 +1,64 @@
+name: deploy-web
+
+# Builds the Next.js web for Cloudflare Workers with OpenNext on Linux (the
+# build creates symlinks that Windows refuses without Developer Mode). With a
+# CLOUDFLARE_API_TOKEN secret it deploys; without one it keeps the bundle as an
+# artifact so a maintainer can run `wrangler deploy` from a logged-in machine.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'mvp/fase-6-9']
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-web.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.footebas.com.br' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://wjisqiiwsuykfbmqglfb.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_AUTH_MODE: supabase
+      HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require the public Supabase key
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Defina a variável NEXT_PUBLIC_SUPABASE_ANON_KEY no repositório (Settings > Variables)."
+            exit 1
+          fi
+      - run: pnpm turbo run build --filter=@footebas/web^...
+      - run: pnpm --filter @footebas/web cf:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: footebas-web-open-next
+          path: apps/web/.open-next
+          include-hidden-files: true
+          retention-days: 7
+      - name: Deploy to Cloudflare
+        if: ${{ env.HAS_CLOUDFLARE_TOKEN == 'true' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: apps/web
+        run: pnpm exec opennextjs-cloudflare deploy

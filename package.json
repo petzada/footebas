@@ -11,10 +11,12 @@
   "scripts": {
     "build": "turbo run build",
     "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm smoke",
+    "e2e": "pnpm --filter @footebas/e2e e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
     "smoke": "pnpm --filter @footebas/sim-lab smoke",
+    "smoke:cloud": "pnpm --filter @footebas/cloud-smoke smoke",
     "test": "turbo run test",
     "test:phase1": "pnpm --filter @footebas/sim-lab phase1-gate",
     "typecheck": "turbo run typecheck"
@@ -25,10 +27,12 @@
     "eslint": "10.7.0",
     "fast-check": "4.9.0",
     "prettier": "3.9.5",
+    "supabase": "2.121.0",
     "tsx": "4.23.1",
     "turbo": "2.10.5",
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "wrangler": "4.152.0"
   }
 }

@@ -55,7 +55,8 @@ export type {
 export {
   createMatchInput,
   createMatchResult,
-  MATCH_DECISION_MINUTES,
+  MATCH_INSTRUCTION_MINUTES,
+  MATCH_PLAYS,
 } from './match.js';
 export type {
   MatchEvent,
@@ -65,6 +66,8 @@ export type {
   MatchStatistics,
   MatchInstruction,
   MatchDecisionMinute,
+  MatchPlay,
+  ChanceOutcome,
   PlayerMatchPerformance,
 } from './match.js';
 export {
@@ -86,3 +89,6 @@ export * from './market.js';
 export * from './development.js';
 export * from './career-world.js';
 export * from './competition.js';
+export * from './coach.js';
+export * from './transfer-window.js';
+export * from './ranking.js';

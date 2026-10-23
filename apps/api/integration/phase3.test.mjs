@@ -5,6 +5,7 @@ import {
   InMemoryStorage,
   NoopTelemetry,
   SequentialIdGenerator,
+  careerSaveRepository,
 } from '@footebas/application';
 import {
   jobSseEventSchema,
@@ -111,7 +112,7 @@ async function createSelectedCareer(fixture, suffix) {
     fixture,
     command('SelectClub', `command_select_${suffix}`, 1, {
       careerId,
-      clubId: 'club_1',
+      clubId: 'club_flamengo',
     }),
   );
   expect(selected.statusCode).toBe(202);
@@ -127,7 +128,7 @@ describe('Phase 3 Fastify/application/worker integration', () => {
       fixture,
       command('AutoPickLineup', 'command_autopick_flow', 2, {
         careerId,
-        clubId: 'club_1',
+        clubId: 'club_flamengo',
         formation: '4-3-3',
         mode: 'develop',
       }),
@@ -184,7 +185,7 @@ describe('Phase 3 Fastify/application/worker integration', () => {
       approximateStrength: expect.any(String),
       absences: expect.any(Array),
     });
-    const managedSide = next.homeClub.id === 'club_1' ? 'home' : 'away';
+    const managedSide = next.homeClub.id === 'club_flamengo' ? 'home' : 'away';
     const opponentSide = managedSide === 'home' ? 'away' : 'home';
     const outgoingId = squad.lineup.starters.at(-1);
     const firstIncomingId = squad.lineup.bench[0];
@@ -306,7 +307,7 @@ describe('Phase 3 Fastify/application/worker integration', () => {
     );
     expect(postMatch.playback).toEqual({
       modes: ['instant', 'fast', 'feed'],
-      speeds: [1, 2, 4, 8],
+      speeds: [0.5, 1, 2, 4, 8],
       canSkip: true,
     });
     const expandedAfter = squadReadModelSchema.parse(
@@ -365,7 +366,7 @@ describe('Phase 3 Fastify/application/worker integration', () => {
     const squad = await readSquad();
     const lineupPayload = (positions = formationPositions['4-4-2']) => ({
       careerId,
-      clubId: 'club_1',
+      clubId: 'club_flamengo',
       starters: squad.lineup.starters.map((playerId, index) => ({
         playerId,
         position: positions[index],
@@ -396,11 +397,13 @@ describe('Phase 3 Fastify/application/worker integration', () => {
     await fixture.dependencies.unitOfWork.withCareerLock(
       careerId,
       async (tx) => {
-        const save = await tx.saves.load(careerId, 'user_phase3_owner');
+        // Saves are stored lean (ADR 0014); edit them through the codec.
+        const saves = careerSaveRepository(tx.saves);
+        const save = await saves.load(careerId, 'user_phase3_owner');
         const snapshot = structuredClone(save.snapshot);
         snapshot.players.find(({ id }) => id === unavailableId).injuryRounds =
           2;
-        await tx.saves.update(careerId, 'user_phase3_owner', save.version, {
+        await saves.update(careerId, 'user_phase3_owner', save.version, {
           snapshot,
           seed: save.seed,
           versions: save.versions,
@@ -413,13 +416,15 @@ describe('Phase 3 Fastify/application/worker integration', () => {
     await fixture.dependencies.unitOfWork.withCareerLock(
       careerId,
       async (tx) => {
-        const save = await tx.saves.load(careerId, 'user_phase3_owner');
+        // Saves are stored lean (ADR 0014); edit them through the codec.
+        const saves = careerSaveRepository(tx.saves);
+        const save = await saves.load(careerId, 'user_phase3_owner');
         const snapshot = structuredClone(save.snapshot);
         snapshot.players.find(({ id }) => id === unavailableId).injuryRounds =
           0;
         snapshot.players.find(({ id }) => id === suspendedId).suspensionRounds =
           1;
-        await tx.saves.update(careerId, 'user_phase3_owner', save.version, {
+        await saves.update(careerId, 'user_phase3_owner', save.version, {
           snapshot,
           seed: save.seed,
           versions: save.versions,

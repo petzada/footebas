@@ -1,86 +1,53 @@
 # Estado de implementação
 
-Última atualização: 2026-07-21
+Última atualização: 2026-10-23
 
-| Fase                           | Estado       | Evidência                                       |
-| ------------------------------ | ------------ | ----------------------------------------------- |
-| 0 — Baseline reproduzível      | concluída    | `pnpm check` verde; build e smoke               |
-| 1 — Laboratório determinístico | concluída    | `pnpm test:phase1`: 10k partidas + 1k épocas    |
-| 2 — Primeira carreira          | concluída    | vertical HTTP/worker/web e `pnpm check` verdes  |
-| 3 — Elenco e matchday          | concluída    | matchday reproduzível e acessível; gates verdes |
-| 4 — Mundo vivo                 | concluída    | economia/carreira 25 épocas; API e gates verdes |
-| 5 — Pirâmide e calendário      | concluída    | engine canônico; gate de 2.000 épocas verde     |
-| 6 — Experiência e campo 2D     | em progresso | shell mobile, acessibilidade e timeline 2D      |
-| 7–9                            | pendente     | execução estritamente sequencial pelos gates    |
+| Fase                           | Estado    | Evidência                                        |
+| ------------------------------ | --------- | ------------------------------------------------ |
+| 0 — Baseline reproduzível      | concluída | `pnpm check` verde; build e smoke                |
+| 1 — Laboratório determinístico | concluída | `pnpm test:phase1`: 10k partidas + 1k épocas     |
+| 2 — Primeira carreira          | concluída | vertical HTTP/worker/web e `pnpm check` verdes   |
+| 3 — Elenco e matchday          | concluída | matchday reproduzível e acessível; gates verdes  |
+| 4 — Mundo vivo                 | concluída | economia/carreira 25 épocas; API e gates verdes  |
+| 5 — Pirâmide e calendário      | concluída | engine canônico; gate de 2.000 épocas verde      |
+| 6 — Experiência e campo 2D     | concluída | shell, PWA, replay 2D; testes e build web verdes |
+| 7–9                            | em curso  | entrega final por etapas (ver abaixo)            |
 
-## Decisões operacionais
+Hospedagem de produção: Cloudflare nativo (ADR 0005), Supabase para Postgres/Auth/Storage, domínio
+`footebas.com.br`.
 
-- GOAL/ROADMAP são o design aprovado; não há gates de aprovação intermediária.
-- Infraestrutura externa é substituída por ports/adapters in-memory ou fake durante o objetivo.
-- `dados/elencos/*.md` permanece bruto e imutável.
-- Escritor único no workspace principal até o commit-base da Fase 0.
+## Entrega final (objetivo de 2026-10-22, reestruturado em 2026-10-23)
 
-## Gate da Fase 0
+Branch de integração: `mvp/fase-6-9`. Até três subagentes em paralelo, cada um em worktree próprio e com arquivos
+disjuntos, em três trilhas: **servidor** (`packages/*`, serializada), **web** (`apps/web`, serializada por área) e
+**infraestrutura** (`apps/api`, migrations, CI, ferramentas).
 
-- Ambiente de referência: Node 22.14.0, pnpm 10.6.2, Windows.
-- `pnpm install --frozen-lockfile`: reproduzível, sem segredo ou serviço.
-- `pnpm check`: formatter, typecheck, lint, 10 testes, build e smoke verdes.
-- Smoke canônico: `phase-zero-smoke-v1` / `mulberry32-v1`, data final `2026-01-15`.
-- Infra de produto deliberadamente ausente até a Fase 2 conforme ROADMAP/GOAL.
+Etapas (as marcadas com ★ entraram com o ADR 0010 — apresentação premium e Phaser):
 
-## Gate da Fase 1
+| Etapa | Conteúdo                                                                                                                                                                                                                          | Estado                                |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| 1     | Nuvem: login Supabase, web via OpenNext, domínios, fumaça na nuvem                                                                                                                                                                | concluída                             |
+| 2A    | Telas de entrada: Início, Carregar, Central, Mapa, emblemas                                                                                                                                                                       | concluída                             |
+| 2B    | Visual ISOPOP (ADR 0009), Mapa isométrico, Nova Carreira em etapas com treinador                                                                                                                                                  | concluída (Futebol Retrô, ADR 0012)   |
+| 2C ★  | Partida em Phaser sob demanda sobre a timeline oficial, campo 2D como fallback                                                                                                                                                    | concluída                             |
+| 2D ★  | Apresentação premium: movimento, feedback, sons com mudo, celebração de gol, avatares gerados                                                                                                                                     | concluída                             |
+| 2E    | Telas restantes sobre 2D: Elenco (campo arrastável, presets), Mercado, Escritório, Temporada, Ranking                                                                                                                             | concluída                             |
+| 3     | Servidor: personalidade e limites ✔, mercado/janelas/IA ✔, escritório + entrosamento ✔, e-mails com decisões, estatísticas de temporada, ranking com snapshots; variância do motor e pausas só no intervalo e no fim (decisão 18) | concluída                             |
+| 4     | Licença Woovi PIX ✔ (sandbox aguarda AppID), perfil, termos e privacidade                                                                                                                                                         | concluída (AbacatePay, ADR 0016)      |
+| 5     | ADR 0014: Durable Object por carreira, save enxuto (< 200 KB), endpoint único da Central, TanStack Query + Zustand no cliente; observabilidade ✔, rate limit ✔, backups ✔, E2E no CI ✔                                            | em curso (TanStack/Zustand pendentes) |
+| 6     | Landing arcade isométrica                                                                                                                                                                                                         | concluída (`lp.footebas.com.br`)      |
 
-- Modelo de domínio: jogador, clube, escalação, tática, carreira, competição, fixture e partida com invariantes.
-- `simulateMatch` puro/versionado: golden, properties, força efetiva, posição, formações, mentalidades e mando.
-- Bandas `match-v1-bands-v1`: 10.000 partidas, favoritismo monotônico, zebras, mando e cartões verdes.
-- Liga de oito clubes: 14 rodadas, 56 partidas, tabela/campeão e progressão bounded.
-- Stress: 1.000 temporadas completas / 56.000 partidas, zero estado impossível.
-- Amostra real: oito clubes e 200 jogadores lidos do Markdown bruto; atributos somente `derived` com proveniência.
-- Playthrough automatizado: 14 rodadas, decisões registradas e proxies de variação/consequência verdes.
+### Estado da nuvem
 
-## Gate da Fase 2
+Detalhes operacionais (comandos de deploy, segredos, fumaça) e pendências em `HANDOFF.md`.
 
-- Fluxo real autenticado: criar carreira, escolher clube, escalar, definir tática, avançar, simular, acompanhar job/SSE, consultar pós-jogo e recarregar.
-- Fastify REST/OpenAPI e read models de home, elenco, próximo jogo, tabela e pós-partida; nenhuma escrita canônica direta pelo cliente.
-- Persistência in-memory transacional com checksum, versões obrigatórias, lock por carreira, versão otimista e idempotência pela chave contratual.
-- Worker isolado sobre a mesma fila, com queued/running/succeeded/failed, retry/backoff, timeout lógico, dead-letter, health e shutdown.
-- Gate adversarial: retry não duplica partida, dois avanços concorrentes produzem uma rodada, falha parcial faz rollback e recarga preserva checksum.
-- Conteúdo autoritativo: oito clubes e 200 atletas reais do Markdown bruto; atributos somente `derived`, versionados e com proveniência.
-- Web PWA mobile-first: onboarding curto, navegação, elenco, formações/táticas, feed pulável, resultado, tabela e recarga por port fake.
-- `pnpm check`: formatter, typecheck, lint, 74 testes, builds (incluindo Next) e smoke verdes.
-
-## Gate da Fase 3
-
-- Elenco completo: força, até duas características, posições/lado, condição, moral, ritmo, lesões, suspensões, cartões, notas e estatísticas.
-- Os seis atributos ocultos influenciam o domínio, mas read models e web expõem somente estimativas textuais.
-- Titulares, banco e reservas; formações validadas e automações determinísticas `best`, `rest` e `develop`.
-- Tática compacta com mentalidade, construção, foco, pressão, linha defensiva e marcação.
-- Preparação informa adversário, forma, força aproximada e desfalques antes da decisão.
-- Substituições e mudanças táticas em minutos discretos são imutáveis, afetam o resultado e reproduzem exatamente.
-- API rejeita escalações inválidas antes de persistir/enfileirar e impede instruções sobre o time adversário.
-- Web oferece alternativa sem drag-and-drop, teclado, feed 1×/2×/4×, resultado instantâneo e skip em um toque.
-- Playthrough `phase-three-playthrough-v1`: 14/14 rodadas com informação, consequência e replay, zero falhas.
-- `pnpm check`: formatter, typecheck, lint, 88 testes, builds (incluindo Next) e smoke verdes.
-
-## Gate da Fase 4
-
-- Mundo de carreira puro e determinístico com 40 clubes, 960 identidades reais e atributos derivados com proveniência.
-- Contratos, transferências, empréstimos, agentes livres e IA de mercado conservam dinheiro em ledger balanceado por origem.
-- Estádio, público, base, evolução, diretoria, demissão e troca de clube preservam a identidade e o histórico do treinador.
-- Fastify, aplicação e engine avançam a temporada no mesmo pipeline autoritativo, com ownership, lock, versão otimista e commit atômico.
-- Replay usa fingerprint exato; saves e arquivos canônicos validam checksum; migração e compactação possuem adapters in-memory.
-- Web mobile-first cobre mercado, contratos, finanças, estádio, base, diretoria, empregos, notícias, história e leaderboards.
-- Stress de 25 temporadas: zero falhas, 920 jogadores finais, força média 58,45, salário médio 9.498,86 e caixa mundial 9.461.620.523.
-- `pnpm check`: formatter, typecheck, lint, 121 testes, builds (incluindo Next) e smoke verdes.
-
-## Gate da Fase 5
-
-- DSL canônica e data-driven para liga, grupos e mata-mata, incluindo byes, qualificação e desempates determinísticos.
-- Configuração versionada cobre Séries A/B/C, Copa do Brasil, cinco estaduais simplificados e continental com pré, grupos e mata-mata.
-- Validador recusa conflitos, descanso insuficiente, pernas/mandos incorretos, participantes/fases inválidos e datas reservadas.
-- Resultados alimentam acesso, rebaixamento, vagas continentais, premiações, prestígio e eventos da temporada seguinte.
-- Serviço autoritativo usa adapter engine-backed com ownership, lock, versão otimista e idempotência por fingerprint canônico.
-- Web mobile-first expõe competições, calendário, qualificação, prêmios/prestígio e transição da temporada.
-- Gate canônico: 2.000 épocas, 2.648.000 partidas, dez competições/época, zero falhas em 37,44 s.
-- Transições observadas: 16.000 promoções, 16.000 rebaixamentos e 20.000 classificações continentais.
-- `pnpm check`: formatter, typecheck, lint, 145 testes, builds (incluindo Next) e smoke verdes.
+- Web `footebas-web` em um só Worker com quatro hosts: jogo em `https://game.footebas.com.br`, landing em
+  `https://lp.footebas.com.br`, apex e www → 308 para a landing, `/auth/*` dos hosts antigos → 307 para o jogo.
+  Callback `https://game.footebas.com.br/auth/callback` cadastrado no Supabase.
+- API `footebas-api` em `https://api.footebas.com.br`: Durable Object por carreira, save v3 enxuto, Queues, cron de
+  15 min (reconciliação de pagamentos e ranking), R2 de avatares.
+- Supabase: migrations aplicadas até `20261027000300_ranking_avatar.sql`.
+- Licença: R$ 29,90 por PIX dinâmico da AbacatePay (15 min), webhook com secret, reconciliação automática,
+  carreiras extras bloqueadas após reembolso.
+- Fumaça na nuvem verde em 2026-10-23: CreateCareer ~1,5 s, SelectClub ~1,3 s, demais 0,2–0,9 s (meta de 0,8 s
+  depende de aproximar Worker e banco).

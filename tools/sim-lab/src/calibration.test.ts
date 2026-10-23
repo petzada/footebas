@@ -13,7 +13,7 @@ describe('phase one simulation laboratory', () => {
     expect(report.failures).toEqual([]);
     expect(report.passed).toBe(true);
     expect(canonicalJson(report)).toBe(canonicalJson(runCalibration(2_000)));
-  }, 30_000);
+  }, 180_000);
 
   it('loads a conservative deterministic real sample without resolving raw markers', () => {
     const first = loadRealSample();

@@ -1,6 +1,7 @@
 import type { MatchEvent, MatchResult } from '@footebas/domain';
 
-export const PLAYBACK_SPEEDS = [1, 2, 4, 8] as const;
+/** Feed speeds; 0.5× is the slow live view of decision 18. */
+export const PLAYBACK_SPEEDS = [0.5, 1, 2, 4, 8] as const;
 export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
 export type MatchOutputMode = 'instant' | 'fast' | 'feed';
 

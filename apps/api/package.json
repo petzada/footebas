@@ -13,14 +13,18 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --max-warnings=0",
     "test": "pnpm --filter @footebas/application build && vitest run --config ../../vitest.config.ts src integration",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/dev-server.ts"
   },
   "dependencies": {
     "@fastify/swagger": "9.8.1",
     "@fastify/swagger-ui": "6.1.0",
     "@footebas/application": "workspace:*",
     "@footebas/contracts": "workspace:*",
+    "@footebas/database": "workspace:*",
     "fastify": "5.10.0",
+    "jose": "6.1.0",
+    "postgres": "3.4.7",
     "zod": "4.4.3"
   },
   "devDependencies": {

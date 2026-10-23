@@ -11,6 +11,9 @@ export type LedgerAccount =
   | `club:${string}:income:gate`
   | `club:${string}:income:sponsor`
   | `club:${string}:income:prize`
+  | `club:${string}:income:membership`
+  | `club:${string}:expense:membership`
+  | `club:${string}:expense:sponsor`
   | 'world:transfer_clearing'
   | 'world:gate_source'
   | 'world:sponsor_source'
@@ -38,7 +41,11 @@ export type LedgerSource =
       readonly competitionId: string;
       readonly season: number;
     }
-  | { readonly type: 'stadium'; readonly projectId: string };
+  | { readonly type: 'stadium'; readonly projectId: string }
+  /** Fan membership (sócio-torcedor): revenue or benefit costs of a month. */
+  | { readonly type: 'membership'; readonly period: string }
+  /** Fee the club pays to end a sponsorship contract early. */
+  | { readonly type: 'sponsor_termination'; readonly agreementId: string };
 
 export interface LedgerPosting {
   readonly account: LedgerAccount;
@@ -193,7 +200,8 @@ export function createClubIncomeTransaction(
     source:
       | Extract<LedgerSource, { type: 'gate' }>
       | Extract<LedgerSource, { type: 'sponsor' }>
-      | Extract<LedgerSource, { type: 'prize' }>;
+      | Extract<LedgerSource, { type: 'prize' }>
+      | Extract<LedgerSource, { type: 'membership' }>;
   }>,
 ): LedgerTransaction {
   assertPositiveAmount(input.amount);
@@ -202,7 +210,9 @@ export function createClubIncomeTransaction(
       ? (`club:${input.clubId}:income:gate` as const)
       : input.source.type === 'sponsor'
         ? (`club:${input.clubId}:income:sponsor` as const)
-        : (`club:${input.clubId}:income:prize` as const);
+        : input.source.type === 'membership'
+          ? (`club:${input.clubId}:income:membership` as const)
+          : (`club:${input.clubId}:income:prize` as const);
   return Object.freeze({
     id: input.id,
     occurredAt: input.occurredAt,
@@ -216,6 +226,45 @@ export function createClubIncomeTransaction(
       Object.freeze({
         account: incomeAccount,
         amount: -Number(input.amount) as Money,
+        clubId: input.clubId,
+      }),
+    ]),
+  });
+}
+
+/**
+ * Club expense outside wages and transfers: fan membership benefits or the
+ * fee to end a sponsorship early. Cash leaves, the expense account grows.
+ */
+export function createClubExpenseTransaction(
+  input: Readonly<{
+    id: string;
+    occurredAt: string;
+    clubId: ClubId;
+    amount: Money;
+    source:
+      | Extract<LedgerSource, { type: 'membership' }>
+      | Extract<LedgerSource, { type: 'sponsor_termination' }>;
+  }>,
+): LedgerTransaction {
+  assertPositiveAmount(input.amount);
+  const expenseAccount =
+    input.source.type === 'membership'
+      ? (`club:${input.clubId}:expense:membership` as const)
+      : (`club:${input.clubId}:expense:sponsor` as const);
+  return Object.freeze({
+    id: input.id,
+    occurredAt: input.occurredAt,
+    source: Object.freeze({ ...input.source }),
+    postings: Object.freeze([
+      Object.freeze({
+        account: `club:${input.clubId}:cash` as const,
+        amount: -Number(input.amount) as Money,
+        clubId: input.clubId,
+      }),
+      Object.freeze({
+        account: expenseAccount,
+        amount: input.amount,
         clubId: input.clubId,
       }),
     ]),

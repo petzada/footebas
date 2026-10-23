@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   commandIdSchema,
   entityIdSchema,
+  gameDateSchema,
   transportVersionSchema,
   versionSchema,
 } from './primitives.js';
@@ -59,6 +60,36 @@ export const jobFailedErrorSchema = z.strictObject({
   jobId: entityIdSchema,
   retryable: z.boolean(),
 });
+/** CreateCareer refused: the user already has the plan's maximum of active careers. */
+export const careerLimitReachedErrorSchema = z.strictObject({
+  ...base,
+  code: z.literal('CAREER_LIMIT_REACHED'),
+  message: z.string().min(1).max(500),
+  plan: z.enum(['free', 'licensed']).optional(),
+  maxCareers: z.int().min(0).optional(),
+});
+/** Club-to-club buy, sale or loan outside a transfer window (docs/adr/0008). */
+export const transferWindowClosedErrorSchema = z.strictObject({
+  ...base,
+  code: z.literal('TRANSFER_WINDOW_CLOSED'),
+  message: z.string().min(1).max(500),
+  nextWindowOpensOn: gameDateSchema.optional(),
+});
+/** A transfer would push a squad above the catalog cap of 35 players. */
+export const squadLimitReachedErrorSchema = z.strictObject({
+  ...base,
+  code: z.literal('SQUAD_LIMIT_REACHED'),
+  message: z.string().min(1).max(500),
+  clubId: entityIdSchema.optional(),
+  maxSquadSize: z.int().min(1).optional(),
+});
+/** Too many requests for this player or address; retry after the given delay. */
+export const rateLimitedErrorSchema = z.strictObject({
+  ...base,
+  code: z.literal('RATE_LIMITED'),
+  message: z.string().min(1).max(500),
+  retryAfterSeconds: z.int().min(0).optional(),
+});
 export const internalErrorSchema = z.strictObject({
   ...base,
   code: z.literal('INTERNAL_ERROR'),
@@ -72,6 +103,10 @@ export const apiErrorSchema = z.discriminatedUnion('code', [
   versionConflictErrorSchema,
   idempotencyConflictErrorSchema,
   jobFailedErrorSchema,
+  careerLimitReachedErrorSchema,
+  transferWindowClosedErrorSchema,
+  squadLimitReachedErrorSchema,
+  rateLimitedErrorSchema,
   internalErrorSchema,
 ]);
 export type ApiError = z.infer<typeof apiErrorSchema>;
