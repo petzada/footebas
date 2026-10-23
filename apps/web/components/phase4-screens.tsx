@@ -935,12 +935,12 @@ function YouthTab(props: TabProps) {
           note="Posições em que o elenco tem menos jogadores"
         />
       </div>
-      <p className="rounded-md border bg-muted p-3 text-sm text-ink">
+      <div className="rounded-md border bg-muted p-3 text-sm text-ink">
         Os garotos treinam todo mês e ganham força até o potencial (estimado,
         nunca exato). Quem passa dos {academy?.maxAge ?? 20} anos sem subir
         deixa o clube na virada da temporada. Todos são{' '}
         <Badge variant="outline">gerados pelo universo</Badge>.
-      </p>
+      </div>
       {prospects.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           A base está vazia. A próxima peneira traz novos garotos.
@@ -977,23 +977,23 @@ function YouthTab(props: TabProps) {
               </select>
             </label>
           </div>
-          <div className="grid gap-3 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {shown.map((kid) => (
               <Card
                 key={kid.id}
                 className={kid.highlight ? 'border-bulb' : undefined}
               >
                 <CardHeader>
-                  <div className="flex justify-between gap-2">
-                    <div>
-                      <CardTitle className="font-display text-sm uppercase">
+                  <div className="flex flex-col gap-2">
+                    <div className="min-w-0">
+                      <CardTitle className="font-display text-sm uppercase break-words">
                         {kid.name}
                       </CardTitle>
                       <CardDescription>
                         {kid.position} · {kid.age} anos
                       </CardDescription>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-wrap gap-1">
                       {kid.highlight && <Badge variant="bulb">Destaque</Badge>}
                       {needs.has(kid.position) && (
                         <Badge variant="outline">Carência</Badge>
@@ -1025,7 +1025,7 @@ function YouthTab(props: TabProps) {
                     {READINESS_LABEL[kid.readiness]}
                   </p>
                 </CardContent>
-                <CardFooter className="grid gap-2 min-[400px]:grid-cols-2">
+                <CardFooter className="grid gap-2">
                   <Button
                     size="sm"
                     disabled={!kid.promotable}
