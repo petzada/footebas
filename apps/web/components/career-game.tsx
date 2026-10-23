@@ -433,6 +433,19 @@ function CareerFlow({
       .then((view) => view && setCareer(view))
       .catch(() => undefined);
   }, [api]);
+  // Opening the inbox page reads its messages (MarkInboxRead), so the
+  // badge clears and stays cleared on any device.
+  const unreadMail = career?.world.news
+    .filter(({ unread }) => unread === true)
+    .map(({ id }) => id)
+    .join('|');
+  useEffect(() => {
+    if (stage !== 'game' || screen !== 'inbox' || !unreadMail) return;
+    void products.inbox
+      .markRead(unreadMail.split('|'))
+      .then(refreshCareer)
+      .catch(() => undefined);
+  }, [stage, screen, unreadMail, products.inbox, refreshCareer]);
   const removeCareer = useCallback(
     async (careerId: string) => {
       try {

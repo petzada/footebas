@@ -407,6 +407,7 @@ describe('Durable Object por carreira (ADR 0014)', () => {
       'office',
       'next-match',
       'standings',
+      'tables',
       'post-match',
       'world',
       'competitions',

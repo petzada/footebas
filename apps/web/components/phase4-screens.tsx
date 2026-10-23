@@ -7,6 +7,7 @@ import {
   Buildings,
   CheckCircle,
   ShieldCheck,
+  Trash,
   Trophy,
 } from '@phosphor-icons/react';
 import { ScreenSkeleton } from '@/components/retro/skeleton';
@@ -913,7 +914,22 @@ export function WorldScreen(
           <TabsTrigger value="save">Save</TabsTrigger>
         </TabsList>
         <TabsContent value="news" className="mt-4">
-          <NewsList news={world.news} />
+          <NewsList
+            news={world.news}
+            onDelete={async (id) => {
+              try {
+                await productPortsFor(props.api).inbox.remove(id);
+                const next = await props.api.getCareer();
+                if (next) props.onCareerChange(next);
+              } catch (caught) {
+                props.reportError(
+                  caught instanceof Error
+                    ? caught.message
+                    : 'Não foi possível excluir a mensagem.',
+                );
+              }
+            }}
+          />
         </TabsContent>
         <TabsContent value="history" className="mt-4">
           <HistoryTab base={world.history} port={ports.season} />
@@ -955,7 +971,14 @@ export function WorldScreen(
   );
 }
 
-function NewsList({ news }: { news: CareerView['world']['news'] }) {
+function NewsList({
+  news,
+  onDelete,
+}: {
+  news: CareerView['world']['news'];
+  onDelete?: (id: string) => Promise<void>;
+}) {
+  const [removing, setRemoving] = useState<string | null>(null);
   if (news.length === 0)
     return (
       <p className="panel p-4 text-sm text-muted-foreground">
@@ -980,6 +1003,21 @@ function NewsList({ news }: { news: CareerView['world']['news'] }) {
                 )}
                 {item.pending && (
                   <Badge className="w-fit">Decisão pendente</Badge>
+                )}
+                {item.deletable && onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto size-8"
+                    aria-label={`Excluir: ${item.headline}`}
+                    disabled={removing !== null}
+                    onClick={() => {
+                      setRemoving(item.id);
+                      void onDelete(item.id).finally(() => setRemoving(null));
+                    }}
+                  >
+                    <Trash aria-hidden="true" />
+                  </Button>
                 )}
               </div>
               <CardTitle className="font-display text-sm uppercase">

@@ -31,6 +31,7 @@ import {
 } from '@phosphor-icons/react';
 import { MuteButton } from '@/components/retro/mute-button';
 import type { CareerView, Screen } from '@/lib/career-api';
+import { unreadCount } from '@/lib/inbox-product';
 import { transferWindowOn } from '@/lib/management-model';
 import { useSound } from '@/lib/retro/use-sound';
 import { cn } from '@/lib/utils';
@@ -106,7 +107,7 @@ export function menuBadges(
   career: CareerView,
 ): Partial<Record<Screen, string>> {
   const badges: Partial<Record<Screen, string>> = {};
-  const mail = career.world.news.length;
+  const mail = unreadCount(career.world.news);
   if (mail > 0) badges.inbox = mail > 99 ? '99+' : String(mail);
   // The next fixture date is the closest thing to "today" the shell has.
   const date = career.fixture?.date;

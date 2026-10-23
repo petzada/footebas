@@ -364,6 +364,234 @@ export function liveStandings(
   return outcome.standings ?? [];
 }
 
+/** One knockout tie of a stage, with the legs played so far. */
+export interface LiveTie {
+  readonly tieId: string;
+  /** Home club of the first leg. */
+  readonly homeClubId: ClubId;
+  readonly awayClubId: ClubId;
+  readonly legs: readonly {
+    readonly fixture: CompetitionCalendarFixture;
+    readonly result?: CompetitionMatchResult;
+  }[];
+  /** Goals over the legs played, from the first-leg home club's side. */
+  readonly aggregate?: { readonly home: number; readonly away: number };
+  /** Set once every leg is played (same rule as the stage close). */
+  readonly winnerClubId?: ClubId;
+  /** `tiebreak` when the aggregate was level (penalties or the draw). */
+  readonly decidedBy?: 'goals' | 'tiebreak';
+}
+
+/** A stage of a competition as it stands now (tables or ties). */
+export interface LiveStage {
+  readonly stageId: string;
+  readonly name: string;
+  readonly type: CompetitionDefinition['stages'][number]['type'];
+  readonly status: 'scheduled' | 'active' | 'complete';
+  /** League: one group (the stage itself); groups: one per group. */
+  readonly groups: readonly {
+    readonly groupId: string;
+    readonly standings: readonly CompetitionStanding[];
+  }[];
+  readonly ties: readonly LiveTie[];
+  /** Clubs that skip the current knockout round. */
+  readonly byeClubIds: readonly ClubId[];
+}
+
+export interface LiveCompetition {
+  readonly competitionId: CompetitionId;
+  readonly currentStageId: string;
+  readonly championId?: ClubId;
+  /** Date of the last match, once the competition is decided. */
+  readonly decidedOn?: string;
+  readonly stages: readonly LiveStage[];
+}
+
+function knockoutTies(
+  stage: Extract<CompetitionDefinition['stages'][number], { type: 'knockout' }>,
+  fixtures: readonly CompetitionCalendarFixture[],
+  results: CareerSeasonState['results'],
+  seed: string,
+): LiveTie[] {
+  const byTie = new Map<string, CompetitionCalendarFixture[]>();
+  for (const fixture of fixtures) {
+    const tieId = fixture.tieId ?? fixture.id;
+    byTie.set(tieId, [...(byTie.get(tieId) ?? []), fixture]);
+  }
+  return [...byTie].map(([tieId, legs]) => {
+    const ordered = [...legs].sort(
+      (left, right) => (left.leg ?? 1) - (right.leg ?? 1),
+    );
+    const first = ordered[0]!;
+    const played = ordered.filter(({ id }) => results[id] !== undefined);
+    const goals = (clubId: ClubId) =>
+      played.reduce((sum, fixture) => {
+        const result = results[fixture.id]!;
+        return (
+          sum +
+          (fixture.homeClubId === clubId
+            ? result.homeGoals
+            : fixture.awayClubId === clubId
+              ? result.awayGoals
+              : 0)
+        );
+      }, 0);
+    const aggregate =
+      played.length === 0
+        ? undefined
+        : { home: goals(first.homeClubId), away: goals(first.awayClubId) };
+    const complete = played.length === ordered.length && aggregate;
+    const winnerClubId = complete
+      ? evaluateKnockoutRound(
+          stage,
+          ordered,
+          ordered.map(({ id }) => results[id]!),
+          seed,
+        ).orderedClubIds[0]
+      : undefined;
+    return {
+      tieId,
+      homeClubId: first.homeClubId,
+      awayClubId: first.awayClubId,
+      legs: ordered.map((fixture) => ({
+        fixture,
+        ...(results[fixture.id] === undefined
+          ? {}
+          : { result: results[fixture.id]! }),
+      })),
+      ...(aggregate === undefined ? {} : { aggregate }),
+      ...(winnerClubId === undefined
+        ? {}
+        : {
+            winnerClubId,
+            decidedBy:
+              aggregate!.home === aggregate!.away
+                ? ('tiebreak' as const)
+                : ('goals' as const),
+          }),
+    };
+  });
+}
+
+/**
+ * Every stage of a competition as it stands mid-season: league and group
+ * tables (live until the stage closes, then the closed ranking) and
+ * knockout ties with aggregate and winner. Read-only; never changes the
+ * season.
+ */
+export function liveCompetition(
+  config: MvpCompetitionConfig,
+  state: CareerSeasonState,
+  competitionId: CompetitionId,
+): LiveCompetition {
+  const system = createConfiguredMvpCompetitionSystem(config, state.year);
+  const definition = definitionOf(system, competitionId);
+  const competition = state.competitions.find(
+    (candidate) => candidate.competitionId === competitionId,
+  );
+  if (competition === undefined)
+    throw new Error(`competition ${competitionId} is not in this season`);
+  const decided = competition.outcome !== undefined;
+  const current = decided
+    ? definition.stages.length - 1
+    : competition.stageIndex;
+  const all = state.fixtures.filter(
+    (fixture) => fixture.competitionId === competitionId,
+  );
+  const stages = definition.stages.map((stage, index): LiveStage => {
+    const fixtures = all.filter(({ stageId }) => stageId === stage.id);
+    const closed = competition.outcomes.find(
+      (outcome) => outcome.stageId === stage.id,
+    );
+    const status =
+      closed !== undefined
+        ? ('complete' as const)
+        : index === current &&
+            fixtures.some(({ id }) => state.results[id] !== undefined)
+          ? ('active' as const)
+          : ('scheduled' as const);
+    const seed = `${state.seed}|${String(state.season)}|${definition.id}|${stage.id}`;
+    const base = {
+      stageId: stage.id,
+      name: stage.name,
+      type: stage.type,
+      status,
+      byeClubIds:
+        index === current && !decided ? [...competition.byeClubIds] : [],
+    };
+    if (stage.type === 'knockout')
+      return {
+        ...base,
+        groups: [],
+        ties: knockoutTies(stage, fixtures, state.results, seed),
+      };
+    if (stage.type === 'league') {
+      const standings =
+        closed?.standings ??
+        (index === current ? liveStandings(config, state, competitionId) : []);
+      return {
+        ...base,
+        groups:
+          standings.length === 0 ? [] : [{ groupId: stage.id, standings }],
+        ties: [],
+      };
+    }
+    const groupIds = [
+      ...new Set(fixtures.flatMap(({ groupId }) => groupId ?? [])),
+    ].sort();
+    const groups = groupIds.map((groupId) => {
+      const known = closed?.groupStandings?.[groupId];
+      if (known !== undefined) return { groupId, standings: known };
+      const groupFixtures = fixtures.filter(
+        (fixture) => fixture.groupId === groupId,
+      );
+      const played = groupFixtures.filter(
+        ({ id }) => state.results[id] !== undefined,
+      );
+      const outcome = evaluateRankingStage(
+        {
+          id: stage.id,
+          name: stage.name,
+          type: 'league',
+          participantSource: stage.participantSource,
+          schedule: stage.schedule,
+          roundRobin: stage.roundRobin,
+          ranking: stage.ranking,
+        },
+        [
+          ...new Set(
+            groupFixtures.flatMap(({ homeClubId, awayClubId }) => [
+              homeClubId,
+              awayClubId,
+            ]),
+          ),
+        ],
+        played,
+        played.map(({ id }) => state.results[id]!),
+        `${seed}|${groupId}`,
+      );
+      return { groupId, standings: outcome.standings ?? [] };
+    });
+    return { ...base, groups, ties: [] };
+  });
+  const lastDate = all
+    .filter(({ id }) => state.results[id] !== undefined)
+    .map(({ date }) => date)
+    .sort()
+    .at(-1);
+  return {
+    competitionId,
+    currentStageId: definition.stages[current]!.id,
+    ...(competition.outcome === undefined
+      ? {}
+      : {
+          championId: competition.outcome.championId,
+          ...(lastDate === undefined ? {} : { decidedOn: lastDate }),
+        }),
+    stages,
+  };
+}
+
 export function closeCareerSeason(
   config: MvpCompetitionConfig,
   state: CareerSeasonState,
