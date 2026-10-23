@@ -20,6 +20,7 @@ import {
   play,
   resetSoundForTests,
   setMuted,
+  stopSounds,
 } from '@/lib/retro/sound';
 
 let matchMedia: ((query: string) => MediaQueryList) | undefined;
@@ -123,6 +124,33 @@ describe('som retrô', () => {
     expect(await play('confirm')).toBe(false);
     resetSoundForTests(synth);
     expect(isMuted()).toBe(true);
+  });
+
+  it('mudo e pausa cortam o som que já está tocando', async () => {
+    const context = {
+      state: 'running',
+      suspend: vi.fn(function (this: { state: string }) {
+        this.state = 'suspended';
+        return Promise.resolve();
+      }),
+      resume: vi.fn(function (this: { state: string }) {
+        this.state = 'running';
+        return Promise.resolve();
+      }),
+    };
+    resetSoundForTests(vi.fn(), context);
+    localStorage.removeItem(MUTE_STORAGE_KEY);
+    armSoundUnlock();
+    fireEvent.pointerDown(document.body);
+    expect(await play('crowd')).toBe(true);
+    stopSounds();
+    expect(context.suspend).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(context.resume).toHaveBeenCalled();
+    setMuted(true);
+    expect(context.suspend).toHaveBeenCalledTimes(2);
+    expect(await play('goal')).toBe(false);
   });
 
   it('o botão de mudo expõe o estado e alterna', () => {

@@ -63,6 +63,7 @@ import {
   type CompetitionId,
   type CompetitionMatchResult,
   type Lineup,
+  type Position,
   type MatchResult,
   type MatchInstruction,
   type MatchInput,
@@ -1021,7 +1022,7 @@ export class FootebasApplication {
       return {
         club,
         lineup: managed
-          ? snapshot.lineup!
+          ? availableLineup(snapshot)!
           : autoSelectLineup({
               club,
               players: snapshot.players,
@@ -2023,6 +2024,90 @@ function playedManagedMatch(snapshot: Snapshot, played: ManagedMatch) {
       'adversário',
   };
 }
+/**
+ * The assistant's fix for the saved lineup: injured or suspended starters give
+ * way to the strongest available player for the same position (bench first,
+ * then reserves, then anyone fit), and unavailable substitutes leave the bench.
+ * Everything else the manager chose stays as it was.
+ */
+export function availableLineup(snapshot: Snapshot): Lineup | undefined {
+  const lineup = snapshot.lineup;
+  const clubId = snapshot.selectedClubId;
+  if (!lineup || clubId === undefined) return lineup;
+  const byId = new Map<string, Snapshot['players'][number]>(
+    snapshot.players.map((player) => [player.id, player]),
+  );
+  const fit = (id: string) => {
+    const player = byId.get(id);
+    return player?.injuryRounds === 0 && player.suspensionRounds === 0;
+  };
+  const used = new Set(lineup.starters.map(({ playerId }) => playerId));
+  if (
+    lineup.starters.every(({ playerId }) => fit(playerId)) &&
+    lineup.substitutes.every(fit)
+  )
+    return lineup;
+  const club = snapshot.clubs.find(({ id }) => id === clubId);
+  if (!club) return lineup;
+  const pool = [
+    ...lineup.substitutes,
+    ...(lineup.reserves ?? []),
+    ...club.squad.filter(
+      (id) =>
+        !lineup.substitutes.includes(id) && !lineup.reserves?.includes(id),
+    ),
+  ].filter((id) => !used.has(id) && fit(id));
+  const strength = (id: string) => Number(byId.get(id)?.strength ?? 0);
+  const take = (position: Position): string | undefined => {
+    const natural = pool.filter((id) => byId.get(id)?.position === position);
+    const secondary = pool.filter((id) =>
+      byId.get(id)?.secondaryPositions.includes(position),
+    );
+    const outfield = pool.filter((id) =>
+      position === 'GK' ? false : byId.get(id)?.position !== 'GK',
+    );
+    const choice = [natural, secondary, outfield]
+      .map((group) => [...group].sort((a, b) => strength(b) - strength(a))[0])
+      .find((id) => id !== undefined);
+    if (choice !== undefined) pool.splice(pool.indexOf(choice), 1);
+    return choice;
+  };
+  const starters = lineup.starters.map((slot) => {
+    if (fit(slot.playerId)) return slot;
+    const replacement = take(slot.position);
+    return replacement === undefined
+      ? slot
+      : { ...slot, playerId: entityId(replacement, 'player') };
+  });
+  if (starters.some(({ playerId }) => !fit(playerId)))
+    return autoSelectLineup({
+      club,
+      players: snapshot.players,
+      formation: snapshot.tactic?.formation ?? '4-4-2',
+      mode: 'best',
+    });
+  const onPitch = new Set(starters.map(({ playerId }) => playerId));
+  const substitutes = lineup.substitutes.filter(
+    (id) => fit(id) && !onPitch.has(id),
+  );
+  const captainId = onPitch.has(lineup.captainId)
+    ? lineup.captainId
+    : starters[0]!.playerId;
+  return {
+    ...lineup,
+    starters,
+    substitutes,
+    ...(lineup.reserves === undefined
+      ? {}
+      : {
+          reserves: lineup.reserves.filter(
+            (id) => !onPitch.has(id) && !substitutes.includes(id),
+          ),
+        }),
+    captainId,
+  };
+}
+
 /** Keeps the matchday club aligned with the manager after firings or moves. */
 export function syncManagedClub(snapshot: Snapshot): void {
   const clubId = snapshot.world.manager.currentClubId;
@@ -2042,6 +2127,7 @@ export function syncManagedClub(snapshot: Snapshot): void {
           formation: snapshot.tactic?.formation ?? '4-4-2',
           mode: 'best',
         });
+      else snapshot.lineup = availableLineup(snapshot) ?? lineup;
     }
     return;
   }

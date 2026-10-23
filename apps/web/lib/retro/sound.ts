@@ -29,6 +29,12 @@ let muted: boolean | null = null;
 let unlocked = false;
 let armed = false;
 let synth: ((...parameters: (number | undefined)[]) => unknown) | null = null;
+/** ZzFX's AudioContext: suspending it silences sounds already playing. */
+let context: {
+  suspend(): Promise<void>;
+  resume(): Promise<void>;
+  state: string;
+} | null = null;
 
 function storage(): Storage | null {
   try {
@@ -51,7 +57,18 @@ export function setMuted(value: boolean): void {
   } catch {
     // Private mode or blocked storage: the choice lasts for the session.
   }
+  // Muting must cut what is already sounding, not only what comes next.
+  if (value) void context?.suspend().catch(() => undefined);
   for (const listener of listeners) listener(value);
+}
+
+/** Stops every sound in flight (pause, skip, leaving the match). */
+export function stopSounds(): void {
+  if (!context || context.state !== 'running') return;
+  void context
+    .suspend()
+    .then(() => (isMuted() ? undefined : context?.resume()))
+    .catch(() => undefined);
 }
 
 export function toggleMuted(): boolean {
@@ -102,10 +119,15 @@ export async function play(name: SoundName): Promise<boolean> {
     try {
       const loaded = await import('zzfx');
       synth = loaded.zzfx;
+      context = loaded.ZZFX.audioContext;
     } catch {
       return false;
     }
   }
+  // The user may have muted while the synth was loading.
+  if (isMuted()) return false;
+  if (context?.state === 'suspended')
+    await context.resume().catch(() => undefined);
   try {
     synth(...SOUNDS[name]);
     return true;
@@ -117,10 +139,12 @@ export async function play(name: SoundName): Promise<boolean> {
 /** Test seam: forgets the cached state (mute, unlock, synth). */
 export function resetSoundForTests(
   fake?: (...parameters: (number | undefined)[]) => unknown,
+  fakeContext?: typeof context,
 ): void {
   muted = null;
   unlocked = false;
   armed = false;
   synth = fake ?? null;
+  context = fakeContext ?? null;
   listeners.clear();
 }

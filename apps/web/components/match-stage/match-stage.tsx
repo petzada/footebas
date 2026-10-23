@@ -16,6 +16,7 @@ import {
   textualReplayAlternative,
   type MatchReplayInput,
 } from '@/lib/match-replay-model';
+import { stopSounds } from '@/lib/retro/sound';
 import { useSound } from '@/lib/retro/use-sound';
 import { SEGMENT_MS } from './match-scene';
 import { cuesFor, momentsBetween } from './moments';
@@ -197,6 +198,8 @@ export function MatchStage({
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [animated, match, minute, play, speed]);
+  // Leaving the match (or the stage) silences whatever is still sounding.
+  useEffect(() => () => stopSounds(), []);
 
   function toggleSimple() {
     const next = !simple;

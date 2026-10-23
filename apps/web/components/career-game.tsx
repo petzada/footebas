@@ -70,6 +70,7 @@ import { MatchStage } from '@/components/match-stage/match-stage';
 import type { MatchReplayInput } from '@/lib/match-replay-model';
 import { ClubEmblem } from '@/components/club-emblem';
 import { TickerProvider, useTicker } from '@/components/retro/ticker';
+import { stopSounds } from '@/lib/retro/sound';
 import { useSound } from '@/lib/retro/use-sound';
 import { CentralScreen } from '@/components/central-screen';
 import { ClubMapScreen } from '@/components/club-map';
@@ -862,6 +863,10 @@ function Matchday(props: {
   );
   const halfTimeStop = update.decisionPoint && dismissedPauseId !== update.id;
   const paused = manualPaused || halfTimeStop || update.done;
+  // Pausing (by hand, at half time or at the end) cuts sounds in flight.
+  useEffect(() => {
+    if (paused) stopSounds();
+  }, [paused]);
   const minute = Math.max(clock, update.minute);
   const advance = useEffectEvent(() => void props.onNext());
 
