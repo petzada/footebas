@@ -639,10 +639,10 @@ function Onboarding(props: {
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="mb-8">
-          <Brand />
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Brand size="lg" />
           <p className="mt-3 text-sm font-semibold text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
-            Sua carreira, sua história. A rodada cabe no intervalo.
+            Sua carreira, sua história
           </p>
         </div>
         <Card>

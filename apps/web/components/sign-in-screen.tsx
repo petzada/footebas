@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/card';
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
@@ -32,10 +31,10 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="mb-8">
-          <Brand />
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Brand size="lg" />
           <p className="mt-3 text-sm font-semibold text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
-            Sua carreira, sua história. A rodada cabe no intervalo.
+            Sua carreira, sua história
           </p>
         </div>
         {children}
@@ -128,11 +127,9 @@ export function SignInScreen({
               <h1>Entre para assumir o clube</h1>
             )}
           </CardTitle>
-          <CardDescription>
-            {status === 'sent'
-              ? 'O link de acesso está a caminho.'
-              : 'Sua carreira fica salva na nuvem e segue com você em qualquer aparelho.'}
-          </CardDescription>
+          {status === 'sent' && (
+            <CardDescription>O link de acesso está a caminho.</CardDescription>
+          )}
         </CardHeader>
         <CardContent>
           <div aria-live="polite" role="status">
@@ -203,9 +200,6 @@ export function SignInScreen({
                     }
                     onChange={(event) => setEmail(event.target.value)}
                   />
-                  <FieldDescription id="sign-in-email-hint">
-                    Mandamos um link mágico: sem senha para lembrar.
-                  </FieldDescription>
                 </Field>
                 <Button
                   type="submit"
@@ -220,6 +214,12 @@ export function SignInScreen({
                     <ArrowRight data-icon="inline-end" />
                   )}
                 </Button>
+                <p
+                  id="sign-in-email-hint"
+                  className="mt-2 text-center text-xs whitespace-nowrap text-muted-foreground"
+                >
+                  Sem senha para lembrar
+                </p>
               </form>
             </FieldGroup>
           )}

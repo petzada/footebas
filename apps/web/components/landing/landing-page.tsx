@@ -173,7 +173,9 @@ function useReveal(root: React.RefObject<HTMLElement | null>) {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
+          // Also reveal blocks already above the viewport (anchor jumps and
+          // fast scrolls never intersect them).
+          if (entry.isIntersecting || entry.boundingClientRect.top < 0) {
             (entry.target as HTMLElement).dataset['in'] = 'true';
             observer.unobserve(entry.target);
           }
@@ -725,10 +727,10 @@ export function LandingPage() {
                 R$ 0
               </p>
               <ul className="flex flex-col gap-2 text-sm leading-relaxed text-ink/90">
-                <li>✔ Jogo completo: elenco, mercado, escritório, temporada</li>
+                <li>✔ Jogo completo</li>
                 <li>✔ {FREE_ENTITLEMENTS.maxCareers} carreira ativa</li>
-                <li>✔ Começa na Série C e sobe no braço</li>
-                <li>✔ Partida ao vivo e ranking global</li>
+                <li>✔ Começa na Série C</li>
+                <li>✔ Partidas ao vivo e ranking global</li>
               </ul>
               <a
                 href={GAME_URL}
@@ -755,23 +757,18 @@ export function LandingPage() {
                 {formatCents(LICENSE_PRICE_CENTS)}
               </p>
               <ul className="flex flex-col gap-2 text-sm leading-relaxed text-chalk">
-                <li className="flex gap-2">
-                  <PixelStar size={14} className="mt-1" />
-                  Até {LICENSED_ENTITLEMENTS.maxCareers} carreiras ao mesmo
-                  tempo, cada uma com nome
-                </li>
-                <li className="flex gap-2">
-                  <PixelStar size={14} className="mt-1" />
-                  Comece em qualquer clube, de qualquer série
-                </li>
-                <li className="flex gap-2">
-                  <PixelStar size={14} className="mt-1" />
-                  PIX na hora. Sem assinatura, sem renovação
-                </li>
-                <li className="flex gap-2">
-                  <PixelStar size={14} className="mt-1" />
-                  Arrependeu? Reembolso integral em até 7 dias
-                </li>
+                {[
+                  'Jogo completo',
+                  `Até ${String(LICENSED_ENTITLEMENTS.maxCareers)} carreiras ativas`,
+                  'Começa no seu clube favorito',
+                  'Sem assinatura',
+                  'Reembolso integral em até 7 dias',
+                ].map((benefit) => (
+                  <li key={benefit} className="flex gap-2">
+                    <PixelStar size={14} className="mt-1" />
+                    {benefit}
+                  </li>
+                ))}
               </ul>
               <a
                 href={GAME_URL}
@@ -782,15 +779,14 @@ export function LandingPage() {
               </a>
             </div>
           </div>
-          <p className="mt-4 text-center text-xs text-chalk/80">
-            7 dias para testar o jogo ou seu dinheiro de volta. Qualquer dúvida,
-            fale com o nosso suporte.
+          <p className="mt-4 text-center text-xs whitespace-nowrap text-chalk/80">
+            Ficou com dúvidas? Fale com o nosso suporte
           </p>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
+      <section className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
         <div className="lp-reveal panel-chalk flex flex-col items-center gap-4 p-6 text-center sm:p-10">
           <div className="flex items-center gap-3">
             <Crest id="club_gremio" size={40} />
@@ -816,6 +812,11 @@ export function LandingPage() {
         </div>
       </section>
 
+      <p className="mx-auto max-w-2xl px-4 pb-8 text-center text-xs leading-relaxed text-chalk/70 sm:px-6">
+        Escudos e nomes dos clubes pertencem aos seus donos e aparecem apenas
+        para identificar as equipes do jogo.
+      </p>
+
       <footer className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">
         <div className="panel-wood flex flex-col items-center gap-5 px-4 py-8 text-center font-pixel text-[.5rem] text-chalk sm:py-10">
           <span className="text-[.65rem] sm:text-sm">Footebas</span>
@@ -835,16 +836,10 @@ export function LandingPage() {
           </nav>
           <span className="text-chalk/80">Feito no Brasil</span>
         </div>
-        <div className="mx-auto mt-5 flex max-w-2xl flex-col gap-2 text-center text-xs leading-relaxed text-chalk/70">
-          <p>
-            Escudos e nomes dos clubes pertencem aos seus donos e aparecem
-            apenas para identificar as equipes do jogo.
-          </p>
-          <p>
-            Jogo Footebas operado por Marct Soluções Digitais · CNPJ
-            63.940.273/0001-36
-          </p>
-        </div>
+        <p className="mx-auto mt-5 max-w-2xl text-center text-xs leading-relaxed text-chalk/70">
+          Footebas é operado por Marct Soluções Digitais · CNPJ
+          63.940.273/0001-36
+        </p>
       </footer>
     </div>
   );
