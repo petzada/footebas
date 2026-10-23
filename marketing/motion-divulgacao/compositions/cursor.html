@@ -1,0 +1,97 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    /* The fingertip sits on the element's origin (0, 0). */
+    #cursor-hand .art {
+      position: absolute;
+      left: -25px;
+      top: -2px;
+    }
+    #cursor-hand .grab {
+      left: -25px;
+      top: -22px;
+    }
+  </style>
+  <div data-hf-id="hf-nrk9" id="root" data-composition-id="cursor" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-ecfo" id="cursor-hand" class="cursor">
+      <div data-hf-id="hf-x467" class="lift">
+        <div data-hf-id="hf-v5vh" class="press">
+          <span data-hf-id="hf-c1eu" id="cursor-open" class="art" data-sprite="hand" data-px="5"></span>
+          <span data-hf-id="hf-d0wd" id="cursor-grab" class="art grab" data-sprite="grab" data-px="5"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const C = PLANO.cliques;
+      const tl = gsap.timeline({ paused: true });
+      const hand = document.getElementById('cursor-hand');
+      FB.mountSprites(hand);
+      const IR = { immediateRender: false };
+      const show = (t, on) => tl.fromTo(hand, { opacity: on ? 0 : 1 }, Object.assign({ opacity: on ? 1 : 0, duration: 1 / 30, ease: 'steps(1)' }, IR), t);
+      const grab = (t, on) => {
+        tl.fromTo('#cursor-open', { opacity: on ? 1 : 0 }, Object.assign({ opacity: on ? 0 : 1, duration: 1 / 30, ease: 'steps(1)' }, IR), t);
+        tl.fromTo('#cursor-grab', { opacity: on ? 0 : 1 }, Object.assign({ opacity: on ? 1 : 0, duration: 1 / 30, ease: 'steps(1)' }, IR), t);
+      };
+      gsap.set(hand, { x: 1990, y: 1130, opacity: 0 });
+      gsap.set('#cursor-grab', { opacity: 0 });
+      const P = (c) => [c.x, c.y];
+
+      /* Half time: tactics, the kid, the second-half button. */
+      show(2.4, true);
+      FB.cursorTo(tl, hand, [1990, 1130], P(C.ofensiva), C.ofensiva.t - 0.03, 0.55, -60);
+      FB.click(tl, hand, C.ofensiva.t);
+      FB.cursorTo(tl, hand, P(C.ofensiva), P(C.f433), C.f433.t - 0.03, 0.36, -30);
+      FB.click(tl, hand, C.f433.t);
+      FB.cursorTo(tl, hand, P(C.f433), P(C.pegaGaroto), C.pegaGaroto.t - 0.08, 0.5, -40);
+      grab(C.pegaGaroto.t - 0.05, true);
+      FB.click(tl, hand, C.pegaGaroto.t);
+      const dragStart = C.pegaGaroto.t + 0.06;
+      const dragEnd = C.soltaGaroto.t - 0.1;
+      FB.cursorTo(tl, hand, P(C.pegaGaroto), P(C.soltaGaroto), dragEnd, dragEnd - dragStart, PLANO.arcoArraste);
+      grab(C.soltaGaroto.t, false);
+      const rest = [C.soltaGaroto.x + 112, C.soltaGaroto.y + 50];
+      FB.cursorTo(tl, hand, P(C.soltaGaroto), rest, C.soltaGaroto.t + 0.4, 0.32, -16);
+      FB.cursorTo(tl, hand, rest, P(C.segundoTempo), C.segundoTempo.t - 0.05, 0.5, -50);
+      FB.click(tl, hand, C.segundoTempo.t);
+      show(7.12, false);
+
+      /* Live match: the speed control (4x, then back to 1x). */
+      show(10.41, true);
+      FB.cursorTo(tl, hand, [1250, 1150], P(C.vel4x), C.vel4x.t - 0.04, 0.42, -30);
+      FB.click(tl, hand, C.vel4x.t);
+      FB.cursorTo(tl, hand, P(C.vel4x), P(C.vel1x), C.vel1x.t - 0.04, 0.34, -24);
+      FB.click(tl, hand, C.vel1x.t);
+      FB.cursorTo(tl, hand, P(C.vel1x), [760, 1180], 11.95, 0.3, 0);
+      show(11.95, false);
+
+      /* On the phone: "Preparar próxima rodada". */
+      show(13.5, true);
+      FB.cursorTo(tl, hand, [1480, 1150], P(C.preparar), C.preparar.t - 0.04, 0.42, -40);
+      FB.click(tl, hand, C.preparar.t);
+      show(14.12, false);
+
+      /* The club: accept the sponsor, then the offer from the AI. */
+      show(18.05, true);
+      FB.cursorTo(tl, hand, [1250, 1150], P(C.aceitar), C.aceitar.t - 0.04, 0.42, -50);
+      FB.click(tl, hand, C.aceitar.t);
+      FB.cursorTo(tl, hand, P(C.aceitar), P(C.proposta), C.proposta.t - 0.04, 0.5, -60);
+      FB.click(tl, hand, C.proposta.t);
+      FB.cursorTo(tl, hand, P(C.proposta), [1500, 1180], 19.95, 0.3, 0);
+      show(19.95, false);
+
+      /* End card: the call to action. */
+      show(27.35, true);
+      FB.cursorTo(tl, hand, [1720, 1150], P(C.chamada), C.chamada.t - 0.05, 0.55, -50);
+      FB.click(tl, hand, C.chamada.t);
+
+      window.__timelines['cursor'] = tl;
+    })();
+  </script>
+</template>

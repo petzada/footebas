@@ -1,0 +1,79 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    /* Letreiro: the game's scoreboard ticker (.ticker), carrying the coach's
+       half-time decisions in bulb letters. Starts 0.7 s into the film. */
+    #letreiro-box {
+      position: absolute;
+      left: 160px;
+      top: 846px;
+      width: 1600px;
+      height: 128px;
+    }
+    .letreiro-msg {
+      position: absolute;
+      left: 56px;
+      top: 42px;
+      font-family: var(--font-pixel);
+      font-size: 64px;
+      line-height: 1;
+      color: var(--bulb);
+      text-shadow: 0 0 14px rgb(255 210 63 / 0.55);
+      white-space: nowrap;
+    }
+    #letreiro-dot {
+      position: absolute;
+      right: 44px;
+      top: 50px;
+      width: 28px;
+      height: 28px;
+      background: var(--card-red);
+      box-shadow: 0 0 12px rgb(200 50 43 / 0.7);
+    }
+  </style>
+  <div data-hf-id="hf-0d33" id="root" data-composition-id="letreiro" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-1agc" id="letreiro-box" class="ticker">
+      <p data-hf-id="hf-ivph" id="letreiro-m1" class="letreiro-msg">O TÉCNICO É VOCÊ</p>
+      <p data-hf-id="hf-bgvv" id="letreiro-m2" class="letreiro-msg">MUDE A TÁTICA</p>
+      <p data-hf-id="hf-33kf" id="letreiro-m3" class="letreiro-msg">CHAME O GAROTO DA BASE</p>
+      <p data-hf-id="hf-h0wj" id="letreiro-m4" class="letreiro-msg">VOLTA PRO JOGO</p>
+      <span data-hf-id="hf-d37c" id="letreiro-dot"></span>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const T0 = PLANO.inicio.letreiro;
+      const at = (abs) => abs - T0;
+      const tl = gsap.timeline({ paused: true });
+      const lines = ['#letreiro-m1', '#letreiro-m2', '#letreiro-m3', '#letreiro-m4'].map((s) => document.querySelector(s));
+      const letters = lines.map((el) => FB.pixelTitle(el));
+      // The ticker rises from the bottom edge with the UI spring.
+      FB.springTo(tl, '#letreiro-box', { y: 220 }, { y: 0 }, at(0.8), 'ui');
+      // "On air" lamp blinks every beat while the ticker speaks.
+      for (let b = 1.0; b < 7.5; b += 0.5) {
+        tl.fromTo('#letreiro-dot', { opacity: 1 }, { opacity: 0.25, duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(b + 0.25));
+        tl.fromTo('#letreiro-dot', { opacity: 0.25 }, { opacity: 1, duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(b + 0.5));
+      }
+      // Each message lights letter by letter, holds, then the board clears.
+      const plan = [
+        { i: 0, on: 0.95, gap: 1 / 30, off: 2.9 },
+        { i: 1, on: 3.0, gap: 1 / 30, off: 4.4 },
+        { i: 2, on: 4.5, gap: 1 / 30, off: 6.4 },
+        { i: 3, on: 6.5, gap: 1 / 30, off: 99 },
+      ];
+      plan.forEach(({ i, on, gap, off }) => {
+        FB.lightLetters(tl, letters[i], at(on), gap);
+        if (off < 99) tl.fromTo(lines[i], { opacity: 1 }, { opacity: 0, duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(off));
+      });
+      // "VOLTA PRO JOGO" rides the zoom-through, then drops away fast.
+      tl.fromTo('#letreiro-box', { y: 0 }, { y: 260, duration: 0.25, ease: 'power3.in', immediateRender: false }, at(7.5));
+      FB.pixelAccents(document.querySelector('[data-composition-id="letreiro"]'));
+      window.__timelines['letreiro'] = tl;
+    })();
+  </script>
+</template>

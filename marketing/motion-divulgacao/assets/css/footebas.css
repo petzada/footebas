@@ -1,0 +1,494 @@
+/*
+ * The game's "Futebol Retrô" materials (apps/web/app/globals.css, ADR 0012)
+ * at film scale: every app pixel is doubled (--px 3px -> 6px), so pixel
+ * borders, bars and the dotted scoreboard stay crisp at 1080p.
+ */
+@font-face {
+  font-family: 'Press Start 2P';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/press-start-2p-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Press Start 2P';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/press-start-2p-latin-ext-400-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --px: 6px;
+  --ink: #15201a;
+  --chalk: #f4efe2;
+  --chalk-deep: #e6dcc3;
+  --grass: #2f7d3a;
+  --grass-deep: #246630;
+  --grass-light: #3a9447;
+  --board: #121a15;
+  --bulb: #ffd23f;
+  --wood: #a0672f;
+  --wood-deep: #6b4119;
+  --sky: #7cc4ea;
+  --card-red: #c8322b;
+  --accent-red: #a3261f;
+  --muted: #e9e2cf;
+  --muted-ink: #514b3d;
+  --popover: #fbf8ef;
+  --row-highlight: #f6dd8a;
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-body: 'Inter', sans-serif;
+  --ink-border: 0 calc(var(--px) * -1) 0 0 var(--ink), 0 var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 0 var(--ink), var(--px) 0 0 0 var(--ink);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html,
+body {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--grass-deep);
+}
+body {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  color: var(--chalk);
+}
+
+.font-pixel,
+.pixel {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  text-transform: uppercase;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+img.pixelated,
+.pixelated img,
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* Mowed pitch stripes: the app's page ground. */
+.grass {
+  background: repeating-linear-gradient(180deg, var(--grass) 0 84px, var(--grass-light) 84px 168px);
+}
+
+/* Prancheta: cream reading panel with a stepped ink border. */
+.panel {
+  background: var(--chalk);
+  color: var(--ink);
+  box-shadow:
+    var(--ink-border),
+    inset 0 calc(var(--px) * -1) 0 0 var(--chalk-deep);
+}
+/* Placar: dark stadium scoreboard with bulb digits. */
+.panel-board {
+  background:
+    radial-gradient(circle at 2px 2px, rgb(255 255 255 / 0.05) 2px, transparent 3px),
+    var(--board);
+  background-size: 12px 12px;
+  color: var(--chalk);
+  box-shadow:
+    var(--ink-border),
+    inset 0 0 0 var(--px) var(--wood-deep);
+}
+/* Prancheta de giz: pitch green with a dashed chalk frame. */
+.panel-chalk {
+  background: var(--grass-deep);
+  color: var(--chalk);
+  outline: var(--px) dashed var(--chalk);
+  outline-offset: calc(var(--px) * -2);
+  box-shadow: var(--ink-border);
+}
+/* Banco de reservas: wood bar for navigation. */
+.panel-wood {
+  background: repeating-linear-gradient(90deg, var(--wood) 0 88px, var(--wood-deep) 88px 94px);
+  color: var(--chalk);
+  box-shadow: var(--ink-border);
+}
+
+/* Amber scoreboard digits. */
+.led {
+  font-family: var(--font-pixel);
+  color: var(--bulb);
+  text-shadow: 0 0 12px rgb(255 210 63 / 0.55);
+}
+
+/* Video game button: pixel border and a raised base that presses down. */
+.btn-px {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  border: 0;
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  line-height: 1.2;
+  --press: 0;
+  box-shadow:
+    var(--ink-border),
+    0 calc(var(--px) * 2 * (1 - var(--press))) 0 0 var(--ink);
+}
+.btn-px [data-icon] svg {
+  display: block;
+}
+.btn-grass {
+  background: var(--grass-deep);
+  color: var(--chalk);
+}
+.btn-chalk {
+  background: var(--chalk);
+  color: var(--ink);
+}
+.btn-board {
+  background: var(--board);
+  color: var(--chalk);
+}
+.btn-red {
+  background: var(--accent-red);
+  color: var(--chalk);
+}
+.btn-play {
+  background: var(--bulb);
+  color: var(--ink);
+}
+
+/* Figurinha: sticker card. */
+.sticker {
+  background: var(--chalk);
+  color: var(--ink);
+  box-shadow:
+    var(--ink-border),
+    inset 0 0 0 var(--px) var(--chalk),
+    inset 0 0 0 calc(var(--px) * 2) var(--chalk-deep);
+}
+
+/* Pixel bar: stepped blocks instead of a smooth fill. */
+.bar-px {
+  position: relative;
+  height: 20px;
+  background: var(--muted);
+  box-shadow: inset 0 0 0 4px var(--ink);
+  overflow: hidden;
+}
+.bar-px > span {
+  display: block;
+  height: 100%;
+  background-color: var(--grass-deep);
+  background-image: repeating-linear-gradient(90deg, transparent 0 12px, rgb(21 32 26 / 0.35) 12px 16px);
+}
+.bar-px[data-tone='bulb'] > span {
+  background-color: var(--bulb);
+}
+
+/* Letreiro: scoreboard ticker. */
+.ticker {
+  overflow: hidden;
+  background: var(--board);
+  color: var(--bulb);
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  box-shadow:
+    var(--ink-border),
+    inset 0 0 0 var(--px) var(--wood-deep);
+}
+
+/* Badge (components/ui/badge.tsx). */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 4px solid var(--ink);
+  padding: 6px 12px;
+  font-family: var(--font-pixel);
+  font-size: 18px;
+  line-height: 1;
+  text-transform: uppercase;
+  background: var(--grass-deep);
+  color: var(--chalk);
+}
+.badge.bulb {
+  background: var(--bulb);
+  color: var(--ink);
+}
+.badge.board {
+  background: var(--board);
+  color: var(--bulb);
+}
+.badge.red {
+  background: var(--accent-red);
+  color: var(--chalk);
+}
+
+/* Crests: tiny pixel PNGs scaled by whole numbers. */
+.crest {
+  image-rendering: pixelated;
+  object-fit: contain;
+  display: block;
+}
+
+/* Pixel hand cursor (film only). */
+.cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 0 rgb(21 32 26 / 0.35));
+}
+.cursor .press {
+  transform-origin: 30% 10%;
+}
+
+/* ---------- Phone (film prop): a pixel device with stepped corners. ---------- */
+.phone {
+  position: absolute;
+  width: 480px;
+  height: 1000px;
+  background: var(--ink);
+  clip-path: polygon(
+    0 36px, 6px 36px, 6px 24px, 12px 24px, 12px 18px, 18px 18px, 18px 12px, 24px 12px, 24px 6px, 36px 6px, 36px 0,
+    calc(100% - 36px) 0, calc(100% - 36px) 6px, calc(100% - 24px) 6px, calc(100% - 24px) 12px, calc(100% - 18px) 12px,
+    calc(100% - 18px) 18px, calc(100% - 12px) 18px, calc(100% - 12px) 24px, calc(100% - 6px) 24px, calc(100% - 6px) 36px,
+    100% 36px, 100% calc(100% - 36px), calc(100% - 6px) calc(100% - 36px), calc(100% - 6px) calc(100% - 24px),
+    calc(100% - 12px) calc(100% - 24px), calc(100% - 12px) calc(100% - 18px), calc(100% - 18px) calc(100% - 18px),
+    calc(100% - 18px) calc(100% - 12px), calc(100% - 24px) calc(100% - 12px), calc(100% - 24px) calc(100% - 6px),
+    calc(100% - 36px) calc(100% - 6px), calc(100% - 36px) 100%, 36px 100%, 36px calc(100% - 6px), 24px calc(100% - 6px),
+    24px calc(100% - 12px), 18px calc(100% - 12px), 18px calc(100% - 18px), 12px calc(100% - 18px), 12px calc(100% - 24px),
+    6px calc(100% - 24px), 6px calc(100% - 36px), 0 calc(100% - 36px)
+  );
+}
+.phone-screen {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  width: 444px;
+  height: 964px;
+  overflow: hidden;
+  background: var(--grass);
+}
+.phone-notch {
+  position: absolute;
+  left: 186px;
+  top: 30px;
+  width: 108px;
+  height: 24px;
+  background: var(--ink);
+  z-index: 5;
+}
+/* The app at its own size (390 x 844 CSS px), scaled into the screen. */
+.mob {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 390px;
+  height: 847px;
+  transform-origin: 0 0;
+  transform: scale(1.1385);
+  --px: 3px;
+  background: repeating-linear-gradient(180deg, var(--grass) 0 56px, var(--grass-light) 56px 112px);
+  overflow: hidden;
+}
+.mob .panel-board {
+  background-size: 6px 6px;
+  background-image: radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.05) 1px, transparent 1.5px);
+  background-color: var(--board);
+}
+.mob-head {
+  position: absolute;
+  left: 19px;
+  top: 19px;
+  width: 352px;
+  height: 69px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+}
+.mob-head .led {
+  font-size: 13px;
+  text-transform: none;
+}
+.mob-head .ico {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  background: var(--chalk);
+  box-shadow: var(--ink-border);
+}
+.mob-board {
+  position: absolute;
+  left: 19px;
+  top: 103px;
+  width: 352px;
+  height: 245px;
+  padding: 14px 16px;
+}
+.mob-board .badge {
+  font-size: 9px;
+  padding: 3px 6px;
+  border-width: 2px;
+}
+.mob-board .pts {
+  position: absolute;
+  right: 16px;
+  top: 17px;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: rgb(244 239 226 / 0.8);
+  text-transform: uppercase;
+}
+.mob-board .digits {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 46px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.mob-board .teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 12px;
+}
+.mob-board .teams div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.mob-board .teams span {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.mob-board .verdict {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 500;
+}
+.mob-stage {
+  position: absolute;
+  left: 16px;
+  top: 373px;
+  width: 358px;
+  height: 224px;
+  background: #1b1f24;
+  box-shadow: var(--ink-border);
+}
+.mob-controls {
+  position: absolute;
+  left: 16px;
+  top: 660px;
+  display: flex;
+  gap: 8px;
+}
+.mob-controls span {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 40px;
+  border: 2px solid var(--ink);
+  background: var(--grass-deep);
+  color: var(--chalk);
+  font-size: 12px;
+  font-weight: 700;
+}
+.mob-controls span.on {
+  background: var(--ink);
+  color: var(--bulb);
+}
+.mob-prep {
+  position: absolute;
+  left: 16px;
+  top: 359px;
+  width: 358px;
+  height: 50px;
+  font-size: 12px;
+}
+.mob-resumo {
+  position: absolute;
+  left: 19px;
+  top: 430px;
+  width: 352px;
+  height: 330px;
+  padding: 18px 20px;
+}
+.mob-resumo h4 {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+.mob-resumo p {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--muted-ink);
+}
+.mob-stats {
+  margin-top: 14px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+}
+.mob-stats div {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  font-family: var(--font-pixel);
+}
+.mob-stats b {
+  font-weight: 400;
+  font-size: 20px;
+  color: var(--bulb);
+}
+.mob-stats b:last-child {
+  text-align: right;
+}
+.mob-stats i {
+  font-style: normal;
+  font-size: 8px;
+  color: rgb(244 239 226 / 0.75);
+  text-transform: uppercase;
+}
+.mob-nav {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  height: 70px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 6px;
+}
+.mob-nav span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  text-transform: uppercase;
+  color: var(--chalk);
+}
+.mob-nav span.on {
+  background: var(--board);
+  color: var(--bulb);
+}
+.mob-nav svg {
+  width: 22px;
+  height: 22px;
+}

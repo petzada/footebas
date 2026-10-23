@@ -26,3 +26,5 @@ packages/content/catalog-report.md
 pnpm-lock.yaml
 supabase/.temp
 design.md
+# HyperFrames video project: templates checked by `hyperframes check`, vendored GSAP, local Studio state.
+marketing/motion-divulgacao

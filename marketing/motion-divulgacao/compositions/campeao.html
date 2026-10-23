@@ -1,0 +1,107 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    #campeao-ground {
+      position: absolute;
+      inset: 0;
+      background: var(--bulb);
+    }
+    #campeao-cup {
+      position: absolute;
+      left: 780px;
+      top: 92px;
+      width: 360px;
+      height: 360px;
+      transform-origin: 50% 100%;
+    }
+    #campeao-title {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 548px;
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 160px;
+      line-height: 1;
+      color: var(--ink);
+      text-shadow: 0 10px 0 var(--chalk);
+      white-space: nowrap;
+    }
+    #campeao-sub {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 780px;
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 40px;
+      line-height: 1;
+      color: var(--ink);
+    }
+    #campeao-confete span {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+  </style>
+  <div data-hf-id="hf-w46l" id="root" data-composition-id="campeao" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-sbkl" id="campeao-ground"></div>
+    <div data-hf-id="hf-5t2o" id="campeao-cup"><span data-hf-id="hf-3f3a" data-sprite="trophy" data-px="36"></span></div>
+    <h2 data-hf-id="hf-2qog" id="campeao-title">CAMPEÃO!</h2>
+    <p data-hf-id="hf-r3xe" id="campeao-sub">BRASILEIRÃO SÉRIE A · 2026</p>
+    <div data-hf-id="hf-8ka6" id="campeao-confete"></div>
+  </div>
+  <script>
+    (() => {
+      const T0 = PLANO.inicio.campeao;
+      const at = (abs) => abs - T0;
+      const tl = gsap.timeline({ paused: true });
+      const IR = { immediateRender: false };
+      FB.mountSprites(document.getElementById('campeao-cup'));
+      const letters = FB.pixelTitle(document.getElementById('campeao-title'));
+      FB.pixelTitle(document.getElementById('campeao-sub'));
+
+      // Colour flood: the bulb yellow wipes up over the montage.
+      tl.fromTo('#campeao-ground', { clipPath: 'inset(100% 0 0 0)' }, { clipPath: 'inset(0% 0 0 0)', duration: 0.32, ease: 'power2.inOut' }, at(22.0));
+      // The game's trophy sprite rides the wipe up from below the frame:
+      // position on the UI spring (it never overshoots past the top edge),
+      // size on the pop spring.
+      const POP = FB.springs.pop;
+      const UI = FB.springs.ui;
+      gsap.set('#campeao-cup', { y: 1000, scale: 0.6 });
+      tl.fromTo('#campeao-cup', { y: 1000 }, { y: 0, duration: UI.duration, ease: UI.ease, immediateRender: false }, at(22.06));
+      tl.fromTo('#campeao-cup', { scale: 0.6 }, { scale: 1, duration: POP.duration, ease: POP.ease, immediateRender: false }, at(22.12));
+      // CAMPEÃO! drops in letter by letter (landing title: steps(4)).
+      FB.dropLetters(tl, letters, at(22.32), { gap: 2 / 30, dur: 0.5, rise: 1.4 });
+      tl.fromTo('#campeao-sub', { opacity: 0 }, { opacity: 1, duration: 1 / 30, ease: 'steps(1)' }, at(22.66));
+
+      // Pixel confetti: seeded, falling with gravity and a little sway.
+      const rnd = FB.rng(2026);
+      const colors = ['#c8322b', '#f4efe2', '#2f7d3a', '#7cc4ea', '#15201a'];
+      const box = document.getElementById('campeao-confete');
+      for (let i = 0; i < 140; i++) {
+        const el = document.createElement('span');
+        const size = 10 + Math.floor(rnd() * 3) * 4;
+        el.style.width = `${size}px`;
+        el.style.height = `${size}px`;
+        el.style.background = colors[i % colors.length];
+        box.appendChild(el);
+        const x0 = rnd() * 1920;
+        const delay = rnd() * 0.5;
+        const fall = 1.2 + rnd() * 0.9;
+        const sway = (rnd() - 0.5) * 160;
+        const y0 = -60 - rnd() * 300;
+        gsap.set(el, { x: x0, y: y0 });
+        tl.fromTo(el, { y: y0 }, { y: 1140, duration: fall, ease: 'power1.in', immediateRender: false }, at(22.3 + delay));
+        tl.fromTo(el, { x: x0 }, { x: x0 + sway, duration: fall, ease: 'sine.inOut', immediateRender: false }, at(22.3 + delay));
+        tl.fromTo(el, { rotation: 0 }, { rotation: (rnd() - 0.5) * 720, duration: fall, ease: 'steps(6)', immediateRender: false }, at(22.3 + delay));
+      }
+      FB.pixelAccents(document.querySelector('[data-composition-id="campeao"]'));
+      window.__timelines['campeao'] = tl;
+    })();
+  </script>
+</template>

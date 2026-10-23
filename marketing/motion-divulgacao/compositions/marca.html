@@ -1,0 +1,143 @@
+<template>
+  <style>
+    /* No ground of its own: the film's grass shows through, so the crest
+       shelves can finish parting while the wordmark already falls. */
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    #marca-word {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 150px;
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 144px;
+      line-height: 1;
+      color: var(--chalk);
+      text-shadow: 0 12px 0 var(--ink);
+      white-space: nowrap;
+    }
+    #marca-sloganrow {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 352px;
+      display: flex;
+      justify-content: center;
+    }
+    #marca-slogan {
+      padding: 22px 36px;
+      font-size: 40px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    #marca-caret {
+      display: inline-block;
+      margin-left: 6px;
+    }
+    #marca-ctawrap {
+      position: absolute;
+      left: 430px;
+      top: 500px;
+      width: 1060px;
+      height: 136px;
+    }
+    #marca-cta {
+      width: 1060px;
+      height: 136px;
+      font-size: 40px;
+      gap: 32px;
+    }
+    #marca-url {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 690px;
+      text-align: center;
+      font-family: var(--font-pixel);
+      font-size: 40px;
+      line-height: 1;
+      color: var(--chalk);
+      text-shadow: 0 4px 0 var(--ink);
+      text-transform: none;
+    }
+    #marca-claim {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 766px;
+      text-align: center;
+      font-size: 34px;
+      font-weight: 500;
+      color: var(--chalk);
+    }
+    #marca-legal {
+      position: absolute;
+      left: 260px;
+      right: 260px;
+      top: 878px;
+      text-align: center;
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 1.3;
+      text-wrap: balance;
+      color: var(--chalk);
+    }
+  </style>
+  <div data-hf-id="hf-naj1" id="root" data-composition-id="marca" data-width="1920" data-height="1080">
+    <h1 data-hf-id="hf-43nl" id="marca-word">FOOTEBAS</h1>
+    <div data-hf-id="hf-a0he" id="marca-sloganrow">
+      <p data-hf-id="hf-dbtu" id="marca-slogan" class="panel-board led"><span data-hf-id="hf-wrou" id="marca-text">SUA CARREIRA, SUA HISTÓRIA</span><span data-hf-id="hf-aaxd" id="marca-caret">_</span></p>
+    </div>
+    <div data-hf-id="hf-ckxq" id="marca-ctawrap">
+      <button data-hf-id="hf-kuba" id="marca-cta" class="btn-px btn-play"><span data-hf-id="hf-29t9" data-sprite="arrow" data-px="5"></span><span data-hf-id="hf-y7j3" id="marca-cta-txt">COMEÇAR CARREIRA GRÁTIS</span></button>
+    </div>
+    <p data-hf-id="hf-nuvq" id="marca-url">footebas.com.br</p>
+    <p data-hf-id="hf-4nqk" id="marca-claim">Manager de futebol brasileiro · grátis · direto no celular</p>
+    <p data-hf-id="hf-erjd" id="marca-legal">Escudos e nomes dos clubes pertencem aos seus donos e aparecem apenas para identificar as equipes do jogo.</p>
+  </div>
+  <script>
+    (() => {
+      const T0 = PLANO.inicio.marca;
+      const at = (abs) => abs - T0;
+      const C = PLANO.cliques;
+      const tl = gsap.timeline({ paused: true });
+      const IR = { immediateRender: false };
+      FB.mountSprites(document.getElementById('marca-cta'));
+      const vars = (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables()) || {};
+      if (vars.slogan) document.getElementById('marca-text').textContent = String(vars.slogan).toUpperCase();
+      if (vars.url) document.getElementById('marca-url').textContent = vars.url;
+      if (vars.chamada) document.getElementById('marca-cta-txt').textContent = String(vars.chamada).toUpperCase();
+      FB.pixelTitle(document.getElementById('marca-cta-txt'));
+
+      // The wordmark lights up like a stadium sign: letters drop in steps.
+      const word = FB.pixelTitle(document.getElementById('marca-word'));
+      FB.dropLetters(tl, word, at(26.22), { gap: 2 / 30, dur: 0.6, rise: 1.2 });
+      // The LED strip powers on (the opening badge's flicker), then the
+      // slogan types in with the landing's blinking cursor.
+      gsap.set('#marca-slogan', { opacity: 0 });
+      tl.fromTo('#marca-slogan', { opacity: 0 }, { opacity: 1, duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(26.74));
+      FB.flicker(tl, '#marca-slogan', at(26.78));
+      const typed = FB.pixelTitle(document.getElementById('marca-text'));
+      FB.lightLetters(tl, typed, at(26.95), 1 / 30);
+      gsap.set('#marca-caret', { opacity: 0 });
+      tl.fromTo('#marca-caret', { opacity: 0 }, { opacity: 1, duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(26.95));
+      for (let b = 27.0; b < 30; b += 0.5) {
+        tl.fromTo('#marca-caret', { opacity: 1 }, { opacity: 0, duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(b + 0.25));
+        tl.fromTo('#marca-caret', { opacity: 0 }, { opacity: 1, duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(b + 0.5));
+      }
+      // The call to action: the big yellow play button pops in, then the
+      // coach's hand presses it.
+      tl.fromTo('#marca-ctawrap', { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: FB.springs.pop.duration, ease: FB.springs.pop.ease }, at(27.25));
+      FB.click(tl, document.createElement('i'), at(C.chamada.t), '#marca-cta', 6);
+      tl.fromTo('#marca-url', { opacity: 0 }, { opacity: 1, duration: 1 / 30, ease: 'steps(1)' }, at(27.45));
+      tl.fromTo('#marca-claim', { opacity: 0, filter: 'blur(6px)' }, { opacity: 1, filter: 'blur(0px)', duration: 0.18, ease: 'power2.out' }, at(27.6));
+      tl.fromTo('#marca-legal', { opacity: 0 }, { opacity: 1, duration: 0.2, ease: 'power1.out' }, at(27.7));
+      FB.pixelAccents(document.querySelector('[data-composition-id="marca"]'));
+      window.__timelines['marca'] = tl;
+    })();
+  </script>
+</template>

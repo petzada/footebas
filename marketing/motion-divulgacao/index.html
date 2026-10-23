@@ -1,0 +1,83 @@
+<!doctype html>
+<html
+  lang="pt-BR"
+  data-composition-variables='[
+    {"id":"slogan","type":"string","label":"Slogan","default":"Sua carreira, sua história"},
+    {"id":"chamada","type":"string","label":"Chamada do botão","default":"Começar carreira grátis"},
+    {"id":"url","type":"string","label":"Endereço","default":"footebas.com.br"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Footebas — A Virada</title>
+    <link rel="stylesheet" href="assets/css/footebas.css" />
+    <script src="assets/js/gsap.min.js"></script>
+    <script src="assets/js/fb.js"></script>
+    <script src="assets/js/plano.js"></script>
+    <style>
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #fundo {
+        position: absolute;
+        inset: 0;
+      }
+      #placar { z-index: 1; }
+      #tatica { z-index: 2; }
+      #apito { z-index: 4; }
+      #estadio { z-index: 5; }
+      #tabela { z-index: 6; }
+      #clube { z-index: 7; }
+      #campeao { z-index: 8; }
+      #escudos { z-index: 9; }
+      #marca { z-index: 10; }
+      #letreiro { z-index: 20; }
+      #cursor { z-index: 30; }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-j7pz"
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="30"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div data-hf-id="hf-uhlw" id="fundo" class="grass"></div>
+
+      <!-- Ato 1 — intervalo: o técnico é você -->
+      <div data-hf-id="hf-h1dj" id="placar" class="clip" data-composition-id="placar" data-composition-src="compositions/placar.html" data-start="0" data-duration="2.6" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div data-hf-id="hf-1lsb" id="tatica" class="clip" data-composition-id="tatica" data-composition-src="compositions/tatica.html" data-start="2" data-duration="4.4" data-track-index="2" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div data-hf-id="hf-r1ei" id="apito" class="clip" data-composition-id="apito" data-composition-src="compositions/apito.html" data-start="5.9" data-duration="2.2" data-track-index="4" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div data-hf-id="hf-bh8j" id="letreiro" class="clip" data-composition-id="letreiro" data-composition-src="compositions/letreiro.html" data-start="0.7" data-duration="7.1" data-track-index="9" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Ato 2 — segundo tempo: a virada no estádio -->
+      <div data-hf-id="hf-jlgv" id="estadio" class="clip" data-composition-id="estadio" data-composition-src="compositions/estadio.html" data-start="7.85" data-duration="6.2" data-track-index="5" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Ato 3 — a carreira: tabela, clube, título -->
+      <div data-hf-id="hf-6yi4" id="tabela" class="clip" data-composition-id="tabela" data-composition-src="compositions/tabela.html" data-start="14" data-duration="4.1" data-track-index="6" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div data-hf-id="hf-o3al" id="clube" class="clip" data-composition-id="clube" data-composition-src="compositions/clube.html" data-start="18" data-duration="4.1" data-track-index="7" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div data-hf-id="hf-xu6c" id="campeao" class="clip" data-composition-id="campeao" data-composition-src="compositions/campeao.html" data-start="22" data-duration="2.1" data-track-index="8" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Fecho — pergunta, marca e chamada -->
+      <div data-hf-id="hf-9ebe" id="escudos" class="clip" data-composition-id="escudos" data-composition-src="compositions/escudos.html" data-start="24" data-duration="2.4" data-track-index="10" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div data-hf-id="hf-r98s" id="marca" class="clip" data-composition-id="marca" data-composition-src="compositions/marca.html" data-start="26.2" data-duration="3.8" data-track-index="11" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- O cursor é o técnico: uma mão em pixel que atravessa o filme -->
+      <div data-hf-id="hf-c6g7" id="cursor" class="clip" data-composition-id="cursor" data-composition-src="compositions/cursor.html" data-start="0" data-duration="30" data-track-index="12" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Som: batucada chiptune + efeitos (ZzFX do jogo, Pixabay, torcida sintetizada),
+           mixados e masterizados em audio-src/ (−15 LUFS, −1,7 dBTP) -->
+      <audio data-hf-id="hf-jj4f" id="trilha" class="clip" src="assets/audio/trilha.wav" data-start="0" data-duration="30" data-track-index="20" data-volume="1"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

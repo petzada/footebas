@@ -1,0 +1,312 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: repeating-linear-gradient(180deg, var(--grass) 0 84px, var(--grass-light) 84px 168px);
+    }
+    /* The phone, now on the Central screen, scrolled to its TABELA card. */
+    #tabela-cam {
+      position: absolute;
+      inset: 0;
+      transform-origin: 960px 593px;
+    }
+    .mob-card {
+      position: absolute;
+      left: 19px;
+      width: 352px;
+    }
+    .mob-next {
+      top: 103px;
+      height: 196px;
+      padding: 12px 14px;
+    }
+    .mob-next .badge {
+      font-size: 8px;
+      padding: 3px 5px;
+      border-width: 2px;
+      background: var(--bulb);
+      color: var(--ink);
+    }
+    .mob-next .vs {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      justify-items: center;
+      margin-top: 10px;
+    }
+    .mob-next .vs b {
+      font-family: var(--font-pixel);
+      font-weight: 400;
+      font-size: 26px;
+      color: var(--bulb);
+    }
+    .mob-next .play {
+      margin-top: 12px;
+      height: 46px;
+      width: 100%;
+      font-size: 13px;
+    }
+    .mob-tab {
+      top: 318px;
+      height: 296px;
+      padding: 14px 14px;
+    }
+    .mob-tab h4 {
+      font-family: var(--font-pixel);
+      font-weight: 400;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    .mob-tab table {
+      margin-top: 10px;
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-pixel);
+      font-size: 9px;
+    }
+    .mob-tab th {
+      background: var(--ink);
+      color: var(--bulb);
+      font-weight: 400;
+      text-align: left;
+      padding: 5px 4px;
+    }
+    .mob-tab td {
+      padding: 8px 4px;
+      border-bottom: 2px solid var(--ink);
+    }
+    .mob-tab tr.me td {
+      background: var(--row-highlight);
+      color: var(--grass-deep);
+    }
+    .mob-tab .more {
+      margin-top: 16px;
+      font-family: var(--font-pixel);
+      font-size: 11px;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Full-frame CLASSIFICAÇÃO (desktop screen, film scale). */
+    #tabela-full {
+      position: absolute;
+      left: 250px;
+      top: 54px;
+      width: 1420px;
+      height: 972px;
+      padding: 40px 48px;
+      opacity: 0;
+    }
+    #tabela-full h2 {
+      font-family: var(--font-pixel);
+      font-weight: 400;
+      font-size: 40px;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    #tabela-sub {
+      margin-top: 14px;
+      font-size: 32px;
+      font-weight: 500;
+      color: var(--muted-ink);
+    }
+    .tabela-cols {
+      display: grid;
+      grid-template-columns: 70px 72px 1fr 80px 80px 80px 80px 96px 112px;
+      column-gap: 10px;
+      align-items: center;
+      font-family: var(--font-pixel);
+      font-size: 28px;
+      line-height: 1;
+    }
+    .tabela-cols > span:nth-child(n + 4) {
+      text-align: right;
+    }
+    #tabela-head {
+      margin-top: 26px;
+      height: 58px;
+      padding: 0 14px;
+      background: var(--board);
+      color: var(--bulb);
+      font-size: 28px;
+    }
+    #tabela-rows {
+      position: relative;
+      height: 780px;
+    }
+    .tabela-row {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 78px;
+      padding: 0 14px;
+      border-bottom: 4px solid var(--ink);
+      background: var(--chalk);
+    }
+    .tabela-row img {
+      image-rendering: pixelated;
+      width: 46px;
+      height: 56px;
+      object-fit: contain;
+    }
+    .tabela-row.me {
+      background: var(--row-highlight);
+      color: var(--grass-deep);
+      z-index: 2;
+    }
+    .tabela-name {
+      white-space: nowrap;
+    }
+    #tabela-cup {
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 18px;
+    }
+  </style>
+  <div data-hf-id="hf-880u" id="root" data-composition-id="tabela" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-nfvw" id="tabela-cam">
+      <div data-hf-id="hf-lunq" class="phone" style="left: 720px; top: 40px">
+        <div data-hf-id="hf-9o7x" class="phone-screen">
+          <div data-hf-id="hf-hzq2" class="mob">
+            <header data-hf-id="hf-6ad4" class="mob-head panel-board">
+              <img data-hf-id="hf-kdga" class="crest" src="assets/crests/club_flamengo.png" width="23" height="28" alt="" />
+              <span data-hf-id="hf-g7ma" class="led">Você</span>
+              <span data-hf-id="hf-gm9w" class="ico"></span>
+            </header>
+            <section data-hf-id="hf-99p2" class="mob-card mob-next panel-board">
+              <span data-hf-id="hf-hkuj" class="badge">Próximo jogo</span>
+              <div data-hf-id="hf-uvj5" class="vs">
+                <img data-hf-id="hf-bflk" class="crest" src="assets/crests/club_flamengo.png" width="46" height="56" alt="" />
+                <b data-hf-id="hf-24q6">VS</b>
+                <img data-hf-id="hf-qmq9" class="crest" src="assets/crests/club_bahia.png" width="58" height="58" alt="" />
+              </div>
+              <button data-hf-id="hf-soeh" class="btn-px btn-play play">Jogar partida</button>
+            </section>
+            <section data-hf-id="hf-o6bz" class="mob-card mob-tab panel">
+              <h4 data-hf-id="hf-hlbs">Tabela</h4>
+              <table data-hf-id="hf-2j5r">
+                <tr data-hf-id="hf-p3r7"><th data-hf-id="hf-7k7q">#</th><th data-hf-id="hf-l99w">Clube</th><th data-hf-id="hf-kr8h">J</th><th data-hf-id="hf-03pv">SG</th><th data-hf-id="hf-3ole">Pts</th></tr>
+                <tr data-hf-id="hf-ddj7"><td data-hf-id="hf-u3bk">5</td><td data-hf-id="hf-ijcr">São Paulo</td><td data-hf-id="hf-rm51">35</td><td data-hf-id="hf-xh4a">12</td><td data-hf-id="hf-wpgh">62</td></tr>
+                <tr data-hf-id="hf-cz86"><td data-hf-id="hf-sweh">6</td><td data-hf-id="hf-qyww">Internacional</td><td data-hf-id="hf-mr61">35</td><td data-hf-id="hf-pbn8">9</td><td data-hf-id="hf-xwdk">61</td></tr>
+                <tr data-hf-id="hf-8ri9" class="me"><td data-hf-id="hf-tapi">7</td><td data-hf-id="hf-ge20">Flamengo</td><td data-hf-id="hf-ny34">35</td><td data-hf-id="hf-zuyg">14</td><td data-hf-id="hf-xi2j">60</td></tr>
+                <tr data-hf-id="hf-ckx5"><td data-hf-id="hf-oxc7">8</td><td data-hf-id="hf-3ncq">Bahia</td><td data-hf-id="hf-njs3">35</td><td data-hf-id="hf-teyl">6</td><td data-hf-id="hf-7a5h">57</td></tr>
+                <tr data-hf-id="hf-c6m4"><td data-hf-id="hf-mrm4">9</td><td data-hf-id="hf-guhd">Corinthians</td><td data-hf-id="hf-lk8y">35</td><td data-hf-id="hf-rphe">3</td><td data-hf-id="hf-82rj">55</td></tr>
+              </table>
+              <p data-hf-id="hf-pk0w" class="more"><span data-hf-id="hf-kvfv">Ver classificação</span><span data-hf-id="hf-p70p">→</span></p>
+            </section>
+            <nav data-hf-id="hf-0uy0" class="mob-nav panel-wood">
+              <span data-hf-id="hf-9lrz" class="on"><i data-hf-id="hf-5mih" data-icon="House" data-size="22"></i>Central</span>
+              <span data-hf-id="hf-yh0d"><i data-hf-id="hf-fns9" data-icon="UsersThree" data-size="22"></i>Elenco</span>
+              <span data-hf-id="hf-h93y"><i data-hf-id="hf-hbrt" data-icon="Storefront" data-size="22"></i>Mercado</span>
+              <span data-hf-id="hf-0osc"><i data-hf-id="hf-c5gl" data-icon="Briefcase" data-size="22"></i>Escritório</span>
+              <span data-hf-id="hf-8t7a"><i data-hf-id="hf-cbrb" data-icon="DotsThreeOutline" data-size="22"></i>Menu</span>
+            </nav>
+          </div>
+        </div>
+        <span data-hf-id="hf-5vwe" class="phone-notch"></span>
+      </div>
+    </div>
+
+    <section data-hf-id="hf-46tf" id="tabela-full" class="panel">
+      <h2 data-hf-id="hf-j72w">Classificação</h2>
+      <p data-hf-id="hf-e904" id="tabela-sub">Brasileirão Série A · rodada 35</p>
+      <div data-hf-id="hf-9pw7" id="tabela-head" class="tabela-cols">
+        <span data-hf-id="hf-o4yu">#</span><span data-hf-id="hf-uckh"></span><span data-hf-id="hf-ylwk">Clube</span><span data-hf-id="hf-iesx">J</span><span data-hf-id="hf-dn4l">V</span><span data-hf-id="hf-l6y4">E</span><span data-hf-id="hf-ksn3">D</span><span data-hf-id="hf-7k83">SG</span><span data-hf-id="hf-znoy">Pts</span>
+      </div>
+      <div data-hf-id="hf-v79k" id="tabela-rows"></div>
+    </section>
+  </div>
+  <script>
+    (() => {
+      const T0 = PLANO.inicio.tabela;
+      const at = (abs) => abs - T0;
+      const tl = gsap.timeline({ paused: true });
+      const IR = { immediateRender: false };
+      FB.mountIcons(document.querySelector('#tabela-cam'));
+
+      /* Illustrative end of season, rounds 35 -> 38 (points stay coherent:
+         3 V + E = Pts, D = J - V - E). Flamengo climbs 7th -> 1st. */
+      const clubs = {
+        flamengo: ['Flamengo', 'club_flamengo', [60, 63, 66, 69]],
+        palmeiras: ['Palmeiras', 'club_palmeiras', [66, 66, 67, 67]],
+        botafogo: ['Botafogo', 'club_botafogo', [64, 65, 65, 68]],
+        cruzeiro: ['Cruzeiro', 'club_cruzeiro', [63, 64, 64, 65]],
+        saopaulo: ['São Paulo', 'club_sao_paulo', [62, 63, 64, 65]],
+        fluminense: ['Fluminense', 'club_fluminense', [62, 62, 63, 64]],
+        internacional: ['Internacional', 'club_internacional', [61, 61, 62, 63]],
+        bahia: ['Bahia', 'club_bahia', [57, 60, 61, 62]],
+        corinthians: ['Corinthians', 'club_corinthians', [55, 56, 59, 60]],
+        gremio: ['Grêmio', 'club_gremio', [53, 54, 55, 56]],
+      };
+      const order = [
+        ['palmeiras', 'botafogo', 'cruzeiro', 'fluminense', 'saopaulo', 'internacional', 'flamengo', 'bahia', 'corinthians', 'gremio'],
+        ['palmeiras', 'botafogo', 'cruzeiro', 'flamengo', 'saopaulo', 'fluminense', 'internacional', 'bahia', 'corinthians', 'gremio'],
+        ['palmeiras', 'flamengo', 'botafogo', 'cruzeiro', 'saopaulo', 'fluminense', 'internacional', 'bahia', 'corinthians', 'gremio'],
+        ['flamengo', 'botafogo', 'palmeiras', 'cruzeiro', 'saopaulo', 'fluminense', 'internacional', 'bahia', 'corinthians', 'gremio'],
+      ];
+      const stats = (pts, r) => {
+        const j = 35 + r;
+        const e = 6 + (pts % 3);
+        const v = (pts - e) / 3;
+        const d = j - v - e;
+        return { j, v, e, d, sg: Math.round((v - d) * 1.4) };
+      };
+      const ROW = 78;
+      const rowsBox = document.getElementById('tabela-rows');
+      const cells = {};
+      Object.entries(clubs).forEach(([id, [name, crest, pts]]) => {
+        const row = document.createElement('div');
+        row.className = 'tabela-row tabela-cols' + (id === 'flamengo' ? ' me' : '');
+        row.id = `tabela-r-${id}`;
+        const st = stats(pts[0], 0);
+        row.innerHTML = `<span class="pos"></span><img src="assets/crests/${crest}.png" alt=""><span class="tabela-name">${name}${id === 'flamengo' ? '<span id="tabela-cup" data-sprite="trophy" data-px="4"></span>' : ''}</span><span class="j">${st.j}</span><span class="v">${st.v}</span><span class="e">${st.e}</span><span class="d">${st.d}</span><span class="sg">${st.sg}</span><span class="pts">${pts[0]}</span>`;
+        rowsBox.appendChild(row);
+        cells[id] = row;
+        const rank = order[0].indexOf(id);
+        row.querySelector('.pos').textContent = String(rank + 1);
+        gsap.set(row, { y: rank * ROW });
+      });
+      FB.mountSprites(rowsBox);
+      gsap.set('#tabela-cup', { opacity: 0, scale: 0.3 });
+
+      /* 14.0: the phone holds on the Central's table card; the camera dives in
+         and the card becomes the full-frame classification. */
+      tl.fromTo('#tabela-cam', { scale: 1, y: 0 }, { scale: 4.4, y: -53, duration: 0.5, ease: 'power3.in' }, at(14.05));
+      tl.fromTo('#tabela-full', { scale: 0.86 }, { scale: 1, duration: 0.5, ease: 'expo.out', immediateRender: false }, at(14.42));
+      tl.fromTo('#tabela-full', { opacity: 0 }, { opacity: 1, duration: 0.12, ease: 'power1.out', immediateRender: false }, at(14.42));
+      tl.fromTo('#tabela-cam', { opacity: 1 }, { opacity: 0, duration: 0.06, ease: 'power1.in', immediateRender: false }, at(14.48));
+
+      /* Three rounds on the beat: rows swap places with the layout spring. */
+      const L = FB.springs.layout;
+      const steps = [15.0, 15.75, 16.5];
+      const sub = document.getElementById('tabela-sub');
+      steps.forEach((t, k) => {
+        const r = k + 1;
+        FB.setText(tl, sub, `Brasileirão Série A · rodada ${34 + r}`, `Brasileirão Série A · rodada ${35 + r}`, at(t));
+        Object.entries(clubs).forEach(([id, [, , pts]]) => {
+          const row = cells[id];
+          const from = order[r - 1].indexOf(id);
+          const to = order[r].indexOf(id);
+          if (from !== to) tl.fromTo(row, { y: from * ROW }, { y: to * ROW, duration: L.duration, ease: L.ease, immediateRender: false }, at(t));
+          FB.setText(tl, row.querySelector('.pos'), String(from + 1), String(to + 1), at(t + 0.12));
+          const a = stats(pts[r - 1], r - 1);
+          const b = stats(pts[r], r);
+          ['j', 'v', 'e', 'd', 'sg'].forEach((c) => FB.setText(tl, row.querySelector('.' + c), String(a[c]), String(b[c]), at(t)));
+          FB.setText(tl, row.querySelector('.pts'), String(pts[r - 1]), String(pts[r]), at(t));
+          if (pts[r] !== pts[r - 1]) FB.flicker(tl, row.querySelector('.pts'), at(t));
+        });
+      });
+      // First place: the row flashes like a bulb board and the trophy pops.
+      FB.flicker(tl, '#tabela-r-flamengo', at(16.62));
+      tl.fromTo('#tabela-cup', { opacity: 0, scale: 0.3 }, { opacity: 1, scale: 1, duration: FB.springs.pop.duration, ease: FB.springs.pop.ease, immediateRender: false }, at(16.7));
+      // Out at bar 10: a whip to the left into the club.
+      tl.fromTo('#tabela-full', { x: 0 }, { x: -2100, duration: 0.3, ease: 'power3.in', immediateRender: false }, at(17.82));
+      FB.pixelAccents(document.querySelector('[data-composition-id="tabela"]'));
+      window.__timelines['tabela'] = tl;
+    })();
+  </script>
+</template>

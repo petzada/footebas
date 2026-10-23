@@ -1,0 +1,130 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    #apito-cam {
+      position: absolute;
+      inset: 0;
+      transform-origin: 960px 615px;
+    }
+    #apito-page {
+      position: absolute;
+      inset: 0;
+    }
+    /* Compact live scoreboard at the top of the page (same component). */
+    #apito-board {
+      position: absolute;
+      left: 460px;
+      top: 64px;
+      width: 1000px;
+      height: 214px;
+      padding: 26px 34px;
+    }
+    #apito-board .badge {
+      position: absolute;
+      left: 34px;
+      top: 22px;
+      font-size: 28px;
+      padding: 8px 12px;
+    }
+    #apito-board .digits {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 64px;
+      text-align: center;
+      font-size: 120px;
+      line-height: 1;
+    }
+    #apito-board img {
+      position: absolute;
+      top: 70px;
+    }
+    /* Half-time panel (career-game.tsx, role=status) and its button. */
+    #apito-panel {
+      position: absolute;
+      left: 260px;
+      top: 334px;
+      width: 1400px;
+      height: 430px;
+    }
+    #apito-panel p {
+      position: absolute;
+      left: 80px;
+      right: 80px;
+      top: 58px;
+      text-align: center;
+      font-size: 42px;
+      line-height: 1.3;
+      font-weight: 500;
+    }
+    #apito-btnwrap {
+      position: absolute;
+      left: 370px;
+      top: 540px;
+      width: 1180px;
+      height: 150px;
+    }
+    #apito-btn {
+      width: 1180px;
+      height: 150px;
+      font-size: 44px;
+    }
+    #apito-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 30px;
+    }
+    #apito-fill {
+      position: absolute;
+      inset: 0;
+      background: var(--grass-deep);
+      opacity: 0;
+    }
+  </style>
+  <div data-hf-id="hf-0q3g" id="root" data-composition-id="apito" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-o3iu" id="apito-cam">
+      <div data-hf-id="hf-sc5s" id="apito-page">
+        <section data-hf-id="hf-x2d9" id="apito-board" class="panel-board">
+          <span data-hf-id="hf-yuc8" class="badge">Intervalo</span>
+          <p data-hf-id="hf-tmxc" class="digits led">1&nbsp;×&nbsp;0</p>
+          <img data-hf-id="hf-i5us" class="crest" src="assets/crests/club_fluminense.png" width="84" height="99" style="left: 70px" alt="" />
+          <img data-hf-id="hf-6pmt" class="crest" src="assets/crests/club_flamengo.png" width="92" height="112" style="right: 70px; top: 64px" alt="" />
+        </section>
+        <section data-hf-id="hf-y5z6" id="apito-panel" class="panel">
+          <p data-hf-id="hf-db13">Intervalo. Faça substituições e ajustes ou siga para o segundo tempo.</p>
+        </section>
+        <div data-hf-id="hf-uxpf" id="apito-btnwrap">
+          <button data-hf-id="hf-s4mh" id="apito-btn" class="btn-px btn-grass">
+            <span data-hf-id="hf-hp8j" id="apito-label">Começar o segundo tempo <span data-hf-id="hf-mky9" data-sprite="arrow" data-px="5" style="filter: none"></span></span>
+          </button>
+          <span data-hf-id="hf-xi1h" id="apito-fill"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const T0 = PLANO.inicio.apito;
+      const at = (abs) => abs - T0;
+      const C = PLANO.cliques;
+      const tl = gsap.timeline({ paused: true });
+      FB.mountSprites(document.getElementById('apito-btn'));
+
+      // The page scrolls into place (same move as the previous page's exit).
+      tl.fromTo('#apito-page', { y: 1180 }, { y: 0, duration: 0.5, ease: 'power3.out' }, at(6.22));
+      // Click: the pixel button sinks one art pixel (.btn-px:active).
+      FB.click(tl, document.createElement('i'), at(C.segundoTempo.t), '#apito-btn', 6);
+      // Zoom through the button: its label clears, the camera rushes in and
+      // the button's green becomes the whole frame (then the stadium grass).
+      tl.fromTo('#apito-label', { opacity: 1 }, { opacity: 0, duration: 0.1, ease: 'power1.in', immediateRender: false }, at(C.segundoTempo.t + 0.1));
+      tl.fromTo('#apito-fill', { opacity: 0 }, { opacity: 1, duration: 0.12, ease: 'power1.in', immediateRender: false }, at(C.segundoTempo.t + 0.1));
+      tl.fromTo('#apito-cam', { scale: 1 }, { scale: 16, duration: 0.72, ease: 'power3.in', immediateRender: false }, at(C.segundoTempo.t + 0.1));
+      FB.pixelAccents(document.querySelector('[data-composition-id="apito"]'));
+      window.__timelines['apito'] = tl;
+    })();
+  </script>
+</template>

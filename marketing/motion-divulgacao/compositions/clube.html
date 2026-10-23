@@ -1,0 +1,416 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .clube-shot {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+    }
+    .clube-title {
+      position: absolute;
+      left: 160px;
+      top: 58px;
+      font-family: var(--font-pixel);
+      font-size: 64px;
+      line-height: 1;
+      color: var(--chalk);
+      text-shadow: 0 6px 0 var(--ink);
+    }
+    .clube-led {
+      position: absolute;
+      left: 160px;
+      top: 168px;
+      width: 1600px;
+      height: 150px;
+      display: grid;
+      align-items: center;
+      padding: 0 40px;
+    }
+    .clube-led div {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .clube-led i {
+      font-style: normal;
+      font-family: var(--font-pixel);
+      font-size: 28px;
+      color: rgb(244 239 226 / 0.85);
+      text-transform: uppercase;
+    }
+    .clube-led b {
+      font-weight: 400;
+      font-size: 40px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .clube-led .win {
+      background: var(--grass-deep);
+      padding: 14px 20px;
+      box-shadow: var(--ink-border);
+    }
+    .clube-card {
+      position: absolute;
+      left: 360px;
+      top: 352px;
+      width: 1200px;
+      height: 540px;
+      padding: 40px;
+    }
+    .clube-card h3 {
+      font-family: var(--font-pixel);
+      font-weight: 400;
+      font-size: 40px;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    .clube-card .meta {
+      margin-top: 14px;
+      font-size: 30px;
+      font-weight: 500;
+      color: var(--muted-ink);
+    }
+    .clube-card .tag {
+      position: absolute;
+      right: 40px;
+      top: 40px;
+      font-size: 28px;
+      padding: 10px 14px;
+    }
+    .clube-price {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-top: 34px;
+    }
+    .clube-price b {
+      background: var(--board);
+      padding: 16px 22px;
+      font-weight: 400;
+      font-size: 64px;
+      line-height: 1;
+    }
+    .clube-price span {
+      font-size: 32px;
+      font-weight: 500;
+    }
+    .clube-btns {
+      position: absolute;
+      left: 40px;
+      right: 40px;
+      top: 348px;
+      height: 84px;
+    }
+    .clube-btns .btn-px {
+      position: absolute;
+      top: 0;
+      width: 362px;
+      height: 84px;
+      font-size: 28px;
+      white-space: nowrap;
+    }
+    #clube-aceitar { left: 0; }
+    #clube-recusar { left: 374px; }
+    #clube-contra { left: 748px; }
+    #clube-p-aceitar { left: 0; }
+    #clube-p-recusar { left: 374px; }
+    #clube-p-contra { left: 748px; }
+    .clube-metrics {
+      position: absolute;
+      left: 40px;
+      right: 40px;
+      top: 250px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .clube-metrics div {
+      background: var(--muted);
+      padding: 12px 16px;
+    }
+    .clube-metrics i {
+      display: block;
+      font-style: normal;
+      font-family: var(--font-pixel);
+      font-size: 18px;
+      text-transform: uppercase;
+    }
+    .clube-metrics span {
+      display: block;
+      margin-top: 8px;
+      font-size: 28px;
+      font-weight: 600;
+    }
+    #clube-coin {
+      position: absolute;
+      left: 1186px;
+      top: 236px;
+    }
+    .clube-offer-who {
+      display: flex;
+      align-items: center;
+      gap: 26px;
+      margin-top: 26px;
+    }
+    .clube-offer-who img {
+      image-rendering: pixelated;
+    }
+    .clube-offer-who p {
+      font-size: 40px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    /* Map. */
+    #clube-mapa-box {
+      position: absolute;
+      left: 680px;
+      top: 150px;
+      width: 1080px;
+      height: 810px;
+      box-shadow: 0 -6px 0 0 var(--ink), 0 6px 0 0 var(--ink), -6px 0 0 0 var(--ink), 6px 0 0 0 var(--ink);
+    }
+    #clube-mapa-box .map-focus {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 3;
+    }
+    .clube-sub {
+      position: absolute;
+      left: 160px;
+      top: 156px;
+      width: 470px;
+      font-size: 34px;
+      line-height: 1.3;
+      font-weight: 500;
+      color: var(--chalk);
+    }
+    .clube-areas {
+      position: absolute;
+      left: 160px;
+      top: 330px;
+      display: grid;
+      gap: 18px;
+    }
+    .clube-areas span {
+      display: block;
+      width: 500px;
+      padding: 16px 20px;
+      white-space: nowrap;
+      font-family: var(--font-pixel);
+      font-size: 20px;
+      text-transform: uppercase;
+      background: var(--chalk);
+      color: var(--ink);
+      box-shadow: var(--ink-border);
+    }
+    /* Pyramid. */
+    .clube-tier {
+      position: absolute;
+      left: 50%;
+      height: 150px;
+      padding: 26px 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .clube-tier h3 {
+      font-family: var(--font-pixel);
+      font-weight: 400;
+      font-size: 40px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+    .clube-tier p {
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--muted-ink);
+    }
+    .clube-tier .badge {
+      font-size: 18px;
+    }
+    .clube-up {
+      position: absolute;
+      left: 50%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 14px;
+      font-family: var(--font-pixel);
+      font-size: 28px;
+      line-height: 1;
+      color: var(--bulb);
+      background: var(--ink);
+      white-space: nowrap;
+    }
+    #clube-cups {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 846px;
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+    }
+    .clube-cup {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 22px;
+      font-family: var(--font-pixel);
+      font-size: 28px;
+      text-transform: uppercase;
+    }
+  </style>
+  <div data-hf-id="hf-5sw2" id="root" data-composition-id="clube" data-width="1920" data-height="1080">
+    <!-- 1. Escritório: a sponsor on the table (real offer and values) -->
+    <section data-hf-id="hf-5ej6" id="clube-s1" class="clube-shot">
+      <h2 data-hf-id="hf-qf4d" class="clube-title" id="clube-t1">ESCRITÓRIO</h2>
+      <div data-hf-id="hf-v904" class="clube-led panel-board" style="grid-template-columns: 1fr 1fr 1fr">
+        <div data-hf-id="hf-yeow"><i data-hf-id="hf-c3sk">Caixa</i><b data-hf-id="hf-amxd" class="led">R$ 250 mi</b></div>
+        <div data-hf-id="hf-y7yw"><i data-hf-id="hf-oekn">Patrocínio/mês</i><b data-hf-id="hf-afry" id="clube-patro" class="led">R$ 4,8 mi</b></div>
+        <div data-hf-id="hf-x11t"><i data-hf-id="hf-7h7s">Sócios</i><b data-hf-id="hf-y4hr" class="led">51.878</b></div>
+      </div>
+      <span data-hf-id="hf-ql4t" id="clube-coin" data-sprite="coin" data-px="8"></span>
+      <article data-hf-id="hf-7mkb" class="clube-card panel">
+        <h3 data-hf-id="hf-gzzg" id="clube-sponsor">MARÉ CHEIA BEBIDAS</h3>
+        <p data-hf-id="hf-aw6g" class="meta">24 meses · até 15/02/2026</p>
+        <span data-hf-id="hf-9wpp" id="clube-tag1" class="badge bulb tag">Em aberto</span>
+        <span data-hf-id="hf-pu2h" id="clube-tag2" class="badge tag" style="opacity: 0">Assinada</span>
+        <div data-hf-id="hf-937l" class="clube-price"><b data-hf-id="hf-8bz4" class="led">R$ 9,5 mi</b><span data-hf-id="hf-higm">por mês</span></div>
+        <div data-hf-id="hf-pdy8" class="clube-metrics" data-layout-ignore>
+          <div data-hf-id="hf-xfcu"><i data-hf-id="hf-dfrh">Título</i><span data-hf-id="hf-yw4z">R$ 9,5 mi</span></div>
+          <div data-hf-id="hf-w8fr"><i data-hf-id="hf-o01h">Continental</i><span data-hf-id="hf-mwlv">R$ 9,5 mi</span></div>
+          <div data-hf-id="hf-wmqs"><i data-hf-id="hf-4o4h">Multa</i><span data-hf-id="hf-vio7">R$ 57,2 mi</span></div>
+        </div>
+        <div data-hf-id="hf-b3d9" class="clube-btns">
+          <button data-hf-id="hf-b07x" id="clube-aceitar" class="btn-px btn-grass"><span data-hf-id="hf-vs4d" data-icon="Check" data-size="30"></span>Aceitar</button>
+          <button data-hf-id="hf-sqfy" id="clube-recusar" class="btn-px btn-red"><span data-hf-id="hf-un5x" data-icon="X" data-size="30"></span>Recusar</button>
+          <button data-hf-id="hf-qfss" id="clube-contra" class="btn-px btn-chalk">Contrapropor</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- 2. Mercado: the transfer window is open, the AI makes an offer -->
+    <section data-hf-id="hf-1gf5" id="clube-s2" class="clube-shot">
+      <h2 data-hf-id="hf-ahpu" class="clube-title">MERCADO</h2>
+      <div data-hf-id="hf-x68v" class="clube-led panel-board" style="grid-template-columns: 400px 460px 220px 440px">
+        <div data-hf-id="hf-vftp"><i data-hf-id="hf-36mk">Caixa</i><b data-hf-id="hf-7j0l" class="led">R$ 250 mi</b></div>
+        <div data-hf-id="hf-vu4q"><i data-hf-id="hf-dpud">Folha/mês</i><b data-hf-id="hf-kl61" class="led">R$ 11,3 mi</b></div>
+        <div data-hf-id="hf-1043"><i data-hf-id="hf-f1y4">Elenco</i><b data-hf-id="hf-a6dj" class="led">28/35</b></div>
+        <div data-hf-id="hf-v0ka" class="win"><i data-hf-id="hf-76nq">Janela aberta</i><b data-hf-id="hf-tz8r" class="led">47d</b></div>
+      </div>
+      <article data-hf-id="hf-lptn" id="clube-offer" class="clube-card panel">
+        <h3 data-hf-id="hf-xa8g">Proposta</h3>
+        <span data-hf-id="hf-jr3e" id="clube-otag1" class="badge bulb tag">Pendente</span>
+        <span data-hf-id="hf-13jg" id="clube-otag2" class="badge board tag" style="opacity: 0">Contraproposta feita</span>
+        <div data-hf-id="hf-wfmj" class="clube-offer-who">
+          <img data-hf-id="hf-2pna" src="assets/crests/club_palmeiras.png" width="87" height="87" alt="" />
+          <p data-hf-id="hf-dxij">Palmeiras quer o seu camisa 10</p>
+        </div>
+        <div data-hf-id="hf-gkgl" class="clube-price"><b data-hf-id="hf-9utu" id="clube-valor" class="led">R$ 48 mi</b><span data-hf-id="hf-x4i6">à vista</span></div>
+        <div data-hf-id="hf-ejnl" class="clube-btns">
+          <button data-hf-id="hf-ky54" id="clube-p-aceitar" class="btn-px btn-grass"><span data-hf-id="hf-2p81" data-icon="Check" data-size="30"></span>Aceitar</button>
+          <button data-hf-id="hf-ujjn" id="clube-p-recusar" class="btn-px btn-red"><span data-hf-id="hf-u909" data-icon="X" data-size="30"></span>Recusar</button>
+          <button data-hf-id="hf-q9ut" id="clube-p-contra" class="btn-px btn-chalk">Contrapropor</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- 3. Mapa do clube: the game's own pixel map (extracted SVG) -->
+    <section data-hf-id="hf-0orc" id="clube-s3" class="clube-shot">
+      <h2 data-hf-id="hf-e5pe" class="clube-title">MAPA DO CLUBE</h2>
+      <p data-hf-id="hf-4ru4" class="clube-sub">Cada prédio abre uma tela do clube.</p>
+      <div data-hf-id="hf-0ddh" class="clube-areas" data-layout-ignore>
+        <span data-hf-id="hf-0a7m" id="clube-a1">CT · Elenco e táticas</span>
+        <span data-hf-id="hf-h4lw" id="clube-a2">Estádio · Partida</span>
+        <span data-hf-id="hf-n3ir" id="clube-a3">Sede · Escritório</span>
+        <span data-hf-id="hf-8187" id="clube-a4">Imprensa · Notícias</span>
+      </div>
+      <div data-hf-id="hf-hbwk" id="clube-mapa-box"><svg data-hf-id="hf-ampu" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="group" aria-label="Mapa pixel do Flamengo" shape-rendering="crispEdges" id="clube-mapa-svg" width="1080" height="810"><g data-hf-id="hf-jl9y" aria-hidden="true"><rect data-hf-id="hf-yu2g" x="0" y="0" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-crwn" x="0" y="8" width="160" height="8" fill="#2f7d3a"></rect><rect data-hf-id="hf-kist" x="0" y="16" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-ry8b" x="0" y="24" width="160" height="8" fill="#2f7d3a"></rect><rect data-hf-id="hf-0ddv" x="0" y="32" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-f5i1" x="0" y="40" width="160" height="8" fill="#2f7d3a"></rect><rect data-hf-id="hf-xl8k" x="0" y="48" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-38n4" x="0" y="56" width="160" height="8" fill="#2f7d3a"></rect><rect data-hf-id="hf-o4ye" x="0" y="64" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-epoi" x="0" y="72" width="160" height="8" fill="#2f7d3a"></rect><rect data-hf-id="hf-jbbc" x="0" y="80" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-ei85" x="0" y="88" width="160" height="8" fill="#2f7d3a"></rect><rect data-hf-id="hf-y0xx" x="0" y="96" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-3vje" x="0" y="104" width="160" height="8" fill="#2f7d3a"></rect><rect data-hf-id="hf-2cv8" x="0" y="112" width="160" height="8" fill="#3a9447"></rect><rect data-hf-id="hf-3r4x" x="0" y="56" width="160" height="10" fill="#5a5e63"></rect><rect data-hf-id="hf-sh77" x="72" y="0" width="10" height="120" fill="#5a5e63"></rect><rect data-hf-id="hf-2qio" x="2" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-co3z" x="18" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-rlrx" x="34" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-9kwb" x="50" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-7k96" x="66" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-sl8k" x="82" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-wyav" x="98" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-a4bo" x="114" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-vwbq" x="130" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-io27" x="146" y="60" width="8" height="2" fill="#d8d2c0"></rect><rect data-hf-id="hf-hnv5" x="76" y="2" width="2" height="8" fill="#d8d2c0"></rect><rect data-hf-id="hf-1y66" x="76" y="18" width="2" height="8" fill="#d8d2c0"></rect><rect data-hf-id="hf-vj8k" x="76" y="34" width="2" height="8" fill="#d8d2c0"></rect><rect data-hf-id="hf-jm9u" x="76" y="50" width="2" height="8" fill="#d8d2c0"></rect><rect data-hf-id="hf-4iyp" x="76" y="66" width="2" height="8" fill="#d8d2c0"></rect><rect data-hf-id="hf-wutn" x="76" y="82" width="2" height="8" fill="#d8d2c0"></rect><rect data-hf-id="hf-eyqu" x="76" y="98" width="2" height="8" fill="#d8d2c0"></rect><rect data-hf-id="hf-lcll" x="76" y="114" width="2" height="8" fill="#d8d2c0"></rect><g data-hf-id="hf-wc7u" aria-hidden="true"><rect data-hf-id="hf-dwaj" x="72" y="42" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-lhpv" x="70" y="36" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-xkny" x="71" y="37" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-wqiv" aria-hidden="true"><rect data-hf-id="hf-i50e" x="72" y="50" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-qrss" x="70" y="44" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-idhl" x="71" y="45" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-x4tw" aria-hidden="true"><rect data-hf-id="hf-8tfc" x="50" y="106" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-erno" x="48" y="100" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-tmgx" x="49" y="101" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-xj4x" aria-hidden="true"><rect data-hf-id="hf-6mpl" x="58" y="110" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-1pht" x="56" y="104" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-vvp4" x="57" y="105" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-xxfy" aria-hidden="true"><rect data-hf-id="hf-l9rx" x="68" y="106" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-orkw" x="66" y="100" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-bqnd" x="67" y="101" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-ybqz" aria-hidden="true"><rect data-hf-id="hf-26co" x="142" y="106" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-ec93" x="140" y="100" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-hnm0" x="141" y="101" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-yq20" aria-hidden="true"><rect data-hf-id="hf-l2ai" x="150" y="112" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-r3o9" x="148" y="106" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-lxku" x="149" y="107" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-z4d1" aria-hidden="true"><rect data-hf-id="hf-ibwo" x="134" y="116" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-dqtn" x="132" y="110" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-mxl0" x="133" y="111" width="2" height="2" fill="#2f7d3a"></rect></g><g data-hf-id="hf-zio2" aria-hidden="true"><rect data-hf-id="hf-eoy9" x="92" y="116" width="2" height="4" fill="#6b4119"></rect><rect data-hf-id="hf-rpuo" x="90" y="110" width="6" height="6" fill="#1f5a2a"></rect><rect data-hf-id="hf-cnah" x="91" y="111" width="2" height="2" fill="#2f7d3a"></rect></g></g><g data-hf-id="hf-kwp3" role="button" tabindex="0" aria-label="CT: Elenco e Táticas" aria-describedby="area-ct-desc" aria-haspopup="dialog" class="map-building" data-area="ct"><title data-hf-id="hf-mbx6">CT: Elenco e Táticas</title><desc data-hf-id="hf-ywm7" id="area-ct-desc">Centro de treinamento: elenco e prancheta tática.</desc><g data-hf-id="hf-xcwe" class="map-lift"><g data-hf-id="hf-vera"><rect data-hf-id="hf-ndql" x="6" y="6" width="60" height="44" fill="#15201a"></rect><rect data-hf-id="hf-csh1" x="8" y="8" width="56" height="40" fill="#246630"></rect><g data-hf-id="hf-oync" fill="#f4efe2"><rect data-hf-id="hf-8ten" x="12" y="14" width="48" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-ccli" x="12" y="42" width="48" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-g9nc" x="12" y="14" width="2" height="30" fill="#f4efe2"></rect><rect data-hf-id="hf-sod2" x="58" y="14" width="2" height="30" fill="#f4efe2"></rect><rect data-hf-id="hf-krxa" x="36" y="14" width="2" height="30" fill="#f4efe2"></rect><rect data-hf-id="hf-3m8c" x="12" y="22" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-jl2d" x="12" y="34" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-tn8k" x="20" y="22" width="2" height="14" fill="#f4efe2"></rect><rect data-hf-id="hf-f2vc" x="52" y="22" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-w3p5" x="52" y="34" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-42w7" x="50" y="22" width="2" height="14" fill="#f4efe2"></rect><rect data-hf-id="hf-s581" x="34" y="27" width="6" height="4" fill="#f4efe2"></rect></g><rect data-hf-id="hf-mp1a" x="10" y="10" width="2" height="2" fill="#ffd23f"></rect><rect data-hf-id="hf-1a2o" x="16" y="10" width="2" height="2" fill="#ffd23f"></rect><rect data-hf-id="hf-hphv" x="22" y="10" width="2" height="2" fill="#ffd23f"></rect></g><rect data-hf-id="hf-4pu2" class="map-focus" x="4" y="4" width="64" height="48"></rect><g data-hf-id="hf-wori" aria-hidden="true"><rect data-hf-id="hf-ub5h" x="28" y="40" width="16" height="9" fill="#15201a" class="map-label-bg"></rect><text data-hf-id="hf-umjt" x="36" y="46.6" text-anchor="middle" font-size="5" font-family="'Press Start 2P', monospace" fill="#ffd23f">CT</text></g></g></g><g data-hf-id="hf-s1b4" role="button" tabindex="0" aria-label="Estádio: Estádio e Partida" aria-describedby="area-stadium-desc" aria-haspopup="dialog" class="map-building" data-area="stadium"><title data-hf-id="hf-b9hx">Estádio: Estádio e Partida</title><desc data-hf-id="hf-e19c" id="area-stadium-desc">Casa da torcida: ingressos, obras e dia de jogo.</desc><g data-hf-id="hf-f4b6" class="map-lift"><g data-hf-id="hf-pwpm"><rect data-hf-id="hf-r4e5" x="86" y="4" width="68" height="48" fill="#15201a"></rect><rect data-hf-id="hf-np7f" x="88" y="6" width="64" height="44" fill="#8f949b"></rect><rect data-hf-id="hf-d8av" x="88" y="6" width="64" height="2" fill="#6b7078"></rect><rect data-hf-id="hf-onun" x="88" y="48" width="64" height="2" fill="#6b7078"></rect><rect data-hf-id="hf-7qij" x="88" y="6" width="2" height="44" fill="#6b7078"></rect><rect data-hf-id="hf-rnyv" x="150" y="6" width="2" height="44" fill="#6b7078"></rect><rect data-hf-id="hf-lxva" x="94" y="12" width="52" height="32" fill="#2f7d3a"></rect><rect data-hf-id="hf-hzzu" x="94" y="12" width="52" height="4" fill="#3a9447"></rect><rect data-hf-id="hf-ibu9" x="94" y="20" width="52" height="4" fill="#3a9447"></rect><rect data-hf-id="hf-oomx" x="94" y="28" width="52" height="4" fill="#3a9447"></rect><g data-hf-id="hf-nw4g" fill="#f4efe2"><rect data-hf-id="hf-bx5v" x="96" y="14" width="48" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-7n7k" x="96" y="40" width="48" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-d8vv" x="96" y="14" width="2" height="28" fill="#f4efe2"></rect><rect data-hf-id="hf-v9rv" x="142" y="14" width="2" height="28" fill="#f4efe2"></rect><rect data-hf-id="hf-rakj" x="120" y="14" width="2" height="28" fill="#f4efe2"></rect><rect data-hf-id="hf-38pk" x="96" y="22" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-1zdb" x="96" y="32" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-6pdz" x="104" y="22" width="2" height="12" fill="#f4efe2"></rect><rect data-hf-id="hf-2d3v" x="136" y="22" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-5y10" x="136" y="32" width="8" height="2" fill="#f4efe2"></rect><rect data-hf-id="hf-0tjk" x="134" y="22" width="2" height="12" fill="#f4efe2"></rect><rect data-hf-id="hf-9hvn" x="118" y="26" width="6" height="4" fill="#f4efe2"></rect></g><rect data-hf-id="hf-giwi" x="84" y="2" width="4" height="4" fill="#ffd23f"></rect><rect data-hf-id="hf-ja12" x="152" y="2" width="4" height="4" fill="#ffd23f"></rect><rect data-hf-id="hf-588n" x="84" y="50" width="4" height="4" fill="#ffd23f"></rect><rect data-hf-id="hf-m4ij" x="152" y="50" width="4" height="4" fill="#ffd23f"></rect></g><rect data-hf-id="hf-m9fa" class="map-focus" x="84" y="2" width="72" height="52"></rect><g data-hf-id="hf-wagh" aria-hidden="true"><rect data-hf-id="hf-ekji" x="99.5" y="42" width="41" height="9" fill="#15201a" class="map-label-bg"></rect><text data-hf-id="hf-cihb" x="120" y="48.6" text-anchor="middle" font-size="5" font-family="'Press Start 2P', monospace" fill="#ffd23f">ESTÁDIO</text></g></g></g><g data-hf-id="hf-xznw" role="button" tabindex="0" aria-label="Sede: Escritório e Finanças" aria-describedby="area-hq-desc" aria-haspopup="dialog" class="map-building" data-area="hq"><title data-hf-id="hf-58sp">Sede: Escritório e Finanças</title><desc data-hf-id="hf-m4mm" id="area-hq-desc">Escritório da diretoria, propostas e finanças.</desc><g data-hf-id="hf-fim7" class="map-lift"><g data-hf-id="hf-qb0n"><rect data-hf-id="hf-bcbd" x="6" y="70" width="38" height="44" fill="#15201a"></rect><rect data-hf-id="hf-549j" x="8" y="72" width="34" height="40" fill="#e6dcc3"></rect><rect data-hf-id="hf-frvc" x="8" y="72" width="34" height="6" fill="#c9b995"></rect><rect data-hf-id="hf-x7on" x="12" y="82" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-8i08" x="22" y="82" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-gb7t" x="32" y="82" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-rxze" x="12" y="90" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-zcfx" x="22" y="90" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-0cds" x="32" y="90" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-jdky" x="12" y="98" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-qs1h" x="22" y="98" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-tzl4" x="32" y="98" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-rd7s" x="12" y="106" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-iza9" x="22" y="106" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-2mou" x="32" y="106" width="6" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-nzpp" x="22" y="106" width="6" height="6" fill="#6b4119"></rect></g><rect data-hf-id="hf-sufo" class="map-focus" x="4" y="68" width="42" height="48"></rect><g data-hf-id="hf-xhdk" aria-hidden="true"><rect data-hf-id="hf-y0qy" x="12" y="104" width="26" height="9" fill="#15201a" class="map-label-bg"></rect><text data-hf-id="hf-bo0d" x="25" y="110.6" text-anchor="middle" font-size="5" font-family="'Press Start 2P', monospace" fill="#ffd23f">SEDE</text></g></g></g><g data-hf-id="hf-64k2" role="button" tabindex="0" aria-label="Imprensa: Notícias" aria-describedby="area-press-desc" class="map-building" data-area="press"><title data-hf-id="hf-x3s8">Imprensa: Notícias</title><desc data-hf-id="hf-cd74" id="area-press-desc">Sala de imprensa: manchetes e repercussão.</desc><g data-hf-id="hf-fwx8" class="map-lift"><g data-hf-id="hf-qpbo"><rect data-hf-id="hf-vyw4" x="48" y="72" width="20" height="24" fill="#15201a"></rect><rect data-hf-id="hf-nkvp" x="50" y="74" width="16" height="20" fill="#c9b995"></rect><rect data-hf-id="hf-ey3m" x="52" y="78" width="4" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-vx73" x="60" y="78" width="4" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-2piz" x="56" y="88" width="4" height="6" fill="#6b4119"></rect><rect data-hf-id="hf-lz5g" x="62" y="62" width="2" height="12" fill="#15201a"></rect><rect data-hf-id="hf-ar9p" x="60" y="60" width="6" height="2" fill="#c8322b"></rect></g><rect data-hf-id="hf-64a3" class="map-focus" x="46" y="70" width="24" height="28"></rect><g data-hf-id="hf-x32j" aria-hidden="true"><rect data-hf-id="hf-5wg6" x="35" y="86" width="46" height="9" fill="#15201a" class="map-label-bg"></rect><text data-hf-id="hf-z9ka" x="58" y="92.6" text-anchor="middle" font-size="5" font-family="'Press Start 2P', monospace" fill="#ffd23f">IMPRENSA</text></g></g></g><g data-hf-id="hf-ebcc" role="button" tabindex="0" aria-label="Estacionamento: Mercado" aria-describedby="area-parking-desc" class="map-building" data-area="parking"><title data-hf-id="hf-41ha">Estacionamento: Mercado</title><desc data-hf-id="hf-yzpk" id="area-parking-desc">Onde chegam e partem os reforços: mercado.</desc><g data-hf-id="hf-gb89" class="map-lift"><g data-hf-id="hf-r3mp"><rect data-hf-id="hf-b8iv" x="86" y="70" width="68" height="18" fill="#15201a"></rect><rect data-hf-id="hf-f4de" x="88" y="72" width="64" height="14" fill="#5a5e63"></rect><rect data-hf-id="hf-lkq9" x="92" y="74" width="2" height="10" fill="#d8d2c0"></rect><rect data-hf-id="hf-3y1l" x="102" y="74" width="2" height="10" fill="#d8d2c0"></rect><rect data-hf-id="hf-luw0" x="112" y="74" width="2" height="10" fill="#d8d2c0"></rect><rect data-hf-id="hf-j1nn" x="122" y="74" width="2" height="10" fill="#d8d2c0"></rect><rect data-hf-id="hf-0imy" x="132" y="74" width="2" height="10" fill="#d8d2c0"></rect><rect data-hf-id="hf-69t1" x="142" y="74" width="2" height="10" fill="#d8d2c0"></rect><rect data-hf-id="hf-9skz" x="96" y="76" width="6" height="8" fill="#c8322b"></rect><rect data-hf-id="hf-0zbh" x="116" y="76" width="6" height="8" fill="#7cc4ea"></rect><rect data-hf-id="hf-fbf3" x="136" y="76" width="6" height="8" fill="#ffd23f"></rect></g><rect data-hf-id="hf-3wd5" class="map-focus" x="84" y="68" width="72" height="22"></rect><g data-hf-id="hf-v3je" aria-hidden="true"><rect data-hf-id="hf-9we5" x="99.5" y="78" width="41" height="9" fill="#15201a" class="map-label-bg"></rect><text data-hf-id="hf-qpqv" x="120" y="84.6" text-anchor="middle" font-size="5" font-family="'Press Start 2P', monospace" fill="#ffd23f">MERCADO</text></g></g></g><g data-hf-id="hf-j61o" role="button" tabindex="0" aria-label="Casa do treinador: Carreira e histórico" aria-describedby="area-home-desc" class="map-building" data-area="home"><title data-hf-id="hf-1lbg">Casa do treinador: Carreira e histórico</title><desc data-hf-id="hf-arvj" id="area-home-desc">Sua carreira, temporadas e conquistas.</desc><g data-hf-id="hf-gpja" class="map-lift"><g data-hf-id="hf-rhxq"><rect data-hf-id="hf-bkqq" x="100" y="102" width="26" height="12" fill="#15201a"></rect><rect data-hf-id="hf-h6kd" x="102" y="104" width="22" height="8" fill="#e6dcc3"></rect><rect data-hf-id="hf-pmse" x="102" y="100" width="22" height="2" fill="#8f1f1a"></rect><rect data-hf-id="hf-w0as" x="104" y="96" width="18" height="4" fill="#c8322b"></rect><rect data-hf-id="hf-uxbc" x="108" y="94" width="10" height="2" fill="#c8322b"></rect><rect data-hf-id="hf-8xeo" x="104" y="108" width="4" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-0pn3" x="118" y="108" width="4" height="4" fill="#7cc4ea"></rect><rect data-hf-id="hf-axm0" x="111" y="106" width="4" height="6" fill="#6b4119"></rect></g><rect data-hf-id="hf-tolb" class="map-focus" x="98" y="92" width="30" height="24"></rect><g data-hf-id="hf-up8d" aria-hidden="true"><rect data-hf-id="hf-d4yy" x="100" y="104" width="26" height="9" fill="#15201a" class="map-label-bg"></rect><text data-hf-id="hf-x59e" x="113" y="110.6" text-anchor="middle" font-size="5" font-family="'Press Start 2P', monospace" fill="#ffd23f">CASA</text></g></g></g></svg></div>
+    </section>
+
+    <!-- 4. Competições: the Brazilian pyramid (the screen's PIRÂMIDE tab) -->
+    <section data-hf-id="hf-wqnb" id="clube-s4" class="clube-shot">
+      <h2 data-hf-id="hf-rl2a" class="clube-title" id="clube-t4">COMPETIÇÕES</h2>
+      <div data-hf-id="hf-k4zu" id="clube-tA" class="clube-tier panel" style="top: 190px; width: 820px; margin-left: -410px">
+        <div data-hf-id="hf-1ef4"><h3 data-hf-id="hf-isrh" id="clube-hA">SÉRIE A</h3><p data-hf-id="hf-vjqw">20 clubes · pontos corridos</p></div><span data-hf-id="hf-x37d" class="badge bulb" data-layout-ignore>Elite</span>
+      </div>
+      <p data-hf-id="hf-3m6w" id="clube-uAB" class="clube-up" style="top: 360px; margin-left: -132px"><span data-hf-id="hf-6x96" data-sprite="up" data-px="4"></span>4 sobem</p>
+      <div data-hf-id="hf-6zjt" id="clube-tB" class="clube-tier panel" style="top: 412px; width: 1040px; margin-left: -520px">
+        <div data-hf-id="hf-c4s8"><h3 data-hf-id="hf-jde5" id="clube-hB">SÉRIE B</h3><p data-hf-id="hf-5vyr">Acesso: 4 vagas · rebaixamento: 4</p></div><span data-hf-id="hf-wean" class="badge" data-layout-ignore>Pontos corridos</span>
+      </div>
+      <p data-hf-id="hf-09da" id="clube-uBC" class="clube-up" style="top: 582px; margin-left: -132px"><span data-hf-id="hf-9vy6" data-sprite="up" data-px="4"></span>4 sobem</p>
+      <div data-hf-id="hf-xm38" id="clube-tC" class="clube-tier panel" style="top: 634px; width: 1260px; margin-left: -630px">
+        <div data-hf-id="hf-bqh7"><h3 data-hf-id="hf-0u7h" id="clube-hC">SÉRIE C</h3><p data-hf-id="hf-g66g">O plano grátis começa aqui</p></div><span data-hf-id="hf-iwgv" class="badge" data-layout-ignore>Pontos corridos</span>
+      </div>
+      <div data-hf-id="hf-x58w" id="clube-cups">
+        <div data-hf-id="hf-rytl" id="clube-cup1" class="clube-cup panel-board"><span data-hf-id="hf-a6rr" data-sprite="trophy" data-px="4"></span>Copa do Brasil</div>
+        <div data-hf-id="hf-l9nt" id="clube-cup2" class="clube-cup panel-board"><span data-hf-id="hf-bilj" data-sprite="trophy" data-px="4"></span>Libertadores</div>
+        <div data-hf-id="hf-rzdv" id="clube-cup3" class="clube-cup panel-board"><span data-hf-id="hf-b4ai" data-sprite="trophy" data-px="4"></span>Estaduais</div>
+      </div>
+    </section>
+  </div>
+  <script>
+    (() => {
+      const T0 = PLANO.inicio.clube;
+      const at = (abs) => abs - T0;
+      const C = PLANO.cliques;
+      const tl = gsap.timeline({ paused: true });
+      const IR = { immediateRender: false };
+      const step = (el, from, to, t) => tl.fromTo(el, from, Object.assign({}, to, { duration: 1 / 30, ease: 'steps(1)' }, IR), t);
+      FB.mountSprites(document.querySelector('[data-composition-id="clube"]'));
+      FB.mountIcons(document.querySelector('[data-composition-id="clube"]'));
+      ['#clube-t1', '#clube-sponsor', '#clube-t4', '#clube-hA', '#clube-hB', '#clube-hC'].forEach((s) => FB.pixelTitle(document.querySelector(s)));
+
+      // Shots on the beat (1 s each): hard cuts inside the montage.
+      const shots = ['#clube-s1', '#clube-s2', '#clube-s3', '#clube-s4'];
+      const cuts = [18.0, 19.0, 20.0, 21.0];
+      shots.forEach((s, i) => {
+        step(s, { opacity: 0 }, { opacity: 1 }, at(cuts[i]));
+        if (i < shots.length - 1) step(s, { opacity: 1 }, { opacity: 0 }, at(cuts[i + 1]));
+      });
+
+      // 1 — arrives on a whip from the table (enters from the right).
+      tl.fromTo('#clube-s1', { x: 2100 }, { x: 0, duration: 0.3, ease: 'power3.out' }, at(18.0));
+      FB.click(tl, document.createElement('i'), at(C.aceitar.t), '#clube-aceitar', 6);
+      step('#clube-tag1', { opacity: 1 }, { opacity: 0 }, at(C.aceitar.t + 0.05));
+      step('#clube-tag2', { opacity: 0 }, { opacity: 1 }, at(C.aceitar.t + 0.05));
+      FB.count(tl, document.getElementById('clube-patro'), 4.8, 14.3, at(C.aceitar.t + 0.06), 0.4, (v) => `R$ ${v.toFixed(1).replace('.', ',')} mi`, 'power2.out');
+      tl.fromTo('#clube-coin', { y: 40, scale: 0.4, opacity: 0 }, { y: -10, scale: 1, opacity: 1, duration: FB.springs.pop.duration, ease: FB.springs.pop.ease }, at(C.aceitar.t + 0.08));
+
+      // 2 — the AI's offer slides in; the coach counter-offers.
+      FB.springTo(tl, '#clube-offer', { x: 700 }, { x: 0 }, at(19.02), 'ui');
+      FB.click(tl, document.createElement('i'), at(C.proposta.t), '#clube-p-contra', 6);
+      step('#clube-otag1', { opacity: 1 }, { opacity: 0 }, at(C.proposta.t + 0.05));
+      step('#clube-otag2', { opacity: 0 }, { opacity: 1 }, at(C.proposta.t + 0.05));
+      FB.count(tl, document.getElementById('clube-valor'), 48, 55, at(C.proposta.t + 0.06), 0.35, (v) => `R$ ${Math.round(v)} mi`, 'power2.out');
+
+      // 3 — buildings light up on eighth notes (the map's hover lift + focus).
+      const areas = ['ct', 'stadium', 'hq', 'press'];
+      areas.forEach((a, i) => {
+        const t = at(20.05 + i * 0.22);
+        const g = document.querySelector('#clube-mapa-box [data-area="' + a + '"]');
+        tl.fromTo(g.querySelector('.map-lift'), { y: 0 }, { y: -2, duration: 2 / 30, ease: 'steps(2)', immediateRender: false }, t);
+        tl.fromTo(g.querySelector('.map-focus'), { stroke: 'rgba(255,210,63,0)' }, { stroke: 'rgba(255,210,63,1)', duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, t);
+        tl.fromTo('#clube-a' + (i + 1), { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: FB.springs.ui.duration, ease: FB.springs.ui.ease }, t);
+      });
+
+      // 4 — the pyramid stacks bottom-up: C, B, A; then the cups.
+      const U = FB.springs.ui;
+      [['#clube-tC', 21.0], ['#clube-uBC', 21.1], ['#clube-tB', 21.15], ['#clube-uAB', 21.25], ['#clube-tA', 21.3]].forEach(([s, t]) => {
+        tl.fromTo(s, { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: U.duration, ease: U.ease }, at(t));
+      });
+      ['#clube-cup1', '#clube-cup2', '#clube-cup3'].forEach((s, i) => {
+        tl.fromTo(s, { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: FB.springs.pop.duration, ease: FB.springs.pop.ease }, at(21.45 + i * 0.1));
+      });
+      FB.pixelAccents(document.querySelector('[data-composition-id="clube"]'));
+      window.__timelines['clube'] = tl;
+    })();
+  </script>
+</template>

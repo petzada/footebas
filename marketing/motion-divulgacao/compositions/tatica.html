@@ -1,0 +1,497 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    #tatica-page {
+      position: absolute;
+      inset: 0;
+    }
+    /* "Ajustes" card with the prancheta's segmented controls (Táticas). */
+    #tatica-card {
+      position: absolute;
+      left: 140px;
+      top: 100px;
+      width: 940px;
+      height: 620px;
+    }
+    #tatica-card h2 {
+      position: absolute;
+      left: 44px;
+      top: 44px;
+      font-family: var(--font-pixel);
+      font-weight: 400;
+      font-size: 40px;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    #tatica-card .sub {
+      position: absolute;
+      left: 44px;
+      top: 104px;
+      width: 852px;
+      font-size: 28px;
+      line-height: 1.3;
+      font-weight: 500;
+      color: var(--muted-ink);
+    }
+    .tatica-label {
+      position: absolute;
+      left: 44px;
+      font-family: var(--font-pixel);
+      font-size: 28px;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    .tatica-row {
+      position: absolute;
+      left: 44px;
+      width: 852px;
+      height: 96px;
+    }
+    .tatica-seg {
+      position: absolute;
+      top: 0;
+      width: 268px;
+      height: 96px;
+      border: 4px solid var(--ink);
+      background: var(--chalk);
+    }
+    .tatica-pill {
+      position: absolute;
+      top: 0;
+      width: 268px;
+      height: 96px;
+      background: var(--grass-deep);
+      border: 4px solid var(--ink);
+    }
+    .tatica-txt {
+      position: absolute;
+      top: 0;
+      width: 268px;
+      height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .tatica-txt.on {
+      color: var(--chalk);
+    }
+    #tatica-note {
+      position: absolute;
+      left: 44px;
+      top: 556px;
+      font-size: 28px;
+      font-weight: 500;
+      color: var(--muted-ink);
+    }
+
+    /* Prancheta de giz: the tactics board. */
+    #tatica-campo {
+      position: absolute;
+      left: 1180px;
+      top: 90px;
+      width: 600px;
+      height: 720px;
+    }
+    #tatica-linhas {
+      position: absolute;
+      inset: 0;
+    }
+    .tatica-token {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 76px;
+      height: 96px;
+      margin-left: -38px;
+      margin-top: -44px;
+    }
+    .tatica-token img {
+      display: block;
+      width: 64px;
+      height: 64px;
+      margin: 0 6px;
+      background: var(--chalk);
+      box-shadow: 0 -4px 0 0 var(--ink), 0 4px 0 0 var(--ink), -4px 0 0 0 var(--ink), 4px 0 0 0 var(--ink);
+      image-rendering: pixelated;
+    }
+    .tatica-token b {
+      display: block;
+      margin: 8px auto 0;
+      width: max-content;
+      padding: 3px 6px;
+      background: var(--bulb);
+      color: var(--ink);
+      border: 3px solid var(--ink);
+      font-family: var(--font-pixel);
+      font-weight: 400;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .tatica-arrow {
+      fill: none;
+      stroke: var(--chalk);
+      stroke-width: 10;
+      stroke-linecap: square;
+      stroke-linejoin: miter;
+    }
+    #tatica-subboard {
+      position: absolute;
+      left: 1092px;
+      top: 446px;
+      display: inline-flex;
+      align-items: center;
+      gap: 22px;
+      padding: 12px 22px;
+      font-family: var(--font-pixel);
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .tatica-sub {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Figurinha (athlete-card.tsx) of the youth-team kid. */
+    #tatica-kidmove,
+    #tatica-kidarc {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      pointer-events: none;
+    }
+    #tatica-kidwrap {
+      position: absolute;
+      left: 200px;
+      top: 116px;
+      width: 820px;
+      height: 640px;
+      transform-origin: 200px 224px;
+    }
+    #tatica-kid {
+      position: absolute;
+      inset: 0;
+      padding: 0 30px 30px;
+    }
+    #tatica-kid .stripe {
+      margin: 0 -30px;
+      height: 64px;
+      padding: 0 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: repeating-linear-gradient(90deg, #d64545 0 24px, #15201a 24px 32px);
+      font-family: var(--font-pixel);
+      font-size: 26px;
+      line-height: 1;
+    }
+    #tatica-kid .stripe span {
+      padding: 6px 10px;
+    }
+    #tatica-kid .who {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-top: 28px;
+    }
+    #tatica-kid .who img {
+      width: 176px;
+      height: 176px;
+      background: var(--chalk);
+      box-shadow: var(--ink-border);
+      image-rendering: pixelated;
+      flex: none;
+    }
+    #tatica-kid h3 {
+      font-size: 46px;
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+    }
+    #tatica-kid .meta {
+      margin-top: 10px;
+      font-size: 32px;
+      font-weight: 500;
+      color: var(--muted-ink);
+    }
+    #tatica-kid .ovr {
+      margin-left: auto;
+      padding: 14px 16px;
+      background: var(--board);
+      font-size: 56px;
+      line-height: 1;
+    }
+    #tatica-kid dl {
+      display: grid;
+      gap: 14px;
+      margin-top: 28px;
+    }
+    #tatica-kid dl > div {
+      display: grid;
+      grid-template-columns: 170px 1fr;
+      align-items: center;
+      gap: 18px;
+    }
+    #tatica-kid dt {
+      font-family: var(--font-pixel);
+      font-size: 22px;
+      text-transform: uppercase;
+    }
+    #tatica-kid .band {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      opacity: 0.9;
+      background-image: repeating-linear-gradient(135deg, var(--bulb) 0 6px, var(--ink) 6px 10px);
+    }
+    #tatica-kid .est {
+      grid-column: 2;
+      margin-top: -6px;
+      font-family: var(--font-pixel);
+      font-size: 18px;
+    }
+    #tatica-kid ul {
+      display: flex;
+      gap: 12px;
+      margin-top: 22px;
+      list-style: none;
+    }
+    #tatica-kid li {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 4px solid var(--ink);
+      padding: 8px 12px;
+      background: var(--popover);
+      font-family: var(--font-pixel);
+      font-size: 20px;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+    #tatica-kid li.bulb {
+      background: var(--bulb);
+    }
+  </style>
+  <div data-hf-id="hf-kdo3" id="root" data-composition-id="tatica" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-uipz" id="tatica-page">
+      <section data-hf-id="hf-qt1r" id="tatica-card" class="panel">
+        <h2 data-hf-id="hf-e1np">Ajustes aos 45'</h2>
+        <p data-hf-id="hf-lank" class="sub">O que já aconteceu não muda; a mudança vale a partir daqui.</p>
+        <p data-hf-id="hf-x4qt" class="tatica-label" style="top: 200px">Formação</p>
+        <div data-hf-id="hf-6zye" class="tatica-row" style="top: 240px">
+          <span data-hf-id="hf-ficu" class="tatica-seg" style="left: 0"></span>
+          <span data-hf-id="hf-tqdh" class="tatica-seg" style="left: 292px"></span>
+          <span data-hf-id="hf-f333" class="tatica-seg" style="left: 584px"></span>
+          <span data-hf-id="hf-qtt1" id="tatica-pill-f" class="tatica-pill" style="left: 0"></span>
+          <span data-hf-id="hf-sitn" id="tatica-f442" class="tatica-txt on" style="left: 0">4-4-2</span>
+          <span data-hf-id="hf-i2rz" id="tatica-f433" class="tatica-txt" style="left: 292px">4-3-3</span>
+          <span data-hf-id="hf-6ybk" class="tatica-txt" style="left: 584px">3-5-2</span>
+        </div>
+        <p data-hf-id="hf-o8vp" class="tatica-label" style="top: 390px">Mentalidade</p>
+        <div data-hf-id="hf-svid" class="tatica-row" style="top: 430px">
+          <span data-hf-id="hf-m4z6" class="tatica-seg" style="left: 0"></span>
+          <span data-hf-id="hf-gil5" class="tatica-seg" style="left: 292px"></span>
+          <span data-hf-id="hf-sue7" class="tatica-seg" style="left: 584px"></span>
+          <span data-hf-id="hf-pjdp" id="tatica-pill-m" class="tatica-pill" style="left: 292px"></span>
+          <span data-hf-id="hf-ctmc" class="tatica-txt" style="left: 0">Cautela</span>
+          <span data-hf-id="hf-bdh1" id="tatica-equi" class="tatica-txt on" style="left: 292px">Equilibrada</span>
+          <span data-hf-id="hf-u5ty" id="tatica-ofen" class="tatica-txt" style="left: 584px">Ofensiva</span>
+        </div>
+        <p data-hf-id="hf-0u2u" id="tatica-note">Vale a partir do 46'.</p>
+      </section>
+
+      <section data-hf-id="hf-sb2f" id="tatica-campo" class="panel-chalk" aria-label="Prancheta de giz">
+        <svg data-hf-id="hf-xlql" id="tatica-linhas" viewBox="0 0 600 720" aria-hidden="true">
+          <g data-hf-id="hf-lkxs" fill="none" stroke="#f4efe2" stroke-opacity="0.85" stroke-width="5" shape-rendering="crispEdges">
+            <rect data-hf-id="hf-jxqn" x="30" y="30" width="540" height="660" />
+            <line data-hf-id="hf-ucn1" x1="30" y1="360" x2="570" y2="360" />
+            <circle data-hf-id="hf-1xct" cx="300" cy="360" r="72" shape-rendering="geometricPrecision" />
+            <rect data-hf-id="hf-k464" x="150" y="30" width="300" height="110" />
+            <rect data-hf-id="hf-et6z" x="230" y="30" width="140" height="44" />
+            <rect data-hf-id="hf-7tlm" x="150" y="580" width="300" height="110" />
+            <rect data-hf-id="hf-mwb2" x="230" y="646" width="140" height="44" />
+          </g>
+          <g data-hf-id="hf-mfu4" id="tatica-setas">
+            <path data-hf-id="hf-hx2g" class="tatica-arrow" d="M162 330 L162 182 M140 206 L162 182 L184 206" />
+            <path data-hf-id="hf-jn5z" class="tatica-arrow" d="M300 300 L300 132 M278 156 L300 132 L322 156" />
+            <path data-hf-id="hf-ubyf" class="tatica-arrow" d="M438 330 L438 182 M416 206 L438 182 L460 206" />
+          </g>
+        </svg>
+        <div data-hf-id="hf-x788" id="tatica-tokens"></div>
+      </section>
+      <div data-hf-id="hf-4a36" id="tatica-subboard" class="panel-board">
+        <span data-hf-id="hf-zjsk" style="color: #d64545" data-sprite="lamp" data-px="5"></span>
+        <span data-hf-id="hf-bfrf" class="tatica-sub" style="color: #39d36b"><span data-hf-id="hf-6x96" data-sprite="up" data-px="4"></span>19</span>
+        <span data-hf-id="hf-mxx1" class="tatica-sub" style="color: #ff5a4f"><span data-hf-id="hf-nbjh" data-sprite="down" data-px="4"></span>5</span>
+      </div>
+
+      <div data-hf-id="hf-vf4x" id="tatica-kidmove" data-layout-allow-overlap>
+      <div data-hf-id="hf-kn1u" id="tatica-kidarc">
+      <div data-hf-id="hf-w28y" id="tatica-kidwrap">
+        <div data-hf-id="hf-x1e1" id="tatica-kidlift">
+          <article data-hf-id="hf-ouv3" id="tatica-kid" class="sticker" style="width: 820px; height: 640px">
+            <div data-hf-id="hf-5i4a" class="stripe" data-layout-ignore>
+              <span data-hf-id="hf-sart" style="background: var(--chalk); color: var(--ink)">ATA</span>
+              <span data-hf-id="hf-4bmg" style="background: var(--ink); color: var(--chalk)">#19</span>
+            </div>
+            <div data-hf-id="hf-xhzk" class="who">
+              <img data-hf-id="hf-latt" src="assets/avatars/garoto-da-base.svg" alt="" />
+              <div data-hf-id="hf-yeow">
+                <h3 data-hf-id="hf-17ni">Garoto da base</h3>
+                <p data-hf-id="hf-9xj6" class="meta" data-layout-ignore>17 anos · ATA / PD</p>
+              </div>
+              <span data-hf-id="hf-96ub" class="ovr led">71</span>
+            </div>
+            <dl data-hf-id="hf-2bdx" data-layout-ignore>
+              <div data-hf-id="hf-y7yw">
+                <dt data-hf-id="hf-awu4">Força</dt>
+                <dd data-hf-id="hf-rch5" class="bar-px"><span data-hf-id="hf-2b1j" style="width: 71%"></span></dd>
+              </div>
+              <div data-hf-id="hf-x11t">
+                <dt data-hf-id="hf-tlma">Forma</dt>
+                <dd data-hf-id="hf-8rtp" class="bar-px"><span data-hf-id="hf-kgmw" style="width: 96%"></span></dd>
+              </div>
+              <div data-hf-id="hf-xfcu">
+                <dt data-hf-id="hf-d56m">Potenc.</dt>
+                <dd data-hf-id="hf-jsu4" class="bar-px" data-tone="bulb"><span data-hf-id="hf-eabq" class="band" style="left: 84%; width: 11%"></span></dd>
+                <span data-hf-id="hf-r5r6" class="est">≈ 84–95 · estimativa</span>
+              </div>
+            </dl>
+            <ul data-hf-id="hf-xxz2" data-layout-ignore>
+              <li data-hf-id="hf-0hif"><span data-hf-id="hf-1hqs" data-sprite="star" data-px="3"></span>Finalização</li>
+              <li data-hf-id="hf-jipm"><span data-hf-id="hf-10ks" data-sprite="star" data-px="3"></span>Velocidade</li>
+              <li data-hf-id="hf-h19f" class="bulb">Decisivo</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+      </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const T0 = PLANO.inicio.tatica;
+      const at = (abs) => abs - T0;
+      const C = PLANO.cliques;
+      const tl = gsap.timeline({ paused: true });
+      const IR = { immediateRender: false };
+      FB.mountSprites(document.getElementById('tatica-kid'));
+      FB.mountSprites(document.getElementById('tatica-subboard'));
+
+      /* --- Tokens on the chalk board: 4-4-2 -> (Ofensiva) -> 4-3-3. --- */
+      const W = 540, H = 660, OX = 30, OY = 30;
+      const P = (nx, ny) => [OX + nx * W, OY + ny * H];
+      const players = [
+        { n: 1, a: [0.5, 0.92], b: [0.5, 0.9], c: [0.5, 0.9] },
+        { n: 2, a: [0.86, 0.76], b: [0.86, 0.72], c: [0.86, 0.7] },
+        { n: 3, a: [0.62, 0.79], b: [0.62, 0.75], c: [0.63, 0.74] },
+        { n: 4, a: [0.38, 0.79], b: [0.38, 0.75], c: [0.37, 0.74] },
+        { n: 6, a: [0.14, 0.76], b: [0.14, 0.72], c: [0.14, 0.7] },
+        { n: 7, a: [0.86, 0.52], b: [0.86, 0.47], c: [0.84, 0.2] },
+        { n: 5, a: [0.62, 0.55], b: [0.62, 0.5], c: [0.5, 0.456] },
+        { n: 8, a: [0.38, 0.55], b: [0.38, 0.5], c: [0.26, 0.4] },
+        { n: 11, a: [0.14, 0.52], b: [0.14, 0.47], c: [0.16, 0.2] },
+        { n: 9, a: [0.38, 0.27], b: [0.38, 0.22], c: [0.5, 0.15] },
+        { n: 10, a: [0.62, 0.27], b: [0.62, 0.22], c: [0.74, 0.4] },
+      ];
+      const box = document.getElementById('tatica-tokens');
+      const tokens = {};
+      players.forEach((p, i) => {
+        const el = document.createElement('div');
+        el.className = 'tatica-token';
+        el.id = `tatica-t${p.n}`;
+        el.innerHTML = `<img src="assets/avatars/atleta-${String(i + 1).padStart(2, '0')}.svg" alt=""><b data-layout-ignore>${p.n}</b>`;
+        box.appendChild(el);
+        tokens[p.n] = el;
+        const [x, y] = P(...p.a);
+        gsap.set(el, { x, y });
+      });
+      const kid = document.createElement('div');
+      kid.className = 'tatica-token';
+      kid.id = 'tatica-t19';
+      kid.innerHTML = '<img src="assets/avatars/garoto-da-base.svg" alt=""><b data-layout-ignore>19</b>';
+      box.appendChild(kid);
+      const kidXY = P(0.5, 0.456);
+      gsap.set(kid, { x: kidXY[0], y: kidXY[1], scale: 0, opacity: 0 });
+
+      /* --- Page enters from below (the app page scrolls over fixed grass). --- */
+      tl.fromTo('#tatica-page', { y: 1180 }, { y: 0, duration: 0.5, ease: 'power3.out' }, at(2.22));
+      document.querySelectorAll('#tatica-setas path').forEach((path) => {
+        const len = Math.ceil(path.getTotalLength());
+        gsap.set(path, { strokeDasharray: len, strokeDashoffset: len, attr: { 'data-len': len } });
+      });
+
+      /* --- Click 1: OFENSIVA. The green pill slides (layoutId spring). --- */
+      const L = FB.springs.layout;
+      tl.fromTo('#tatica-pill-m', { x: 0 }, { x: 292, duration: L.duration, ease: L.ease, immediateRender: false }, at(C.ofensiva.t));
+      tl.fromTo('#tatica-equi', { color: '#f4efe2' }, { color: '#15201a', duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(C.ofensiva.t + 0.06));
+      tl.fromTo('#tatica-ofen', { color: '#15201a' }, { color: '#f4efe2', duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(C.ofensiva.t + 0.12));
+      // The whole team steps up (higher lines), with a 1-frame stagger.
+      players.forEach((p, i) => {
+        const [x0, y0] = P(...p.a);
+        const [x1, y1] = P(...p.b);
+        tl.fromTo(tokens[p.n], { x: x0, y: y0 }, { x: x1, y: y1, duration: L.duration, ease: L.ease, immediateRender: false }, at(C.ofensiva.t + 0.05 + i / 30));
+      });
+      // Chalk arrows draw forward.
+      document.querySelectorAll('#tatica-setas path').forEach((path, i) => {
+        const len = Number(path.getAttribute('data-len'));
+        tl.fromTo(path, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.32, ease: 'power2.out', immediateRender: false }, at(C.ofensiva.t + 0.04 + (i * 2) / 30));
+      });
+
+      /* --- Click 2: 4-3-3. Tokens re-form with the layout spring. --- */
+      tl.fromTo('#tatica-pill-f', { x: 0 }, { x: 292, duration: L.duration, ease: L.ease, immediateRender: false }, at(C.f433.t));
+      tl.fromTo('#tatica-f442', { color: '#f4efe2' }, { color: '#15201a', duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(C.f433.t + 0.06));
+      tl.fromTo('#tatica-f433', { color: '#15201a' }, { color: '#f4efe2', duration: 1 / 30, ease: 'steps(1)', immediateRender: false }, at(C.f433.t + 0.1));
+      players.forEach((p, i) => {
+        const [x1, y1] = P(...p.b);
+        const [x2, y2] = P(...p.c);
+        if (x1 === x2 && y1 === y2) return;
+        tl.fromTo(tokens[p.n], { x: x1, y: y1 }, { x: x2, y: y2, duration: L.duration, ease: L.ease, immediateRender: false }, at(C.f433.t + 0.04 + (i % 6) / 30));
+      });
+      tl.fromTo('#tatica-setas', { opacity: 1 }, { opacity: 0, duration: 0.2, ease: 'power1.in', immediateRender: false }, at(C.f433.t + 0.1));
+
+      /* --- The kid's sticker card rises over the prancheta (pop spring). --- */
+      const POP = FB.springs.pop;
+      tl.fromTo('#tatica-kidwrap', { y: 1050, rotation: 4 }, { y: 0, rotation: -1.5, duration: POP.duration, ease: POP.ease }, at(4.0));
+      tl.fromTo('#tatica-card', { opacity: 1 }, { opacity: 0.35, duration: 0.3, ease: 'power1.out', immediateRender: false }, at(4.1));
+
+      /* --- Drag: grabbed at the avatar, carried in an arc to the 5's slot,
+             shrinking into a token (card -> token morph). --- */
+      const g = C.pegaGaroto, d = C.soltaGaroto;
+      const dragStart = g.t + 0.06, dragDur = d.t - 0.1 - dragStart;
+      tl.fromTo('#tatica-kidlift', { scale: 1, rotation: 0 }, { scale: 1.04, rotation: 1.5, duration: 0.12, ease: 'power2.out', immediateRender: false }, at(g.t - 0.04));
+      tl.fromTo('#tatica-kidmove', { x: 0 }, { x: d.x - g.x, duration: dragDur, ease: 'power3.inOut', immediateRender: false }, at(dragStart));
+      tl.fromTo('#tatica-kidmove', { y: 0 }, { y: d.y - g.y, duration: dragDur, ease: 'power3.inOut', immediateRender: false }, at(dragStart));
+      const arc = PLANO.arcoArraste;
+      tl.fromTo('#tatica-kidarc', { y: 0 }, { y: arc, duration: dragDur / 2, ease: 'sine.out', immediateRender: false }, at(dragStart));
+      tl.fromTo('#tatica-kidarc', { y: arc }, { y: 0, duration: dragDur / 2, ease: 'sine.in', immediateRender: false }, at(dragStart + dragDur / 2));
+      tl.fromTo('#tatica-kidwrap', { scale: 1 }, { scale: 0.1, duration: dragDur, ease: 'power2.in', immediateRender: false }, at(dragStart));
+      tl.fromTo('#tatica-kidwrap', { rotation: -1.5 }, { rotation: 0, duration: dragDur, ease: 'power2.inOut', immediateRender: false }, at(dragStart));
+      tl.fromTo('#tatica-kidwrap', { opacity: 1 }, { opacity: 0, duration: 2 / 30, ease: 'steps(1)', immediateRender: false }, at(d.t));
+      tl.fromTo('#tatica-card', { opacity: 0.35 }, { opacity: 1, duration: 0.25, ease: 'power1.out', immediateRender: false }, at(d.t));
+      // Out goes the 5, in comes the 19 (pop spring on scale only).
+      const [x5, y5] = P(0.5, 0.456);
+      tl.fromTo('#tatica-t5', { x: x5, opacity: 1 }, { x: x5 + 420, opacity: 0, duration: 0.35, ease: 'power3.in', immediateRender: false }, at(d.t - 0.08));
+      tl.fromTo(kid, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: POP.duration, ease: POP.ease, immediateRender: false }, at(d.t));
+      // The game's substitution board steps up (px-rise).
+      tl.fromTo('#tatica-subboard', { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.22, ease: 'steps(4)' }, at(d.t + 0.04));
+
+      /* --- Exit at bar 4: the page scrolls on to the second-half button. --- */
+      tl.fromTo('#tatica-page', { y: 0 }, { y: -1180, duration: 0.34, ease: 'power3.in', immediateRender: false }, at(6.0));
+
+      FB.pixelAccents(document.querySelector('[data-composition-id="tatica"]'));
+      window.__timelines['tatica'] = tl;
+    })();
+  </script>
+</template>
