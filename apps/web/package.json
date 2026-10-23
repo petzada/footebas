@@ -11,7 +11,8 @@
     "test": "vitest run",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "stadium:convert": "node scripts/convert-stadium.mjs"
   },
   "dependencies": {
     "@dicebear/core": "9.2.4",
@@ -35,6 +36,7 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "tailwind-merge": "3.3.1",
+    "three": "0.186.1",
     "zzfx": "1.4.0"
   },
   "devDependencies": {
@@ -48,6 +50,7 @@
     "@types/node": "24.0.15",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "0.186.0",
     "eslint": "9.31.0",
     "eslint-config-next": "16.2.12",
     "jsdom": "26.1.0",

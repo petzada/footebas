@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -15,19 +16,25 @@ import {
   textualReplayAlternative,
   type MatchReplayInput,
 } from '@/lib/match-replay-model';
+import { useSound } from '@/lib/retro/use-sound';
+import { SEGMENT_MS } from './match-scene';
+import { cuesFor, momentsBetween } from './moments';
 import type { PhaserMatchStageProps } from './phaser-match-stage';
 import {
   canvasSupportSnapshot,
+  lowEndDeviceSnapshot,
   readSimplePreference,
   selectStageMode,
   subscribeSimplePreference,
   writeSimplePreference,
   type CanvasSupport,
 } from './stage-mode';
+import type { ThreeMatchStageProps } from './three-match-stage';
 
 const noSubscription = () => () => undefined;
 const serverSupport = () => undefined;
 const serverPreference = () => false;
+const serverLowEnd = () => false;
 
 /** Phaser and the scene ship in their own chunks, only for this screen. */
 const PhaserMatchStage = dynamic<PhaserMatchStageProps>(
@@ -42,14 +49,40 @@ const PhaserMatchStage = dynamic<PhaserMatchStageProps>(
   { ssr: false, loading: () => null },
 );
 
+/** Three.js and the stadium model likewise: downloaded only here. */
+const ThreeMatchStage = dynamic<ThreeMatchStageProps>(
+  () =>
+    import('./three-match-stage').catch((error: unknown) => {
+      function StageLoadFailed({ onError }: ThreeMatchStageProps) {
+        useEffect(() => onError?.(error), [onError]);
+        return null;
+      }
+      return StageLoadFailed;
+    }),
+  { ssr: false, loading: () => null },
+);
+
 class StageErrorBoundary extends Component<
-  { readonly onError: (error: unknown) => void; readonly children: ReactNode },
-  { readonly failed: boolean }
+  {
+    readonly onError: (error: unknown) => void;
+    readonly resetKey: string;
+    readonly children: ReactNode;
+  },
+  { readonly failed: boolean; readonly key: string }
 > {
-  override state = { failed: false };
+  override state = { failed: false, key: this.props.resetKey };
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  static getDerivedStateFromProps(
+    props: { resetKey: string },
+    state: { failed: boolean; key: string },
+  ) {
+    return props.resetKey === state.key
+      ? null
+      : { failed: false, key: props.resetKey };
   }
 
   override componentDidCatch(error: unknown) {
@@ -67,13 +100,16 @@ export interface MatchStageProps {
   readonly playing: boolean;
   readonly speed: number;
   readonly reducedMotion: boolean;
-  /** The React 2D pitch, used whenever the Phaser stage is not. */
+  /** The React 2D pitch, used whenever no animated stage is. */
   readonly fallback: ReactNode;
   /** Testable override; when omitted, the browser is probed on mount. */
   readonly canvasSupport?: CanvasSupport;
+  /** Testable override; when omitted, cores and memory are probed. */
+  readonly lowEndDevice?: boolean;
 }
 
 const scoreFont = { fontFamily: '"Courier New", Courier, monospace' };
+const pixelFont = { fontFamily: 'var(--font-pixel)' };
 
 export function MatchStage({
   match,
@@ -83,6 +119,7 @@ export function MatchStage({
   reducedMotion,
   fallback,
   canvasSupport: supportOverride,
+  lowEndDevice: lowEndOverride,
 }: MatchStageProps) {
   // Server render and hydration see "unknown", then the client snapshot.
   const detected = useSyncExternalStore<CanvasSupport | undefined>(
@@ -90,13 +127,21 @@ export function MatchStage({
     canvasSupportSnapshot,
     serverSupport,
   );
+  const detectedLowEnd = useSyncExternalStore(
+    noSubscription,
+    lowEndDeviceSnapshot,
+    serverLowEnd,
+  );
   const simple = useSyncExternalStore(
     subscribeSimplePreference,
     readSimplePreference,
     serverPreference,
   );
   const [loadFailed, setLoadFailed] = useState(false);
+  const [threeFailed, setThreeFailed] = useState(false);
+  const [lowFps, setLowFps] = useState(false);
   const [ready, setReady] = useState(false);
+  const { play } = useSound();
 
   const support = supportOverride ?? detected;
   const stage = selectStageMode({
@@ -104,6 +149,9 @@ export function MatchStage({
     canvasSupport: support,
     loadFailed,
     simplePreference: simple,
+    lowEndDevice: lowEndOverride ?? detectedLowEnd,
+    threeFailed,
+    lowFps,
   });
   // Score and minute always come from the official timeline, never from the
   // animation, so skipping or a failed load cannot change what is shown.
@@ -112,10 +160,37 @@ export function MatchStage({
     [match, minute],
   );
   const handleReady = useCallback(() => setReady(true), []);
-  const handleError = useCallback(() => {
+  const handlePhaserError = useCallback(() => {
     setLoadFailed(true);
     setReady(false);
   }, []);
+  const handleThreeError = useCallback(() => {
+    setThreeFailed(true);
+    setReady(false);
+  }, []);
+  const handleLowFps = useCallback(() => {
+    setLowFps(true);
+    setReady(false);
+  }, []);
+
+  // Sounds follow the official minute (whistles, goal, cards...). Cues land
+  // at the moment the animation reaches the action; skipping to the result
+  // only plays the final whistle. Mute and autoplay rules live in lib/retro.
+  const previousMinute = useRef(minute);
+  const animated = stage.mode !== 'fallback';
+  useEffect(() => {
+    const from = previousMinute.current;
+    previousMinute.current = minute;
+    const cues = cuesFor(momentsBetween(match, from, minute));
+    if (cues.length === 0) return;
+    const timers = cues.map((cue) =>
+      window.setTimeout(
+        () => void play(cue.sound),
+        animated ? (cue.at * SEGMENT_MS) / Math.max(speed, 1) : 0,
+      ),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [animated, match, minute, play, speed]);
 
   function toggleSimple() {
     const next = !simple;
@@ -123,46 +198,73 @@ export function MatchStage({
     if (next) setReady(false);
   }
 
-  const usePhaser = stage.mode === 'phaser';
-  const showPhaser = usePhaser && ready;
+  const animatedMode = stage.mode === 'three' || stage.mode === 'phaser';
+  const showStage = animatedMode && ready;
   const minuteLabel = frame.complete
     ? 'FIM'
     : `${String(frame.minute).padStart(2, '0')}'`;
+  const halfTime =
+    !frame.complete &&
+    frame.minute >= Math.floor((match.durationMinutes ?? 90) / 2) &&
+    frame.minute < Math.floor((match.durationMinutes ?? 90) / 2) + 1;
 
   return (
     <div
       className="relative min-w-0 space-y-2"
       data-stage-mode={stage.mode}
       data-stage-reason={stage.mode === 'fallback' ? stage.reason : undefined}
+      data-stage-downgrade={
+        stage.mode === 'phaser' ? (stage.reason ?? undefined) : undefined
+      }
       data-testid="match-stage"
     >
-      {!showPhaser && fallback}
-      {usePhaser ? (
+      {!showStage && fallback}
+      {animatedMode ? (
         <figure
-          aria-hidden={showPhaser ? undefined : true}
+          aria-hidden={showStage ? undefined : true}
           aria-label={`Animação da partida ${match.home.name} contra ${match.away.name}`}
           className={
-            showPhaser
-              ? 'min-w-0 overflow-hidden rounded-[1.4rem] border border-white/10 bg-[#1b1f24]'
+            showStage
+              ? 'px-border min-w-0 overflow-hidden bg-[#1b1f24]'
               : 'pointer-events-none absolute inset-x-0 top-0 overflow-hidden opacity-0'
           }
-          data-testid="phaser-stage"
+          data-testid={stage.mode === 'three' ? 'three-stage' : 'phaser-stage'}
           role="group"
         >
-          <div className="relative aspect-[104/76] w-full">
-            <StageErrorBoundary onError={handleError}>
-              <PhaserMatchStage
-                match={match}
-                minute={minute}
-                onError={handleError}
-                onReady={handleReady}
-                playing={playing}
-                speed={speed}
-              />
-            </StageErrorBoundary>
+          <div
+            className={
+              stage.mode === 'three'
+                ? 'relative aspect-[16/10] w-full'
+                : 'relative aspect-[104/76] w-full'
+            }
+          >
+            {stage.mode === 'three' ? (
+              <StageErrorBoundary onError={handleThreeError} resetKey="three">
+                <ThreeMatchStage
+                  match={match}
+                  minute={minute}
+                  onError={handleThreeError}
+                  onLowFps={handleLowFps}
+                  onReady={handleReady}
+                  playing={playing}
+                  speed={speed}
+                />
+              </StageErrorBoundary>
+            ) : (
+              <StageErrorBoundary onError={handlePhaserError} resetKey="phaser">
+                <PhaserMatchStage
+                  match={match}
+                  minute={minute}
+                  onError={handlePhaserError}
+                  onReady={handleReady}
+                  playing={playing}
+                  speed={speed}
+                />
+              </StageErrorBoundary>
+            )}
             <p
               aria-hidden="true"
-              className="absolute left-1/2 top-[8%] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-sm border border-white/30 bg-black/75 px-2 py-0.5 text-xs font-bold text-white tabular-nums sm:text-sm"
+              className="absolute left-1/2 top-[6%] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap border border-white/30 bg-black/75 px-2 py-0.5 text-xs font-bold text-white tabular-nums sm:text-sm"
               data-testid="stage-scoreboard"
               style={scoreFont}
             >
@@ -175,6 +277,20 @@ export function MatchStage({
                 {minuteLabel}
               </span>
             </p>
+            {showStage && (frame.complete || halfTime) ? (
+              <p
+                aria-hidden="true"
+                className="px-rise pointer-events-none absolute inset-x-0 bottom-[8%] flex justify-center"
+                data-testid="whistle-board"
+              >
+                <span
+                  className="px-border bg-[var(--board)] px-3 py-1.5 text-[.65rem] text-[var(--bulb)] sm:text-xs"
+                  style={pixelFont}
+                >
+                  {frame.complete ? 'FIM DE JOGO' : 'INTERVALO'}
+                </span>
+              </p>
+            ) : null}
           </div>
           <figcaption className="flex min-h-11 items-center px-3 py-2 text-sm text-[#d7e7df]">
             {frame.description}
@@ -197,6 +313,16 @@ export function MatchStage({
             {stage.reason === 'no-canvas'
               ? 'Animação indisponível neste aparelho: exibindo o campo simples.'
               : 'Não foi possível carregar a animação: exibindo o campo simples.'}
+          </p>
+        ) : null}
+        {stage.mode === 'phaser' &&
+        (stage.reason === 'low-fps' ||
+          stage.reason === 'three-load-error' ||
+          stage.reason === 'low-end-device') ? (
+          <p className="text-xs text-[#a9c3b6]" role="status">
+            {stage.reason === 'three-load-error'
+              ? 'Estádio 3D indisponível: exibindo a animação leve.'
+              : 'Estádio 3D desligado neste aparelho: exibindo a animação leve.'}
           </p>
         ) : null}
       </div>

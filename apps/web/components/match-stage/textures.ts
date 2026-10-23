@@ -45,7 +45,7 @@ export function contrastInk(hex: string): string {
   return luminance(hex) > 0.35 ? '#141414' : '#ffffff';
 }
 
-function paintMap(
+export function paintMap(
   context: CanvasRenderingContext2D,
   map: readonly string[],
   palette: Palette,
@@ -77,7 +77,7 @@ function ensureCanvasTexture(
   return key;
 }
 
-function mapSize(map: readonly string[]): readonly [number, number] {
+export function mapSize(map: readonly string[]): readonly [number, number] {
   return [Math.max(...map.map((row) => row.length)), map.length];
 }
 
