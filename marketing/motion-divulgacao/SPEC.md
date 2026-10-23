@@ -91,8 +91,8 @@ SHOTS:   (s = segundos absolutos; q = quadro)
                               claim e aviso legal da landing em 28 px. Segura até q899.
 VOZ:     locução masculina em pt-BR, convidativa: 51 palavras em 10 falas, cada uma sobre a ação que nomeia
          (tempos e limites em audio-src/locucao.json); os gols, o VIROU! e o CAMPEÃO! ficam sem voz por cima.
-         A trilha abaixa só o necessário para a voz ficar 8 LU acima dela (3-8 dB) e perde 4 dB entre 1,8 e
-         7 kHz sob a fala; a fala da virada abaixa no máximo 5 dB para a entrada do groove manter a força.
+         A trilha abaixa só o necessário para a voz ficar 11 LU acima dela (6-11 dB) e perde 4 dB entre 1,8 e
+         7 kHz sob a fala; a fala da virada abaixa no máximo 7 dB para a entrada do groove manter a força.
 BANNED:  vazio escuro com elementos pequenos flutuando; glow/bloom/partículas decorativas (confete só no
          payoff); gradientes roxo/azul, vidro, mesh; papel creme com serifa e rótulos mono numerados;
          tudo centrado e tudo entrando por fade+subida; texto que se move enquanto é lido; títulos que

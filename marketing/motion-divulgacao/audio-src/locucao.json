@@ -7,7 +7,7 @@
     { "id": "02-tatica", "inicio": 2.95, "fim_max": 4.4, "texto": "Mude sua tática," },
     { "id": "03-garoto", "inicio": 4.45, "fim_max": 6.3, "texto": "chame o garoto da base" },
     { "id": "04-jogo", "inicio": 6.3, "fim_max": 7.75, "texto": "e volta pro jogo!" },
-    { "id": "05-virada", "inicio": 8.15, "fim_max": 9.95, "texto": "Chegou a hora da virada!", "abaixa_max_db": 5, "trecho_proprio": true },
+    { "id": "05-virada", "inicio": 8.15, "fim_max": 9.95, "texto": "Chegou a hora da virada!", "abaixa_max_db": 7, "trecho_proprio": true },
     { "id": "06-tabela", "inicio": 14.3, "fim_max": 16.9, "texto": "Suba na tabela, rodada a rodada." },
     { "id": "07-clube", "inicio": 18.15, "fim_max": 22.0, "texto": "Feche patrocínios, faça negócios, cuide do clube…", "fala": "Feche patrocínios, faça negócios, cuide do clube..." },
     { "id": "08-campeao", "inicio": 22.5, "fim_max": 23.95, "texto": "…até ser campeão!", "fala": "até ser campeão!" },

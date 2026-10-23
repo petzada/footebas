@@ -4,8 +4,8 @@ Filme horizontal de 30 s (1920 × 1080, 30 fps, H.264 + AAC) que mostra o jogo, 
 tabela e os recursos do clube, com um cursor que joga no lugar do espectador. Feito em
 [HyperFrames](https://hyperframes.heygen.com) (HTML + GSAP renderizado quadro a quadro) e ffmpeg.
 
-- **Arquivos finais:** `renders/footebas-a-virada-30s-locucao.mp4` (com a locução em pt-BR) e
-  `renders/footebas-a-virada-30s.mp4` (só trilha e efeitos), ambos a −15 LUFS, faststart.
+- **Arquivos finais:** `renders/footebas-a-virada-30s-narrado.mp4` (com a locução em pt-BR) e
+  `renders/footebas-a-virada-30s-sem-voz.mp4` (só trilha e efeitos), ambos a −15 LUFS, faststart.
 - **História e decisões:** `STORYLINES.md` (as três ideias), `SPEC.md` (o filme em números, plano a plano),
   `REVIEW.md` (o que foi medido, o que ficou de fora e as pendências jurídicas).
 
@@ -43,10 +43,10 @@ O render do HyperFrames soma as duas faixas sem master; o áudio final entra dep
 
 ```bash
 npx hyperframes@0.8.189 render --quality delivery --video-frame-format png --output renders/bruto.mp4
-for v in locucao sem-locucao; do
+for v in narrado sem-voz; do
   ffmpeg -i renders/bruto.mp4 -i /tmp/trilha/master-$v.wav -map 0:v:0 -map 1:a:0 -c:v copy \
     -c:a aac -b:a 256k -ar 48000 -ac 2 -t 30 -movflags +faststart renders/footebas-a-virada-30s-$v.mp4
-done   # a versão sem locução é publicada como renders/footebas-a-virada-30s.mp4
+done
 ```
 
 ## Refazer a trilha e a locução
@@ -59,17 +59,17 @@ da biblioteca do HyperFrames (Pixabay). A locução é masculina, em pt-BR, com 
 cd audio-src
 node zzfx-render.mjs ../../../node_modules/.pnpm/zzfx@1.4.0/node_modules/zzfx/ZzFX.js /tmp/trilha
 python3 trilha.py /tmp/trilha <pasta-de-sfx-do-hyperframes> /tmp/trilha   # media-use/audio/assets/sfx
-python3 master.py /tmp/trilha/mix-bruto.wav /tmp/trilha/master-sem-locucao.wav  # −15 LUFS, teto −2 dBTP
+python3 master.py /tmp/trilha/mix-bruto.wav /tmp/trilha/master-sem-voz.wav  # −15 LUFS, teto −2 dBTP
 python3 locucao.py /tmp/voz              # Kokoro: pip install kokoro-onnx soundfile
 python3 mixa.py /tmp/trilha /tmp/voz /tmp/mix
 cp /tmp/mix/trilha.wav /tmp/mix/locucao.wav ../assets/audio/
-python3 master.py /tmp/mix/mix-bruto.wav /tmp/trilha/master-locucao.wav
-python3 analisa.py /tmp/trilha/master-locucao.wav                     # balanço por oitava
+python3 master.py /tmp/mix/mix-bruto.wav /tmp/trilha/master-narrado.wav -15 -3  # a voz pede teto −3
+python3 analisa.py /tmp/trilha/master-narrado.wav                     # balanço por oitava
 ```
 
 O modelo do Kokoro é o que `npx hyperframes tts` baixa em `~/.cache/hyperframes/tts`.
 
-`mixa.py` abaixa a trilha só o necessário para a voz ficar 8 LU acima dela em cada trecho falado (de 3 a 8 dB
+`mixa.py` abaixa a trilha só o necessário para a voz ficar 11 LU acima dela em cada trecho falado (de 6 a 11 dB
 aqui), tira 4 dB entre 1,8 e 7 kHz da trilha sob a fala para as consoantes passarem, e deixa os gols, o VIROU! e o
 CAMPEÃO! sem voz por cima.
 

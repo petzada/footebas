@@ -3,10 +3,10 @@
 Mixes the narration over the film's soundtrack. Every line is levelled to the
 same loudness and lightly treated (high-pass, a little less box, a little more
 presence, gentle compression). Under each run of speech the bed dips only as
-far as it must for the voice to sit 8 LU above it: a lot under the full groove,
+far as it must for the voice to sit 11 LU above it: a lot under the full groove,
 hardly at all under the quiet half-time music. The dip starts just before the
 first syllable and lifts after the last, so the bed breathes between lines.
-The effects dip at most 5 dB, so clicks and whistles stay in the picture,
+The effects dip at most 6 dB, so clicks and whistles stay in the picture,
 and under speech the bed also loses 4 dB between 1.8 and 7 kHz (a carve), so
 consonants cut through the hats and chip blips without the music dropping.
 A line in locucao.json can cap its own dip ("abaixa_max_db") and start a run
@@ -29,8 +29,8 @@ import wave
 import numpy as np
 
 SR = 48000
-VOICE_OVER_BED_LU = 8.0  # while speaking, the voice sits this far above the bed
-MAX_DUCK_DB, FX_MAX_DUCK_DB = 10.0, 5.0
+VOICE_OVER_BED_LU = 11.0  # while speaking, the voice sits this far above the bed
+MAX_DUCK_DB, FX_MAX_DUCK_DB = 12.0, 6.0
 CARVE_DB, CARVE_BAND = 4.0, (1800, 7000)
 VOICE_LEVEL_LU = 1.0  # the voice's level against the whole un-ducked bed
 PRE, ATTACK, RELEASE, HOLD_GAP = 0.03, 0.15, 0.4, 0.9

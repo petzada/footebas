@@ -41,11 +41,13 @@ Nota de entrega do filme de divulgação do Footebas. A próxima rodada de mudan
   "negocie craques" saía com a tônica errada (negoCIe) → "faça negócios"; "Rodada a rodada, suba na tabela"
   virava "chuva" → "Suba na tabela, rodada a rodada". "Footebas" é lido "Futébas" (fu-TÉ-bas) e "intervalo" perde
   o ə que o espeak inseria.
-- **Mixagem:** a trilha abaixa só o necessário para a voz ficar 8 LU acima dela em cada trecho falado (3,0 / 5,0
-  / 5,8 / 7,9 / 6,5 dB) e perde 4 dB entre 1,8 e 7 kHz sob a fala; a fala sobre a entrada do groove (8 s) abaixa
-  no máximo 5 dB. Média medida: voz 8,1 LU acima da trilha enquanto fala.
+- **Mixagem:** a trilha abaixa só o necessário para a voz ficar 11 LU acima dela em cada trecho falado (6,0 /
+  7,0 / 9,1 / 10,9 / 9,5 dB) e perde 4 dB entre 1,8 e 7 kHz sob a fala; a fala sobre a entrada do groove (8 s)
+  abaixa no máximo 7 dB. Média medida: voz 10,9 LU acima da trilha enquanto fala. A primeira entrega usava 8 LU e
+  quem assistiu não percebeu a voz; subiu para 11 LU, o padrão de anúncio para celular.
 - **Medido no arquivo final:** o Whisper medium transcreve as 10 falas certas a partir do MP4 com música e efeitos
-  (só escreve "Futebas", que é o som pretendido); −15,1 LUFS, pico real −2,2 dBTP, LRA 2,4 LU, sem clipping.
+  (só escreve "Futebas", que é o som pretendido); −15,2 LUFS, pico real −2,4 dBTP, LRA 2,7 LU, sem clipping.
+  A voz é 90% correlacionada com a faixa de locução isolada: está no arquivo, nos dois canais.
 - **Não ouvido:** ninguém escutou a voz. O Kokoro em pt-BR soa sintético perto de uma locução profissional ou da
   ElevenLabs; agora a voz é o elo mais fraco do filme.
 
