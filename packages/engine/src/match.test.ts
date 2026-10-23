@@ -155,44 +155,44 @@ describe('simulateMatch', () => {
       first: result.timeline.slice(0, 4),
     }).toMatchInlineSnapshot(`
       {
-        "events": 43,
+        "events": 44,
         "first": [
           {
-            "minute": 4,
+            "minute": 1,
             "side": "away",
             "type": "chance",
-            "xg": 0.111,
+            "xg": 0.027,
           },
           {
-            "minute": 9,
+            "minute": 3,
+            "side": "away",
+            "type": "chance",
+            "xg": 0.026,
+          },
+          {
+            "minute": 6,
             "side": "home",
             "type": "chance",
-            "xg": 0.151,
+            "xg": 0.273,
           },
           {
-            "minute": 10,
-            "side": "home",
+            "minute": 7,
+            "side": "away",
             "type": "chance",
-            "xg": 0.356,
-          },
-          {
-            "minute": 10,
-            "scorerId": "home_player_5",
-            "side": "home",
-            "type": "goal",
+            "xg": 0.302,
           },
         ],
         "score": [
-          3,
-          0,
+          4,
+          1,
         ],
         "shots": [
+          17,
           14,
-          10,
         ],
         "xg": [
-          2.799,
-          1.542,
+          3.122,
+          1.866,
         ],
       }
     `);
@@ -344,5 +344,35 @@ describe('simulateMatch', () => {
     expect(attackingGoals).toBeGreaterThan(balancedGoals);
     expect(attackLosses).toBeGreaterThan(0);
     expect(heavyCards).toBeGreaterThan(lightCards);
+  });
+
+  it('gives decisive (high big-game) forwards a larger share of goals', () => {
+    const decisive = (seed: string) => {
+      const input = match(seed);
+      const tune = (player: Player) =>
+        player.id === 'home_player_9' || player.id === 'home_player_10'
+          ? createPlayer({
+              ...player,
+              hidden: {
+                ...player.hidden,
+                bigGame: percentage(player.id === 'home_player_9' ? 95 : 30),
+              },
+            })
+          : player;
+      return createMatchInput({
+        ...input,
+        home: { ...input.home, players: input.home.players.map(tune) },
+      });
+    };
+    let star = 0;
+    let other = 0;
+    for (let index = 0; index < 300; index++)
+      for (const event of simulateMatch(decisive(`decisive-${String(index)}`))
+        .timeline)
+        if (event.type === 'goal') {
+          if (event.scorerId === 'home_player_9') star++;
+          if (event.scorerId === 'home_player_10') other++;
+        }
+    expect(star).toBeGreaterThan(other * 1.4);
   });
 });

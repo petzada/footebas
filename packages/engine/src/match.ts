@@ -15,7 +15,7 @@ import {
 } from '@footebas/domain';
 import { createPrng, hashSeed, type Prng } from './prng.js';
 
-export const ENGINE_VERSION = 'match-v2' as const;
+export const ENGINE_VERSION = 'match-v3' as const;
 export const POSITION_SUITABILITY = Object.freeze({
   primary: 1,
   secondary: 0.92,
@@ -271,16 +271,19 @@ function weightedPlayer(
   role: 'attack' | 'any',
 ): PlayerId {
   const slots = side.lineup.starters;
+  // Decisive players (high big-game rating, the research standouts) finish
+  // more of their side's chances; goal counts themselves are unaffected.
   const weights = slots.map((slot) =>
     role === 'any'
       ? 1
-      : slot.position === 'ST'
-        ? 5
-        : ['RW', 'LW', 'AM'].includes(slot.position)
-          ? 3
-          : ['CM', 'RB', 'LB'].includes(slot.position)
-            ? 1.5
-            : 0.5,
+      : (slot.position === 'ST'
+          ? 5
+          : ['RW', 'LW', 'AM'].includes(slot.position)
+            ? 3
+            : ['CM', 'RB', 'LB'].includes(slot.position)
+              ? 1.5
+              : 0.5) *
+        (0.6 + Number(playerFor(side, slot.playerId).hidden.bigGame) * 0.008),
   );
   let cursor = random.next() * weights.reduce((a, b) => a + b, 0);
   for (let index = 0; index < slots.length; index += 1) {
