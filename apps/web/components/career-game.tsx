@@ -46,9 +46,15 @@ import {
   type MatchUpdate,
   type Mentality,
   type Screen,
+  FREE_CAREER_LIMIT,
   InMemoryCareerApi,
+  LICENSE_CAREER_LIMIT,
   isCareerLimitError,
 } from '@/lib/career-api';
+import {
+  CareerPaywall,
+  type CareerPaywallReason,
+} from '@/components/career-paywall';
 import type { AuthPort, AuthUser } from '@/lib/auth';
 import { SessionExpiredError } from '@/lib/http-career-api';
 import { Brand } from '@/components/brand';
@@ -202,6 +208,17 @@ function CareerFlow({
   const [stage, setStage] = useState<Stage>('login');
   const [screen, setScreen] = useState<Screen>('central');
   const [limitNotice, setLimitNotice] = useState('');
+  // Career-slot paywall (free save taken, or a career locked by a refund).
+  const [paywall, setPaywall] = useState<CareerPaywallReason | null>(null);
+  // Remounts the saves list after a purchase so locks are re-read.
+  const [listVersion, setListVersion] = useState(0);
+  // Last known plan usage, to open the paywall before the wizard.
+  const plan = useRef<{ used: number; limit: number } | null>(null);
+  // The career the coach was creating when the plan refused it.
+  const pendingCareer = useRef<NewCareerSubmission | null>(null);
+  // Free plan starts in Série C; the career list tells whether the license
+  // lets this coach pick any club (docs/05 §5).
+  const [anyClub, setAnyClub] = useState(true);
   const [career, setCareer] = useState<CareerView | null>(null);
   const [email, setEmail] = useState('torcedor@footebas.com');
   const [matchUpdate, setMatchUpdate] = useState<MatchUpdate | null>(null);
@@ -294,11 +311,31 @@ function CareerFlow({
     setStage('start');
   };
 
-  const startNewCareer = () => {
+  const FREE_LIMIT_NOTICE = `O plano grátis permite ${String(FREE_CAREER_LIMIT)} carreira. Exclua a atual ou ative a licença para ter até ${String(LICENSE_CAREER_LIMIT)}.`;
+
+  const openWizard = () => {
     setError('');
     setLimitNotice('');
     createdCareer.current = false;
     setStage('new');
+  };
+
+  const startNewCareer = () => {
+    const known = plan.current;
+    // The free save is already taken: say it next to the list and offer
+    // the license right away instead of a wizard the server will refuse.
+    if (
+      known &&
+      known.limit === FREE_CAREER_LIMIT &&
+      known.used >= known.limit
+    ) {
+      setError('');
+      setLimitNotice(FREE_LIMIT_NOTICE);
+      setStage('load');
+      setPaywall('limit');
+      return;
+    }
+    openWizard();
   };
 
   const createCareer = (submission: NewCareerSubmission) =>
@@ -311,10 +348,13 @@ function CareerFlow({
             coachProfile: submission.coachProfile,
           });
         } catch (caught) {
-          // The plan refused another career: show it next to the list.
+          // The plan refused another career: show it next to the list and
+          // open the paywall; paying resumes this very career.
           if (!isCareerLimitError(caught)) throw caught;
+          pendingCareer.current = submission;
           setLimitNotice(caught.message);
           setStage('load');
+          setPaywall('limit');
           return;
         }
         createdCareer.current = true;
@@ -325,6 +365,34 @@ function CareerFlow({
       setScreen('central');
       setStage('game');
     });
+
+  /** Paid inside a paywall: entitlements change now, the flow continues. */
+  const licensed = () => {
+    const reason = paywall;
+    setPaywall(null);
+    setAnyClub(true);
+    setLimitNotice('');
+    plan.current = plan.current && {
+      ...plan.current,
+      limit: LICENSE_CAREER_LIMIT,
+    };
+    setListVersion((version) => version + 1);
+    if (reason !== 'limit') return;
+    const pending = pendingCareer.current;
+    pendingCareer.current = null;
+    // Resume the career the plan refused; without one, open the wizard.
+    if (pending) void createCareer(pending);
+    else openWizard();
+  };
+
+  const paywallSheet = paywall && (
+    <CareerPaywall
+      reason={paywall}
+      account={products.account}
+      onClose={() => setPaywall(null)}
+      onLicensed={licensed}
+    />
+  );
 
   const openCareer = (careerId: string) =>
     attempt(`open:${careerId}`, async () => {
@@ -340,12 +408,13 @@ function CareerFlow({
     });
 
   const loadStats = useCallback(() => api.getPublicStats(), [api]);
-  // Free plan starts in Série C; the career list tells whether the license
-  // lets this coach pick any club (docs/05 §5).
-  const [anyClub, setAnyClub] = useState(true);
   const listCareers = useCallback(async () => {
     const list = await api.listCareers();
     setAnyClub(list.anyClub ?? true);
+    plan.current =
+      list.limit === undefined
+        ? null
+        : { used: list.careers.length, limit: list.limit };
     return list;
   }, [api]);
   // After an inbox decision the board/finances may have moved.
@@ -408,6 +477,7 @@ function CareerFlow({
           }}
           onSignOut={onSignOut}
         />
+        {paywallSheet}
       </>
     );
 
@@ -416,15 +486,18 @@ function CareerFlow({
       <>
         <PwaRuntime />
         <LoadCareerScreen
+          key={listVersion}
           load={listCareers}
           remove={removeCareer}
           notice={limitNotice}
           error={error}
           onOpen={(summary) => void openCareer(summary.id)}
+          onUnlock={() => setPaywall('locked')}
           onNewCareer={startNewCareer}
           onBack={goStart}
           onSignOut={onSignOut}
         />
+        {paywallSheet}
       </>
     );
 

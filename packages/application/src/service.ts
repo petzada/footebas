@@ -156,6 +156,8 @@ import { seasonAchievements, type SeasonAchievement } from './rankings.js';
 import { careerProfileOf } from './coach-personality.js';
 import {
   InMemoryEntitlements,
+  isCareerLocked,
+  type CareerSlotsPort,
   type Entitlements,
   type EntitlementsPort,
 } from './entitlements.js';
@@ -262,6 +264,12 @@ export interface ApplicationDependencies {
   /** Plan limits; defaults to everyone on the free plan. */
   readonly entitlements?: EntitlementsPort;
   /**
+   * Creation order of the user's active careers (locked careers). Without
+   * it the unit of work's `listByUser` is used, which the career Durable
+   * Object does not support, so production passes the Postgres adapter.
+   */
+  readonly careerSlots?: CareerSlotsPort;
+  /**
    * Free plan picks only Série C clubs at the start (docs/05 §5). On in
    * production; off by default so local demos and tests can pick any club.
    */
@@ -313,6 +321,23 @@ export class CareerLimitReachedError extends ApplicationError {
       plan: this.entitlements.plan,
       maxCareers: this.entitlements.maxCareers,
     });
+  }
+}
+
+/**
+ * The career is beyond the plan's limit (license refunded or revoked): it
+ * stays saved but cannot be loaded, played or receive commands until the
+ * license is bought again. Deleting it is still allowed.
+ */
+export class CareerLockedError extends ApplicationError {
+  public constructor(
+    public readonly careerId: string,
+    public readonly entitlements: Entitlements,
+  ) {
+    super(
+      'FORBIDDEN',
+      `career ${careerId} is locked: plan ${entitlements.plan} keeps ${String(entitlements.maxCareers)} career(s) playable; buy the license to unlock it or delete it`,
+    );
   }
 }
 
@@ -764,7 +789,9 @@ export class FootebasApplication {
     await this.setJobStatus(job, 'running', attempt);
     try {
       await this.unitOfWork.withCareerLock(job.careerId, async (tx) => {
-        const save = await this.load(tx, job.careerId, job.userId);
+        // A job already accepted finishes even if the career got locked
+        // meanwhile; only new commands and reads are refused.
+        const save = await this.load(tx, job.careerId, job.userId, false);
         const snapshot = withProfile(
           structuredClone(save.snapshot) as unknown as Snapshot,
         );
@@ -1422,6 +1449,10 @@ export class FootebasApplication {
       (tx) => tx.saves.listByUser(user.userId),
     );
     const entitlements = await this.entitlements.forUser(user.userId);
+    const order =
+      this.deps.careerSlots === undefined
+        ? saves.map(({ id }) => id)
+        : await this.deps.careerSlots.activeCareerIds(user.userId);
     return careerListReadModelSchema.parse({
       version: 1,
       limits: {
@@ -1446,6 +1477,7 @@ export class FootebasApplication {
             ...(club ? { clubId: club.id, clubName: club.name } : {}),
             season: snapshot.season,
             currentDate: snapshot.currentDate,
+            locked: isCareerLocked(order, save.id, entitlements),
           };
         }),
     });
@@ -1780,10 +1812,12 @@ export class FootebasApplication {
       throw this.translate(e);
     }
   }
+  /** Owned, playable save: missing, foreign and locked careers fail here. */
   private async load(
     tx: TransactionContext,
     id: string,
     userId: string,
+    guard = true,
   ): Promise<GameSave> {
     const save = await tx.saves.load(id, userId);
     // The checksum of what was stored is verified while hydrating it.
@@ -1793,7 +1827,50 @@ export class FootebasApplication {
         'VERSION_CONFLICT',
         `save schema ${save.versions.schema} requires migration`,
       );
+    if (guard) await this.assertUnlocked(tx, userId, id);
     return save;
+  }
+
+  /** Ids of the user's active careers, oldest first. */
+  private async activeCareerIds(
+    tx: TransactionContext | undefined,
+    userId: string,
+  ): Promise<readonly string[]> {
+    if (this.deps.careerSlots !== undefined)
+      return this.deps.careerSlots.activeCareerIds(userId);
+    if (tx === undefined)
+      return this.unitOfWork.withCareerLock(`user:${userId}`, (inner) =>
+        this.activeCareerIds(inner, userId),
+      );
+    return (await tx.saves.listByUser(userId)).map(({ id }) => id);
+  }
+
+  /**
+   * Locked careers (beyond the plan's limit, by creation order) cannot be
+   * loaded or receive commands; buying the license unlocks them again.
+   */
+  private async assertUnlocked(
+    tx: TransactionContext | undefined,
+    userId: string,
+    careerId: string,
+  ): Promise<void> {
+    const entitlements = await this.entitlements.forUser(userId);
+    // The license allows as many careers as can be created.
+    if (entitlements.plan === 'licensed') return;
+    const ids = await this.activeCareerIds(tx, userId);
+    if (isCareerLocked(ids, careerId, entitlements))
+      throw new CareerLockedError(careerId, entitlements);
+  }
+
+  /**
+   * Guard for career routes served by other services (phase four): the
+   * authenticated owner may only touch an unlocked career.
+   */
+  public async assertCareerUnlocked(
+    userId: string,
+    careerId: string,
+  ): Promise<void> {
+    await this.assertUnlocked(undefined, userId, careerId);
   }
   private accepted(
     command: Command,

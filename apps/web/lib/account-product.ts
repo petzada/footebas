@@ -69,6 +69,18 @@ export class PaymentProviderUnavailableError extends Error {
   }
 }
 
+/**
+ * Checkout refused because the license is already active (409 "license
+ * already active"): e.g. the payment landed while the QR code was still on
+ * screen, or in another tab. The UI treats it as success.
+ */
+export class LicenseAlreadyActiveError extends Error {
+  public constructor() {
+    super('Sua licença já está ativa. Pode seguir jogando com tudo liberado.');
+    this.name = 'LicenseAlreadyActiveError';
+  }
+}
+
 export interface AccountPort {
   me(): Promise<ProfileView>;
   checkout(): Promise<CheckoutView>;
@@ -155,8 +167,7 @@ export function createFakeAccountPort(
     },
     async checkout() {
       if (options.providerDown) throw new PaymentProviderUnavailableError();
-      if (profile.plan === 'licensed')
-        throw new Error('Sua conta já tem a licença ativa.');
+      if (profile.plan === 'licensed') throw new LicenseAlreadyActiveError();
       if (!order || order.status !== 'pending') {
         const created = now();
         order = {

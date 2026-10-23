@@ -19,6 +19,26 @@ export const LICENSED_ENTITLEMENTS: Entitlements = {
   anyClub: true,
 };
 
+/**
+ * Ids of a user's active (not deleted) careers, oldest first. With the plan's
+ * `maxCareers` it decides which careers are locked: after a refund the oldest
+ * career stays playable and the others stay saved but locked until the
+ * license is bought again (derived, so re-buying unlocks without a write).
+ */
+export interface CareerSlotsPort {
+  activeCareerIds(userId: string): Promise<readonly string[]>;
+}
+
+/** A career beyond the plan's `maxCareers` (by creation order) is locked. */
+export function isCareerLocked(
+  careerIds: readonly string[],
+  careerId: string,
+  entitlements: Entitlements,
+): boolean {
+  const index = careerIds.indexOf(careerId);
+  return index >= entitlements.maxCareers;
+}
+
 /** Everyone is free unless explicitly licensed. */
 export class InMemoryEntitlements implements EntitlementsPort {
   private readonly licensed = new Set<string>();

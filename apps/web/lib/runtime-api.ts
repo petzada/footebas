@@ -81,6 +81,22 @@ export interface ProductPorts {
 const portsByApi = new WeakMap<CareerApiPort, ProductPorts>();
 
 /**
+ * Offline demo: paying the fake PIX licenses the in-memory career runtime
+ * too, like the server does with the entitlements.
+ */
+function licensingDemo(account: AccountPort, api: CareerApiPort): AccountPort {
+  if (!(api instanceof InMemoryCareerApi)) return account;
+  return {
+    ...account,
+    async order(orderId) {
+      const order = await account.order(orderId);
+      if (order.status === 'paid') api.grantLicense();
+      return order;
+    },
+  };
+}
+
+/**
  * Over HTTP every port talks to the authoritative server; the in-memory
  * runtime (offline demo, tests) gets deterministic fakes. One set per
  * runtime: the Central and the Notícias/Histórico/Ranking/Save screens read
@@ -101,7 +117,7 @@ export function productPortsFor(api: CareerApiPort): ProductPorts {
           season: createFakeSeasonPort(),
           inbox: createFakeInboxPort(),
           ranking: createFakeRankingPort(),
-          account: createFakeAccountPort(),
+          account: licensingDemo(createFakeAccountPort(), api),
         };
   portsByApi.set(api, ports);
   return ports;

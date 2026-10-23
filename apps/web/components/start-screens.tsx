@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CircleNotch,
   FolderOpen,
+  Lock,
   Play,
   Plus,
   SignOut,
@@ -132,7 +133,12 @@ export function StartScreen({
     if (!loadCareers) return;
     let active = true;
     loadCareers()
-      .then((list) => active && setLatest(list.careers[0] ?? null))
+      .then(
+        (list) =>
+          // A locked career (license refunded) cannot be continued.
+          active &&
+          setLatest(list.careers.find((career) => !career.locked) ?? null),
+      )
       .catch(() => active && setLatest(null));
     return () => {
       active = false;
@@ -395,6 +401,7 @@ export function LoadCareerScreen({
   notice = '',
   error = '',
   onSignOut,
+  onUnlock,
 }: {
   load(): Promise<CareerList>;
   remove(careerId: string): Promise<void>;
@@ -405,6 +412,8 @@ export function LoadCareerScreen({
   notice?: string;
   error?: string;
   onSignOut?: (() => void) | undefined;
+  /** A locked career (license refunded) asks for the license. */
+  onUnlock?: ((career: CareerSummary) => void) | undefined;
 }) {
   const [state, setState] = useState<ListState>({ status: 'loading' });
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -563,6 +572,10 @@ export function LoadCareerScreen({
                     play('confirm');
                     onOpen(career);
                   }}
+                  onUnlock={() => {
+                    play('click');
+                    onUnlock?.(career);
+                  }}
                   onAskDelete={() => setConfirming(career.id)}
                   onCancelDelete={() => setConfirming(null)}
                   onConfirmDelete={() => void confirmDelete(career)}
@@ -621,6 +634,7 @@ function CareerRow({
   confirming,
   deleting,
   onOpen,
+  onUnlock,
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
@@ -630,6 +644,7 @@ function CareerRow({
   confirming: boolean;
   deleting: boolean;
   onOpen(): void;
+  onUnlock(): void;
   onAskDelete(): void;
   onCancelDelete(): void;
   onConfirmDelete(): void;
@@ -653,14 +668,27 @@ function CareerRow({
     career.round ? `Rodada ${career.round}` : undefined,
   ].filter(Boolean);
 
+  const locked = career.locked === true;
+
   return (
-    <li className="panel overflow-hidden">
+    <li
+      className={cn('panel overflow-hidden', locked && 'bg-secondary')}
+      data-locked={locked ? 'true' : undefined}
+    >
       <div className="flex items-center justify-between border-b-2 border-ink bg-board px-3 py-1 font-pixel text-[.55rem] text-bulb">
-        <span>Save {String(slot).padStart(2, '0')}</span>
+        <span className="flex items-center gap-2">
+          Save {String(slot).padStart(2, '0')}
+          {locked && (
+            <span className="inline-flex items-center gap-1 bg-bulb px-1.5 py-0.5 text-bulb-foreground">
+              <Lock weight="fill" aria-hidden="true" />
+              Bloqueada
+            </span>
+          )}
+        </span>
         {career.updatedAt && <span>{formatUpdated(career.updatedAt)}</span>}
       </div>
       <div className="grid grid-cols-[auto_1fr] items-center gap-4 p-4 sm:grid-cols-[auto_1fr_auto]">
-        <span className="relative">
+        <span className={cn('relative', locked && 'opacity-60 grayscale')}>
           <ClubEmblem
             name={career.clubName ?? career.coach}
             size={56}
@@ -692,17 +720,41 @@ function CareerRow({
               </>
             )}
           </p>
+          {locked && (
+            <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-ink">
+              <Lock
+                className="mt-0.5 shrink-0 text-primary"
+                weight="fill"
+                aria-hidden="true"
+              />
+              Salva, mas bloqueada: o plano grátis joga só a carreira mais
+              antiga. A licença libera de novo.
+            </p>
+          )}
         </div>
         <div className="col-span-2 grid grid-cols-[1fr_auto] gap-3 sm:col-span-1">
-          <Button
-            className="min-h-11"
-            onClick={onOpen}
-            aria-label={`Abrir ${title}`}
-            disabled={confirming}
-          >
-            <Play data-icon="inline-start" weight="fill" />
-            Abrir
-          </Button>
+          {locked ? (
+            <Button
+              variant="play"
+              className="min-h-11 whitespace-normal"
+              onClick={onUnlock}
+              aria-label={`Desbloquear ${title} com a licença`}
+              disabled={confirming}
+            >
+              <Lock data-icon="inline-start" weight="fill" />
+              Desbloquear
+            </Button>
+          ) : (
+            <Button
+              className="min-h-11"
+              onClick={onOpen}
+              aria-label={`Abrir ${title}`}
+              disabled={confirming}
+            >
+              <Play data-icon="inline-start" weight="fill" />
+              Abrir
+            </Button>
+          )}
           <Button
             ref={deleteButton}
             variant="outline"

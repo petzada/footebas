@@ -17,6 +17,7 @@ import {
   type SimulationJob,
 } from '@footebas/application';
 import {
+  PostgresCareerSlots,
   PostgresEntitlements,
   PostgresRankingStore,
   PostgresUnitOfWork,
@@ -170,6 +171,39 @@ function billing(env: Env, sql: postgres.Sql, auth: AuthPort) {
   return { service, auth };
 }
 
+/** Billing reconciliation step of the cron; logs and never throws. */
+async function reconcileBilling(
+  env: Env,
+  sql: postgres.Sql,
+  auth: AuthPort,
+  cron: string,
+  version: string,
+): Promise<void> {
+  const started = Date.now();
+  try {
+    const run = await billing(env, sql, auth).service.reconcile();
+    consoleLogSink({
+      type: 'cron',
+      level: run.failed > 0 ? 'warn' : 'info',
+      task: 'billing_reconcile',
+      cron,
+      durationMs: Date.now() - started,
+      version,
+      ...run,
+    });
+  } catch (error) {
+    consoleLogSink({
+      type: 'cron',
+      level: 'error',
+      task: 'billing_reconcile',
+      cron,
+      durationMs: Date.now() - started,
+      version,
+      ...errorFields(error),
+    });
+  }
+}
+
 function compose(env: Env) {
   const sql = postgres(env.HYPERDRIVE.connectionString, {
     max: 5,
@@ -188,6 +222,7 @@ function compose(env: Env) {
     auth,
     clock,
     entitlements: new PostgresEntitlements(sql),
+    careerSlots: new PostgresCareerSlots(sql),
     enforceStartingDivision: true,
     ids,
     jobs,
@@ -295,10 +330,17 @@ export default {
       );
     }
   },
-  /** Cron Trigger (wrangler.jsonc `triggers.crons`): ranking snapshots. */
+  /**
+   * Cron Trigger (wrangler.jsonc `triggers.crons`, every 15 min): the
+   * billing reconciliation (payments, refunds and disputes whose webhook
+   * never arrived), then the ranking snapshots. A billing failure is logged
+   * and never skips the rankings.
+   */
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const version = workerVersion(env);
-    const { sql, rankings } = compose(env);
+    const { sql, auth, rankings } = compose(env);
+    // Never throws: its outcome is logged on its own line.
+    await reconcileBilling(env, sql, auth, controller.cron, version);
     const started = Date.now();
     try {
       const run = await rankings.generateSnapshots();

@@ -1,19 +1,20 @@
 // Postgres (Supabase via Hyperdrive) billing repository over the tables in
 // supabase/migrations/20261024000200_billing.sql.
 import type postgres from 'postgres';
-import type {
-  BillingEffect,
-  BillingRepository,
-  ChargeAttachment,
-  License,
-  NewOrder,
-  Order,
-  OrderStatus,
-  RefundAttachment,
-  RefundStatus,
-  WebhookEventRecord,
-  WebhookOutcome,
-  WebhookResult,
+import {
+  EFFECTIVE_OUTCOMES,
+  type BillingEffect,
+  type BillingRepository,
+  type ChargeAttachment,
+  type License,
+  type NewOrder,
+  type Order,
+  type OrderStatus,
+  type RefundAttachment,
+  type RefundStatus,
+  type WebhookEventRecord,
+  type WebhookOutcome,
+  type WebhookResult,
 } from './billing-repository.js';
 
 type Sql = postgres.Sql | postgres.TransactionSql;
@@ -190,20 +191,45 @@ export class PostgresBillingRepository implements BillingRepository {
     charge: ChargeAttachment,
     now: Date,
   ): Promise<Order> {
+    const providerChargeId = charge.providerChargeId ?? null;
+    // Single-flight per order: only the first provider charge is attached
+    // (two tabs or a double click both create one; the loser reads the
+    // winner's QR code). Woovi charges carry no provider id and stay
+    // idempotent by correlationID.
     const rows = await this.sql<OrderRow[]>`
       update footebas.orders set
         woovi_charge = ${this.sql.json(charge.payload as never)},
         br_code = ${charge.brCode ?? null},
         qr_code_image = ${charge.qrCodeImage ?? null},
         payment_link_url = ${charge.paymentLinkUrl ?? null},
-        provider_charge_id = ${charge.providerChargeId ?? null},
+        provider_charge_id = coalesce(${providerChargeId}, provider_charge_id),
         expires_at = ${charge.expiresAt ?? null},
         updated_at = ${now.toISOString()}
       where id = ${orderId}
+        and (provider_charge_id is null
+          or ${providerChargeId}::text is null
+          or provider_charge_id = ${providerChargeId})
       returning ${this.sql(ORDER_COLUMNS)}`;
     const row = rows[0];
-    if (row === undefined) throw new Error(`order ${orderId} not found`);
-    return toOrder(row);
+    if (row !== undefined) return toOrder(row);
+    const winner = await this.order(orderId);
+    if (winner === undefined) throw new Error(`order ${orderId} not found`);
+    return winner;
+  }
+
+  public async ordersToReconcile(
+    since: Date,
+    limit: number,
+  ): Promise<readonly Order[]> {
+    const rows = await this.sql<OrderRow[]>`
+      select ${this.sql(ORDER_COLUMNS)} from footebas.orders
+      where provider_charge_id is not null
+        and created_at >= ${since.toISOString()}
+        and (status in ('pending', 'expired')
+          or (status = 'paid' and refund_status = 'requested'))
+      order by created_at
+      limit ${limit}`;
+    return rows.map(toOrder);
   }
 
   public async expireOrder(orderId: string, now: Date): Promise<void> {
@@ -264,6 +290,14 @@ export class PostgresBillingRepository implements BillingRepository {
         where id = ${effect.orderId} for update`;
       return rows[0];
     }
+    const charges = [...(effect.providerChargeIds ?? [])];
+    if (charges.length > 0) {
+      const rows = await tx<OrderRow[]>`
+        select ${tx(ORDER_COLUMNS)} from footebas.orders
+        where provider_charge_id in ${tx(charges)}
+        order by created_at desc limit 1 for update`;
+      if (rows[0] !== undefined) return rows[0];
+    }
     if (effect.endToEndIds.length === 0) return undefined;
     const ids = [...effect.endToEndIds];
     const rows = await tx<OrderRow[]>`
@@ -273,44 +307,95 @@ export class PostgresBillingRepository implements BillingRepository {
     return rows[0];
   }
 
+  /** Provider charge id first (AbacatePay echoes nothing else), then ours. */
+  async #paidTarget(
+    tx: Sql,
+    effect: Extract<BillingEffect, { kind: 'paid' }>,
+  ): Promise<OrderRow | undefined> {
+    if (effect.providerChargeId !== undefined) {
+      const rows = await tx<OrderRow[]>`
+        select ${tx(ORDER_COLUMNS)} from footebas.orders
+        where provider_charge_id = ${effect.providerChargeId}
+        order by created_at desc limit 1 for update`;
+      if (rows[0] !== undefined) return rows[0];
+    }
+    if (effect.correlationId === undefined) return undefined;
+    const rows = await tx<OrderRow[]>`
+      select ${tx(ORDER_COLUMNS)} from footebas.orders
+      where correlation_id = ${effect.correlationId} for update`;
+    return rows[0];
+  }
+
+  /**
+   * The order behind the license stopped counting (refund, dispute): the
+   * license moves to the user's other paid order (paid twice) or is revoked.
+   * Only the license that points at `row` is touched.
+   */
+  async #release(tx: Sql, row: OrderRow, instant: string): Promise<void> {
+    const others = await tx<{ id: string }[]>`
+      select id from footebas.orders
+      where user_id = ${row.user_id} and id <> ${row.id} and status = 'paid'
+        and (refund_status is null or refund_status not in ('confirmed', 'disputed'))
+      order by paid_at nulls last, created_at limit 1`;
+    const other = others[0];
+    if (other !== undefined) {
+      await tx`
+        update footebas.licenses set order_id = ${other.id}, updated_at = ${instant}
+        where user_id = ${row.user_id} and order_id = ${row.id} and status = 'active'`;
+      return;
+    }
+    await tx`
+      update footebas.licenses set
+        status = 'revoked', revoked_at = ${instant}, updated_at = ${instant}
+      where user_id = ${row.user_id} and order_id = ${row.id} and status = 'active'`;
+  }
+
   async #apply(
     tx: Sql,
     effect: BillingEffect,
     now: Date,
-  ): Promise<WebhookOutcome> {
+  ): Promise<Omit<WebhookResult, 'duplicate'>> {
     const instant = now.toISOString();
     switch (effect.kind) {
       case 'ignored':
-        return 'ignored';
+        return { outcome: 'ignored' };
       case 'expired': {
-        const rows = await tx<{ status: OrderStatus }[]>`
-          select status from footebas.orders
-          where correlation_id = ${effect.correlationId} for update`;
+        const rows = await tx<{ id: string; status: OrderStatus }[]>`
+          select id, status from footebas.orders
+          where ${
+            effect.orderId === undefined
+              ? tx`correlation_id = ${effect.correlationId}`
+              : tx`id = ${effect.orderId}`
+          } for update`;
         const row = rows[0];
-        if (row === undefined) return 'unknown_order';
-        if (row.status !== 'pending') return 'ignored';
+        if (row === undefined) return { outcome: 'unknown_order' };
+        if (row.status !== 'pending')
+          return { outcome: 'ignored', orderId: row.id };
         await tx`
           update footebas.orders set status = 'expired', updated_at = ${instant}
-          where correlation_id = ${effect.correlationId}`;
-        return 'expired';
+          where id = ${row.id}`;
+        return { outcome: 'expired', orderId: row.id };
       }
       case 'paid': {
-        const rows = await tx<OrderRow[]>`
-          select ${tx(ORDER_COLUMNS)} from footebas.orders
-          where correlation_id = ${effect.correlationId} for update`;
-        const row = rows[0];
-        if (row === undefined) return 'unknown_order';
-        if (row.amount_cents !== effect.amountCents) return 'amount_mismatch';
-        if (row.status === 'refunded') return 'ignored';
+        const row = await this.#paidTarget(tx, effect);
+        if (row === undefined) return { outcome: 'unknown_order' };
+        if (
+          effect.amountCents !== undefined &&
+          row.amount_cents !== effect.amountCents
+        )
+          return { outcome: 'amount_mismatch', orderId: row.id };
+        if (row.status === 'refunded' || row.refund_status === 'disputed')
+          return { outcome: 'ignored', orderId: row.id };
         await tx`
           update footebas.orders set
             status = 'paid',
             paid_at = coalesce(paid_at, ${effect.paidAt}),
+            provider_charge_id = coalesce(${effect.providerChargeId ?? null}, provider_charge_id),
             pix_end_to_end_id = coalesce(pix_end_to_end_id, ${effect.pixEndToEndId ?? null}),
             woovi_charge = coalesce(${effect.charge === undefined ? null : tx.json(effect.charge as never)}, woovi_charge),
             updated_at = ${instant}
           where id = ${row.id}`;
-        await tx`
+        const licensed = await tx<{ order_id: string }[]>`
           insert into footebas.licenses (user_id, order_id, status, granted_at, updated_at)
           values (${row.user_id}, ${row.id}, 'active', ${instant}, ${instant})
           on conflict (user_id) do update set
@@ -319,12 +404,21 @@ export class PostgresBillingRepository implements BillingRepository {
             granted_at = excluded.granted_at,
             revoked_at = null,
             updated_at = excluded.updated_at
-          where footebas.licenses.status <> 'active'`;
-        return 'paid';
+          where footebas.licenses.status <> 'active'
+          returning order_id`;
+        if (licensed.length > 0) return { outcome: 'paid', orderId: row.id };
+        // The license was already active: same order (redelivery) or paid twice.
+        const current = await tx<{ order_id: string }[]>`
+          select order_id from footebas.licenses where user_id = ${row.user_id}`;
+        return {
+          outcome: 'paid',
+          orderId: row.id,
+          ...(current[0]?.order_id === row.id ? {} : { doublePayment: true }),
+        };
       }
       case 'refund_confirmed': {
         const row = await this.#refundTarget(tx, effect);
-        if (row === undefined) return 'unknown_order';
+        if (row === undefined) return { outcome: 'unknown_order' };
         await tx`
           update footebas.orders set
             status = 'refunded',
@@ -332,19 +426,27 @@ export class PostgresBillingRepository implements BillingRepository {
             refunded_at = coalesce(refunded_at, ${instant}),
             updated_at = ${instant}
           where id = ${row.id}`;
+        await this.#release(tx, row, instant);
+        return { outcome: 'refunded', orderId: row.id };
+      }
+      case 'disputed': {
+        const row = await this.#refundTarget(tx, effect);
+        if (row === undefined) return { outcome: 'unknown_order' };
+        if (row.status === 'refunded')
+          return { outcome: 'ignored', orderId: row.id };
         await tx`
-          update footebas.licenses set
-            status = 'revoked', revoked_at = ${instant}, updated_at = ${instant}
-          where user_id = ${row.user_id} and order_id = ${row.id} and status = 'active'`;
-        return 'refunded';
+          update footebas.orders set refund_status = 'disputed', updated_at = ${instant}
+          where id = ${row.id}`;
+        await this.#release(tx, row, instant);
+        return { outcome: 'disputed', orderId: row.id };
       }
       case 'refund_rejected': {
         const row = await this.#refundTarget(tx, effect);
-        if (row === undefined) return 'unknown_order';
+        if (row === undefined) return { outcome: 'unknown_order' };
         await tx`
           update footebas.orders set refund_status = 'rejected', updated_at = ${instant}
-          where id = ${row.id} and status = 'paid'`;
-        return 'refund_rejected';
+          where id = ${row.id} and status = 'paid' and refund_status = 'requested'`;
+        return { outcome: 'refund_rejected', orderId: row.id };
       }
     }
   }
@@ -357,7 +459,7 @@ export class PostgresBillingRepository implements BillingRepository {
     return this.sql.begin(async (tx) => {
       const inserted = await tx<{ id: string }[]>`
         insert into footebas.webhook_events (id, provider, type, payload, received_at)
-        values (${event.id}, 'woovi', ${event.type},
+        values (${event.id}, ${event.provider ?? 'woovi'}, ${event.type},
           ${tx.json(event.payload as never)}, ${now.toISOString()})
         on conflict (id) do nothing
         returning id`;
@@ -366,12 +468,21 @@ export class PostgresBillingRepository implements BillingRepository {
           select outcome from footebas.webhook_events where id = ${event.id}`;
         return { duplicate: true, outcome: rows[0]?.outcome ?? 'ignored' };
       }
-      const outcome = await this.#apply(tx, effect, now);
+      const result = await this.#apply(tx, effect, now);
+      if (
+        event.persist === 'on_effect' &&
+        !EFFECTIVE_OUTCOMES.has(result.outcome)
+      ) {
+        // A reconciliation read that changed nothing leaves no trace, so it
+        // can never shadow the effect of a later poll with the same key.
+        await tx`delete from footebas.webhook_events where id = ${event.id}`;
+        return { duplicate: false, ...result };
+      }
       await tx`
         update footebas.webhook_events
-        set outcome = ${outcome}, processed_at = ${now.toISOString()}
+        set outcome = ${result.outcome}, processed_at = ${now.toISOString()}
         where id = ${event.id}`;
-      return { duplicate: false, outcome };
+      return { duplicate: false, ...result };
     });
   }
 }

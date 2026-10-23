@@ -69,7 +69,7 @@ export class FakeWooviClient implements WooviClient {
     const refund: WooviRefund = {
       correlationID: input.correlationID,
       status: this.refundStatus,
-      value: input.value ?? charge.value,
+      value: input.value ?? charge.value ?? 0,
       endToEndId: `D${input.correlationID}`,
       raw: { correlationID: input.correlationID, status: this.refundStatus },
     };

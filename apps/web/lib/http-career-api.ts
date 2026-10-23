@@ -123,6 +123,8 @@ interface CareerListModel {
     coach?: CoachProfile;
     /** Last change timestamp (ISO), when the server sends it. */
     updatedAt?: string;
+    /** Beyond the plan's limit after a refund: saved, not playable. */
+    locked?: boolean;
   }[];
   /** Plan limit (docs/09 decision 5). */
   limits?: { maxCareers: number; activeCareers?: number; anyClub?: boolean };
@@ -906,6 +908,7 @@ export class HttpCareerApi implements CareerApiPort {
         ...(item.season === undefined ? {} : { season: item.season }),
         ...(item.currentDate ? { currentDate: item.currentDate } : {}),
         ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
+        ...(item.locked === true ? { locked: true } : {}),
       })),
       ...(list.limits === undefined
         ? {}

@@ -35,15 +35,23 @@ const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 
-/** AbacatePay charge status → the provider-neutral status the service uses. */
+/**
+ * AbacatePay charge status → the provider-neutral status the service uses.
+ * Only PAID/APPROVED/REDEEMED mean the money is ours. REFUNDED and
+ * UNDER_DISPUTE happen *after* a payment and must never grant a license
+ * (`/transparents/check` enum: PENDING, PAID, EXPIRED, CANCELLED,
+ * UNDER_DISPUTE, REFUNDED, REDEEMED, APPROVED, FAILED).
+ */
 export function chargeStatusOf(status: unknown): WooviChargeStatus {
   switch (status) {
     case 'PAID':
     case 'APPROVED':
     case 'REDEEMED':
-    case 'REFUNDED':
-    case 'UNDER_DISPUTE':
       return 'COMPLETED';
+    case 'REFUNDED':
+      return 'REFUNDED';
+    case 'UNDER_DISPUTE':
+      return 'DISPUTED';
     case 'EXPIRED':
     case 'CANCELLED':
     case 'FAILED':
@@ -61,14 +69,13 @@ export function chargeFromAbacate(
   const brCode = text(data.brCode);
   const image = text(data.brCodeBase64);
   const expiresAt = text(data.expiresAt);
-  const paidAt =
-    chargeStatusOf(data.status) === 'COMPLETED'
-      ? text(data.updatedAt)
-      : undefined;
+  const status = chargeStatusOf(data.status);
+  const paidAt = status === 'COMPLETED' ? text(data.updatedAt) : undefined;
   return {
     correlationID,
-    status: chargeStatusOf(data.status),
-    value: typeof data.amount === 'number' ? data.amount : 0,
+    status,
+    // `/transparents/check` answers without `amount`: leave it undefined.
+    ...(typeof data.amount === 'number' ? { value: data.amount } : {}),
     ...(brCode === undefined ? {} : { brCode }),
     ...(image === undefined ? {} : { qrCodeImage: image }),
     ...(expiresAt === undefined ? {} : { expiresDate: expiresAt }),
