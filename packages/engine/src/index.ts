@@ -2,6 +2,7 @@ export { createPrng, hashSeed, PRNG_VERSION } from './prng.js';
 export type { Prng, PrngVersion } from './prng.js';
 export {
   calculateEffectiveStrength,
+  calculateMatchExpectation,
   calculateMatchup,
   ENGINE_VERSION,
   POSITION_SUITABILITY,
