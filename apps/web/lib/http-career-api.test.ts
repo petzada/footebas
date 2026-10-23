@@ -487,6 +487,32 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     expect(view.calendar.entries.length).toBeGreaterThan(38);
     expect(view.nextSeason.status).toBe('pending');
   });
+
+  it('a classificação da Central segue o estadual em andamento e as tabelas vêm por competição', async () => {
+    const { client, career } = await start();
+    expect(career.division).toBe('Carioca');
+    const played = await client.instantResult();
+    expect(played.division).toBe('Carioca');
+    expect(
+      played.standings.find(({ club }) => club === 'Flamengo')?.played,
+    ).toBe(1);
+    const tables = await httpCompetitionPort(client).tables!();
+    expect(tables.focusCompetitionId).toBe('carioca');
+    expect(
+      tables.competitions.map(({ competitionId }) => competitionId),
+    ).toEqual(
+      expect.arrayContaining([
+        'carioca',
+        'copa_do_brasil',
+        'copa_libertadores',
+      ]),
+    );
+    const cup = tables.competitions.find(
+      ({ competitionId }) => competitionId === 'copa_do_brasil',
+    )!;
+    expect(cup.stages.every(({ kind }) => kind === 'knockout')).toBe(true);
+    expect(cup.champion).toBeUndefined();
+  });
 });
 
 describe('HttpCareerApi com provedor de token', () => {

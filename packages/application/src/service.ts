@@ -16,6 +16,7 @@ import {
   postMatchReadModelSchema,
   squadReadModelSchema,
   standingsReadModelSchema,
+  competitionTablesReadModelSchema,
   type ApiError,
   type CareerBundleReadModel,
   type CoachMessage,
@@ -92,6 +93,7 @@ import {
 import {
   projectCalendar,
   projectPyramid,
+  projectTables,
   projectTransition,
   type SeasonSummary,
 } from './career-competitions.js';
@@ -1788,6 +1790,12 @@ export class FootebasApplication {
   }
   public calendar(bearer: string, careerId: string) {
     return this.competitionView(bearer, careerId, projectCalendar);
+  }
+  /** Tables and brackets of every competition of the season. */
+  public tables(bearer: string, careerId: string) {
+    return this.competitionView(bearer, careerId, (input) =>
+      competitionTablesReadModelSchema.parse(projectTables(input)),
+    );
   }
   public seasonTransition(bearer: string, careerId: string) {
     return this.competitionView(bearer, careerId, projectTransition);

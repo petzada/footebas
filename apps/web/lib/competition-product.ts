@@ -56,8 +56,128 @@ export interface CompetitionProductView {
   };
 }
 
+/**
+ * Tables and brackets per competition and phase. Mirrors
+ * `competitionTablesReadModelSchema` (`GET /v1/careers/:id/tables`); every
+ * value comes from the server, nothing is estimated on the client.
+ *
+ * - League / estadual: one stage `kind: 'league'` with one group whose rows
+ *   carry `zone` (title, continental, continental_qualifying, promotion,
+ *   relegation) and whose `zones` describe the bands (1-based, inclusive).
+ * - Copa do Brasil: stages `kind: 'knockout'` (one per round) with `ties`;
+ *   each tie has its legs (score once played), `aggregate`, `winnerClubId`
+ *   and `decidedBy` (`tiebreak` when the aggregate was level).
+ * - Libertadores: preliminary `knockout`, then `groups` (one group per
+ *   "Grupo A…D", zone `advance`) and the knockout rounds; rounds not drawn
+ *   yet come with empty `ties` and `status: 'scheduled'`.
+ * - `currentStageId` is the phase in play (the last one once decided);
+ *   `champion` exists only after the last match (`decidedOn`).
+ * - `focusCompetitionId` is the table the Central summarises: the managed
+ *   club's estadual while it runs, then its national division.
+ */
+export type TableZoneKind =
+  | 'title'
+  | 'continental'
+  | 'continental_qualifying'
+  | 'promotion'
+  | 'relegation'
+  | 'advance';
+
+export interface TableClubRef {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface TableRowView {
+  readonly position: number;
+  readonly club: TableClubRef;
+  readonly played: number;
+  readonly won: number;
+  readonly drawn: number;
+  readonly lost: number;
+  readonly goalsFor: number;
+  readonly goalsAgainst: number;
+  readonly goalDifference: number;
+  readonly points: number;
+  readonly zone?: TableZoneKind;
+}
+
+export interface TableGroupView {
+  readonly id: string;
+  readonly name: string;
+  readonly rows: readonly TableRowView[];
+  readonly zones: readonly {
+    readonly kind: TableZoneKind;
+    readonly label: string;
+    readonly from: number;
+    readonly to: number;
+  }[];
+}
+
+export interface TieView {
+  readonly id: string;
+  readonly home: TableClubRef;
+  readonly away: TableClubRef;
+  readonly legs: readonly {
+    readonly fixtureId: string;
+    readonly leg: number;
+    readonly date: string;
+    readonly homeClubId: string;
+    readonly awayClubId: string;
+    readonly homeGoals?: number;
+    readonly awayGoals?: number;
+  }[];
+  readonly aggregate?: { readonly home: number; readonly away: number };
+  readonly winnerClubId?: string;
+  readonly decidedBy?: 'goals' | 'tiebreak';
+  readonly status: 'scheduled' | 'active' | 'complete';
+}
+
+export interface TableStageView {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: 'league' | 'groups' | 'knockout';
+  readonly status: 'scheduled' | 'active' | 'complete';
+  readonly groups: readonly TableGroupView[];
+  readonly ties: readonly TieView[];
+  readonly byes: readonly TableClubRef[];
+}
+
+export interface CompetitionTableView {
+  readonly competitionId: string;
+  readonly name: string;
+  readonly category: CompetitionView['category'];
+  readonly status: 'scheduled' | 'active' | 'complete';
+  readonly managed: boolean;
+  readonly currentStageId: string;
+  readonly champion?: {
+    readonly club: TableClubRef;
+    readonly decidedOn: string;
+  };
+  readonly stages: readonly TableStageView[];
+}
+
+export interface CompetitionTablesView {
+  readonly aggregateVersion: number;
+  readonly season: number;
+  readonly focusCompetitionId?: string;
+  readonly competitions: readonly CompetitionTableView[];
+}
+
+/** Main table of a competition: its league stage, or the current group stage. */
+export function mainGroupOf(
+  table: CompetitionTableView,
+): TableGroupView | undefined {
+  const stage =
+    table.stages.find(({ kind }) => kind === 'league') ??
+    table.stages.find(({ id }) => id === table.currentStageId);
+  return stage?.groups[0];
+}
+
 export interface CompetitionProductPort {
   load(): Promise<CompetitionProductView>;
+  /** Tables and brackets of every competition (absent on the offline demo). */
+  tables?(): Promise<CompetitionTablesView>;
 }
 
 const league = (
