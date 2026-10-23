@@ -23,7 +23,7 @@ complementa `docs/08-mvp-fonte-de-verdade.md`; em conflito sobre telas, vale est
 | 14  | Cards de atleta            | **Avatares gerados** por atleta, sem fotos reais (direito de imagem).                                                                                                                                                            |
 | 15  | Potencial e atributos      | Força, condição e moral em barras; **potencial só como faixa estimada** com incerteza.                                                                                                                                           |
 | 16  | Entrosamento               | **Nas regras do mundo** (bônus pequeno de força efetiva antes do motor); motor de partida intacto.                                                                                                                               |
-| 17  | Direção visual             | ISOPOP adaptado, **só modo claro**, vidro 50%, verde-gramado nas ações e coral em destaque. ADR 0009.                                                                                                                            |
+| 17  | Direção visual             | **Futebol retrô** (pixel art 16-bit, placar, giz, figurinhas), tema único, assets gerados por código ou com licença aberta, pseudo-3D no Phaser. ADR 0012 (substitui o 0009).                                                    |
 
 ## Mapa de telas do MVP
 

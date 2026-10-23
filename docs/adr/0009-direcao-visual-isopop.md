@@ -1,6 +1,6 @@
 # ADR 0009 — Direção visual ISOPOP adaptada
 
-- Status: aceito
+- Status: substituído pelo ADR 0012 (2026-10-23)
 - Data: 2026-10-22
 
 ## Contexto
