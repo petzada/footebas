@@ -1,0 +1,352 @@
+/*
+ * Landing arcade (docs/09, mapa de telas: "landing arcade"). Only motion and
+ * scene drawing live here; colors and borders come from globals.css tokens.
+ * Every animation is CSS, stepped like a 16-bit game, and stops under
+ * prefers-reduced-motion.
+ */
+
+/* Scroll reveal: blocks rise in two steps when they enter the viewport. */
+.lp-reveal {
+  opacity: 0;
+  transform: translateY(calc(var(--px) * 4));
+  transition:
+    opacity var(--beat) steps(3, end),
+    transform var(--beat) steps(3, end);
+}
+.lp-reveal[data-in='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Title: letters drop in one by one, like a stadium sign lighting up. */
+.lp-title span {
+  display: inline-block;
+  animation: lp-drop 0.6s steps(4, end) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+@keyframes lp-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-1.2em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Blinking cursor on the subtitle. */
+.lp-cursor::after {
+  content: '_';
+  animation: lp-blink 1s steps(1, end) infinite;
+}
+@keyframes lp-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Bulb digits flicker once when the score changes. */
+.lp-digit {
+  animation: lp-flicker 0.4s steps(2, end);
+}
+@keyframes lp-flicker {
+  0%,
+  40% {
+    opacity: 0.2;
+  }
+  20%,
+  60%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Stadium crowd: two rows of pixel heads, waving in opposite phases. */
+.lp-crowd {
+  height: 28px;
+  background-image:
+    radial-gradient(circle at 4px 6px, #f0c8a0 2px, transparent 2.5px),
+    radial-gradient(circle at 12px 10px, #ffd23f 2px, transparent 2.5px),
+    radial-gradient(circle at 20px 5px, #c8322b 2px, transparent 2.5px),
+    radial-gradient(circle at 28px 11px, #f4efe2 2px, transparent 2.5px),
+    radial-gradient(circle at 36px 7px, #2d6cdf 2px, transparent 2.5px),
+    radial-gradient(circle at 44px 12px, #8a5a2b 2px, transparent 2.5px);
+  background-size: 48px 14px;
+  background-color: #1d2b22;
+  animation: lp-wave 1.6s steps(2, end) infinite;
+}
+.lp-crowd[data-row='2'] {
+  animation-delay: 0.8s;
+  filter: brightness(0.8);
+}
+@keyframes lp-wave {
+  50% {
+    background-position-y: 2px;
+  }
+}
+
+/* Floodlights: a slow sweep of light over the pitch. */
+.lp-floodlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.1) 45%,
+    transparent 60%
+  );
+  background-size: 300% 100%;
+  animation: lp-sweep 6s steps(24, end) infinite;
+}
+@keyframes lp-sweep {
+  from {
+    background-position-x: 100%;
+  }
+  to {
+    background-position-x: 0%;
+  }
+}
+
+/* Players: 3x5 pixel shirts that jog around a small loop. */
+.lp-player {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  box-shadow: 0 2px 0 0 rgb(0 0 0 / 0.35);
+  animation: lp-jog var(--dur, 3s) steps(6, end) infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+.lp-player::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 1px;
+  width: 6px;
+  height: 5px;
+  background: #e8b68a;
+}
+.lp-player::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 1px;
+  width: 6px;
+  height: 4px;
+  background: var(--shorts, #15201a);
+}
+@keyframes lp-jog {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(var(--dx, 24px), var(--dy, -10px));
+  }
+}
+
+/* Ball: runs the length of the pitch and bounces. */
+.lp-ball {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #f4efe2;
+  box-shadow: inset 0 0 0 1px #15201a;
+  animation:
+    lp-run 7s steps(28, end) infinite,
+    lp-bounce 0.5s steps(2, end) infinite;
+}
+@keyframes lp-run {
+  0% {
+    left: 48%;
+    top: 48%;
+  }
+  20% {
+    left: 70%;
+    top: 30%;
+  }
+  40% {
+    left: 86%;
+    top: 55%;
+  }
+  52% {
+    left: 95%;
+    top: 46%;
+  }
+  60% {
+    left: 50%;
+    top: 50%;
+  }
+  80% {
+    left: 22%;
+    top: 68%;
+  }
+  92% {
+    left: 6%;
+    top: 48%;
+  }
+  100% {
+    left: 48%;
+    top: 48%;
+  }
+}
+@keyframes lp-bounce {
+  50% {
+    margin-top: -3px;
+  }
+}
+
+/* Narration lines type in. */
+.lp-line {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  animation: lp-type 0.8s steps(30, end);
+}
+@keyframes lp-type {
+  from {
+    max-width: 0;
+  }
+  to {
+    max-width: 100%;
+  }
+}
+
+/* Crest marquee: an endless shelf of stickers. */
+.lp-marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+.lp-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 12px;
+  animation: lp-slide 40s linear infinite;
+}
+.lp-marquee[data-dir='reverse'] .lp-marquee-track {
+  animation-direction: reverse;
+}
+.lp-marquee:hover .lp-marquee-track {
+  animation-play-state: paused;
+}
+@keyframes lp-slide {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Floating sprites around the hero. */
+.lp-float {
+  animation: lp-hover 2.4s steps(4, end) infinite alternate;
+  animation-delay: var(--delay, 0s);
+}
+@keyframes lp-hover {
+  to {
+    transform: translateY(calc(var(--px) * -3));
+  }
+}
+
+/* Chalk arrow pointing to the CTA. */
+.lp-nudge {
+  animation: lp-nudge 0.9s steps(2, end) infinite alternate;
+}
+@keyframes lp-nudge {
+  to {
+    transform: translateX(var(--px));
+  }
+}
+
+/* Benefit stickers tilt slightly on hover like a card being picked up. */
+.lp-sticker {
+  transition: transform var(--tick) steps(2, end);
+}
+.lp-sticker:hover {
+  transform: translateY(calc(var(--px) * -1)) rotate(-1deg);
+}
+
+/* Pixel bars fill when the block is revealed. */
+.lp-bar > span {
+  width: 0;
+  transition: width 1.2s steps(12, end);
+}
+[data-in='true'] .lp-bar > span {
+  width: var(--w);
+}
+
+/* Price tag swings in. */
+.lp-tag {
+  transform-origin: top center;
+  animation: lp-swing 2.8s steps(6, end) infinite alternate;
+}
+@keyframes lp-swing {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+
+/* Coin spin on the price. */
+.lp-coin {
+  animation: lp-spin 1.6s steps(8, end) infinite;
+}
+@keyframes lp-spin {
+  50% {
+    transform: scaleX(0.15);
+  }
+}
+
+/* Confetti over the licence panel. */
+.lp-confetti {
+  position: absolute;
+  top: -8px;
+  width: 4px;
+  height: 8px;
+  animation: lp-fall var(--dur, 4s) steps(16, end) infinite;
+  animation-delay: var(--delay, 0s);
+}
+@keyframes lp-fall {
+  to {
+    transform: translateY(420px) rotate(540deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-title span,
+  .lp-cursor::after,
+  .lp-digit,
+  .lp-crowd,
+  .lp-floodlight,
+  .lp-player,
+  .lp-ball,
+  .lp-line,
+  .lp-marquee-track,
+  .lp-float,
+  .lp-nudge,
+  .lp-tag,
+  .lp-coin,
+  .lp-confetti {
+    animation: none;
+  }
+  .lp-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .lp-bar > span {
+    width: var(--w);
+    transition: none;
+  }
+  .lp-ball {
+    left: 48%;
+    top: 48%;
+  }
+}
