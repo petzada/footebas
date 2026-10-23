@@ -86,7 +86,7 @@ describe('Fase 6 · shell mobile-first', () => {
   it('esconde a barra inferior na partida ao vivo e a devolve ao rolar', async () => {
     await onboard();
     fireEvent.click(screen.getByRole('button', { name: /jogar partida/i }));
-    await screen.findByRole('button', { name: /pular resultado/i });
+    await screen.findByRole('button', { name: /pular para o resultado/i });
     expect(
       screen.queryByRole('navigation', { name: /navegação principal mobile/i }),
     ).toBeNull();
