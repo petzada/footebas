@@ -148,7 +148,8 @@ describe('Fase 4 · verticais de carreira longa', () => {
 
   it('expõe notícias, rankings segmentados e estado de migração por teclado', async () => {
     await onboard();
-    navigate(/^ranking$/i);
+    // Ranking virou tela própria; os rankings do mundo seguem em Histórico.
+    navigate(/^histórico$/i);
     expect((await screen.findAllByRole('tablist')).length).toBeGreaterThan(0);
     await selectTab(/^ranking$/i);
     expect(screen.getByText(/referência nacional/i)).toBeTruthy();
