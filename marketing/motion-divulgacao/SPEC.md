@@ -3,7 +3,7 @@
 ```text
 GOAL:    o torcedor termina o filme sabendo que no Footebas o técnico é ele — escala, muda a tática, vira o
          jogo, sobe na tabela e cuida do clube — grátis, no navegador do celular; e quer começar a carreira.
-OUTPUT:  HyperFrames, 1920 x 1080, 30 fps, H.264 + AAC.
+OUTPUT:  HyperFrames, 1920 x 1080, 30 fps, H.264 + AAC; uma versão com locução em pt-BR e uma sem.
 TIME:    30,0 s x 30 fps = 900 quadros. Música a 120 BPM: 15 quadros por batida, 60 por compasso (2 s),
          15 compassos. Cortes de mundo nas linhas de compasso; trocas internas nas batidas.
 LOOK:    os materiais do próprio jogo (apps/web/app/globals.css, ADR 0012 "Futebol Retrô"):
@@ -52,7 +52,7 @@ SHOTS:   (s = segundos absolutos; q = quadro)
  S2 tática   2,0-6,4  q60-192 Prancheta 2x: AJUSTES AOS 45'. q90 clique em OFENSIVA: o preenchimento verde
                               desliza (mola layout, como layoutId), o time inteiro sobe e três setas de giz se
                               desenham. q105 clique em 4-3-3: as 11 fichas migram (mola layout, 1 q de
-                              stagger). Letreiro "MUDE A TÁTICA". q120 a figurinha GAROTO DA BASE (17 anos,
+                              stagger). Letreiro "MUDE SUA TÁTICA". q120 a figurinha GAROTO DA BASE (17 anos,
                               ATA, 71) sobe com mola pop; q135 o cursor pega, arrasta em arco até a vaga do 5
                               encolhendo a figurinha em ficha (morph); q162 solta: o 5 sai pela lateral, o 19
                               entra (pop) e a placa de substituição ▲ 19 ▼ 5 acende na linha do meio-campo.
@@ -89,6 +89,10 @@ SHOTS:   (s = segundos absolutos; q = quadro)
                               CARREIRA, SUA HISTÓRIA" com cursor piscando; botão amarelo "COMEÇAR CARREIRA
                               GRÁTIS" (mola pop); q840 o cursor clica e o botão afunda; footebas.com.br,
                               claim e aviso legal da landing em 28 px. Segura até q899.
+VOZ:     locução masculina em pt-BR, convidativa: 51 palavras em 10 falas, cada uma sobre a ação que nomeia
+         (tempos e limites em audio-src/locucao.json); os gols, o VIROU! e o CAMPEÃO! ficam sem voz por cima.
+         A trilha abaixa só o necessário para a voz ficar 8 LU acima dela (3-8 dB) e perde 4 dB entre 1,8 e
+         7 kHz sob a fala; a fala da virada abaixa no máximo 5 dB para a entrada do groove manter a força.
 BANNED:  vazio escuro com elementos pequenos flutuando; glow/bloom/partículas decorativas (confete só no
          payoff); gradientes roxo/azul, vidro, mesh; papel creme com serifa e rótulos mono numerados;
          tudo centrado e tudo entrando por fade+subida; texto que se move enquanto é lido; títulos que
@@ -107,6 +111,7 @@ QA:      q0 lê como placar de estádio aceso e cria a pergunta (thumbnail).
          q510 Flamengo em 1º, linha amarela, pontos coerentes.
          q560/q590/q620/q650 cada recurso com título e um número grandes em 1 s.
          q700 troféu + CAMPEÃO! + confete; q760 pergunta inteira; q860 marca + chamada + URL.
+         Cada fala reconhecida palavra por palavra pelo Whisper (small e medium) no mix final.
 ```
 
 ## Fontes de verdade
@@ -116,5 +121,5 @@ QA:      q0 lê como placar de estádio aceso e cria a pergunta (thumbnail).
 - Footage do estádio: partidas reais gravadas quadro a quadro com o relógio do navegador parado e avançado
   1/30 s por quadro (o palco Three.js do jogo, sem os banners HTML, que o filme redesenha nítidos).
 - Cópia: a do jogo e a da landing (`DEMO_MATCH`, `BENEFITS`, chamada final). Cópia criativa nova: só
-  "O TÉCNICO É VOCÊ", "MUDE A TÁTICA", "VIROU!" e "CAMPEÃO!".
+  "O TÉCNICO É VOCÊ", "MUDE SUA TÁTICA", "VIROU!" e "CAMPEÃO!".
 - Partida e tabela são ilustrativas (placar e pontos escolhidos para a história); a imagem é do jogo.

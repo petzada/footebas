@@ -1,0 +1,17 @@
+{
+  "idioma": "pt-br",
+  "voz": { "kokoro": "pm_santa", "elevenlabs_modelo": "eleven_multilingual_v2" },
+  "velocidade": 1.0,
+  "falas": [
+    { "id": "01-tecnico", "inicio": 0.3, "fim_max": 2.9, "texto": "No intervalo, o técnico é você.", "fonemas": { "teɾəv": "teɾv" } },
+    { "id": "02-tatica", "inicio": 2.95, "fim_max": 4.4, "texto": "Mude sua tática," },
+    { "id": "03-garoto", "inicio": 4.45, "fim_max": 6.3, "texto": "chame o garoto da base" },
+    { "id": "04-jogo", "inicio": 6.3, "fim_max": 7.75, "texto": "e volta pro jogo!" },
+    { "id": "05-virada", "inicio": 8.15, "fim_max": 9.95, "texto": "Chegou a hora da virada!", "abaixa_max_db": 5, "trecho_proprio": true },
+    { "id": "06-tabela", "inicio": 14.3, "fim_max": 16.9, "texto": "Suba na tabela, rodada a rodada." },
+    { "id": "07-clube", "inicio": 18.15, "fim_max": 22.0, "texto": "Feche patrocínios, faça negócios, cuide do clube…", "fala": "Feche patrocínios, faça negócios, cuide do clube..." },
+    { "id": "08-campeao", "inicio": 22.5, "fim_max": 23.95, "texto": "…até ser campeão!", "fala": "até ser campeão!" },
+    { "id": "09-pergunta", "inicio": 24.0, "fim_max": 26.3, "texto": "Qual clube você vai levar ao título?" },
+    { "id": "10-marca", "inicio": 26.4, "fim_max": 29.6, "texto": "Footebas. Sua carreira, sua história.", "fala": "Futébas. Sua carreira, sua história.", "velocidade": 0.92 }
+  ]
+}

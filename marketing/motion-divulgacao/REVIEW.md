@@ -26,13 +26,36 @@ Nota de entrega do filme de divulgação do Footebas. A próxima rodada de mudan
 - **Variáveis:** slogan, texto do botão e endereço. As cores ficam nos tokens do jogo (`assets/css/footebas.css`):
   o footage do estádio usa as mesmas, então trocá-las por variável quebraria o filme.
 
+## Passada da locução (pt-BR)
+
+- **Pedido:** narração convidativa em pt-BR pela ElevenLabs ou outra API. A API da ElevenLabs responde deste
+  ambiente, mas não há chave configurada; o dono escolheu seguir com o Kokoro local e voz masculina. Trocar pela
+  ElevenLabs é um comando quando a chave existir (README, "Trocar a voz pela ElevenLabs"); esse caminho ainda não
+  rodou.
+- **Roteiro:** 51 palavras em 10 falas, cada uma sobre a ação que nomeia (`audio-src/locucao.json`); os gols, o
+  VIROU! e o CAMPEÃO! ficam sem voz por cima. A pergunta e o slogan são falados enquanto aparecem na tela.
+- **Voz:** `pm_santa` contra `pm_alex`, medidas: menos erros na transcrição do Whisper (WER 0,15 contra 0,20) e
+  mais variação de entonação (10,8 contra 10,4 semitons entre os percentis 5 e 95 do F0).
+- **Texto mudado para ser entendido, com o Whisper como ouvinte:** "Mude a tática" virava "Múdia tática" → "Mude
+  sua tática" (o letreiro na tela mudou junto); "Hora da virada!" virava "viradas" → "Chegou a hora da virada!";
+  "negocie craques" saía com a tônica errada (negoCIe) → "faça negócios"; "Rodada a rodada, suba na tabela"
+  virava "chuva" → "Suba na tabela, rodada a rodada". "Footebas" é lido "Futébas" (fu-TÉ-bas) e "intervalo" perde
+  o ə que o espeak inseria.
+- **Mixagem:** a trilha abaixa só o necessário para a voz ficar 8 LU acima dela em cada trecho falado (3,0 / 5,0
+  / 5,8 / 7,9 / 6,5 dB) e perde 4 dB entre 1,8 e 7 kHz sob a fala; a fala sobre a entrada do groove (8 s) abaixa
+  no máximo 5 dB. Média medida: voz 8,1 LU acima da trilha enquanto fala.
+- **Medido no arquivo final:** o Whisper medium transcreve as 10 falas certas a partir do MP4 com música e efeitos
+  (só escreve "Futebas", que é o som pretendido); −15,1 LUFS, pico real −2,2 dBTP, LRA 2,4 LU, sem clipping.
+- **Não ouvido:** ninguém escutou a voz. O Kokoro em pt-BR soa sintético perto de uma locução profissional ou da
+  ElevenLabs; agora a voz é o elo mais fraco do filme.
+
 ## O que foi medido e o que só foi olhado
 
 - **Medido:** `npx hyperframes check` — lint, runtime, layout, movimento e contraste: **0 erro**. Contraste do
   slogan subiu de 2,6:1 para ~11:1 (agora numa faixa de LED); texto de leitura ≥ 28 px (2,6% da altura).
 - **Olhado:** as folhas do `snapshot --review` (20 beats, 17 costuras, os beats a 360 px de largura) e faixas de
   8 quadros no arraste do garoto, no recuo do estádio para o celular, na subida do troféu e na entrada da marca.
-- **Som — medido, não ouvido.** Master: −15,0 LUFS integrado, pico real −2,2 dBTP, LRA 6,9 LU; no MP4 final
+- **Som da versão sem locução — medido, não ouvido.** Master: −15,0 LUFS integrado, pico real −2,2 dBTP, LRA 6,9 LU; no MP4 final
   (AAC 256 kbps): −15,1 LUFS, −1,4 dBTP, sem clipping nem silêncio. `hyperframes audio` lê música (0,9), ataques na
   grade de semicolcheias do filme e o pico em 12,6 s (VIROU!). Balanço por oitava com 63 Hz como referência
   (0 dB): 250 Hz −8,0, 1 kHz −6,9, 4 kHz −11,2, 8 kHz −12,4. Ninguém ouviu a mixagem num alto-falante de celular.

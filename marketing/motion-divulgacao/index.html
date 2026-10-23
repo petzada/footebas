@@ -71,9 +71,11 @@
       <!-- O cursor é o técnico: uma mão em pixel que atravessa o filme -->
       <div data-hf-id="hf-c6g7" id="cursor" class="clip" data-composition-id="cursor" data-composition-src="compositions/cursor.html" data-start="0" data-duration="30" data-track-index="12" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
 
-      <!-- Som: batucada chiptune + efeitos (ZzFX do jogo, Pixabay, torcida sintetizada),
-           mixados e masterizados em audio-src/ (−15 LUFS, −1,7 dBTP) -->
+      <!-- Som: a trilha (batucada chiptune + efeitos do jogo) já abaixada sob a voz, e a
+           locução pt-BR, feitas em audio-src/ (locucao.py, mixa.py). Juntas dão o mix sem
+           master; o MP4 de entrega leva o master de master.py (−15 LUFS, −2 dBTP). -->
       <audio data-hf-id="hf-jj4f" id="trilha" class="clip" src="assets/audio/trilha.wav" data-start="0" data-duration="30" data-track-index="20" data-volume="1"></audio>
+      <audio id="locucao" class="clip" src="assets/audio/locucao.wav" data-start="0" data-duration="30" data-track-index="21" data-volume="1"></audio>
     </div>
     <script>
       window.__timelines = window.__timelines || {};
