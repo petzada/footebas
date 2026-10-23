@@ -15,10 +15,14 @@ runtime.
 6. Avança a rodada (`SimulateMatch`): o comando enfileira um job na Queue; o
    script faz polling de `GET /v1/jobs/:id` até `succeeded` (falha em
    `failed`/`cancelled` ou no timeout).
-7. Recarrega a carreira e confere: sem simulação pendente, versão do save
-   exatamente +1 após o job, data avançada, pós-jogo do jogo simulado, próximo
-   jogo diferente e a mesma versão em home, elenco, classificação e pós-jogo.
+7. Recarrega a carreira por `GET /v1/careers/:id/bundle` (a Central numa
+   leitura, ADR 0014) e confere: sem simulação pendente, versão do save
+   exatamente +1 após o job, data avançada, elenco e classificação do clube,
+   próximo jogo diferente, `304` ao revalidar com `If-None-Match` e o pós-jogo
+   do jogo simulado na mesma versão.
 8. Lista as carreiras de novo e confere a carreira nova, com versão e clube.
+9. Mede o tempo de ida e volta de cada comando e falha se o p95 passar de
+   `SMOKE_P95_MS` (meta do ADR 0014: 800 ms).
 
 Saída em português; código de saída `0` (ok), `1` (fumaça falhou) ou `2`
 (configuração inválida). Cada execução cria uma carreira nova para o usuário
@@ -53,6 +57,7 @@ No PowerShell: `$env:API_URL='https://api.footebas.com.br'; $env:SMOKE_TOKEN='<t
 | `JOB_TIMEOUT_MS`     | `120000`                 | Tempo máximo esperando o job             |
 | `JOB_POLL_MS`        | `1000`                   | Intervalo do polling do job              |
 | `REQUEST_TIMEOUT_MS` | `30000`                  | Tempo máximo de cada requisição          |
+| `SMOKE_P95_MS`       | `800`                    | Limite do p95 dos comandos (ms)          |
 
 ## Configurar o token na nuvem
 
