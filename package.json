@@ -11,14 +11,18 @@
   "scripts": {
     "build": "turbo run build",
     "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm smoke",
+    "check:quick": "pnpm format:check && turbo run typecheck lint test --affected",
     "e2e": "pnpm --filter @footebas/e2e e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
+    "prepare": "lefthook install",
     "smoke": "pnpm --filter @footebas/sim-lab smoke",
     "smoke:cloud": "pnpm --filter @footebas/cloud-smoke smoke",
     "test": "turbo run test",
+    "test:ci": "turbo run test",
     "test:phase1": "pnpm --filter @footebas/sim-lab phase1-gate",
+    "test:related": "turbo run test --affected --concurrency=1",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
@@ -26,6 +30,8 @@
     "@types/node": "22.20.1",
     "eslint": "10.7.0",
     "fast-check": "4.9.0",
+    "lefthook": "2.2.2",
+    "oxlint": "1.89.0",
     "prettier": "3.9.5",
     "supabase": "2.121.0",
     "tsx": "4.23.1",

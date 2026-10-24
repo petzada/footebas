@@ -27,6 +27,14 @@ import {
   simulateMatch,
 } from './index.js';
 
+// Monte Carlo de milhares de partidas (~15 s nesta suíte): o pre-push local pula com
+// FOOTEBAS_SKIP_SLOW=1; o CI roda sempre.
+// O engine não tem tipos do Node: lê o ambiente do processo do vitest via globalThis.
+const env = (
+  globalThis as { process?: { env: Record<string, string | undefined> } }
+).process?.env;
+const slowIt = env?.FOOTEBAS_SKIP_SLOW === '1' ? it.skip : it;
+
 const slots: readonly Position[] = [
   'GK',
   'RB',
@@ -294,7 +302,7 @@ describe('simulateMatch', () => {
     expect(mentalityProfiles[2]!.expectedGoals.home).toBeGreaterThan(1);
   });
 
-  it('shows monotonic favoritism while preserving upsets', () => {
+  slowIt('shows monotonic favoritism while preserving upsets', () => {
     const bands = [
       [55, 75],
       [65, 75],
@@ -325,43 +333,50 @@ describe('simulateMatch', () => {
     expect(rates[2]).toBeLessThan(rates[3]!);
   });
 
-  it('makes home advantage and tactical choices measurable without certainty', () => {
-    let homePoints = 0;
-    let awayPoints = 0;
-    let attackingGoals = 0;
-    let balancedGoals = 0;
-    let attackLosses = 0;
-    let lightCards = 0;
-    let heavyCards = 0;
-    for (let index = 0; index < 900; index += 1) {
-      const a = simulateMatch(match(`venue-${String(index)}`));
-      homePoints +=
-        a.homeGoals > a.awayGoals ? 3 : a.homeGoals === a.awayGoals ? 1 : 0;
-      awayPoints +=
-        a.awayGoals > a.homeGoals ? 3 : a.homeGoals === a.awayGoals ? 1 : 0;
-      const attack = simulateMatch(
-        match(`tactic-${String(index)}`, 70, 70, {
-          homeMentality: 'all_out_attack',
-          homeFormation: '4-3-3',
-          homeDirection: 'wings',
-        }),
-      );
-      const balanced = simulateMatch(match(`tactic-${String(index)}`, 70, 70));
-      attackingGoals += attack.homeGoals;
-      balancedGoals += balanced.homeGoals;
-      if (attack.homeGoals < attack.awayGoals) attackLosses += 1;
-      lightCards += simulateMatch(
-        match(`cards-${String(index)}`, 70, 70, { homeMarking: 'light' }),
-      ).home.yellowCards;
-      heavyCards += simulateMatch(
-        match(`cards-${String(index)}`, 70, 70, { homeMarking: 'very_heavy' }),
-      ).home.yellowCards;
-    }
-    expect(homePoints).toBeGreaterThan(awayPoints);
-    expect(attackingGoals).toBeGreaterThan(balancedGoals);
-    expect(attackLosses).toBeGreaterThan(0);
-    expect(heavyCards).toBeGreaterThan(lightCards);
-  });
+  slowIt(
+    'makes home advantage and tactical choices measurable without certainty',
+    () => {
+      let homePoints = 0;
+      let awayPoints = 0;
+      let attackingGoals = 0;
+      let balancedGoals = 0;
+      let attackLosses = 0;
+      let lightCards = 0;
+      let heavyCards = 0;
+      for (let index = 0; index < 900; index += 1) {
+        const a = simulateMatch(match(`venue-${String(index)}`));
+        homePoints +=
+          a.homeGoals > a.awayGoals ? 3 : a.homeGoals === a.awayGoals ? 1 : 0;
+        awayPoints +=
+          a.awayGoals > a.homeGoals ? 3 : a.homeGoals === a.awayGoals ? 1 : 0;
+        const attack = simulateMatch(
+          match(`tactic-${String(index)}`, 70, 70, {
+            homeMentality: 'all_out_attack',
+            homeFormation: '4-3-3',
+            homeDirection: 'wings',
+          }),
+        );
+        const balanced = simulateMatch(
+          match(`tactic-${String(index)}`, 70, 70),
+        );
+        attackingGoals += attack.homeGoals;
+        balancedGoals += balanced.homeGoals;
+        if (attack.homeGoals < attack.awayGoals) attackLosses += 1;
+        lightCards += simulateMatch(
+          match(`cards-${String(index)}`, 70, 70, { homeMarking: 'light' }),
+        ).home.yellowCards;
+        heavyCards += simulateMatch(
+          match(`cards-${String(index)}`, 70, 70, {
+            homeMarking: 'very_heavy',
+          }),
+        ).home.yellowCards;
+      }
+      expect(homePoints).toBeGreaterThan(awayPoints);
+      expect(attackingGoals).toBeGreaterThan(balancedGoals);
+      expect(attackLosses).toBeGreaterThan(0);
+      expect(heavyCards).toBeGreaterThan(lightCards);
+    },
+  );
 
   it('gives decisive (high big-game) forwards a damped edge in goals', () => {
     // match-v4 (ADR 0015): big-game still helps, but it no longer

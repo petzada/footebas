@@ -1,0 +1,26 @@
+# Gates locais: pre-commit só nos arquivos em stage (< 10 s); pre-push só nos pacotes que o
+# branch afeta (turbo --affected contra o merge-base com a main). Lint tipado, suíte completa,
+# build, smoke, bundle e E2E ficam no CI (pnpm check).
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      glob: '*.{ts,tsx,js,mjs,cjs,json,md,css,yml,yaml}'
+      run: pnpm exec prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true
+    # Lint sem tipos (~1 s no repo inteiro); o ESLint tipado roda no CI.
+    - name: lint
+      glob: '*.{ts,tsx,js,mjs,cjs}'
+      run: pnpm exec oxlint {staged_files}
+
+pre-push:
+  piped: true
+  jobs:
+    - name: 1_typecheck
+      run: TURBO_SCM_BASE=$(git merge-base HEAD origin/main) pnpm exec turbo run typecheck --affected --output-logs=errors-only
+    # Uma suíte por vez (cada vitest já usa todos os núcleos; suítes em paralelo disputam CPU
+    # e derrubam testes sensíveis a tempo). Os Monte Carlo do engine (~15 s) pulam aqui; o CI
+    # roda tudo.
+    - name: 2_related
+      run: FOOTEBAS_SKIP_SLOW=1 TURBO_SCM_BASE=$(git merge-base HEAD origin/main) pnpm exec turbo run test --affected --concurrency=1 --output-logs=errors-only

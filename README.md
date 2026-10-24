@@ -14,12 +14,19 @@ construído pelas Fases 0–9 de [`ROADMAP-MVP.md`](./ROADMAP-MVP.md), sob os ov
 
 ```bash
 corepack enable
-pnpm install --frozen-lockfile
-pnpm check
+pnpm install --frozen-lockfile   # o prepare instala os hooks do lefthook
 ```
 
-`pnpm check` executa formatter check, typecheck, lint, testes, build e o smoke determinístico do sim-lab. Para
-executar apenas o laboratório:
+Os gates locais rodam sozinhos e só sobre o diff (`lefthook.yml`):
+
+- **commit:** prettier e oxlint nos arquivos em stage;
+- **push:** typecheck e testes dos pacotes afetados (`turbo run … --affected` contra o merge-base com a `main`), sem
+  os Monte Carlo do engine.
+
+Sob demanda, `pnpm check:quick` roda formatter check, typecheck, lint e testes dos pacotes afetados. `pnpm check`
+(formatter check, typecheck, lint tipado, todos os testes, build e o smoke determinístico do sim-lab) é o que o CI roda
+no PR pronto e na `main`; localmente, só ao mexer em config, dependências ou no build. Para executar apenas o
+laboratório:
 
 ```bash
 pnpm smoke

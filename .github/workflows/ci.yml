@@ -2,15 +2,27 @@ name: ci
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
+    # ready_for_review: tirar o PR de draft dispara os jobs pesados.
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Push novo no mesmo PR cancela o run anterior.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Repositório privado: PR em draft não roda CI (os gates locais do lefthook cobrem o diff);
+# o CI completo roda quando o PR fica pronto, no push da main e no Run workflow.
 jobs:
   verify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -39,6 +51,7 @@ jobs:
   # (tools/e2e/playwright.config.ts sobe os dois servidores). Roda em paralelo
   # ao verify.
   e2e:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
