@@ -10,7 +10,8 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      "env": ["FOOTEBAS_SKIP_SLOW"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
