@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
-    "prepare": "lefthook install",
+    "prepare": "node -e \"try{if(require('fs').existsSync('.git'))require('child_process').execSync('lefthook install',{stdio:'inherit'})}catch(e){console.warn('lefthook install ignorado')}\"",
     "smoke": "pnpm --filter @footebas/sim-lab smoke",
     "smoke:cloud": "pnpm --filter @footebas/cloud-smoke smoke",
     "test": "turbo run test",
