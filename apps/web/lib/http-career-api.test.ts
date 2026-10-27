@@ -136,8 +136,11 @@ async function sideline(
 }
 
 describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
-  it('joga a rodada seguinte com titulares lesionado e suspenso: instantâneo, pular e narrado', async () => {
-    for (const mode of ['instant', 'skip', 'narrated'] as const) {
+  // One test per mode: each plays a whole career round trip against the
+  // real API, and three in a row did not fit one timeout on slow runners.
+  it.each(['instant', 'skip', 'narrated'] as const)(
+    'joga a rodada seguinte com titulares lesionado e suspenso (%s)',
+    async (mode) => {
       const { client } = await start();
       await client.instantResult();
       const before = (await client.getCareer())!;
@@ -167,10 +170,8 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
         ),
         mode,
       ).toEqual([]);
-    }
-    // Three full matchdays against the in-memory authoritative API: on CI
-    // it takes 40-62 s, too close to the 60 s default.
-  }, 180_000);
+    },
+  );
 
   it('mostra em português a recusa de escalar um lesionado', async () => {
     const { client, career } = await start();

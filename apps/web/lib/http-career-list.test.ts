@@ -139,6 +139,57 @@ describe('HttpCareerApi · carreiras do usuário', () => {
     expect(String(bodies[0]!.commandId)).toMatch(/^command_/);
   });
 
+  it('retoma a carreira jogada por último, nunca a mais antiga nem uma bloqueada', async () => {
+    const careers = [
+      {
+        careerId: 'career_old',
+        aggregateVersion: 30,
+        managerName: 'Ana',
+        clubId: 'club_flamengo',
+        season: 2027,
+        currentDate: '2027-05-01',
+        updatedAt: '2026-10-20T15:00:00.000Z',
+      },
+      {
+        careerId: 'career_locked',
+        aggregateVersion: 4,
+        managerName: 'Ana',
+        clubId: 'club_bahia',
+        season: 2026,
+        currentDate: '2026-02-01',
+        updatedAt: '2026-10-23T10:00:00.000Z',
+        locked: true,
+      },
+      {
+        careerId: 'career_new',
+        aggregateVersion: 3,
+        managerName: 'Ana',
+        clubId: 'club_vitoria',
+        season: 2026,
+        currentDate: '2026-01-20',
+        updatedAt: '2026-10-22T21:00:00.000Z',
+      },
+    ];
+    const urls: string[] = [];
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      urls.push(url);
+      // Creation order, as an older API sent it.
+      if (url.endsWith('/v1/careers')) return json({ ...list, careers });
+      return json({ code: 'NOT_FOUND' }, 404);
+    });
+    const api = client(fetchMock);
+    expect((await api.listCareers()).careers.map(({ id }) => id)).toEqual([
+      'career_locked',
+      'career_new',
+      'career_old',
+    ]);
+    await expect(api.getCareer()).rejects.toBeDefined();
+    const opened = urls.filter((url) => url.includes('/v1/careers/career_'));
+    expect(opened.length).toBeGreaterThan(0);
+    expect(opened.every((url) => url.includes('/career_new/'))).toBe(true);
+  });
+
   it('envia CreateCareer com careerName e o perfil do treinador', async () => {
     const bodies: Record<string, unknown>[] = [];
     const api = client(

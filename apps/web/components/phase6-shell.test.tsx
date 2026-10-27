@@ -149,11 +149,19 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(
       screen.queryByRole('navigation', { name: /navegação principal mobile/i }),
     ).toBeNull();
-    Object.defineProperty(window, 'scrollY', { value: 80, configurable: true });
-    // Scroll until the bar is back: on a slow runner the listener may not be
-    // attached yet when the first event fires, and the re-render may lag.
+    // The scroll listener attaches in an effect after the match opens: keep
+    // scrolling further down until it answers (a single event fired before
+    // the listener exists is lost on a slow runner).
+    let y = 0;
     await waitFor(() => {
-      fireEvent.scroll(window);
+      act(() => {
+        y += 80;
+        Object.defineProperty(window, 'scrollY', {
+          value: y,
+          configurable: true,
+        });
+        window.dispatchEvent(new Event('scroll'));
+      });
       expect(
         screen.getByRole('navigation', { name: /navegação principal mobile/i }),
       ).toBeTruthy();

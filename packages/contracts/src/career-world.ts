@@ -176,6 +176,8 @@ export const careerListReadModelSchema = z.strictObject({
       clubName: nonEmptyTextSchema.optional(),
       season: z.int().positive(),
       currentDate: gameDateSchema,
+      /** Last saved change; the list comes most recent first. */
+      updatedAt: instantSchema.optional(),
       /**
        * Saved but not playable: beyond the plan's limit by creation order
        * (license refunded). Buying the license unlocks it; deleting it is
