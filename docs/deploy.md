@@ -7,6 +7,35 @@ Tudo roda em Cloudflare Workers (ADR 0005). Deploy em produção só com autoriz
 | Web (Next.js via OpenNext) | `footebas-web` | `game.footebas.com.br` (jogo), `lp.footebas.com.br` (landing), apex e `www` → landing | `apps/web/wrangler.jsonc`, `apps/web/open-next.config.ts` |
 | API                        | `footebas-api` | `api.footebas.com.br` (hoje `*.workers.dev`)                                          | `apps/api/wrangler.jsonc`                                 |
 
+## Pelo CI (padrão)
+
+Deploy em produção sai só do GitHub Actions, em push na `main` (ou "Run workflow"):
+
+| Workflow         | Worker         | Dispara em                                     |
+| ---------------- | -------------- | ---------------------------------------------- |
+| `deploy-web.yml` | `footebas-web` | `apps/web/**`, `packages/**`, `pnpm-lock.yaml` |
+| `deploy-api.yml` | `footebas-api` | `apps/api/**`, `packages/**`, `pnpm-lock.yaml` |
+
+Os dois precisam do secret **`CLOUDFLARE_API_TOKEN`** (token com "Workers Scripts: Edit" e "Workers Routes:
+Edit" na conta) e da variable **`CLOUDFLARE_ACCOUNT_ID`** (Settings → Secrets and variables → Actions). Sem o
+token, o `deploy-web` guarda o bundle como artefato e o `deploy-api` só valida o bundle com `--dry-run`; os dois
+avisam no log e nada é publicado. O `deploy-api` termina conferindo o `/health`.
+
+### Turbo Remote Cache
+
+O cache remoto da Vercel é gratuito: `turbo` publica o resultado de `build`, `typecheck` e `test`, e qualquer
+máquina com as mesmas variáveis baixa em vez de recompilar (inclusive o pre-push local, que depende de `^build`).
+
+1. Crie o token em <https://vercel.com/account/tokens> e anote o slug do time (ou da conta pessoal).
+2. No repositório: secret `TURBO_TOKEN` e variable `TURBO_TEAM` (o `ci.yml` e os deploys já leem os dois).
+3. No notebook ou na VM: `TURBO_TOKEN` e `TURBO_TEAM` no ambiente (ou `pnpm exec turbo login` + `turbo link`).
+
+Sem as variáveis tudo continua funcionando, só com o cache local.
+
+## Manual (exceção)
+
+Só com autorização do responsável e nunca por agente (AGENTS.md).
+
 ## Pré-requisitos
 
 - `pnpm install` na raiz; login no Cloudflare: `pnpm exec wrangler login` (ou `CLOUDFLARE_API_TOKEN` no ambiente).

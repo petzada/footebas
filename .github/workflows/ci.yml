@@ -12,6 +12,12 @@ permissions:
   contents: read
 
 # Push novo no mesmo PR cancela o run anterior.
+# Turbo Remote Cache (Vercel, gratuito): o CI publica o build dos pacotes e o
+# pre-push local baixa em vez de recompilar. Sem os valores, só cache local.
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -21,7 +27,7 @@ concurrency:
 jobs:
   verify:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +58,7 @@ jobs:
   # ao verify.
   e2e:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
