@@ -23,7 +23,6 @@ import { buildBoard, lineupInput, placePlayer } from '@/lib/management-model';
 import {
   HttpCareerApi,
   httpCompetitionPort,
-  NotSupportedYetError,
   SessionExpiredError,
   type AccessTokenProvider,
 } from '@/lib/http-career-api';
@@ -136,8 +135,11 @@ async function sideline(
 }
 
 describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
-  it('joga a rodada seguinte com titulares lesionado e suspenso: instantâneo, pular e narrado', async () => {
-    for (const mode of ['instant', 'skip', 'narrated'] as const) {
+  // One test per mode: each plays a whole career round trip against the
+  // real API, and three in a row did not fit one timeout on slow runners.
+  it.each(['instant', 'skip', 'narrated'] as const)(
+    'joga a rodada seguinte com titulares lesionado e suspenso (%s)',
+    async (mode) => {
       const { client } = await start();
       await client.instantResult();
       const before = (await client.getCareer())!;
@@ -167,10 +169,8 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
         ),
         mode,
       ).toEqual([]);
-    }
-    // Three full matchdays against the in-memory authoritative API: on CI
-    // it takes 40-62 s, too close to the 60 s default.
-  }, 180_000);
+    },
+  );
 
   it('mostra em português a recusa de escalar um lesionado', async () => {
     const { client, career } = await start();
@@ -348,9 +348,27 @@ describe('HttpCareerApi contra a API autoritativa', { timeout: 60_000 }, () => {
     expect(played.lastResult?.score).toMatch(/\d+ × \d+/);
     const priced = await client.setTicketPrice(90);
     expect(priced.world.stadium.ticketPrice).toBe(90);
-    await expect(client.maintainStadium()).rejects.toBeInstanceOf(
-      NotSupportedYetError,
+    expect(priced.world.stadium.homeMatches).toBeGreaterThanOrEqual(0);
+    expect(priced.world.stadium.demand).toBeGreaterThan(0);
+    const before = priced.world.stadium;
+    const repairs = before.maintenancePlans.find(({ id }) => id === 'repairs')!;
+    const maintained = await client.maintainStadium('repairs');
+    expect(maintained.world.stadium.quality).toBe(
+      before.quality + repairs.qualityGain,
     );
+    expect(maintained.world.finances.ledger[0]?.category).toBe('stadium');
+    const small = before.expansionPlans.find(({ id }) => id === 'small')!;
+    const expanded = await client.expandStadium('small');
+    expect(expanded.world.stadium.works).toEqual({
+      addedCapacity: small.addedCapacity,
+      completesOn: small.completesOn,
+      cost: small.cost,
+    });
+    expect(expanded.world.stadium.expansionPlans).toEqual([]);
+    // The academy opened with the first intake and a "jovem destaque".
+    expect(expanded.world.youth.length).toBeGreaterThanOrEqual(5);
+    expect(expanded.world.youth.some(({ highlight }) => highlight)).toBe(true);
+    expect(expanded.world.academy?.capacity).toBe(14);
   });
 
   it('envia SetLineup com as posições dos slots e lê a escalação de volta', async () => {

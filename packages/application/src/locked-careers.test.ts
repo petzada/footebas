@@ -89,12 +89,14 @@ describe('careers locked after the license is revoked', () => {
     entitlements.revoke('user_owner');
 
     const list = await app.careers(token);
+    // Most recently played first (the second picked its club last); the
+    // lock still follows the creation order.
     expect(
       list.careers.map(({ careerId, locked }) => [careerId, locked]),
     ).toEqual([
-      [oldest, false],
       [second, true],
       [third, true],
+      [oldest, false],
     ]);
     // Locked careers still count against the free limit of one.
     expect(list.limits).toMatchObject({ plan: 'free', activeCareers: 3 });
@@ -199,5 +201,33 @@ describe('careers locked after the license is revoked', () => {
     expect(isCareerLocked(['a', 'b'], 'b', free)).toBe(true);
     expect(isCareerLocked(['a', 'b'], 'b', licensed)).toBe(false);
     expect(isCareerLocked(['a'], 'missing', free)).toBe(false);
+  });
+});
+
+describe('career list order (saves of a licensed player)', () => {
+  it('lists the career played last first, with its save time', async () => {
+    const { app, clock, token, ids } = await licensedWithThree();
+    const [oldest, second, third] = ids as [string, string, string];
+    expect((await app.careers(token)).careers[0]?.careerId).toBe(second);
+
+    // Playing the oldest career again brings it back to the top.
+    clock.advance(60_000);
+    await app.execute(
+      token,
+      command('SelectClub', 'command_club_oldest', 1, {
+        careerId: oldest,
+        clubId: 'club_flamengo',
+      }),
+    );
+    const list = await app.careers(token);
+    expect(list.careers.map(({ careerId }) => careerId)).toEqual([
+      oldest,
+      second,
+      third,
+    ]);
+    const [first, next] = list.careers;
+    expect(first?.updatedAt).toBeDefined();
+    expect(first!.updatedAt! > next!.updatedAt!).toBe(true);
+    expect(list.careers.every(({ locked }) => !locked)).toBe(true);
   });
 });

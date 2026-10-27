@@ -100,14 +100,28 @@ export const setTicketPriceCommandSchema = z.strictObject({
   type: z.literal('SetTicketPrice'),
   payload: z.strictObject({ clubId: entityIdSchema, ticketPrice: moneySchema }),
 });
+/** Works priced by the server; the client only picks a plan. */
+export const stadiumExpansionPlanSchema = z.enum(['small', 'medium', 'large']);
+export const stadiumMaintenancePlanSchema = z.enum([
+  'repairs',
+  'renovation',
+  'modernization',
+]);
 export const expandStadiumCommandSchema = z.strictObject({
   ...envelope,
   type: z.literal('ExpandStadium'),
   payload: z.strictObject({
     clubId: entityIdSchema,
-    addedCapacity: z.int().min(100),
-    cost: moneySchema.positive(),
-    completesOn: gameDateSchema,
+    plan: stadiumExpansionPlanSchema,
+  }),
+});
+/** One-off maintenance paid from the club cash (restores quality). */
+export const maintainStadiumCommandSchema = z.strictObject({
+  ...envelope,
+  type: z.literal('MaintainStadium'),
+  payload: z.strictObject({
+    clubId: entityIdSchema,
+    plan: stadiumMaintenancePlanSchema,
   }),
 });
 export const generateYouthCommandSchema = z.strictObject({
@@ -139,6 +153,11 @@ export const acceptJobProposalCommandSchema = z.strictObject({
   type: z.literal('AcceptJobProposal'),
   payload: z.strictObject({ proposalId: entityIdSchema }),
 });
+export const rejectJobProposalCommandSchema = z.strictObject({
+  ...envelope,
+  type: z.literal('RejectJobProposal'),
+  payload: z.strictObject({ proposalId: entityIdSchema }),
+});
 export const migrateSaveCommandSchema = z.strictObject({
   ...envelope,
   type: z.literal('MigrateSave'),
@@ -165,11 +184,13 @@ export const phaseFourCommandSchema = z.discriminatedUnion('type', [
   withdrawTransferListingCommandSchema,
   setTicketPriceCommandSchema,
   expandStadiumCommandSchema,
+  maintainStadiumCommandSchema,
   generateYouthCommandSchema,
   promoteYouthCommandSchema,
   releaseYouthCommandSchema,
   leaveClubCommandSchema,
   acceptJobProposalCommandSchema,
+  rejectJobProposalCommandSchema,
   migrateSaveCommandSchema,
   compactHistoryCommandSchema,
   advanceCareerSeasonCommandSchema,
@@ -210,12 +231,14 @@ export const phaseFourEventSchema = z.strictObject({
     'TRANSFER_UNLISTED',
     'TICKET_PRICE_CHANGED',
     'STADIUM_EXPANSION_STARTED',
+    'STADIUM_MAINTAINED',
     'YOUTH_GENERATED',
     'YOUTH_PROMOTED',
     'YOUTH_RELEASED',
     'MANAGER_FIRED',
     'MANAGER_RESIGNED',
     'MANAGER_CHANGED_CLUB',
+    'JOB_PROPOSAL_REJECTED',
     'SAVE_MIGRATED',
     'HISTORY_ARCHIVED',
     'SEASON_ADVANCED',

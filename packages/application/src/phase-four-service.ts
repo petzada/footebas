@@ -39,6 +39,13 @@ import {
   searchTransferMarket,
   shouldFireManager,
   startStadiumExpansion,
+  stadiumExpansionPlans,
+  stadiumMaintenancePlans,
+  maintainStadium,
+  createClubExpenseTransaction,
+  createContract,
+  createPlayer,
+  ACADEMY_PROMOTION_MIN_AGE,
   terminateContract,
   transitionOffer,
   type Club,
@@ -56,6 +63,36 @@ import {
   type TransferOffer,
 } from '@footebas/domain';
 import type { Clock, IdGenerator } from './ports.js';
+import { TICKET_PRICE_MAX, TICKET_PRICE_MIN } from './career-world-rules.js';
+
+const DAY_MS = 86_400_000;
+const addDays = (date: string, days: number): string =>
+  new Date(Date.parse(`${date}T00:00:00.000Z`) + days * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+
+/**
+ * First professional contract of an academy graduate: a youth wage on the
+ * catalog's strength curve (half of a senior's) and a value that also
+ * prices the hidden potential.
+ */
+export function youthContractTerms(
+  player: Pick<Player, 'strength' | 'hidden'>,
+): { wage: Money; value: Money } {
+  const strengthValue = Number(player.strength);
+  const potential = Number(player.hidden.potential);
+  const wageBrl = Math.max(
+    1_500,
+    Math.round(7_000 * 1.12 ** (strengthValue - 40) * 0.5),
+  );
+  const valueBrl = Math.round(
+    wageBrl * 60 * (1 + Math.max(0, potential - strengthValue) / 40),
+  );
+  return {
+    wage: (wageBrl * 100) as Money,
+    value: (valueBrl * 100) as Money,
+  };
+}
 import type {
   ArchiveStoragePort,
   CareerSeasonAdvancePort,
@@ -357,6 +394,8 @@ export class PhaseFourApplicationService {
         return this.setTicketPrice(state, command);
       case 'ExpandStadium':
         return this.expandStadium(state, command);
+      case 'MaintainStadium':
+        return this.maintainStadium(state, command);
       case 'GenerateYouth':
         return this.generateYouth(state, command);
       case 'PromoteYouth':
@@ -367,6 +406,8 @@ export class PhaseFourApplicationService {
         return this.leave(state, command);
       case 'AcceptJobProposal':
         return this.acceptJob(state, command);
+      case 'RejectJobProposal':
+        return this.rejectJob(state, command);
       case 'MigrateSave':
         return this.migrate(state, command);
       case 'CompactHistory':
@@ -987,6 +1028,13 @@ export class PhaseFourApplicationService {
     this.assertManagedClub(state, command.payload.clubId as ClubId);
     if (!state.stadiums.some(({ clubId }) => clubId === command.payload.clubId))
       throw new PhaseFourNotFoundError('stadium not found');
+    if (
+      command.payload.ticketPrice < TICKET_PRICE_MIN ||
+      command.payload.ticketPrice > TICKET_PRICE_MAX
+    )
+      throw new PhaseFourConflictError(
+        'O preço do ingresso precisa ficar entre R$ 10 e R$ 250.',
+      );
     state.stadiums = state.stadiums.map((stadium) =>
       stadium.clubId === command.payload.clubId
         ? Object.freeze({
@@ -1014,52 +1062,103 @@ export class PhaseFourApplicationService {
     const clubId = command.payload.clubId as ClubId;
     this.assertManagedClub(state, clubId);
     const club = this.club(state, clubId);
-    if (!state.stadiums.some((stadium) => stadium.clubId === clubId))
+    const stadium = state.stadiums.find((item) => item.clubId === clubId);
+    if (stadium === undefined)
       throw new PhaseFourNotFoundError('stadium not found');
-    if (command.payload.completesOn <= state.currentDate)
+    if (stadium.expansion !== undefined)
       throw new PhaseFourConflictError(
-        'stadium completion must be in the future',
+        `Já há uma obra em andamento no estádio (conclusão em ${stadium.expansion.completesOn}).`,
       );
-    if (
-      clubCashBalance(state.ledger, club.id, club.balance) <
-      command.payload.cost
-    )
+    // Priced by the server: the client only picks the plan.
+    const plan = stadiumExpansionPlans(stadium).find(
+      ({ id }) => id === command.payload.plan,
+    );
+    if (plan === undefined)
       throw new PhaseFourConflictError(
-        'insufficient cash for stadium expansion',
+        'O estádio já está na capacidade máxima para essa obra.',
+      );
+    if (clubCashBalance(state.ledger, club.id, club.balance) < plan.cost)
+      throw new PhaseFourConflictError(
+        'Caixa insuficiente para a ampliação do estádio.',
       );
     const projectId = this.dependencies.ids.next('stadium_project');
-    state.stadiums = state.stadiums.map((stadium) =>
-      stadium.clubId === clubId
-        ? startStadiumExpansion(stadium, {
+    const completesOn = addDays(state.currentDate, plan.days);
+    state.stadiums = state.stadiums.map((item) =>
+      item.clubId === clubId
+        ? startStadiumExpansion(item, {
             projectId,
-            addedCapacity: command.payload.addedCapacity,
-            cost: command.payload.cost as Money,
-            completesOn: command.payload.completesOn,
+            addedCapacity: plan.addedCapacity,
+            cost: plan.cost,
+            completesOn,
           })
-        : stadium,
+        : item,
     );
-    state.ledger = appendLedgerEntry(state.ledger, {
-      id: this.dependencies.ids.next('ledger'),
-      occurredAt: this.dependencies.clock.now().toISOString(),
-      source: { type: 'stadium', projectId },
-      postings: [
-        {
-          account: `club:${clubId}:cash`,
-          amount: -command.payload.cost as Money,
-          clubId,
-        },
-        {
-          account: `club:${clubId}:expense:stadium`,
-          amount: command.payload.cost as Money,
-          clubId,
-        },
-      ],
-    });
+    state.ledger = appendLedgerEntry(
+      state.ledger,
+      createClubExpenseTransaction({
+        id: this.dependencies.ids.next('ledger'),
+        occurredAt: `${state.currentDate}T12:00:00.000Z`,
+        clubId,
+        amount: plan.cost,
+        source: { type: 'stadium', projectId },
+      }),
+    );
     this.addEvent(
       state,
       command,
       'STADIUM_EXPANSION_STARTED',
-      payload({ clubId, projectId }),
+      payload({
+        clubId,
+        projectId,
+        addedCapacity: plan.addedCapacity,
+        completesOn,
+      }),
+    );
+    return 'applied';
+  }
+
+  private maintainStadium(
+    state: MutableState,
+    command: Extract<PhaseFourCommand, { type: 'MaintainStadium' }>,
+  ): 'applied' {
+    const clubId = command.payload.clubId as ClubId;
+    this.assertManagedClub(state, clubId);
+    const club = this.club(state, clubId);
+    const stadium = state.stadiums.find((item) => item.clubId === clubId);
+    if (stadium === undefined)
+      throw new PhaseFourNotFoundError('stadium not found');
+    const plan = stadiumMaintenancePlans(stadium).find(
+      ({ id }) => id === command.payload.plan,
+    );
+    if (plan === undefined)
+      throw new PhaseFourConflictError(
+        'O estádio já está em condição máxima; não há o que reformar.',
+      );
+    if (clubCashBalance(state.ledger, club.id, club.balance) < plan.cost)
+      throw new PhaseFourConflictError(
+        'Caixa insuficiente para a manutenção do estádio.',
+      );
+    const projectId = this.dependencies.ids.next('stadium_maintenance');
+    state.stadiums = state.stadiums.map((item) =>
+      item.clubId === clubId
+        ? maintainStadium(item, plan.qualityGain, state.currentDate)
+        : item,
+    );
+    state.ledger = appendLedgerEntry(
+      state.ledger,
+      createClubExpenseTransaction({
+        id: this.dependencies.ids.next('ledger'),
+        occurredAt: `${state.currentDate}T12:00:00.000Z`,
+        clubId,
+        amount: plan.cost,
+        source: { type: 'stadium', projectId },
+      }),
+    );
+    this.addEvent(
+      state,
+      command,
+      'STADIUM_MAINTAINED',
+      payload({ clubId, plan: plan.id, qualityGain: plan.qualityGain }),
     );
     return 'applied';
   }
@@ -1106,34 +1205,64 @@ export class PhaseFourApplicationService {
     );
     if (candidate === undefined)
       throw new PhaseFourNotFoundError('youth candidate not found');
-    if (candidate.player.clubId === undefined)
-      throw new PhaseFourConflictError('released youth cannot be promoted');
-    this.assertManagedClub(state, candidate.player.clubId);
-    const squad = state.players.filter(
-      ({ clubId, squadStatus }) =>
-        clubId === candidate.player.clubId && squadStatus !== 'youth',
-    );
-    const promoted = promoteYouth(candidate, squad.length, 35);
+    if (candidate.player.clubId === undefined || candidate.status !== 'academy')
+      throw new PhaseFourConflictError(
+        'Só um jovem que ainda está na base pode subir ao profissional.',
+      );
+    const clubId = candidate.player.clubId;
+    this.assertManagedClub(state, clubId);
+    if (candidate.player.age < ACADEMY_PROMOTION_MIN_AGE)
+      throw new PhaseFourConflictError(
+        `${candidate.player.name} tem ${String(candidate.player.age)} anos: a base sobe jogadores a partir dos ${String(ACADEMY_PROMOTION_MIN_AGE)}.`,
+      );
+    const club = this.club(state, clubId);
+    if (club.squad.length >= MAX_SQUAD_SIZE)
+      throw new PhaseFourConflictError(
+        `O elenco já tem ${String(MAX_SQUAD_SIZE)} jogadores: libere uma vaga antes de subir ${candidate.player.name}.`,
+      );
+    const promoted = promoteYouth(candidate, club.squad.length, MAX_SQUAD_SIZE);
+    const terms = youthContractTerms(promoted.player);
+    const player = createPlayer({
+      ...promoted.player,
+      salary: terms.wage,
+      value: terms.value,
+    });
+    const graduated = Object.freeze({ ...promoted, player });
     state.youth = state.youth.map((item) =>
-      item.player.id === promoted.player.id ? promoted : item,
+      item.player.id === player.id ? graduated : item,
     );
-    state.players = state.players.map((item) =>
-      item.id === promoted.player.id ? promoted.player : item,
-    );
-    state.clubs = state.clubs.map((club) =>
-      club.id === promoted.player.clubId &&
-      !club.squad.includes(promoted.player.id)
+    // Academy kids live only in the academy until they join the squad.
+    state.players = state.players.some(({ id }) => id === player.id)
+      ? state.players.map((item) => (item.id === player.id ? player : item))
+      : [...state.players, player];
+    state.clubs = state.clubs.map((item) =>
+      item.id === clubId && !item.squad.includes(player.id)
         ? Object.freeze({
-            ...club,
-            squad: Object.freeze([...club.squad, promoted.player.id]),
+            ...item,
+            squad: Object.freeze([...item.squad, player.id]),
           })
-        : club,
+        : item,
     );
+    const year = Number(state.currentDate.slice(0, 4));
+    state.contracts = [
+      ...state.contracts.filter(({ playerId }) => playerId !== player.id),
+      createContract({
+        id: `contract_${player.id}`,
+        playerId: player.id,
+        clubId,
+        startsOn: state.currentDate,
+        endsOn: `${String(year + 3)}-12-31`,
+        wage: terms.wage,
+        status: 'active',
+        terminationCost: (Number(terms.wage) * 6) as Money,
+        revision: 1,
+      }),
+    ];
     this.addEvent(
       state,
       command,
       'YOUTH_PROMOTED',
-      payload({ playerId: promoted.player.id }),
+      payload({ playerId: player.id }),
     );
     return 'applied';
   }
@@ -1196,14 +1325,23 @@ export class PhaseFourApplicationService {
     );
     if (proposal === undefined)
       throw new PhaseFourNotFoundError('job proposal not found');
+    if (proposal.status !== 'open' || proposal.expiresOn < state.currentDate)
+      throw new PhaseFourConflictError(
+        'Esta proposta de emprego não está mais aberta.',
+      );
     const result = acceptJobProposal(
       state.manager,
       proposal,
       state.currentDate,
     );
     state.manager = result.career;
+    // Taking one job answers the other open calls.
     state.jobProposals = state.jobProposals.map((item) =>
-      item.id === result.proposal.id ? result.proposal : item,
+      item.id === result.proposal.id
+        ? result.proposal
+        : item.status === 'open'
+          ? { ...item, status: 'rejected' as const }
+          : item,
     );
     this.addEvent(
       state,
@@ -1213,6 +1351,31 @@ export class PhaseFourApplicationService {
         managerId: state.manager.managerId,
         clubId: result.proposal.clubId,
       }),
+    );
+    return 'applied';
+  }
+
+  private rejectJob(
+    state: MutableState,
+    command: Extract<PhaseFourCommand, { type: 'RejectJobProposal' }>,
+  ): 'applied' {
+    const proposal = state.jobProposals.find(
+      ({ id }) => id === command.payload.proposalId,
+    );
+    if (proposal === undefined)
+      throw new PhaseFourNotFoundError('job proposal not found');
+    if (proposal.status !== 'open')
+      throw new PhaseFourConflictError(
+        'Esta proposta de emprego já foi respondida.',
+      );
+    state.jobProposals = state.jobProposals.map((item) =>
+      item.id === proposal.id ? { ...item, status: 'rejected' as const } : item,
+    );
+    this.addEvent(
+      state,
+      command,
+      'JOB_PROPOSAL_REJECTED',
+      payload({ proposalId: proposal.id, clubId: proposal.clubId }),
     );
     return 'applied';
   }

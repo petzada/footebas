@@ -233,8 +233,9 @@ export function createClubIncomeTransaction(
 }
 
 /**
- * Club expense outside wages and transfers: fan membership benefits or the
- * fee to end a sponsorship early. Cash leaves, the expense account grows.
+ * Club expense outside wages and transfers: fan membership benefits, the fee
+ * to end a sponsorship early or stadium works. Cash leaves, the expense
+ * account grows.
  */
 export function createClubExpenseTransaction(
   input: Readonly<{
@@ -244,14 +245,17 @@ export function createClubExpenseTransaction(
     amount: Money;
     source:
       | Extract<LedgerSource, { type: 'membership' }>
-      | Extract<LedgerSource, { type: 'sponsor_termination' }>;
+      | Extract<LedgerSource, { type: 'sponsor_termination' }>
+      | Extract<LedgerSource, { type: 'stadium' }>;
   }>,
 ): LedgerTransaction {
   assertPositiveAmount(input.amount);
   const expenseAccount =
     input.source.type === 'membership'
       ? (`club:${input.clubId}:expense:membership` as const)
-      : (`club:${input.clubId}:expense:sponsor` as const);
+      : input.source.type === 'stadium'
+        ? (`club:${input.clubId}:expense:stadium` as const)
+        : (`club:${input.clubId}:expense:sponsor` as const);
   return Object.freeze({
     id: input.id,
     occurredAt: input.occurredAt,
@@ -284,7 +288,10 @@ export interface Stadium {
   readonly capacity: number;
   readonly ticketPrice: Money;
   readonly maintenance: Money;
+  /** Pitch, stands and facilities (0-100); wears with every home match. */
   readonly quality: number;
+  /** Game date of the last one-off maintenance. */
+  readonly lastMaintenanceOn?: string;
   readonly expansion?: Readonly<{
     projectId: string;
     addedCapacity: number;
@@ -331,24 +338,52 @@ export interface CrowdInput {
   readonly awayReputation: number;
   readonly importance: number;
   readonly recentForm: number;
+  /** Fan confidence in the work (0-100); 50 is neutral. */
+  readonly fanMood?: number;
+  /** Stadium quality (0-100); 60 is neutral. */
+  readonly stadiumQuality?: number;
 }
 
-/** Pure demand curve: raising price can never raise attendance for identical context. */
-export function calculateAttendance(input: CrowdInput): number {
+/**
+ * Fans a club can draw for an ordinary match at its reference price: bigger
+ * clubs (reputation) pull a crowd far larger than a small club's.
+ */
+export function clubFanBase(reputation: number): number {
+  const above = Math.max(0, reputation - 40);
+  return Math.round(9_000 + above * above * 40);
+}
+
+/**
+ * Fans who want a ticket, before the stadium caps them. Price works against
+ * the club's own reference price, so a big club charges more for the same
+ * pull; opponent, stakes, form, fan mood and stadium quality add appeal.
+ */
+export function crowdDemand(input: CrowdInput): number {
   if (input.capacity < 1 || input.referencePrice < 1 || input.ticketPrice < 0)
     throw new DomainError('INVALID_VALUE', 'invalid crowd inputs');
-  const appeal =
-    0.2 +
-    input.homeReputation / 250 +
-    input.awayReputation / 500 +
-    Math.max(0, Math.min(100, input.importance)) / 500 +
-    Math.max(-20, Math.min(20, input.recentForm)) / 200;
+  const appeal = Math.max(
+    0.2,
+    Math.min(
+      1.6,
+      0.6 +
+        (input.awayReputation - 50) / 250 +
+        Math.max(0, Math.min(100, input.importance)) / 400 +
+        Math.max(-20, Math.min(20, input.recentForm)) / 100 +
+        (Math.max(0, Math.min(100, input.fanMood ?? 50)) - 50) / 250 +
+        (Math.max(0, Math.min(100, input.stadiumQuality ?? 60)) - 60) / 400,
+    ),
+  );
   const priceRatio = input.ticketPrice / input.referencePrice;
   const priceFactor = Math.max(0.15, Math.min(1.25, 1.35 - priceRatio * 0.45));
   return Math.max(
     0,
-    Math.min(input.capacity, Math.floor(input.capacity * appeal * priceFactor)),
+    Math.floor(clubFanBase(input.homeReputation) * appeal * priceFactor),
   );
+}
+
+/** Pure demand curve: raising price can never raise attendance for identical context. */
+export function calculateAttendance(input: CrowdInput): number {
+  return Math.min(input.capacity, crowdDemand(input));
 }
 
 export function startStadiumExpansion(
@@ -384,5 +419,130 @@ export function completeStadiumExpansion(
   return createStadium({
     ...withoutExpansion,
     capacity: stadium.capacity + stadium.expansion.addedCapacity,
+  });
+}
+
+/** Largest stadium a club can grow into. */
+export const STADIUM_MAX_CAPACITY = 90_000;
+
+export type StadiumExpansionPlanId = 'small' | 'medium' | 'large';
+
+export interface StadiumExpansionPlan {
+  readonly id: StadiumExpansionPlanId;
+  readonly addedCapacity: number;
+  readonly cost: Money;
+  /** Days from the order to the opening of the new seats. */
+  readonly days: number;
+}
+
+/** Seats, cost per seat (minor units) and duration of each work. */
+const EXPANSION_PLANS: Readonly<
+  Record<
+    StadiumExpansionPlanId,
+    Readonly<{ seats: number; seatCost: number; days: number }>
+  >
+> = {
+  small: { seats: 2_000, seatCost: 150_000, days: 90 },
+  medium: { seats: 5_000, seatCost: 180_000, days: 150 },
+  large: { seats: 10_000, seatCost: 220_000, days: 240 },
+};
+
+/**
+ * Works the club can order, priced by the server (the client only picks
+ * one). Seats stop at {@link STADIUM_MAX_CAPACITY}; a stadium with works
+ * already running offers none.
+ */
+export function stadiumExpansionPlans(
+  stadium: Stadium,
+): readonly StadiumExpansionPlan[] {
+  if (stadium.expansion !== undefined) return Object.freeze([]);
+  const room = STADIUM_MAX_CAPACITY - stadium.capacity;
+  return Object.freeze(
+    (Object.keys(EXPANSION_PLANS) as StadiumExpansionPlanId[]).flatMap((id) => {
+      const plan = EXPANSION_PLANS[id];
+      const seats = Math.min(plan.seats, room);
+      if (seats < 100) return [];
+      return [
+        Object.freeze({
+          id,
+          addedCapacity: seats,
+          cost: (seats * plan.seatCost) as Money,
+          days: plan.days,
+        }),
+      ];
+    }),
+  );
+}
+
+export type StadiumMaintenancePlanId =
+  'repairs' | 'renovation' | 'modernization';
+
+export interface StadiumMaintenancePlan {
+  readonly id: StadiumMaintenancePlanId;
+  /** Quality points the work restores (never past 100). */
+  readonly qualityGain: number;
+  readonly cost: Money;
+}
+
+/** Quality points and cost per seat (minor units) of each one-off work. */
+const MAINTENANCE_PLANS: Readonly<
+  Record<StadiumMaintenancePlanId, Readonly<{ gain: number; seatCost: number }>>
+> = {
+  repairs: { gain: 10, seatCost: 1_500 },
+  renovation: { gain: 25, seatCost: 3_500 },
+  modernization: { gain: 45, seatCost: 7_000 },
+};
+
+/**
+ * One-off maintenance the club can pay for, priced by stadium size. A work
+ * that would pass 100 restores only the missing points and costs pro rata.
+ */
+export function stadiumMaintenancePlans(
+  stadium: Stadium,
+): readonly StadiumMaintenancePlan[] {
+  const missing = 100 - stadium.quality;
+  return Object.freeze(
+    (Object.keys(MAINTENANCE_PLANS) as StadiumMaintenancePlanId[]).flatMap(
+      (id) => {
+        const plan = MAINTENANCE_PLANS[id];
+        const gain = Math.min(plan.gain, missing);
+        if (gain <= 0) return [];
+        return [
+          Object.freeze({
+            id,
+            qualityGain: gain,
+            cost: Math.max(
+              1,
+              Math.round((stadium.capacity * plan.seatCost * gain) / plan.gain),
+            ) as Money,
+          }),
+        ];
+      },
+    ),
+  );
+}
+
+export function maintainStadium(
+  stadium: Stadium,
+  qualityGain: number,
+  onDate: string,
+): Stadium {
+  if (!Number.isInteger(qualityGain) || qualityGain <= 0)
+    throw new DomainError('INVALID_VALUE', 'maintenance must restore quality');
+  return createStadium({
+    ...stadium,
+    quality: Math.min(100, stadium.quality + qualityGain),
+    lastMaintenanceOn: onDate,
+  });
+}
+
+/** Wear of the stands and pitch; quality never drops below zero. */
+export function wearStadium(stadium: Stadium, points: number): Stadium {
+  if (!Number.isInteger(points) || points < 0)
+    throw new DomainError('INVALID_VALUE', 'stadium wear must be natural');
+  if (points === 0 || stadium.quality === 0) return stadium;
+  return createStadium({
+    ...stadium,
+    quality: Math.max(0, stadium.quality - points),
   });
 }

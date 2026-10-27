@@ -24,7 +24,6 @@ import {
   SoccerBall,
   Storefront,
   Strategy,
-  Trophy,
   UserCircle,
   UsersThree,
   X,
@@ -39,46 +38,58 @@ import { cn } from '@/lib/utils';
 export type Destination = readonly [Screen, string, typeof House];
 
 /**
- * Game-menu groups (docs/09 screen map). Every career screen lives in exactly
+ * Game-menu groups (docs/09 screen map). Every menu screen lives in exactly
  * one group so `aria-current` always has a home; the bottom bar repeats the
- * four screens of the round loop (docs/07 §3) plus the menu trigger.
+ * four screens of the round loop (docs/07 §3) plus the menu trigger. The
+ * desktop sidebar shows a heading only for Clube and Carreira; the mobile
+ * menu titles every group. Competições lives inside Calendário.
  */
 interface MenuGroup {
-  id: 'clube' | 'futebol' | 'carreira';
-  label: string;
+  id: 'inicio' | 'clube' | 'futebol' | 'carreira';
+  /** Visible heading on the desktop sidebar; absent means no heading. */
+  label?: string;
+  /** Heading of the group in the mobile game menu (and its region name). */
+  menuLabel: string;
   items: readonly Destination[];
 }
 
 export const menuGroups: readonly MenuGroup[] = [
   {
+    id: 'inicio',
+    menuLabel: 'Principal',
+    items: [
+      ['central', 'Central', House],
+      ['map', 'Mapa', MapTrifold],
+      ['inbox', 'Caixa de entrada', Bell],
+    ],
+  },
+  {
     id: 'clube',
     label: 'Clube',
+    menuLabel: 'Clube',
     items: [
-      ['map', 'Mapa', MapTrifold],
-      ['stadium', 'Estádio', SoccerBall],
-      ['office', 'Escritório', Briefcase],
+      ['squad', 'Elenco', UsersThree],
+      ['tactics', 'Táticas', Strategy],
       ['finance', 'Finanças', Bank],
+      ['office', 'Escritório', Briefcase],
+      ['stadium', 'Estádio', SoccerBall],
     ],
   },
   {
     id: 'futebol',
-    label: 'Futebol',
+    menuLabel: 'Futebol',
     items: [
-      ['central', 'Central', House],
-      ['squad', 'Elenco', UsersThree],
-      ['tactics', 'Táticas', Strategy],
       ['market', 'Mercado', Storefront],
-      ['calendar', 'Calendário', CalendarDots],
       ['table', 'Classificação', ListNumbers],
-      ['competitions', 'Competições', Trophy],
+      ['calendar', 'Calendário', CalendarDots],
       ['season', 'Temporada', ChartLineUp],
     ],
   },
   {
     id: 'carreira',
     label: 'Carreira',
+    menuLabel: 'Carreira',
     items: [
-      ['inbox', 'Caixa de entrada', Bell],
       ['history', 'Histórico', ClockCounterClockwise],
       ['ranking', 'Ranking', Ranking],
       ['profile', 'Perfil', UserCircle],
@@ -98,9 +109,11 @@ export const barDestinations = [
   ['office', 'Escritório', Briefcase],
 ] as const satisfies ReadonlyArray<Destination>;
 
-export const labels = Object.fromEntries(
-  destinations.map(([id, label]) => [id, label]),
-) as Record<Screen, string>;
+/** Screen titles; Competições has no menu entry (it opens from Calendário). */
+export const labels = {
+  ...Object.fromEntries(destinations.map(([id, label]) => [id, label])),
+  competitions: 'Competições',
+} as Record<Screen, string>;
 
 /** Counters shown on menu buttons (unread mail, open window). */
 export function menuBadges(
@@ -238,7 +251,7 @@ export function GameMenu({
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {menuGroups.map((group) => (
-          <MenuSection key={group.id} id={group.id} label={group.label}>
+          <MenuSection key={group.id} id={group.id} label={group.menuLabel}>
             {group.items.map(([id, label, Icon]) => (
               <MenuButton
                 key={id}

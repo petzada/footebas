@@ -1092,14 +1092,18 @@ function Matchday(props: {
         ? `Pausado · ${String(minute)}'`
         : `Ao vivo · ${String(minute)}'`;
 
+  // Phone: one column (score, pitch, controls, adjustments, stats, feed).
+  // Desktop (lg): the big score on the top left, the pitch large in the
+  // middle with controls and the half-time/paused adjustments right below
+  // it, and the narration over the statistics in a column beside the pitch.
   return (
     <div
-      className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-3 overflow-x-clip"
+      className="mx-auto grid w-full min-w-0 max-w-3xl gap-3 overflow-x-clip lg:max-w-none lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] lg:items-start lg:gap-4"
       data-testid="live-match"
     >
       <section
         aria-label="Placar ao vivo"
-        className="panel-board min-w-0 px-3 py-3"
+        className="panel-board min-w-0 px-3 py-3 lg:col-start-1 lg:row-start-1 lg:w-full lg:max-w-2xl lg:justify-self-start lg:px-5"
       >
         <div className="flex items-center justify-between gap-2">
           <Badge>{status}</Badge>
@@ -1133,14 +1137,17 @@ function Matchday(props: {
         <p
           aria-live="polite"
           aria-atomic="true"
-          className="mt-3 min-h-[3.25rem] text-balance border-t border-chalk/20 pt-2 text-center text-sm font-medium text-chalk"
+          className="mt-3 min-h-[3.25rem] text-balance border-t border-chalk/20 pt-2 text-center text-sm font-medium text-chalk lg:hidden"
           data-testid="live-narration"
         >
           {update.message}
         </p>
       </section>
 
-      <div className="w-full min-w-0 max-w-full" data-testid="live-pitch">
+      <div
+        className="w-full min-w-0 max-w-full lg:col-start-1 lg:row-start-2"
+        data-testid="live-pitch"
+      >
         {replay && !update.done ? (
           <MatchStage
             bare
@@ -1162,7 +1169,7 @@ function Matchday(props: {
       </div>
 
       <div
-        className="flex min-w-0 flex-wrap items-center gap-2"
+        className="flex min-w-0 flex-wrap items-center gap-2 lg:col-start-1 lg:row-start-3"
         data-testid="live-controls"
       >
         {!update.done && (
@@ -1219,7 +1226,10 @@ function Matchday(props: {
       </div>
 
       {halfTimeStop && (
-        <div className="panel min-w-0 p-3 text-center" role="status">
+        <div
+          className="panel min-w-0 p-3 text-center lg:col-start-1 lg:row-start-4"
+          role="status"
+        >
           <p className="text-sm font-medium">
             Intervalo. Faça substituições e ajustes ou siga para o segundo
             tempo.
@@ -1239,7 +1249,10 @@ function Matchday(props: {
       )}
 
       {paused && !update.done && (
-        <Card className="min-w-0" data-testid="live-interventions">
+        <Card
+          className="min-w-0 lg:col-start-1 lg:row-start-5"
+          data-testid="live-interventions"
+        >
           <CardHeader>
             <CardTitle className="font-display text-sm uppercase">
               Ajustes aos {minute}&apos;
@@ -1248,8 +1261,8 @@ function Matchday(props: {
               O que já aconteceu não muda; a mudança vale a partir daqui.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <FieldGroup>
+          <CardContent className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-end">
+            <FieldGroup className="lg:col-span-2 lg:grid lg:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="outgoing">Sai</FieldLabel>
                 <select
@@ -1324,6 +1337,7 @@ function Matchday(props: {
             </Field>
             <Button
               variant="outline"
+              className="lg:col-start-2"
               onClick={() =>
                 perform(async () => {
                   const next = await props.api.changeMatchTactics(
@@ -1343,64 +1357,78 @@ function Matchday(props: {
         </Card>
       )}
 
-      <section
-        aria-label="Estatísticas da partida"
-        className="panel-board grid min-w-0 gap-4 p-4"
-        data-testid="live-stats"
+      {/* Side column on desktop; on the phone its cards keep flowing. */}
+      <div
+        className="contents lg:col-start-2 lg:row-span-5 lg:row-start-1 lg:flex lg:min-w-0 lg:flex-col lg:gap-4 xl:sticky xl:top-20"
+        data-testid="live-side"
       >
-        <StatBar
-          label="Posse"
-          home={stats.possession.home}
-          away={stats.possession.away}
-          format={(value) => `${String(Math.round(value))}%`}
-        />
-        <StatBar
-          label="Finalizações"
-          home={stats.home.shots}
-          away={stats.away.shots}
-        />
-        <StatBar
-          label="xG"
-          home={stats.home.xg}
-          away={stats.away.xg}
-          format={(value) => value.toFixed(1)}
-        />
-        <StatBar
-          label="Cartões"
-          home={stats.home.cards}
-          away={stats.away.cards}
-        />
-      </section>
+        <section
+          aria-label="Estatísticas da partida"
+          className="panel-board grid min-w-0 gap-4 p-4 lg:order-2"
+          data-testid="live-stats"
+        >
+          <StatBar
+            label="Posse"
+            home={stats.possession.home}
+            away={stats.possession.away}
+            format={(value) => `${String(Math.round(value))}%`}
+          />
+          <StatBar
+            label="Finalizações"
+            home={stats.home.shots}
+            away={stats.away.shots}
+          />
+          <StatBar
+            label="xG"
+            home={stats.home.xg}
+            away={stats.away.xg}
+            format={(value) => value.toFixed(1)}
+          />
+          <StatBar
+            label="Cartões"
+            home={stats.home.cards}
+            away={stats.away.cards}
+          />
+        </section>
 
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle className="font-display text-sm uppercase">
-            Lance a lance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol
-            aria-label="Feed da partida"
-            className="match-feed flex max-h-72 flex-col gap-3 overflow-y-auto"
-            data-testid="live-feed"
-          >
-            {props.feed
-              .slice()
-              .reverse()
-              .map((event) => (
-                <li
-                  key={event.id}
-                  className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2 text-sm"
-                >
-                  <strong className="font-display text-primary">
-                    {event.minute}&apos;
-                  </strong>
-                  <span className="min-w-0 break-words">{event.message}</span>
-                </li>
-              ))}
-          </ol>
-        </CardContent>
-      </Card>
+        <Card className="min-w-0 lg:order-1">
+          <CardHeader>
+            <CardTitle className="font-display text-sm uppercase">
+              Lance a lance
+            </CardTitle>
+            <p
+              aria-live="polite"
+              aria-atomic="true"
+              className="hidden min-h-[3.25rem] text-balance text-sm font-medium lg:block"
+              data-testid="live-narration-side"
+            >
+              {update.message}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ol
+              aria-label="Feed da partida"
+              className="match-feed flex max-h-72 flex-col gap-3 overflow-y-auto lg:max-h-[min(55vh,30rem)]"
+              data-testid="live-feed"
+            >
+              {props.feed
+                .slice()
+                .reverse()
+                .map((event) => (
+                  <li
+                    key={event.id}
+                    className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2 text-sm"
+                  >
+                    <strong className="font-display text-primary">
+                      {event.minute}&apos;
+                    </strong>
+                    <span className="min-w-0 break-words">{event.message}</span>
+                  </li>
+                ))}
+            </ol>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -71,6 +71,9 @@ export const INBOX_TOPICS = [
   'notice_window_open',
   'notice_window_closing',
   'notice_contract_end',
+  'notice_job_offer',
+  'notice_youth_intake',
+  'notice_stadium',
 ] as const;
 export const inboxTopicSchema = z.enum(INBOX_TOPICS);
 export const inboxChoiceSchema = z.strictObject({

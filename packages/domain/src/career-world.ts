@@ -104,6 +104,109 @@ export interface JobProposal {
   readonly expiresOn: string;
   readonly minimumPrestige: number;
   readonly status: 'open' | 'accepted' | 'rejected' | 'expired';
+  /**
+   * Why the club called: a bigger club after good work (`step_up`), a peer
+   * (`lateral`), a smaller club after a poor run (`step_down`) or any club
+   * for a coach out of work (`reemployment`). Absent on older proposals.
+   */
+  readonly reason?: JobProposalReason;
+}
+
+export type JobProposalReason =
+  'step_up' | 'lateral' | 'step_down' | 'reemployment';
+
+export interface JobMarketInput {
+  readonly career: ManagerCareer;
+  /** Reputation of the club the coach manages; absent when out of work. */
+  readonly currentReputation?: number;
+  /** Reputation of the last club managed (out of work). */
+  readonly lastReputation?: number;
+  /**
+   * Recent work from -1 (crisis) to 1 (excellent): league standing against
+   * the objective, form and board confidence.
+   */
+  readonly performance: number;
+  /** Clubs of the pyramid; `interested` means a vacancy this time. */
+  readonly clubs: readonly Readonly<{
+    clubId: ClubId;
+    reputation: number;
+    interested: boolean;
+  }>[];
+  /** Clubs with an open proposal already (never offered twice). */
+  readonly excludedClubIds?: readonly ClubId[];
+  readonly onDate: string;
+  readonly maxOffers: number;
+  readonly validDays?: number;
+  readonly nextId: () => string;
+}
+
+/**
+ * Clubs that call the coach. Good work brings bigger clubs, a poor run only
+ * smaller ones; prestige widens the reach. A coach out of work always hears
+ * from someone (the nearest clubs below the last one), so a career never
+ * stalls after a dismissal.
+ */
+export function jobMarketOffers(input: JobMarketInput): readonly JobProposal[] {
+  if (input.maxOffers <= 0) return Object.freeze([]);
+  const performance = Math.max(-1, Math.min(1, input.performance));
+  const employed = input.currentReputation !== undefined;
+  const reference = input.currentReputation ?? (input.lastReputation ?? 58) - 5;
+  const center =
+    reference +
+    performance * 12 +
+    Math.min(6, Math.max(0, input.career.prestige) / 30);
+  const low = employed ? center - 6 : center - 12;
+  const high = employed ? center + 6 : center + 4;
+  // Never the current club, nor (out of work) the club that just let go.
+  const lastClubId = input.career.appointments.at(-1)?.clubId;
+  const excluded = new Set<string>([
+    ...(input.excludedClubIds ?? []),
+    ...(input.career.currentClubId === undefined
+      ? []
+      : [input.career.currentClubId]),
+    ...(!employed && lastClubId !== undefined ? [lastClubId] : []),
+  ]);
+  const distance = (reputation: number) => Math.abs(reputation - center);
+  const eligible = input.clubs
+    .filter(({ clubId }) => !excluded.has(clubId))
+    .sort(
+      (a, b) =>
+        distance(a.reputation) - distance(b.reputation) ||
+        a.clubId.localeCompare(b.clubId),
+    );
+  const inBand = eligible.filter(
+    ({ interested, reputation }) =>
+      interested && reputation >= low && reputation <= high,
+  );
+  // Out of work, the nearest clubs (not above the reach) fill the list.
+  const chosen = employed
+    ? inBand
+    : [
+        ...new Set([
+          ...inBand,
+          ...eligible.filter(({ reputation }) => reputation <= high),
+          ...eligible,
+        ]),
+      ];
+  return Object.freeze(
+    chosen.slice(0, input.maxOffers).map(({ clubId, reputation }) =>
+      Object.freeze({
+        id: input.nextId(),
+        clubId,
+        offeredOn: input.onDate,
+        expiresOn: addDays(input.onDate, input.validDays ?? 21),
+        minimumPrestige: Math.max(0, input.career.prestige),
+        status: 'open' as const,
+        reason: !employed
+          ? ('reemployment' as const)
+          : reputation > reference + 2
+            ? ('step_up' as const)
+            : reputation < reference - 2
+              ? ('step_down' as const)
+              : ('lateral' as const),
+      }),
+    ),
+  );
 }
 
 export function proposeJobs(

@@ -10,7 +10,11 @@ import type {
   StoredPhaseFourReceipt,
 } from './phase-four-ports.js';
 import { PhaseFourConflictError } from './phase-four-service.js';
-import { syncManagedClub, type CareerSnapshot } from './service.js';
+import {
+  objectivesAfterMove,
+  syncManagedClub,
+  type CareerSnapshot,
+} from './service.js';
 import { careerProfileOf } from './coach-personality.js';
 import {
   catalogCareerContent,
@@ -143,6 +147,10 @@ export class UnifiedPhaseFourRepository implements PhaseFourStateRepository {
       ) as Pick<CareerSnapshot['world'], (typeof WORLD_FIELDS)[number]>),
       market: { listings: [...(state.market?.listings ?? [])] },
     };
+    objectivesAfterMove(
+      snapshot,
+      (save.snapshot as unknown as CareerSnapshot).world.manager.currentClubId,
+    );
     syncManagedClub(snapshot);
     await tx.saves.update(save.id, save.userId, expectedVersion, {
       snapshot: snapshot as unknown as CanonicalValue,

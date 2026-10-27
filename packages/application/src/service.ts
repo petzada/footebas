@@ -98,6 +98,7 @@ import {
   type SeasonSummary,
 } from './career-competitions.js';
 import {
+  boardObjectives,
   closeSeasonWorld,
   coachedMatchDeltas,
   createCareerWorld,
@@ -110,6 +111,13 @@ import {
   type WorldContext,
 } from './career-world-rules.js';
 import { runMarketDay } from './career-market.js';
+import { runClubDay } from './career-club.js';
+import {
+  academyView,
+  divisionOfClub,
+  jobProposalsView,
+  stadiumView,
+} from './club-read.js';
 import {
   OfficeRuleError,
   configureMembership,
@@ -607,6 +615,12 @@ export class FootebasApplication {
                 snapshot.season,
               ),
             );
+            // The academy opens with a first intake on the coach's first day.
+            runClubDay(snapshot, {
+              date: snapshot.currentDate,
+              seed: save.seed,
+              form: [],
+            });
             break;
           }
           case 'DecideSponsorshipOffer':
@@ -1016,11 +1030,19 @@ export class FootebasApplication {
         managedToday === undefined
           ? undefined
           : this.recordPosition(snapshot, config, tiers, managedToday);
+      const played =
+        managedToday === undefined
+          ? undefined
+          : playedManagedMatch(snapshot, managedToday);
+      runClubDay(snapshot, {
+        date,
+        seed,
+        form: played?.form ?? recentManagedForm(snapshot),
+        ...(league === undefined ? {} : { league }),
+      });
       runInboxDay(snapshot, {
         date,
-        ...(managedToday === undefined
-          ? {}
-          : { played: playedManagedMatch(snapshot, managedToday) }),
+        ...(played === undefined ? {} : { played }),
         ...(league === undefined ? {} : { league }),
       });
     }
@@ -1521,9 +1543,18 @@ export class FootebasApplication {
         anyClub: entitlements.anyClub,
         activeCareers: saves.length,
       },
+      // Most recently played first: "Continuar" and a fresh session open the
+      // career the player was on, never just the oldest save. Locks still
+      // follow the creation order above.
       careers: saves
         .filter((save) => save.versions.schema === CAREER_SAVE_SCHEMA)
-        .map((save) => {
+        .map((save, created) => ({ save, created }))
+        .sort(
+          (left, right) =>
+            right.save.updatedAt.localeCompare(left.save.updatedAt) ||
+            left.created - right.created,
+        )
+        .map(({ save }) => {
           const snapshot = snapshotOf(save);
           const club = snapshot.clubs.find(
             ({ id }) => id === snapshot.selectedClubId,
@@ -1537,6 +1568,7 @@ export class FootebasApplication {
             ...(club ? { clubId: club.id, clubName: club.name } : {}),
             season: snapshot.season,
             currentDate: snapshot.currentDate,
+            updatedAt: save.updatedAt,
             locked: isCareerLocked(order, save.id, entitlements),
           };
         }),
@@ -1603,7 +1635,9 @@ export class FootebasApplication {
                         ? `${Number(posting.amount) < 0 ? 'Benefícios do sócio-torcedor' : 'Sócio-torcedor'} · ${source.period}`
                         : source.type === 'sponsor_termination'
                           ? 'Multa rescisória de patrocínio'
-                          : 'Estádio';
+                          : source.projectId.startsWith('stadium_maintenance')
+                            ? 'Estádio · manutenção'
+                            : 'Estádio · ampliação';
           return [
             {
               id: entry.id,
@@ -1639,21 +1673,11 @@ export class FootebasApplication {
                 ),
                 openingBalance: Number(club.balance),
                 monthlyWageBill: clubWageBill(world, club.id),
-                stadium: {
-                  capacity: stadium.capacity,
-                  ticketPrice: Number(stadium.ticketPrice),
-                  maintenance: Number(stadium.maintenance),
-                  quality: stadium.quality,
-                  ...(stadium.expansion
-                    ? {
-                        expansion: {
-                          addedCapacity: stadium.expansion.addedCapacity,
-                          cost: Number(stadium.expansion.cost),
-                          completesOn: stadium.expansion.completesOn,
-                        },
-                      }
-                    : {}),
-                },
+                reputation: Number(club.reputation),
+                ...(divisionOfClub(s, club.id) === undefined
+                  ? {}
+                  : { division: divisionOfClub(s, club.id) }),
+                stadium: stadiumView(s, worldContextOf(s), stadium),
               },
             }
           : {}),
@@ -1667,14 +1691,7 @@ export class FootebasApplication {
             status,
           }),
         ),
-        jobProposals: world.jobProposals.map((proposal) => ({
-          id: proposal.id,
-          clubId: proposal.clubId,
-          clubName: names.get(proposal.clubId) ?? proposal.clubId,
-          expiresOn: proposal.expiresOn,
-          minimumPrestige: proposal.minimumPrestige,
-          status: proposal.status,
-        })),
+        jobProposals: jobProposalsView(s),
         contracts: world.contracts
           .filter((contract) => contract.clubId === clubId)
           .map((contract) => ({
@@ -1702,16 +1719,7 @@ export class FootebasApplication {
               ? {}
               : { counterOf: offer.counterOf }),
           })),
-        youth: world.youth
-          .filter(({ player }) => player.clubId === clubId)
-          .map(({ player, estimate, status }) => ({
-            playerId: player.id,
-            name: player.name,
-            position: player.position,
-            age: player.age,
-            estimate,
-            status,
-          })),
+        ...academyView(s),
         history: world.history
           .slice(-200)
           .reverse()
@@ -2205,6 +2213,12 @@ function rollSeason(
   withWorld(snapshot, (context) =>
     runOfficeDay(context, snapshot.currentDate, seed, snapshot.season),
   );
+  // Academy season turn (ages, leavers) and expired job offers.
+  runClubDay(snapshot, {
+    date: snapshot.currentDate,
+    seed,
+    form: managedForm,
+  });
   return achievements;
 }
 /** Names the season statistics resolve ids with. */
@@ -2350,6 +2364,25 @@ function eligibleShortage(snapshot: Snapshot, club: Club): string | undefined {
   if (!eligible.some(({ position }) => position === 'GK'))
     return 'Nenhum goleiro apto: todos os goleiros do elenco estão lesionados ou suspensos. Contrate um goleiro para entrar em campo.';
   return undefined;
+}
+
+/**
+ * After the coach takes a job offer the board of the new club sets its own
+ * objectives (the old club's targets no longer apply).
+ */
+export function objectivesAfterMove(
+  snapshot: Snapshot,
+  previousClubId: string | undefined,
+): void {
+  const clubId = snapshot.world.manager.currentClubId;
+  if (clubId === undefined || clubId === previousClubId) return;
+  const division = divisionOf(snapshot, clubId);
+  const rank =
+    [...snapshot.competition.divisions[division]]
+      .map((id) => snapshot.clubs.find((item) => item.id === id)!)
+      .sort((left, right) => Number(right.reputation) - Number(left.reputation))
+      .findIndex(({ id }) => id === clubId) + 1;
+  snapshot.world.objectives = boardObjectives(snapshot.world, division, rank);
 }
 
 /** Keeps the matchday club aligned with the manager after firings or moves. */

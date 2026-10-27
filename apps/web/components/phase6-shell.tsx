@@ -11,7 +11,6 @@ import {
 } from '@phosphor-icons/react';
 import { Brand } from '@/components/brand';
 import { ClubEmblem } from '@/components/club-emblem';
-import { CoachAvatar } from '@/components/coach-avatar';
 import {
   GameMenu,
   barDestinations,
@@ -25,7 +24,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { CareerView, Screen } from '@/lib/career-api';
-import { personalityLabel } from '@/lib/coach-profile';
 import { unreadCount } from '@/lib/inbox-product';
 import { cn } from '@/lib/utils';
 
@@ -265,15 +263,19 @@ function DesktopSidebar({
         {menuGroups.map((group) => (
           <section
             key={group.id}
-            aria-labelledby={`desktop-${group.id}`}
+            {...(group.label
+              ? { 'aria-labelledby': `desktop-${group.id}` }
+              : { 'aria-label': group.menuLabel })}
             className="mb-3 flex flex-col gap-1"
           >
-            <p
-              id={`desktop-${group.id}`}
-              className="px-3 pb-1 font-pixel text-[.5rem] text-bulb"
-            >
-              {group.label}
-            </p>
+            {group.label && (
+              <p
+                id={`desktop-${group.id}`}
+                className="px-3 pb-1 font-pixel text-[.5rem] text-bulb"
+              >
+                {group.label}
+              </p>
+            )}
             {group.items.map(([id, label, Icon]) => (
               <Button
                 key={id}
@@ -297,20 +299,6 @@ function DesktopSidebar({
           </section>
         ))}
       </nav>
-      <Separator className="my-4" />
-      <div className="flex min-w-0 items-center gap-3">
-        {career.coachProfile && (
-          <CoachAvatar avatar={career.coachProfile.avatar} size={44} />
-        )}
-        <div className="min-w-0">
-          <p className="text-xs text-chalk/70">
-            Treinador
-            {career.coachProfile &&
-              ` · ${personalityLabel(career.coachProfile.personality)}`}
-          </p>
-          <p className="truncate font-pixel text-[.6rem]">{career.coach}</p>
-        </div>
-      </div>
     </aside>
   );
 }
