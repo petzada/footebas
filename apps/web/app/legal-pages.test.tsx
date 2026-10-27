@@ -3,15 +3,15 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import PrivacidadePage from '@/app/privacidade/page';
 import TermosPage from '@/app/termos/page';
-import { LEGAL_DRAFT_NOTICE } from '@/components/legal-page';
+import { LEGAL_INFO } from '@/components/legal-page';
 
 describe('Páginas legais', () => {
-  it('Termos de uso renderiza com marcação de rascunho e marcadores a preencher', () => {
+  it('Termos de uso identifica a empresa, o operador e o contato reais', () => {
     render(<TermosPage />);
     expect(
       screen.getByRole('heading', { level: 1, name: /termos de uso/i }),
     ).toBeTruthy();
-    expect(screen.getByRole('note').textContent).toBe(LEGAL_DRAFT_NOTICE);
+    expect(screen.queryByRole('note')).toBeNull();
     expect(
       screen.getByRole('heading', { name: /licença única/i }),
     ).toBeTruthy();
@@ -19,10 +19,18 @@ describe('Páginas legais', () => {
     expect(
       screen.getByRole('heading', { name: /ranking público/i }),
     ).toBeTruthy();
-    expect(document.body.textContent).toMatch(/\[preencher: CNPJ\]/);
-    expect(document.body.textContent).not.toMatch(
-      /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/,
-    );
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/preencher/i);
+    expect(text).toContain('Marct Soluções Digitais');
+    expect(text).toContain('63.940.273/0001-36');
+    expect(text).toContain('Marcio Petigrosso');
+    expect(
+      screen
+        .getAllByRole('link', { name: LEGAL_INFO.email })
+        .every(
+          (link) => link.getAttribute('href') === `mailto:${LEGAL_INFO.email}`,
+        ),
+    ).toBe(true);
     expect(
       screen.getByRole('link', { name: /política de privacidade/i }),
     ).toBeTruthy();
@@ -36,8 +44,10 @@ describe('Páginas legais', () => {
         name: /política de privacidade/i,
       }),
     ).toBeTruthy();
-    expect(screen.getByRole('note').textContent).toBe(LEGAL_DRAFT_NOTICE);
+    expect(screen.queryByRole('note')).toBeNull();
     for (const heading of [
+      /quem é responsável/i,
+      /login com google/i,
       /dados que coletamos/i,
       /base legal/i,
       /por quanto tempo/i,
@@ -48,9 +58,14 @@ describe('Páginas legais', () => {
     expect(
       screen.getByText(/não vendemos nem alugamos dados pessoais/i),
     ).toBeTruthy();
-    expect(document.body.textContent).toMatch(
-      /\[preencher: encarregado de dados/i,
-    );
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/preencher/i);
+    expect(text).toMatch(/encarregado .*\(DPO\)/);
+    expect(text).toMatch(/uso limitado/i);
+    expect(text).toContain(LEGAL_INFO.cnpj);
+    expect(
+      screen.getAllByRole('link', { name: LEGAL_INFO.email }).length,
+    ).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: /termos de uso/i })).toBeTruthy();
   });
 });
