@@ -32,6 +32,18 @@ Monorepo pnpm + Turbo (`apps/web`, `apps/api`, `apps/worker`, `packages/*`). Pro
 5. Deploy manual (`wrangler deploy`, `cf:deploy`), secrets do Worker e migrations são ações do responsável,
    nunca do agente. Nenhum segredo no repositório nem no ambiente da nuvem.
 
+### PR na VM da nuvem (Claude Code na web, app ou thread de projeto)
+
+Na nuvem o proxy do GitHub bloqueia GraphQL, então `gh pr …` e `gh issue …` dão 403. `git push` e
+`gh api` (REST) funcionam. Lá o fluxo de PR é este:
+
+- Abrir em draft: botão **Create draft PR** no cartão Changes (clique direito em Create PR), ou
+  `gh api repos/{owner}/{repo}/pulls -f title='<tipo>(<escopo>): …' -f head=<branch> -f base=main -f body='…' -F draft=true`.
+- Listar ou ver PR: `gh api repos/{owner}/{repo}/pulls?head={owner}:<branch>`.
+- Marcar como pronto não tem endpoint REST: na nuvem o agente avisa que os gates estão verdes e o
+  responsável marca pelo GitHub (ou pelo app). Merge continua sendo só do responsável.
+- Não coloque `GH_TOKEN` no ambiente da nuvem: não resolve o 403 e deixa o token legível.
+
 ## Branches de referência
 
 - `mvp/fase-6-9`: trilha antiga do MVP; não é mais gatilho de deploy. Trabalho novo nasce da `main`.
