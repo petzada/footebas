@@ -4,11 +4,14 @@ name: deploy-web
 # build creates symlinks that Windows refuses without Developer Mode). With a
 # CLOUDFLARE_API_TOKEN secret it deploys; without one it keeps the bundle as an
 # artifact so a maintainer can run `wrangler deploy` from a logged-in machine.
+# Deploy só pelo CI (AGENTS.md): o secret CLOUDFLARE_API_TOKEN e a variable
+# CLOUDFLARE_ACCOUNT_ID ficam em Settings do repositório. A API tem o seu
+# próprio workflow (deploy-api.yml).
 
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'mvp/fase-6-9']
+    branches: [main]
     paths:
       - 'apps/web/**'
       - 'packages/**'
@@ -24,7 +27,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.footebas.com.br' }}
@@ -32,6 +35,10 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       NEXT_PUBLIC_AUTH_MODE: supabase
       HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      # Turbo Remote Cache (Vercel, gratuito): reaproveita o build dos pacotes entre
+      # runs e com o pre-push local. Sem os valores, o turbo só usa o cache local.
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -56,6 +63,9 @@ jobs:
           path: apps/web/.open-next
           include-hidden-files: true
           retention-days: 7
+      - name: Token ausente
+        if: ${{ env.HAS_CLOUDFLARE_TOKEN != 'true' }}
+        run: echo "::warning::CLOUDFLARE_API_TOKEN ausente; o bundle ficou como artefato e nada foi publicado."
       - name: Deploy to Cloudflare
         if: ${{ env.HAS_CLOUDFLARE_TOKEN == 'true' }}
         env:

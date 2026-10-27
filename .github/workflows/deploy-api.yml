@@ -1,0 +1,65 @@
+name: deploy-api
+
+# Publica o Worker `footebas-api` (apps/api/wrangler.jsonc) em push na main que toque a
+# API ou os pacotes de que ela depende. Sem o secret CLOUDFLARE_API_TOKEN, só valida o
+# bundle (`wrangler deploy --dry-run`) e avisa. Deploy só pelo CI (AGENTS.md).
+#
+# Secrets do Worker (SMOKE_TOKEN, ABACATEPAY_*) ficam no Cloudflare, não aqui; o
+# `wrangler deploy` preserva os já configurados.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-api.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # O wrangler empacota apps/api/src/worker.ts; os pacotes do workspace precisam do dist.
+      - run: pnpm exec turbo run build --filter="@footebas/api^..."
+      - name: Validar o bundle do Worker
+        run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/api-bundle" --config apps/api/wrangler.jsonc
+      - name: Token ausente
+        if: ${{ env.HAS_CLOUDFLARE_TOKEN != 'true' }}
+        run: echo "::warning::CLOUDFLARE_API_TOKEN ausente; bundle validado, nada foi publicado."
+      - name: Deploy to Cloudflare
+        if: ${{ env.HAS_CLOUDFLARE_TOKEN == 'true' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy --config apps/api/wrangler.jsonc --message "${{ github.sha }}"
+      - name: Smoke (/health)
+        if: ${{ env.HAS_CLOUDFLARE_TOKEN == 'true' }}
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 15 "https://api.footebas.com.br/health"; then echo; exit 0; fi
+            sleep 10
+          done
+          echo "::error::/health não respondeu 2xx depois do deploy"; exit 1
