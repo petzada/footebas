@@ -43,7 +43,7 @@ export function LegalPage({
       <article className="panel mt-6 p-5 sm:p-8">
         <p
           role="note"
-          className="inline-block border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.74rem] uppercase text-bulb-foreground"
+          className="inline-block border-2 border-white/15 bg-bulb px-2 py-1 font-pixel text-[.74rem] uppercase text-bulb-foreground"
         >
           {LEGAL_DRAFT_NOTICE}
         </p>
@@ -57,7 +57,7 @@ export function LegalPage({
         <div className="legal mt-6 flex flex-col gap-6 text-sm leading-relaxed [&_h2]:font-pixel [&_h2]:text-[.86rem] [&_h2]:leading-relaxed [&_li]:mt-1 [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5">
           {children}
         </div>
-        <footer className="mt-8 border-t-2 border-ink pt-4 text-xs text-muted-foreground">
+        <footer className="mt-8 border-t-2 border-white/15 pt-4 text-xs text-muted-foreground">
           <nav aria-label="Documentos legais" className="flex flex-wrap gap-4">
             <a className={legalLink} href="/termos">
               Termos de uso

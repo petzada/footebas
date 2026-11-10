@@ -279,7 +279,7 @@ function SaveDetails({ archive }: { archive: SaveArchive }) {
         {rows.map(([label, value]) => (
           <div
             key={label}
-            className="flex flex-wrap justify-between gap-x-3 border-t-2 border-ink/20 pt-2"
+            className="flex flex-wrap justify-between gap-x-3 border-t-2 border-white/10 pt-2"
           >
             <dt className="text-muted-foreground">{label}</dt>
             <dd className="font-pixel text-[.74rem] break-all">{value}</dd>

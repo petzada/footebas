@@ -117,7 +117,7 @@ export function NewsList({
           {news.map((item) => (
             <li
               key={item.id}
-              className="grid gap-1 border-2 border-ink border-l-8 border-l-sky bg-popover p-3"
+              className="grid gap-1 border-2 border-white/15 border-l-8 border-l-sky bg-popover p-3"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{item.tag}</Badge>

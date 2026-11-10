@@ -277,7 +277,7 @@ function Envelope({
     <li
       aria-busy={busy}
       className={cn(
-        'grid gap-2 border-2 border-ink border-l-8 bg-popover p-3',
+        'grid gap-2 border-2 border-white/15 border-l-8 bg-popover p-3',
         tone(message),
         closed && !chosen && 'opacity-80',
       )}

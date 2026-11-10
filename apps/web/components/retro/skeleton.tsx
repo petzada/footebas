@@ -28,13 +28,13 @@ export function ScreenSkeleton({
       <div className="panel-board grid grid-cols-3 gap-2 p-3">
         {[0, 1, 2].map((item) => (
           <div key={item} className="grid gap-1.5">
-            <SkeletonBar className="h-2 w-10 bg-chalk/30" />
-            <SkeletonBar className="h-4 w-16 bg-bulb/40" delay={item} />
+            <SkeletonBar className="h-2 w-10 bg-white/10" />
+            <SkeletonBar className="h-4 w-16 bg-bulb/15" delay={item} />
           </div>
         ))}
       </div>
       <div className="panel grid gap-3 p-4">
-        <SkeletonBar className="h-3 w-32 bg-ink/25" />
+        <SkeletonBar className="h-3 w-32 bg-white/5" />
         {Array.from({ length: rows }, (_, index) => (
           <SkeletonBar
             key={index}
@@ -63,7 +63,7 @@ function SkeletonBar({
   return (
     <span
       aria-hidden="true"
-      className={cn('skeleton-bar block bg-ink/15', className)}
+      className={cn('skeleton-bar block bg-white/5', className)}
       style={{ animationDelay: `${String(delay * 120)}ms` }}
     />
   );

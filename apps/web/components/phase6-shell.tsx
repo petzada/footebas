@@ -254,7 +254,7 @@ function DesktopSidebar({
 }) {
   const badges = menuBadges(career);
   return (
-    <aside className="sticky top-0 hidden h-dvh border-r-4 border-ink bg-board p-4 text-chalk lg:flex lg:flex-col">
+    <aside className="sticky top-0 hidden h-dvh border-r-4 border-white/15 bg-board p-4 text-chalk lg:flex lg:flex-col">
       <Brand />
       <a
         href="#conteudo-principal"
@@ -333,7 +333,7 @@ function DesktopRail({
     maximumFractionDigits: 1,
   }).format(career.world.finances.cash);
   return (
-    <aside className="sticky top-0 hidden h-dvh border-l-4 border-ink bg-board p-5 text-chalk xl:flex xl:flex-col xl:gap-5">
+    <aside className="sticky top-0 hidden h-dvh border-l-4 border-white/15 bg-board p-5 text-chalk xl:flex xl:flex-col xl:gap-5">
       <section aria-labelledby="proximo-jogo">
         <p className="led text-[.74rem] tracking-[.2em]">Próximo jogo</p>
         <h2 id="proximo-jogo" className="mt-1 font-pixel text-[.86rem]">

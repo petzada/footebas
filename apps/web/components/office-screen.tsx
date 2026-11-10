@@ -330,7 +330,7 @@ export function OfficeScreen({
                 {office.contracts.map((contract) => (
                   <tr
                     key={contract.contractId}
-                    className="border-t border-ink/20"
+                    className="border-t border-white/10"
                   >
                     <td className="py-1.5 font-semibold">
                       {contract.playerName}

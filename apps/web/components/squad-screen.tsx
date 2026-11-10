@@ -839,7 +839,7 @@ export function SquadScreen({
                             selectedId === player.id &&
                             'outline outline-4 outline-bulb',
                           !player &&
-                            'bg-chalk/30 outline-dashed outline-2 outline-chalk',
+                            'bg-white/10 outline-dashed outline-2 outline-chalk',
                           dragging?.playerId === player?.id && 'opacity-40',
                           selectedId &&
                             (!player || selectedId !== player.id) &&

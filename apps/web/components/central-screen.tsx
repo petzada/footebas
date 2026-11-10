@@ -186,7 +186,7 @@ function CoachBadge({ career }: { career: CareerView }) {
     <div
       aria-label="Treinador"
       role="group"
-      className="flex min-w-0 items-center gap-3 border-2 border-ink bg-popover p-2.5"
+      className="flex min-w-0 items-center gap-3 border-2 border-white/15 bg-popover p-2.5"
     >
       {profile && <CoachAvatar avatar={profile.avatar} size={52} />}
       <div className="min-w-0 text-sm">
@@ -667,7 +667,7 @@ function StandingsSummary({
               return (
                 <tr
                   key={row.club}
-                  className={cn('border-t-2', isMine && 'bg-bulb/50')}
+                  className={cn('border-t-2', isMine && 'bg-bulb/15')}
                   {...(isMine ? { 'aria-current': 'true' as const } : {})}
                 >
                   <td className="relative py-1.5 pr-1.5 pl-2.5">
@@ -761,7 +761,7 @@ function Upcoming({
     >
       <ol className="flex flex-col gap-2 text-sm">
         {career.fixture && (
-          <li className="flex items-start gap-3 border-2 border-ink bg-bulb/40 p-2">
+          <li className="flex items-start gap-3 border-2 border-white/15 bg-bulb/15 p-2">
             <CalendarDots
               className="mt-0.5 size-5 shrink-0 text-primary"
               aria-hidden="true"
@@ -851,7 +851,7 @@ function Inbox({
           {decisions.map((item) => (
             <li
               key={item.id}
-              className="grid gap-2 border-2 border-ink bg-popover p-3 sm:grid-cols-[1fr_auto] sm:items-center"
+              className="grid gap-2 border-2 border-white/15 bg-popover p-3 sm:grid-cols-[1fr_auto] sm:items-center"
             >
               <div className="text-sm">
                 <Badge variant="outline" className="mr-2">

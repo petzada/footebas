@@ -213,7 +213,7 @@ function ResultBar({ record }: { record: SeasonClubRecord }) {
     <div
       role="img"
       aria-label={`${String(record.won)} vitórias, ${String(record.drawn)} empates e ${String(record.lost)} derrotas em ${String(record.played)} jogos`}
-      className="flex h-3 w-full gap-px border-2 border-ink bg-ink/60"
+      className="flex h-3 w-full gap-px border-2 border-white/15 bg-ink/60"
     >
       {parts.map(([name, count, color]) => (
         <span
@@ -279,7 +279,7 @@ export function PositionChart({
             <span className="sr-only">Competição</span>
             <select
               aria-label="Competição"
-              className="border-2 border-ink bg-popover px-2 py-1 font-pixel text-[.74rem]"
+              className="border-2 border-white/15 bg-popover px-2 py-1 font-pixel text-[.74rem]"
               value={index}
               onChange={(event) => setIndex(Number(event.target.value))}
             >
@@ -406,7 +406,7 @@ function Honours({ view }: { view: SeasonView }) {
             {view.champions.map((champion) => (
               <li
                 key={champion.competitionId}
-                className="flex items-center gap-3 border-2 border-ink bg-popover p-2"
+                className="flex items-center gap-3 border-2 border-white/15 bg-popover p-2"
               >
                 <ClubEmblem name={champion.club.name} size={28} decorative />
                 <span className="min-w-0 text-sm">

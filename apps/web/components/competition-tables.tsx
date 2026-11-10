@@ -448,7 +448,7 @@ export function LeagueTable({
           return (
             <tr
               key={row.club.id}
-              className={cn('border-t-2', isMine && 'bg-bulb/50')}
+              className={cn('border-t-2', isMine && 'bg-bulb/15')}
               {...(isMine ? { 'aria-current': 'true' as const } : {})}
             >
               <td className="relative py-2 pr-1.5 pl-2.5">
@@ -533,7 +533,7 @@ export function ZoneLegend({
           <span
             aria-hidden="true"
             className={cn(
-              'inline-block size-2.5 border border-ink',
+              'inline-block size-2.5 border border-white/15',
               ZONE_TONE[item.kind],
             )}
           />
@@ -570,7 +570,7 @@ function TieCard({ tie, club }: { tie: TieView; club: string }) {
     const isMine = side.name === club;
     return (
       <tr
-        className={cn('border-t-2', winner && 'bg-bulb/50')}
+        className={cn('border-t-2', winner && 'bg-bulb/15')}
         {...(isMine ? { 'aria-current': 'true' as const } : {})}
       >
         <th
@@ -718,7 +718,7 @@ export function LeagueStandings({ career }: { career: CareerView }) {
               return (
                 <tr
                   key={row.club}
-                  className={cn('border-t-2', isMine && 'bg-bulb/50')}
+                  className={cn('border-t-2', isMine && 'bg-bulb/15')}
                   {...(isMine ? { 'aria-current': 'true' as const } : {})}
                 >
                   <td className="py-2 pr-1.5 pl-1">

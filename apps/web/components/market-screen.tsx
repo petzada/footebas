@@ -279,7 +279,7 @@ export function MarketScreen({
                     <label className="grid gap-1 text-xs">
                       Posição
                       <select
-                        className="min-h-10 border-2 border-ink bg-popover px-2 text-sm"
+                        className="min-h-10 border-2 border-white/15 bg-popover px-2 text-sm"
                         value={query.position ?? ''}
                         onChange={(event) =>
                           setQuery({
@@ -743,8 +743,8 @@ function OfferList({
           <li
             key={offer.id}
             className={cn(
-              'grid gap-1 border-2 border-ink p-2 text-xs',
-              offer.awaiting === 'manager' ? 'bg-bulb/30' : 'bg-popover',
+              'grid gap-1 border-2 border-white/15 p-2 text-xs',
+              offer.awaiting === 'manager' ? 'bg-bulb/15' : 'bg-popover',
             )}
           >
             <div className="flex items-start justify-between gap-2">
@@ -904,7 +904,7 @@ function OwnSquadPanel({
         <label className="grid gap-1 text-xs">
           Atleta
           <select
-            className="min-h-10 border-2 border-ink bg-popover px-2 text-sm"
+            className="min-h-10 border-2 border-white/15 bg-popover px-2 text-sm"
             value={playerId}
             onChange={(event) => {
               setPlayerId(event.target.value);

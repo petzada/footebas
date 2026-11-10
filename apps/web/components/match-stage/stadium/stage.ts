@@ -520,6 +520,7 @@ export async function createStadiumStage(
   let excitement = 0.1;
   let reportedExcitement = -1;
   let snapMotion = true;
+  let introUntil = 0;
   let rig: CameraRig = cameraFor({ kind: 'aerial', angle: Math.PI / 2 });
   let shotKind: CameraShot['kind'] = 'aerial';
 
@@ -710,6 +711,8 @@ export async function createStadiumStage(
       snapTo(frameAt(0, 1));
       startOpenPlay(segment, 'kickoff');
       sceneState = 'open';
+      // Open on the whole stadium, then cut to the gantry for the kickoff.
+      introUntil = time + 2.8;
       emit('whistle');
     }
     lastStep = step;
@@ -828,11 +831,17 @@ export async function createStadiumStage(
         emit(event.kind, event.power);
       }
       wanted = ambient.settingUp ? 0.3 : 0.12;
-      shot = {
-        kind: 'follow',
-        focus: { x: ballPosition.x, y: 0, z: ballPosition.z },
-        zoom: 0.08,
-      };
+      shot =
+        time < introUntil
+          ? {
+              kind: 'aerial',
+              angle: Math.PI / 2 - 0.5 + (introUntil - time) * 0.12,
+            }
+          : {
+              kind: 'follow',
+              focus: { x: ballPosition.x, y: 0, z: ballPosition.z },
+              zoom: 0.08,
+            };
     } else {
       // Before kickoff and after the final whistle: the stadium from above.
       wanted = sceneState === 'post' ? 0.45 : 0.14;

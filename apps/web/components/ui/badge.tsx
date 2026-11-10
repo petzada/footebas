@@ -8,13 +8,13 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-ink bg-primary text-primary-foreground',
-        secondary: 'border-ink bg-secondary text-secondary-foreground',
-        coral: 'border-ink bg-bulb text-bulb-foreground',
-        bulb: 'border-ink bg-bulb text-bulb-foreground',
-        board: 'border-ink bg-board text-bulb',
-        destructive: 'border-ink bg-destructive text-destructive-foreground',
-        outline: 'border-ink bg-popover text-popover-foreground',
+        default: 'border-input bg-primary text-primary-foreground',
+        secondary: 'border-input bg-secondary text-secondary-foreground',
+        coral: 'border-input bg-bulb text-bulb-foreground',
+        bulb: 'border-input bg-bulb text-bulb-foreground',
+        board: 'border-input bg-board text-bulb',
+        destructive: 'border-input bg-destructive text-destructive-foreground',
+        outline: 'border-input bg-popover text-popover-foreground',
       },
     },
     defaultVariants: {

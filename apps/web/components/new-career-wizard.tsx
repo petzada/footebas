@@ -272,7 +272,7 @@ export function NewCareerWizard({
               >
                 <span
                   className={cn(
-                    'grid size-7 place-items-center border-2 border-ink text-[.82rem]',
+                    'grid size-7 place-items-center border-2 border-white/15 text-[.82rem]',
                     index < step
                       ? 'bg-primary text-primary-foreground'
                       : index === step
@@ -419,7 +419,7 @@ export function NewCareerWizard({
               createPortal(
                 <div
                   data-testid="wizard-footer"
-                  className="fixed inset-x-0 bottom-0 z-30 border-t-4 border-ink bg-card px-4 pt-3 pb-[max(.75rem,env(safe-area-inset-bottom))] text-card-foreground"
+                  className="fixed inset-x-0 bottom-0 z-30 border-t-4 border-white/15 bg-card px-4 pt-3 pb-[max(.75rem,env(safe-area-inset-bottom))] text-card-foreground"
                 >
                   <div className="mx-auto flex w-full max-w-xs flex-col items-stretch gap-2">
                     <Button
@@ -931,7 +931,7 @@ function SquadPreview({
                   key={player.name}
                   className={cn(
                     'flex min-w-0 items-center justify-between gap-2 border-b px-1 py-1.5 text-sm',
-                    light ? 'border-ink/10' : 'border-wood-deep',
+                    light ? 'border-white/10' : 'border-wood-deep',
                   )}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -1274,14 +1274,14 @@ function CountryFlagIcon({ code, size = 28 }: { code: string; size?: number }) {
         aria-hidden="true"
         width={size}
         height={Math.round(size * 0.75)}
-        className="pixelated shrink-0 border-2 border-ink"
+        className="pixelated shrink-0 border-2 border-white/15"
         style={{ width: size, height: Math.round(size * 0.75) }}
       />
     );
   return (
     <span
       aria-hidden="true"
-      className="grid shrink-0 place-items-center border-2 border-ink bg-chalk-deep font-pixel text-[.74rem] text-ink"
+      className="grid shrink-0 place-items-center border-2 border-white/15 bg-chalk-deep font-pixel text-[.74rem] text-ink"
       style={{ width: size, height: Math.round(size * 0.75) }}
     >
       {code}
@@ -1365,7 +1365,7 @@ function NationalityPicker({
             size={6}
             value={value}
             onChange={(event) => pick(event.target.value)}
-            className="w-full min-w-0 border-2 border-ink bg-popover p-1 text-base text-popover-foreground"
+            className="w-full min-w-0 border-2 border-white/15 bg-popover p-1 text-base text-popover-foreground"
           >
             {options.map((country) => (
               <option key={country.code} value={country.code}>

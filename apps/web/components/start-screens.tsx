@@ -678,7 +678,7 @@ function CareerRow({
       className={cn('panel overflow-hidden', locked && 'bg-secondary')}
       data-locked={locked ? 'true' : undefined}
     >
-      <div className="flex items-center justify-between border-b-2 border-ink bg-board px-3 py-1 font-pixel text-[.78rem] text-bulb">
+      <div className="flex items-center justify-between border-b-2 border-white/15 bg-board px-3 py-1 font-pixel text-[.78rem] text-bulb">
         <span className="flex items-center gap-2">
           Save {String(slot).padStart(2, '0')}
           {locked && (

@@ -220,7 +220,7 @@ export function GameMenu({
       className="panel-board px-rise fixed inset-0 z-50 flex flex-col overflow-hidden lg:hidden"
       onKeyDown={onKeyDown}
     >
-      <header className="flex items-center justify-between gap-3 border-b-4 border-ink px-4 pt-[max(.75rem,env(safe-area-inset-top))] pb-3">
+      <header className="flex items-center justify-between gap-3 border-b-4 border-white/15 px-4 pt-[max(.75rem,env(safe-area-inset-top))] pb-3">
         <div className="min-w-0">
           <p className="led text-[.74rem] tracking-[.2em]">Pausa</p>
           <h2 id={titleId} className="truncate font-pixel text-sm text-chalk">

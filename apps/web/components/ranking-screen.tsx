@@ -192,7 +192,7 @@ export function RankingScreen({
             <span className="font-pixel text-[.74rem]">Mês</span>
             <select
               aria-label="Mês do ranking"
-              className="min-h-11 border-2 border-ink bg-popover px-2 font-pixel text-[.74rem]"
+              className="min-h-11 border-2 border-white/15 bg-popover px-2 font-pixel text-[.74rem]"
               value={period}
               onChange={(event) => setPeriod(event.target.value)}
             >
