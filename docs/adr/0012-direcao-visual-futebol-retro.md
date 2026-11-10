@@ -1,6 +1,6 @@
 # ADR 0012 — Direção visual Futebol Retrô
 
-- Status: aceito (substitui o ADR 0009)
+- Status: substituído pelo ADR 0018 (substituiu o ADR 0009)
 - Data: 2026-10-23
 
 ## Contexto

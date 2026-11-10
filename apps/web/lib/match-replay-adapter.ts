@@ -1,4 +1,5 @@
 import type { CareerView, MatchUpdate } from '@/lib/career-api';
+import { clubIdFromName, matchKits } from '@/lib/club-kits';
 import {
   statisticsFromTimeline,
   type MatchReplayInput,
@@ -86,20 +87,30 @@ export function replayFromFeed(
       });
   }
 
+  // The local port only knows club names: derive the ids the crests use.
+  const clubId = clubIdFromName;
+  const kits = matchKits(
+    { id: clubId(career.club), name: career.club },
+    { id: clubId(career.opponent.club), name: career.opponent.club },
+  );
   return {
     matchId,
     home: {
       id: 'home',
       name: career.club,
       abbreviation: abbreviation(career.club),
-      color: '#1f9d55',
+      color: kits.home.shirt,
+      kit: kits.home,
+      keeperKit: kits.homeKeeper,
       players: home,
     },
     away: {
       id: 'away',
       name: career.opponent.club,
       abbreviation: abbreviation(career.opponent.club),
-      color: '#d64545',
+      color: kits.away.shirt,
+      kit: kits.away,
+      keeperKit: kits.awayKeeper,
       players: away,
     },
     finalScore: previous,

@@ -171,7 +171,7 @@ describe('Mapa do clube', () => {
     });
     for (const button of [play, instant]) {
       // Small label that wraps instead of overflowing at 320–375 px.
-      expect(button.className).toContain('text-[.5rem]');
+      expect(button.className).toContain('text-[.74rem]');
       expect(button.className).toContain('whitespace-normal');
       expect(button.className).toContain('min-w-0');
       expect(button.className).not.toContain('whitespace-nowrap');

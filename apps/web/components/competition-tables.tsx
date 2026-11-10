@@ -179,7 +179,7 @@ function TablesBrowser({
 function CompetitionSummary({ table }: { table: CompetitionTableView }) {
   const champion = table.champion;
   return (
-    <div className="panel-board flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 font-pixel text-[.5rem] leading-relaxed">
+    <div className="panel-board flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 font-pixel text-[.74rem] leading-relaxed">
       <span className="text-bulb">{CATEGORY_LABEL[table.category]}</span>
       <span aria-hidden="true">·</span>
       <span>
@@ -271,13 +271,13 @@ function ScrollTabs({
             onClick={() => onChange(item.id)}
             className={cn(
               'btn-px flex min-h-11 shrink-0 snap-center flex-col items-center justify-center gap-0.5 px-3 normal-case leading-tight',
-              size === 'sm' ? 'text-[.45rem]' : 'text-[.5rem]',
+              size === 'sm' ? 'text-[.7rem]' : 'text-[.74rem]',
               selected ? 'btn-grass' : 'btn-chalk',
             )}
           >
             <span>{item.label}</span>
             {item.mark && (
-              <span className="text-[.4rem] opacity-80">{item.mark}</span>
+              <span className="text-[.68rem] opacity-80">{item.mark}</span>
             )}
           </button>
         );
@@ -326,10 +326,10 @@ function StagePanel({
                 mine && 'border-l-8 border-bulb',
               )}
             >
-              <h3 className="mb-2 flex items-center justify-between font-pixel text-[.6rem]">
+              <h3 className="mb-2 flex items-center justify-between font-pixel text-[.82rem]">
                 {group.name}
                 {mine && (
-                  <span className="rounded-sm bg-bulb px-1.5 py-0.5 text-[.4rem] text-bulb-foreground">
+                  <span className="rounded-sm bg-bulb px-1.5 py-0.5 text-[.68rem] text-bulb-foreground">
                     meu grupo
                   </span>
                 )}
@@ -366,7 +366,7 @@ function StagePanel({
 function Undecided({ stage }: { stage: TableStageView }) {
   return (
     <div className="panel grid gap-2 p-4">
-      <p className="font-pixel text-[.55rem] text-ink">
+      <p className="font-pixel text-[.78rem] text-card-foreground">
         {stage.name}: {STAGE_STATUS_LABEL[stage.status].toLowerCase()}
       </p>
       <p className="text-sm text-muted-foreground">
@@ -381,7 +381,7 @@ function Undecided({ stage }: { stage: TableStageView }) {
 function Byes({ byes }: { byes: readonly TableClubRef[] }) {
   return (
     <p className="panel-board px-3 py-2 text-xs">
-      <span className="font-pixel text-[.45rem] text-bulb">Entram direto:</span>{' '}
+      <span className="font-pixel text-[.7rem] text-bulb">Entram direto:</span>{' '}
       {byes.map((item) => item.name).join(', ')}
     </p>
   );
@@ -408,7 +408,7 @@ export function LeagueTable({
   compact?: boolean;
 }) {
   return (
-    <table className="teletext w-full text-[.5rem] sm:text-[.6rem]">
+    <table className="teletext w-full text-[.74rem] sm:text-[.82rem]">
       <caption className="sr-only">{caption}</caption>
       <thead>
         <tr className="bg-board text-left text-bulb">
@@ -448,7 +448,7 @@ export function LeagueTable({
           return (
             <tr
               key={row.club.id}
-              className={cn('border-t-2', isMine && 'bg-bulb/50')}
+              className={cn('border-t-2', isMine && 'bg-bulb/15')}
               {...(isMine ? { 'aria-current': 'true' as const } : {})}
             >
               <td className="relative py-2 pr-1.5 pl-2.5">
@@ -526,14 +526,14 @@ export function ZoneLegend({
   return (
     <ul
       aria-label="Zonas da tabela"
-      className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-pixel text-[.45rem] text-muted-foreground"
+      className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-pixel text-[.7rem] text-muted-foreground"
     >
       {items.map((item) => (
         <li key={item.kind} className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
             className={cn(
-              'inline-block size-2.5 border border-ink',
+              'inline-block size-2.5 border border-white/15',
               ZONE_TONE[item.kind],
             )}
           />
@@ -570,7 +570,7 @@ function TieCard({ tie, club }: { tie: TieView; club: string }) {
     const isMine = side.name === club;
     return (
       <tr
-        className={cn('border-t-2', winner && 'bg-bulb/50')}
+        className={cn('border-t-2', winner && 'bg-bulb/15')}
         {...(isMine ? { 'aria-current': 'true' as const } : {})}
       >
         <th
@@ -604,7 +604,7 @@ function TieCard({ tie, club }: { tie: TieView; club: string }) {
       className={cn('panel p-3', mine && 'border-l-8 border-bulb')}
       aria-label={`${tie.home.name} × ${tie.away.name}`}
     >
-      <table className="teletext w-full text-[.5rem] sm:text-[.6rem]">
+      <table className="teletext w-full text-[.74rem] sm:text-[.82rem]">
         <thead>
           <tr className="bg-board text-left text-bulb">
             <th scope="col" className="pb-1.5 pl-1 font-bold">
@@ -627,10 +627,10 @@ function TieCard({ tie, club }: { tie: TieView; club: string }) {
           {row(tie.away)}
         </tbody>
       </table>
-      <p className="mt-2 font-pixel text-[.45rem] text-muted-foreground">
+      <p className="mt-2 font-pixel text-[.7rem] text-muted-foreground">
         {summary.winner ? (
           <>
-            <span className="text-ink">
+            <span className="text-card-foreground">
               Classificado: {summary.winner.name}
             </span>
             {summary.decidedByTiebreak && ' · no desempate'}
@@ -663,7 +663,7 @@ export function LeagueStandings({ career }: { career: CareerView }) {
   const hasRecord = rows.some((row) => row.won !== undefined);
   return (
     <section aria-labelledby="classificacao-titulo" className="panel p-4">
-      <h2 id="classificacao-titulo" className="font-pixel text-[.65rem]">
+      <h2 id="classificacao-titulo" className="font-pixel text-[.86rem]">
         Classificação
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -674,7 +674,7 @@ export function LeagueStandings({ career }: { career: CareerView }) {
           A tabela aparece depois da primeira rodada.
         </p>
       ) : (
-        <table className="teletext mt-3 w-full text-[.5rem] sm:text-[.6rem]">
+        <table className="teletext mt-3 w-full text-[.74rem] sm:text-[.82rem]">
           <caption className="sr-only">
             Classificação completa
             {career.division ? ` · ${career.division}` : ''}
@@ -718,7 +718,7 @@ export function LeagueStandings({ career }: { career: CareerView }) {
               return (
                 <tr
                   key={row.club}
-                  className={cn('border-t-2', isMine && 'bg-bulb/50')}
+                  className={cn('border-t-2', isMine && 'bg-bulb/15')}
                   {...(isMine ? { 'aria-current': 'true' as const } : {})}
                 >
                   <td className="py-2 pr-1.5 pl-1">

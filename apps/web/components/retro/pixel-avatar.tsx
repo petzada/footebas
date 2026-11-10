@@ -3,7 +3,7 @@ import { pixelAvatarUri, type PixelAvatarOptions } from '@/lib/retro/avatar';
 import { cn } from '@/lib/utils';
 
 /**
- * Deterministic pixel portrait for an athlete or coach (no photos). The
+ * Deterministic vector portrait for an athlete or coach (no photos). The
  * picture is an inline `data:` SVG, so it never leaves the device and is
  * cached per seed. Decorative unless a `label` is given.
  */
@@ -19,15 +19,16 @@ export function PixelAvatar({
   label?: string;
   className?: string;
 }) {
-  const { backdrop, transparent } = options;
+  const { backdrop, transparent, shirt } = options;
   const src = useMemo(
     () =>
       pixelAvatarUri(seed, {
         size,
         ...(backdrop === undefined ? {} : { backdrop }),
         ...(transparent === undefined ? {} : { transparent }),
+        ...(shirt === undefined ? {} : { shirt }),
       }),
-    [seed, size, backdrop, transparent],
+    [seed, size, backdrop, transparent, shirt],
   );
   return (
     // Generated locally; next/image is for remote or static files.
@@ -39,7 +40,7 @@ export function PixelAvatar({
       style={{ width: size, height: size }}
       draggable={false}
       data-avatar-seed={seed}
-      className={cn('pixelated shrink-0 select-none', className)}
+      className={cn('shrink-0 select-none rounded-md', className)}
       alt={label ?? ''}
       {...(label ? { role: 'img' } : { 'aria-hidden': true })}
     />

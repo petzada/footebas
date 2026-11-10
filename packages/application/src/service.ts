@@ -2467,7 +2467,18 @@ function postMatchModel(
     participants: (result.playerPerformances ?? []).flatMap((performance) => {
       const player = s.players.find(({ id }) => id === performance.playerId);
       return player
-        ? [{ id: player.id, name: player.name, side: performance.side }]
+        ? [
+            {
+              id: player.id,
+              name: player.name,
+              side: performance.side,
+              position: player.position,
+              ...(player.shirtNumber === undefined
+                ? {}
+                : { shirtNumber: player.shirtNumber }),
+              started: performance.started,
+            },
+          ]
         : [];
     }),
     tableUpdated: committed,

@@ -100,7 +100,7 @@ export function NewsList({
       <div className="flex items-center justify-between gap-2">
         <h2
           id="inbox-noticias"
-          className="flex items-center gap-2 font-pixel text-[.65rem]"
+          className="flex items-center gap-2 font-pixel text-[.86rem]"
         >
           <Newspaper aria-hidden="true" />
           Notícias
@@ -117,12 +117,12 @@ export function NewsList({
           {news.map((item) => (
             <li
               key={item.id}
-              className="grid gap-1 border-2 border-ink border-l-8 border-l-sky bg-popover p-3"
+              className="grid gap-1 border-2 border-white/15 border-l-8 border-l-sky bg-popover p-3"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{item.tag}</Badge>
                 {item.date && (
-                  <span className="font-pixel text-[.45rem] text-muted-foreground">
+                  <span className="font-pixel text-[.7rem] text-muted-foreground">
                     {formatGameDate(item.date)}
                   </span>
                 )}

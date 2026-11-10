@@ -30,10 +30,16 @@ describe('momentsBetween', () => {
 });
 
 describe('cuesFor', () => {
-  it('lands the goal sounds when the animation reaches the action', () => {
-    const cues = cuesFor(['goal']);
-    expect(cues.map((cue) => cue.sound)).toEqual(['goal', 'crowd']);
-    expect(cues.every((cue) => cue.at >= 0.72)).toBe(true);
-    expect(cuesFor(['kickoff'])).toEqual([{ sound: 'whistle', at: 0 }]);
+  it('maps the moments of a minute to the interface sounds, in order', () => {
+    expect(cuesFor(['goal']).map((cue) => cue.sound)).toEqual([
+      'goal',
+      'crowd',
+    ]);
+    expect(cuesFor(['kickoff'])).toEqual([{ sound: 'whistle' }]);
+    expect(cuesFor(['card', 'substitution']).map((cue) => cue.sound)).toEqual([
+      'whistle',
+      'confirm',
+    ]);
+    expect(cuesFor([])).toEqual([]);
   });
 });

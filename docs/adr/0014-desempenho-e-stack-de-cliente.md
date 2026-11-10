@@ -1,6 +1,6 @@
 # ADR 0014 — Desempenho: Durable Object por carreira, save enxuto e camada de dados no cliente
 
-- Status: aceito
+- Status: aceito (itens 4 e 5 revisados pelo ADR 0018: Three.js puro continua, o Phaser saiu e 3D sob demanda é permitido fora da partida)
 - Data: 2026-10-23
 
 ## Contexto

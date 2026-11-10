@@ -24,8 +24,8 @@ export function MatchSimulation({
       className="panel-board mx-auto grid w-full max-w-3xl gap-3 p-3"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="led text-[.55rem] tracking-[.2em]">Simulando</span>
-        <span className="font-pixel text-[.5rem] text-chalk/80">
+        <span className="led text-[.78rem] tracking-[.2em]">Simulando</span>
+        <span className="font-pixel text-[.74rem] text-chalk/80">
           resultado instantâneo
         </span>
       </div>
@@ -39,7 +39,7 @@ export function MatchSimulation({
         </div>
         <ClubEmblem name={away} size={40} decorative />
       </div>
-      <p className="text-center font-pixel text-[.55rem] text-chalk">
+      <p className="text-center font-pixel text-[.78rem] text-chalk">
         <span aria-hidden="true" className="blink">
           ▶{' '}
         </span>

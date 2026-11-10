@@ -117,7 +117,7 @@ export function ProfileScreen({
         <div className="flex items-center gap-4">
           <PlayerAvatar player={player} size="md" />
           <div className="min-w-0">
-            <p className="font-pixel text-[.5rem] text-muted-foreground">
+            <p className="font-pixel text-[.74rem] text-muted-foreground">
               Perfil
             </p>
             <h2
@@ -133,7 +133,7 @@ export function ProfileScreen({
         </div>
         <dl className="grid grid-cols-2 gap-3">
           <div>
-            <dt className="font-pixel text-[.5rem] text-muted-foreground">
+            <dt className="font-pixel text-[.74rem] text-muted-foreground">
               Plano
             </dt>
             <dd>
@@ -143,7 +143,7 @@ export function ProfileScreen({
             </dd>
           </div>
           <div>
-            <dt className="font-pixel text-[.5rem] text-muted-foreground">
+            <dt className="font-pixel text-[.74rem] text-muted-foreground">
               Carreiras
             </dt>
             <dd className="font-pixel text-base">
@@ -151,7 +151,7 @@ export function ProfileScreen({
             </dd>
           </div>
           <div className="col-span-2">
-            <dt className="font-pixel text-[.5rem] text-muted-foreground">
+            <dt className="font-pixel text-[.74rem] text-muted-foreground">
               Licença
             </dt>
             <dd className="text-sm">
@@ -268,7 +268,7 @@ function SaveDetails({ archive }: { archive: SaveArchive }) {
   ];
   return (
     <details className="panel group p-3" data-testid="perfil-save-detalhes">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-pixel text-[.55rem]">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-pixel text-[.78rem]">
         Detalhes técnicos do save
         <CaretDown
           aria-hidden="true"
@@ -279,10 +279,10 @@ function SaveDetails({ archive }: { archive: SaveArchive }) {
         {rows.map(([label, value]) => (
           <div
             key={label}
-            className="flex flex-wrap justify-between gap-x-3 border-t-2 border-ink/20 pt-2"
+            className="flex flex-wrap justify-between gap-x-3 border-t-2 border-white/10 pt-2"
           >
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="font-pixel text-[.5rem] break-all">{value}</dd>
+            <dd className="font-pixel text-[.74rem] break-all">{value}</dd>
           </div>
         ))}
       </dl>

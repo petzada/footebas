@@ -220,9 +220,9 @@ export function GameMenu({
       className="panel-board px-rise fixed inset-0 z-50 flex flex-col overflow-hidden lg:hidden"
       onKeyDown={onKeyDown}
     >
-      <header className="flex items-center justify-between gap-3 border-b-4 border-ink px-4 pt-[max(.75rem,env(safe-area-inset-top))] pb-3">
+      <header className="flex items-center justify-between gap-3 border-b-4 border-white/15 px-4 pt-[max(.75rem,env(safe-area-inset-top))] pb-3">
         <div className="min-w-0">
-          <p className="led text-[.5rem] tracking-[.2em]">Pausa</p>
+          <p className="led text-[.74rem] tracking-[.2em]">Pausa</p>
           <h2 id={titleId} className="truncate font-pixel text-sm text-chalk">
             Menu do jogo
           </h2>
@@ -257,7 +257,7 @@ export function GameMenu({
           </MenuSection>
         ))}
         <MenuSection id="sistema" label="Sistema">
-          <MuteButton className="min-h-20 flex-col justify-center gap-1.5 px-1 text-[.5rem] [&>span]:inline" />
+          <MuteButton className="min-h-20 flex-col justify-center gap-1.5 px-1 text-[.74rem] [&>span]:inline" />
           {onHome && (
             <MenuButton
               label="Início"
@@ -307,7 +307,7 @@ function MenuSection({
     <section aria-labelledby={headingId} className="pt-4">
       <h3
         id={headingId}
-        className="mb-2 px-1 font-pixel text-[.55rem] tracking-[.15em] text-bulb"
+        className="mb-2 px-1 font-pixel text-[.78rem] tracking-[.15em] text-bulb"
       >
         {label}
       </h3>
@@ -320,7 +320,7 @@ const menuItemClass =
   // Labels wrap only at spaces (`break-normal`, no hyphenation): a 3-column
   // grid at 320px leaves ~90px per label, so below 360px the pixel font
   // drops to .4rem (6.4px a glyph) and "Classificação" (13 glyphs) fits.
-  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-0.5 py-2 text-center text-[.4rem] normal-case leading-tight tracking-tight break-normal min-[360px]:px-1 min-[360px]:text-[.45rem]';
+  'btn-px relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-1.5 px-0.5 py-2 text-center text-[.68rem] normal-case leading-tight tracking-tight break-normal min-[360px]:px-1 min-[360px]:text-[.7rem]';
 
 function MenuButton({
   label,
@@ -355,7 +355,7 @@ function MenuButton({
           <span className="sr-only">({badge})</span>
           <span
             aria-hidden="true"
-            className="absolute top-1 right-1 rounded-sm bg-bulb px-1 py-0.5 font-pixel text-[.4rem] text-bulb-foreground"
+            className="absolute top-1 right-1 rounded-sm bg-bulb px-1 py-0.5 font-pixel text-[.68rem] text-bulb-foreground"
           >
             {badge}
           </span>

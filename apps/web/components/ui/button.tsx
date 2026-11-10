@@ -18,12 +18,12 @@ const buttonVariants = cva(
         secondary: 'btn-px btn-chalk',
         board: 'btn-px btn-board',
         ghost:
-          'font-pixel uppercase text-current hover:bg-ink/10 focus-visible:bg-ink/10',
+          'font-pixel uppercase text-current hover:bg-muted focus-visible:bg-muted',
         link: 'font-pixel uppercase text-current underline underline-offset-4',
       },
       size: {
         default: 'min-h-10 px-4 py-2',
-        sm: 'min-h-9 px-3 text-[.6rem]',
+        sm: 'min-h-9 px-3 text-[.82rem]',
         lg: 'min-h-12 px-6 text-sm',
         icon: 'size-10',
       },

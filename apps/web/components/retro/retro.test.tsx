@@ -84,7 +84,7 @@ describe('avatares pixel art determinísticos', () => {
 });
 
 describe('sprites desenhados por código', () => {
-  it('bola, apito, troféu e cartões são SVG pixelados e decorativos', () => {
+  it('bola, apito, troféu e cartões são SVG vetoriais e decorativos', () => {
     render(
       <>
         <PixelBall />
@@ -101,8 +101,11 @@ describe('sprites desenhados por código', () => {
       'card-red',
     ]);
     for (const sprite of sprites) {
-      expect(sprite.getAttribute('shape-rendering')).toBe('crispEdges');
-      expect(sprite.querySelectorAll('rect').length).toBeGreaterThan(10);
+      // Smooth vectors on a 24x24 grid: no pixel grid, no crisp edges.
+      expect(sprite.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(sprite.getAttribute('shape-rendering')).toBeNull();
+      expect(sprite.querySelector('path, circle')).not.toBeNull();
+      expect(sprite.querySelectorAll('rect').length).toBeLessThan(3);
     }
     expect(screen.getByRole('img', { name: 'Troféu' })).toBeTruthy();
     expect(sprites[0]!.getAttribute('aria-hidden')).toBe('true');

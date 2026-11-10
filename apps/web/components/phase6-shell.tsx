@@ -95,7 +95,7 @@ export function Phase6Shell({
           <h1 className="sr-only">{labels[screen]}</h1>
           <div className="flex min-w-0 items-center gap-2.5">
             <ClubEmblem name={career.club} size={40} />
-            <p className="led min-w-0 truncate text-[.6rem] leading-relaxed sm:text-sm">
+            <p className="led min-w-0 truncate text-[.82rem] leading-relaxed sm:text-sm">
               {career.coach}
             </p>
           </div>
@@ -194,7 +194,11 @@ export function PwaRuntime() {
   );
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
+    // Cache-first static files would serve stale chunks to the dev server.
+    if (
+      process.env.NODE_ENV !== 'development' &&
+      'serviceWorker' in navigator
+    ) {
       void navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     }
     const markOffline = () => setNetwork('offline');
@@ -216,7 +220,7 @@ export function PwaRuntime() {
     <div
       role="status"
       aria-live="polite"
-      className="ticker fixed inset-x-3 top-3 z-50 mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-3 text-[.6rem] text-chalk"
+      className="ticker fixed inset-x-3 top-3 z-50 mx-auto flex max-w-xl items-center justify-between gap-3 px-4 py-3 text-[.82rem] text-chalk"
     >
       <span className="flex items-center gap-2 font-medium">
         {network === 'offline' ? <WifiSlash /> : <WifiHigh />}
@@ -250,7 +254,7 @@ function DesktopSidebar({
 }) {
   const badges = menuBadges(career);
   return (
-    <aside className="sticky top-0 hidden h-dvh border-r-4 border-ink bg-board p-4 text-chalk lg:flex lg:flex-col">
+    <aside className="sticky top-0 hidden h-dvh border-r-4 border-white/15 bg-board p-4 text-chalk lg:flex lg:flex-col">
       <Brand />
       <a
         href="#conteudo-principal"
@@ -270,7 +274,7 @@ function DesktopSidebar({
           >
             <p
               id={`desktop-${group.id}`}
-              className="px-3 pb-1 font-pixel text-[.5rem] text-bulb"
+              className="px-3 pb-1 font-pixel text-[.74rem] text-bulb"
             >
               {group.label}
             </p>
@@ -278,7 +282,7 @@ function DesktopSidebar({
               <Button
                 key={id}
                 variant={screen === id ? 'outline' : 'ghost'}
-                className="min-h-10 justify-between text-[.6rem]"
+                className="min-h-10 justify-between text-[.82rem]"
                 aria-current={screen === id ? 'page' : undefined}
                 onClick={() => navigate(id)}
               >
@@ -308,7 +312,7 @@ function DesktopSidebar({
             {career.coachProfile &&
               ` · ${personalityLabel(career.coachProfile.personality)}`}
           </p>
-          <p className="truncate font-pixel text-[.6rem]">{career.coach}</p>
+          <p className="truncate font-pixel text-[.82rem]">{career.coach}</p>
         </div>
       </div>
     </aside>
@@ -329,17 +333,17 @@ function DesktopRail({
     maximumFractionDigits: 1,
   }).format(career.world.finances.cash);
   return (
-    <aside className="sticky top-0 hidden h-dvh border-l-4 border-ink bg-board p-5 text-chalk xl:flex xl:flex-col xl:gap-5">
+    <aside className="sticky top-0 hidden h-dvh border-l-4 border-white/15 bg-board p-5 text-chalk xl:flex xl:flex-col xl:gap-5">
       <section aria-labelledby="proximo-jogo">
-        <p className="led text-[.5rem] tracking-[.2em]">Próximo jogo</p>
-        <h2 id="proximo-jogo" className="mt-1 font-pixel text-[.65rem]">
+        <p className="led text-[.74rem] tracking-[.2em]">Próximo jogo</p>
+        <h2 id="proximo-jogo" className="mt-1 font-pixel text-[.86rem]">
           {career.club} × {career.opponent.club}
         </h2>
         <p className="mt-1 text-sm text-chalk/70">{career.opponent.report}</p>
       </section>
       <Separator />
       <section aria-labelledby="central-rapida" className="flex flex-col gap-2">
-        <h2 id="central-rapida" className="font-pixel text-[.6rem]">
+        <h2 id="central-rapida" className="font-pixel text-[.82rem]">
           Central rápida
         </h2>
         <Button
@@ -368,7 +372,7 @@ function DesktopRail({
         </Button>
       </section>
       <div className="panel mt-auto p-4">
-        <p className="font-pixel text-[.5rem] text-muted-foreground">
+        <p className="font-pixel text-[.74rem] text-muted-foreground">
           Ritmo da carreira
         </p>
         <p className="mt-1 font-pixel text-2xl">{career.round}</p>
@@ -402,7 +406,7 @@ function MobileNavigation({
   // name, D2); from 376px each column is at least as wide as its label
   // (`minmax(min-content,1fr)`), so nothing overflows or truncates.
   const itemClass =
-    'relative flex min-h-14 min-w-11 flex-col items-center justify-center gap-1 px-0.5 font-pixel text-[.45rem] leading-none whitespace-nowrap';
+    'relative flex min-h-14 min-w-11 flex-col items-center justify-center gap-1 px-0.5 font-pixel text-[.7rem] leading-none whitespace-nowrap';
   const labelClass = 'hidden min-[376px]:inline';
   return (
     <nav

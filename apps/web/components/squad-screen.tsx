@@ -538,17 +538,17 @@ export function SquadScreen({
           onClick={() => onClickPlayer(playerId)}
         >
           <PixelAvatar seed={`atleta-${playerId}`} size={28} />
-          <span className="w-full truncate text-[.6rem] font-bold leading-tight">
+          <span className="w-full truncate text-[.82rem] font-bold leading-tight">
             {lastName(player.name)}
           </span>
-          <span className="flex items-center gap-1 font-pixel text-[.45rem]">
+          <span className="flex items-center gap-1 font-pixel text-[.7rem]">
             <span className="bg-ink px-0.5 text-chalk">
               {player.primaryPosition}
             </span>
             <span className="led bg-board px-0.5">{player.strength}</span>
           </span>
           {unavailable && (
-            <span className="font-pixel text-[.4rem] uppercase text-destructive">
+            <span className="font-pixel text-[.68rem] uppercase text-destructive">
               {player.suspended ? 'Susp.' : 'Les.'}
             </span>
           )}
@@ -574,7 +574,7 @@ export function SquadScreen({
       <div className="flex items-center justify-between gap-2 px-1">
         <h3
           id={`zona-${kind}`}
-          className="font-pixel text-[.55rem] uppercase text-chalk"
+          className="font-pixel text-[.78rem] uppercase text-chalk"
         >
           {title}{' '}
           <span className="led">
@@ -584,7 +584,7 @@ export function SquadScreen({
         </h3>
         <button
           type="button"
-          className="btn-px btn-chalk min-h-10 px-2 py-1 text-[.5rem] disabled:opacity-60"
+          className="btn-px btn-chalk min-h-10 px-2 py-1 text-[.74rem] disabled:opacity-60"
           disabled={!selectedId}
           onClick={() => onTargetActivate({ kind })}
           aria-label={
@@ -602,7 +602,7 @@ export function SquadScreen({
         className="mt-2 flex min-h-[5rem] flex-wrap gap-1 pb-1"
       >
         {ids.length === 0 && (
-          <li className="self-center px-2 text-[.65rem] text-chalk/80">
+          <li className="self-center px-2 text-[.86rem] text-chalk/80">
             {hint}
           </li>
         )}
@@ -621,7 +621,7 @@ export function SquadScreen({
           <h2 className="font-pixel text-xs uppercase text-chalk">
             Vestiário · <span className="led">{board.formation}</span>
           </h2>
-          <p className="font-pixel text-[.55rem] uppercase text-chalk/80">
+          <p className="font-pixel text-[.78rem] uppercase text-chalk/80">
             Força do time <span className="led text-sm">{strength}</span>
           </p>
           {chemistry && (
@@ -629,7 +629,7 @@ export function SquadScreen({
               className="flex items-center gap-2"
               aria-label={`Entrosamento ${String(chemistry.value)} de 100, ${chemistryLabel(chemistry.value)}, bônus de ${chemistry.bonusPercent.toFixed(1)}% na força`}
             >
-              <span className="font-pixel text-[.55rem] uppercase text-chalk/80">
+              <span className="font-pixel text-[.78rem] uppercase text-chalk/80">
                 Entrosamento
               </span>
               <span className="w-20">
@@ -640,7 +640,7 @@ export function SquadScreen({
                 />
               </span>
               <span className="led text-sm">{chemistry.value}</span>
-              <span className="text-[.6rem] text-chalk/80">
+              <span className="text-[.82rem] text-chalk/80">
                 +{chemistry.bonusPercent.toFixed(1)}%
                 {chemistry.startersChanged > 0 &&
                   ` · ${String(chemistry.startersChanged)} troca(s) desde o último jogo`}
@@ -741,7 +741,7 @@ export function SquadScreen({
                       onClick={() => void autoPick(mode.id)}
                       className="btn-px btn-chalk flex min-h-10 items-center gap-2 px-2 py-1.5 text-left disabled:opacity-60 sm:grid sm:min-h-14 sm:content-center sm:gap-0.5 sm:px-1 sm:text-center"
                     >
-                      <span className="flex min-w-[5.5rem] items-center gap-1 text-[.55rem] leading-tight sm:min-w-0 sm:justify-center sm:text-[.6rem]">
+                      <span className="flex min-w-[5.5rem] items-center gap-1 text-[.78rem] leading-tight sm:min-w-0 sm:justify-center sm:text-[.82rem]">
                         {mode.id === 'best' ? (
                           <Sparkle size={12} className="hidden sm:inline" />
                         ) : mode.id === 'rest' ? (
@@ -754,7 +754,7 @@ export function SquadScreen({
                         )}
                         {mode.label}
                       </span>
-                      <span className="font-sans text-[.6rem] normal-case leading-tight text-muted-foreground">
+                      <span className="font-sans text-[.82rem] normal-case leading-tight text-muted-foreground">
                         {mode.description}
                       </span>
                     </button>
@@ -839,7 +839,7 @@ export function SquadScreen({
                             selectedId === player.id &&
                             'outline outline-4 outline-bulb',
                           !player &&
-                            'bg-chalk/30 outline-dashed outline-2 outline-chalk',
+                            'bg-white/10 outline-dashed outline-2 outline-chalk',
                           dragging?.playerId === player?.id && 'opacity-40',
                           selectedId &&
                             (!player || selectedId !== player.id) &&
@@ -849,7 +849,7 @@ export function SquadScreen({
                         {player ? (
                           <PixelAvatar seed={`atleta-${player.id}`} size={44} />
                         ) : (
-                          <span className="font-pixel text-[.5rem] text-chalk">
+                          <span className="font-pixel text-[.74rem] text-chalk">
                             {slot.position}
                           </span>
                         )}
@@ -857,7 +857,7 @@ export function SquadScreen({
                           <span
                             aria-hidden="true"
                             className={cn(
-                              'absolute -right-1 -top-1 px-0.5 font-pixel text-[.4rem]',
+                              'absolute -right-1 -top-1 px-0.5 font-pixel text-[.68rem]',
                               fit === 2
                                 ? 'bg-primary text-chalk'
                                 : fit === 1
@@ -871,7 +871,7 @@ export function SquadScreen({
                         {isCaptain && (
                           <span
                             aria-hidden="true"
-                            className="absolute -left-1 -top-1 bg-bulb px-0.5 font-pixel text-[.4rem] text-ink"
+                            className="absolute -left-1 -top-1 bg-bulb px-0.5 font-pixel text-[.68rem] text-ink"
                           >
                             C
                           </span>
@@ -879,7 +879,7 @@ export function SquadScreen({
                         {unavailable && (
                           <span
                             aria-hidden="true"
-                            className="absolute -bottom-1 -left-1 bg-destructive px-0.5 font-pixel text-[.4rem] text-chalk"
+                            className="absolute -bottom-1 -left-1 bg-destructive px-0.5 font-pixel text-[.68rem] text-chalk"
                           >
                             !
                           </span>
@@ -902,7 +902,7 @@ export function SquadScreen({
                 aria-label="Formação"
                 className="panel flex items-center gap-2 p-2"
               >
-                <span className="font-pixel text-[.55rem] uppercase">
+                <span className="font-pixel text-[.78rem] uppercase">
                   Formação
                 </span>
                 <ToggleGroup
@@ -1132,7 +1132,7 @@ function FocusCard({
             </Button>
           )}
           <details className="contents">
-            <summary className="btn-px btn-chalk flex min-h-9 cursor-pointer list-none items-center justify-center gap-2 px-2 font-pixel text-[.55rem] uppercase leading-tight [&::-webkit-details-marker]:hidden">
+            <summary className="btn-px btn-chalk flex min-h-9 cursor-pointer list-none items-center justify-center gap-2 px-2 font-pixel text-[.78rem] uppercase leading-tight [&::-webkit-details-marker]:hidden">
               <MagnifyingGlass size={14} />
               Ver estatísticas
             </summary>
@@ -1174,7 +1174,7 @@ function PlayerStats({ player }: { player: PlayerView }) {
           ['Idade', String(player.age)],
         ].map(([label, value]) => (
           <div key={label} className="bg-card p-1">
-            <dt className="font-pixel text-[.45rem] uppercase text-muted-foreground">
+            <dt className="font-pixel text-[.7rem] uppercase text-muted-foreground">
               {label}
             </dt>
             <dd className="led bg-board text-base">{value}</dd>
@@ -1397,7 +1397,7 @@ function SquadList({
       className={cn('panel flex scroll-mt-20 flex-col gap-2 p-2', className)}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="album" className="font-pixel text-[.6rem] uppercase">
+        <h3 id="album" className="font-pixel text-[.82rem] uppercase">
           Elenco <span className="text-muted-foreground">{players.length}</span>
         </h3>
         <ToggleGroup
@@ -1407,14 +1407,14 @@ function SquadList({
           onValueChange={(value) => value && setFilter(value as typeof filter)}
           className="grid grid-cols-4"
         >
-          <ToggleGroupItem value="all" className="min-h-9 px-2 text-[.55rem]">
+          <ToggleGroupItem value="all" className="min-h-9 px-2 text-[.78rem]">
             Todos
           </ToggleGroupItem>
           {(['starter', 'bench', 'reserve'] as const).map((role) => (
             <ToggleGroupItem
               key={role}
               value={role}
-              className="min-h-9 px-2 text-[.55rem]"
+              className="min-h-9 px-2 text-[.78rem]"
             >
               {roleLabel[role]}
             </ToggleGroupItem>
@@ -1443,7 +1443,7 @@ function SquadList({
       )}
       {groups.map((group) => (
         <div key={group.id} className="grid gap-1">
-          <h4 className="px-1 font-pixel text-[.5rem] uppercase text-muted-foreground">
+          <h4 className="px-1 font-pixel text-[.74rem] uppercase text-muted-foreground">
             {group.label} <span className="led">{group.players.length}</span>
           </h4>
           <ul role="list" aria-label={group.label} className="grid gap-1">
@@ -1477,7 +1477,7 @@ function SquadList({
                           />
                         )}
                       </span>
-                      <span className="block truncate text-[.6rem] text-muted-foreground">
+                      <span className="block truncate text-[.82rem] text-muted-foreground">
                         {player.age} anos · {player.primaryPosition}
                         {player.secondaryPositions.length > 0 &&
                           ` / ${player.secondaryPositions.join(', ')}`}
@@ -1487,7 +1487,7 @@ function SquadList({
                     </span>
                     <span
                       className={cn(
-                        'font-pixel text-[.45rem] uppercase',
+                        'font-pixel text-[.7rem] uppercase',
                         role === 'starter'
                           ? 'bg-bulb px-1 text-ink'
                           : role === 'bench'
@@ -1529,7 +1529,7 @@ function SavedLineups({
 }) {
   return (
     <section aria-labelledby="escalacoes-salvas" className="panel p-2">
-      <h3 id="escalacoes-salvas" className="font-pixel text-[.55rem] uppercase">
+      <h3 id="escalacoes-salvas" className="font-pixel text-[.78rem] uppercase">
         Escalações salvas{' '}
         <span className="text-muted-foreground">
           {saved.length}/{MAX_SAVED_LINEUPS}
@@ -1588,7 +1588,7 @@ function SavedLineups({
           </li>
         ))}
       </ul>
-      <p className="mt-1 text-[.6rem] text-muted-foreground">
+      <p className="mt-1 text-[.82rem] text-muted-foreground">
         Guardadas neste aparelho, por carreira.
       </p>
     </section>
@@ -1623,7 +1623,7 @@ function TacticsPanel({
     const labels = TACTIC_LABEL[key] as Record<string, string>;
     return (
       <div key={key} className="grid gap-1">
-        <span id={id} className="font-pixel text-[.55rem] uppercase">
+        <span id={id} className="font-pixel text-[.78rem] uppercase">
           {label}
         </span>
         <ToggleGroup
@@ -1654,13 +1654,13 @@ function TacticsPanel({
   return (
     <div className="grid gap-3">
       <section aria-labelledby="prancheta" className="panel grid gap-3 p-3">
-        <h3 id="prancheta" className="font-pixel text-[.6rem] uppercase">
+        <h3 id="prancheta" className="font-pixel text-[.82rem] uppercase">
           Prancheta
         </h3>
         <div className="grid gap-1">
           <span
             id="tatica-formacao"
-            className="font-pixel text-[.55rem] uppercase"
+            className="font-pixel text-[.78rem] uppercase"
           >
             Formação
           </span>
@@ -1705,7 +1705,7 @@ function TacticsPanel({
       >
         <h3
           id="presets"
-          className="font-pixel text-[.6rem] uppercase text-chalk"
+          className="font-pixel text-[.82rem] uppercase text-chalk"
         >
           Presets
         </h3>
@@ -1716,11 +1716,11 @@ function TacticsPanel({
             className="btn-px btn-chalk grid gap-0.5 px-3 py-2 text-left"
             onClick={() => onPreset(preset.id)}
           >
-            <span className="flex items-center justify-between text-[.6rem]">
+            <span className="flex items-center justify-between text-[.82rem]">
               <span>{preset.name}</span>
               <span className="led bg-board px-1">{preset.formation}</span>
             </span>
-            <span className="font-sans text-[.65rem] normal-case text-muted-foreground">
+            <span className="font-sans text-[.86rem] normal-case text-muted-foreground">
               {preset.description}
             </span>
           </button>

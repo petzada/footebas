@@ -1,4 +1,5 @@
 import type { NarrationEvent } from '@footebas/engine/narration';
+import type { Kit } from './club-kits';
 
 export type ReplaySide = 'home' | 'away';
 /** How a chance was built and how it ended (match-v4, ADR 0015). */
@@ -11,6 +12,8 @@ export interface ReplayPlayer {
   readonly number: number;
   readonly started?: boolean;
   readonly rating?: number;
+  /** Field position code (GK, CB, ST...) when the source knows it. */
+  readonly position?: string;
 }
 
 export interface ReplayTeam {
@@ -18,6 +21,9 @@ export interface ReplayTeam {
   readonly name: string;
   readonly abbreviation: string;
   readonly color: string;
+  /** Full kit for the 3D stage; `color` stays the shirt colour. */
+  readonly kit?: Kit;
+  readonly keeperKit?: Kit;
   readonly players: readonly ReplayPlayer[];
 }
 

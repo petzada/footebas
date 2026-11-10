@@ -1,5 +1,5 @@
 /**
- * Deterministic, presentation-only choreography for the Phaser match stage.
+ * Deterministic, presentation-only choreography for the 3D match stage.
  *
  * The official timeline (ADR 0001/0010) is the only input: this module never
  * changes the score, events or statistics and never re-simulates anything.
@@ -7,9 +7,11 @@
  * keyed by the match id and the step index, so the same match always yields
  * the same animation.
  */
+import { PLAY_MS, playDurationMs, primaryEvent } from '@/lib/match-pace';
 import type {
   MatchReplayInput,
   ReplayEvent,
+  ReplayPlay,
   ReplayPlayer,
   ReplaySide,
 } from '@/lib/match-replay-model';
@@ -45,6 +47,30 @@ export interface StageSlotPlayer {
   readonly id: string;
   readonly number: number;
   readonly name: string;
+  readonly position?: string;
+}
+
+/** How a chance that is not a goal ends on the pitch. */
+export type ChanceEnding = 'saved' | 'wide' | 'over' | 'blocked' | 'post';
+
+/** A body movement the renderer animates on one athlete. */
+export interface StageAction {
+  /** Segment progress the movement starts at. */
+  readonly p: number;
+  /** Progress it is held until (falls, celebrations); a one-off otherwise. */
+  readonly until?: number;
+  readonly playerKey: string;
+  readonly kind:
+    | 'pass'
+    | 'shot'
+    | 'header'
+    | 'dive'
+    | 'tackle'
+    | 'fall'
+    | 'celebrate'
+    | 'despair';
+  /** -1 or 1: which way a keeper dives (towards the top or the bottom). */
+  readonly lean?: number;
 }
 
 export type StageOverlay =
@@ -52,7 +78,7 @@ export type StageOverlay =
   | Readonly<{
       kind: 'chance';
       side: ReplaySide;
-      outcome: 'saved' | 'wide' | 'over';
+      outcome: ChanceEnding;
     }>
   | Readonly<{
       kind: 'card';
@@ -121,6 +147,13 @@ export interface StageSegment {
   readonly lineupAfter: Lineup;
   readonly involvedKey: string | undefined;
   readonly shot: Readonly<{ from: StagePoint }> | null;
+  /** Formation anchors of each side during this segment (home-oriented). */
+  readonly anchors: Anchors;
+  readonly actions: readonly StageAction[];
+  /** How the chance was built, when the engine told us. */
+  readonly play: ReplayPlay | undefined;
+  /** Real time of the segment at 1x. */
+  readonly durationMs: number;
 }
 
 export interface StageChoreography {
@@ -134,23 +167,136 @@ export interface StageChoreography {
 const SIDES = ['home', 'away'] as const;
 const SLOTS = 11;
 
-/** 4-3-3 anchors for a team attacking to the right (home orientation). */
-const ANCHORS: readonly StagePoint[] = [
-  { x: 7, y: 32 },
-  { x: 22, y: 10 },
-  { x: 20, y: 25 },
-  { x: 20, y: 39 },
-  { x: 22, y: 54 },
-  { x: 38, y: 16 },
-  { x: 35, y: 32 },
-  { x: 38, y: 48 },
-  { x: 55, y: 14 },
-  { x: 58, y: 32 },
-  { x: 55, y: 50 },
+export type Anchors = Readonly<Record<ReplaySide, readonly StagePoint[]>>;
+
+/** Slot order used when the source does not say who plays where. */
+const DEFAULT_CODES: readonly string[] = [
+  'GK',
+  'RB',
+  'CB',
+  'CB',
+  'LB',
+  'DM',
+  'CM',
+  'AM',
+  'RW',
+  'LW',
+  'ST',
 ];
 
-const ATTACKERS = [9, 8, 10, 6, 5, 7] as const;
-const BUILDERS = [2, 3, 5, 6, 7, 1, 4] as const;
+const FORMATION_CODES: Readonly<Record<string, readonly string[]>> = {
+  '4-4-2': ['GK', 'RB', 'CB', 'CB', 'LB', 'CM', 'CM', 'RW', 'LW', 'ST', 'ST'],
+  '4-3-3': DEFAULT_CODES,
+  '3-5-2': ['GK', 'CB', 'CB', 'CB', 'RB', 'LB', 'DM', 'CM', 'AM', 'ST', 'ST'],
+};
+
+/** Depth of each line for a team attacking to the right. */
+const LINE_X: Readonly<Record<string, number>> = {
+  GK: 7,
+  CB: 20,
+  RB: 24,
+  LB: 24,
+  DM: 33,
+  CM: 41,
+  AM: 50,
+  RW: 57,
+  LW: 57,
+  ST: 62,
+};
+const WIDE_Y: Readonly<Record<string, number>> = {
+  RB: 54,
+  LB: 10,
+  RW: 52,
+  LW: 12,
+};
+const SPREAD: Readonly<Record<string, number>> = {
+  CB: 13,
+  DM: 16,
+  CM: 18,
+  AM: 16,
+  ST: 13,
+};
+/** Lone central players of different lines do not queue on the same axis. */
+const STAGGER: Readonly<Record<string, number>> = { CM: -7, AM: 7 };
+
+/** Formation anchors (home orientation) for 11 position codes, by slot. */
+export function anchorsForCodes(codes: readonly string[]): StagePoint[] {
+  const normal = codes.map((code) => (code in LINE_X ? code : 'CM'));
+  const counts = new Map<string, number>();
+  for (const code of normal) counts.set(code, (counts.get(code) ?? 0) + 1);
+  const wingBacks = (counts.get('CB') ?? 0) >= 3;
+  const seen = new Map<string, number>();
+  return normal.map((code) => {
+    const index = seen.get(code) ?? 0;
+    seen.set(code, index + 1);
+    const total = counts.get(code) ?? 1;
+    const wide = WIDE_Y[code];
+    if (wide !== undefined) {
+      const push = wingBacks && (code === 'RB' || code === 'LB') ? 9 : 0;
+      return { x: LINE_X[code]! + push, y: wide };
+    }
+    const y =
+      total === 1
+        ? 32 + (STAGGER[code] ?? 0)
+        : 32 + (index - (total - 1) / 2) * (SPREAD[code] ?? 14);
+    return { x: LINE_X[code]!, y };
+  });
+}
+
+function codesOf(lineup: readonly (StageSlotPlayer | null)[]): string[] {
+  const known = lineup.every(
+    (player) => player === null || player.position !== undefined,
+  );
+  return lineup.map((player, slot) =>
+    known && player?.position ? player.position : DEFAULT_CODES[slot]!,
+  );
+}
+
+/**
+ * Anchors after a formation change: the new shape is handed to the slots in
+ * depth order, so each athlete keeps roughly the zone he already covered.
+ */
+function reshape(
+  current: readonly StagePoint[],
+  formation: string,
+): readonly StagePoint[] {
+  const codes = FORMATION_CODES[formation];
+  if (!codes) return current;
+  const target = anchorsForCodes(codes);
+  const order = (points: readonly StagePoint[]) =>
+    points
+      .map((anchor, slot) => ({ anchor, slot }))
+      .slice(1)
+      .sort(
+        (left, right) =>
+          left.anchor.x - right.anchor.x || left.anchor.y - right.anchor.y,
+      );
+  const from = order(current);
+  const to = order(target);
+  const next = [...current];
+  next[0] = target[0]!;
+  from.forEach(({ slot }, index) => {
+    next[slot] = to[index]!.anchor;
+  });
+  return next;
+}
+
+/** Slots most likely to finish (furthest forward) and to build, by anchors. */
+function rolesOf(anchors: readonly StagePoint[]) {
+  const outfield = anchors
+    .map((anchor, slot) => ({ anchor, slot }))
+    .slice(1)
+    .sort((left, right) => right.anchor.x - left.anchor.x);
+  return {
+    attackers: outfield.slice(0, 6).map(({ slot }) => slot),
+    builders: outfield.slice(3).map(({ slot }) => slot),
+    defenders: outfield
+      .slice(-4)
+      .reverse()
+      .map(({ slot }) => slot),
+  };
+}
+
 const BENCH: StagePoint = { x: 50, y: 63.2 };
 
 export function hashSeed(text: string): number {
@@ -207,7 +353,9 @@ function point(x: number, y: number): StagePoint {
 }
 
 function orient(side: ReplaySide, anchor: StagePoint): StagePoint {
-  return side === 'home' ? anchor : { x: PITCH.width - anchor.x, y: anchor.y };
+  return side === 'home'
+    ? anchor
+    : { x: PITCH.width - anchor.x, y: PITCH.height - anchor.y };
 }
 
 function lerp(from: number, to: number, t: number): number {
@@ -225,7 +373,12 @@ function easeOut(t: number): number {
 }
 
 function toSlotPlayer(player: ReplayPlayer): StageSlotPlayer {
-  return { id: player.id, number: player.number, name: player.name };
+  return {
+    id: player.id,
+    number: player.number,
+    name: player.name,
+    ...(player.position === undefined ? {} : { position: player.position }),
+  };
 }
 
 function initialLineup(input: MatchReplayInput): Lineup {
@@ -235,6 +388,9 @@ function initialLineup(input: MatchReplayInput): Lineup {
       0,
       SLOTS,
     );
+    // The keeper always owns slot 0, whatever order the source used.
+    const keeper = chosen.findIndex((player) => player.position === 'GK');
+    if (keeper > 0) chosen.unshift(...chosen.splice(keeper, 1));
     return Array.from({ length: SLOTS }, (_, slot) =>
       chosen[slot] ? toSlotPlayer(chosen[slot]) : null,
     );
@@ -278,26 +434,10 @@ function applyEvents(
   return next;
 }
 
-const PRIORITY: Readonly<Record<ReplayEvent['type'], number>> = {
-  goal: 6,
-  chance: 5,
-  card: 4,
-  injury: 3,
-  substitution: 2,
-  tactical_change: 1,
-};
-
-function primaryEvent(events: readonly ReplayEvent[]): ReplayEvent | undefined {
-  let best: ReplayEvent | undefined;
-  for (const event of events)
-    if (!best || PRIORITY[event.type] > PRIORITY[best.type]) best = event;
-  return best;
-}
-
-function kickoffPose(): Pose {
+function kickoffPose(anchors: Anchors): Pose {
   const pose: Record<string, StagePoint> = {};
   for (const side of SIDES)
-    ANCHORS.forEach((anchor, slot) => {
+    anchors[side].forEach((anchor, slot) => {
       const compact = {
         x: Math.min(47, PITCH.left + (anchor.x - PITCH.left) * 0.8),
         y: anchor.y,
@@ -305,11 +445,13 @@ function kickoffPose(): Pose {
       const placed = orient(side, compact);
       pose[playerKey(side, slot)] = point(placed.x, placed.y);
     });
-  pose[playerKey('home', 9)] = point(48.6, 32);
+  const striker = rolesOf(anchors.home).attackers[0] ?? 9;
+  pose[playerKey('home', striker)] = point(48.6, 32);
   return pose;
 }
 
 function openPlayPose(
+  anchors: Anchors,
   attacking: ReplaySide,
   ball: StagePoint,
   intensity: number,
@@ -319,7 +461,7 @@ function openPlayPose(
   for (const side of SIDES) {
     const direction = attackDirection(side);
     const isAttacking = side === attacking;
-    ANCHORS.forEach((source, slot) => {
+    anchors[side].forEach((source, slot) => {
       const anchor = orient(side, source);
       const jitterX = (random() - 0.5) * 3;
       const jitterY = (random() - 0.5) * 3;
@@ -369,10 +511,33 @@ interface SegmentPlan {
   readonly involvedSlot: number | undefined;
   readonly spot: StagePoint;
   readonly overlay: StageOverlay | null;
+  readonly play: ReplayPlay | undefined;
+}
+
+type Finish = 'goal' | ChanceEnding;
+
+function chanceEnding(
+  event: Extract<ReplayEvent, { type: 'chance' }>,
+  random: () => number,
+): ChanceEnding {
+  switch (event.outcome) {
+    case 'saved':
+      return 'saved';
+    case 'blocked':
+      return 'blocked';
+    case 'woodwork':
+      return 'post';
+    case 'off_target':
+      return random() < 0.5 ? 'wide' : 'over';
+    default:
+      // Before match-v4 the engine did not say how the chance ended.
+      return pickFrom(['saved', 'wide', 'over'] as const, random);
+  }
 }
 
 function planSegment(
   lineup: Lineup,
+  anchors: Anchors,
   primary: ReplayEvent | undefined,
   attacking: ReplaySide,
   random: () => number,
@@ -386,25 +551,40 @@ function planSegment(
       involvedSlot: undefined,
       spot: midfield,
       overlay: null,
+      play: undefined,
     };
   }
   switch (primary.type) {
     case 'goal':
     case 'chance': {
+      const roles = rolesOf(anchors[primary.side]);
+      const named =
+        primary.playerId === undefined
+          ? undefined
+          : slotOf(lineup, primary.side, primary.playerId);
       const slot =
-        primary.type === 'goal'
-          ? (slotOf(lineup, primary.side, primary.playerId) ??
-            pickSlot(lineup, primary.side, ATTACKERS, random))
-          : pickSlot(lineup, primary.side, ATTACKERS, random);
-      const spot = point(
-        goalX - direction * (8 + random() * 12),
-        32 + (random() - 0.5) * 26,
-      );
-      const outcomes = ['saved', 'wide', 'over'] as const;
+        named ?? pickSlot(lineup, primary.side, roles.attackers, random);
+      const play = primary.play;
+      const spot =
+        play === 'long_shot'
+          ? point(
+              goalX - direction * (24 + random() * 7),
+              32 + (random() - 0.5) * 22,
+            )
+          : play === 'cross'
+            ? point(
+                goalX - direction * (6 + random() * 5),
+                32 + (random() - 0.5) * 11,
+              )
+            : point(
+                goalX - direction * (8 + random() * 12),
+                32 + (random() - 0.5) * 26,
+              );
       return {
         involvedSide: primary.side,
         involvedSlot: slot,
         spot,
+        play,
         overlay:
           primary.type === 'goal'
             ? {
@@ -415,7 +595,7 @@ function planSegment(
             : {
                 kind: 'chance',
                 side: primary.side,
-                outcome: pickFrom(outcomes, random),
+                outcome: chanceEnding(primary, random),
               },
       };
     }
@@ -423,7 +603,12 @@ function planSegment(
     case 'injury': {
       const slot =
         slotOf(lineup, primary.side, primary.playerId) ??
-        pickSlot(lineup, primary.side, BUILDERS, random);
+        pickSlot(
+          lineup,
+          primary.side,
+          rolesOf(anchors[primary.side]).builders,
+          random,
+        );
       const spot = point(
         goalX - direction * (20 + random() * 25),
         10 + random() * 44,
@@ -433,6 +618,7 @@ function planSegment(
         involvedSide: primary.side,
         involvedSlot: slot,
         spot,
+        play: undefined,
         overlay:
           primary.type === 'card'
             ? {
@@ -447,12 +633,18 @@ function planSegment(
     case 'substitution': {
       const slot =
         slotOf(lineup, primary.side, primary.playerOutId) ??
-        pickSlot(lineup, primary.side, BUILDERS, random);
+        pickSlot(
+          lineup,
+          primary.side,
+          rolesOf(anchors[primary.side]).builders,
+          random,
+        );
       return {
         involvedSide: primary.side,
         involvedSlot: slot,
         spot: point(42 + random() * 16, PITCH.bottom + 0.6),
         overlay: null,
+        play: undefined,
       };
     }
     case 'tactical_change':
@@ -461,33 +653,59 @@ function planSegment(
         involvedSlot: undefined,
         spot: midfield,
         overlay: null,
+        play: undefined,
       };
   }
 }
 
 function shotTarget(
   attacking: ReplaySide,
-  overlay: StageOverlay | null,
+  finish: Finish,
   random: () => number,
 ): StagePoint {
-  const behind = attackDirection(attacking) * (PITCH.netDepth * 0.75);
+  const direction = attackDirection(attacking);
+  const behind = direction * (PITCH.netDepth * 0.75);
   const lineX = attackedGoalX(attacking);
   const inside =
     PITCH.goalTop + 1 + random() * (PITCH.goalBottom - PITCH.goalTop - 2);
-  if (overlay?.kind === 'goal') return point(lineX + behind, inside);
-  if (overlay?.kind === 'chance' && overlay.outcome === 'wide') {
-    const high = random() < 0.5;
-    return point(
-      lineX + behind * 1.6,
-      high
-        ? PITCH.goalTop - 2 - random() * 4
-        : PITCH.goalBottom + 2 + random() * 4,
-    );
+  switch (finish) {
+    case 'goal':
+      return point(lineX + behind, inside);
+    case 'wide': {
+      const high = random() < 0.5;
+      return point(
+        lineX + behind * 1.6,
+        high
+          ? PITCH.goalTop - 2 - random() * 4
+          : PITCH.goalBottom + 2 + random() * 4,
+      );
+    }
+    case 'over':
+      return point(lineX + behind * 1.6, inside);
+    case 'post':
+      return point(
+        lineX - direction * 0.25,
+        random() < 0.5 ? PITCH.goalTop : PITCH.goalBottom,
+      );
+    case 'saved':
+    case 'blocked':
+      // Saved: the keeper gathers in front of the line.
+      return point(lineX - direction * 1.4, inside);
   }
-  if (overlay?.kind === 'chance' && overlay.outcome === 'over')
-    return point(lineX + behind * 1.6, inside);
-  // Saved: the keeper gathers in front of the line.
-  return point(lineX - attackDirection(attacking) * 1.4, inside);
+}
+
+function blendPose(
+  from: Pose,
+  to: Pose,
+  t: number,
+): Record<string, StagePoint> {
+  const pose: Record<string, StagePoint> = {};
+  for (const key of Object.keys(to)) {
+    const target = to[key]!;
+    const source = from[key] ?? target;
+    pose[key] = point(lerp(source.x, target.x, t), lerp(source.y, target.y, t));
+  }
+  return pose;
 }
 
 function buildSegment(
@@ -497,6 +715,8 @@ function buildSegment(
   events: readonly ReplayEvent[],
   previousRest: Readonly<{ pose: Pose; ball: StagePoint }>,
   lineupBefore: Lineup,
+  anchorsBefore: Anchors,
+  last: boolean,
 ): StageSegment {
   const random = seededRandom(hashSeed(`${input.matchId}:stage:${step}`));
   const primary = primaryEvent(events);
@@ -507,114 +727,274 @@ function buildSegment(
     : random() < 0.5
       ? 'home'
       : 'away';
+  const defending = opposite(attacking);
   const lineupAfter = applyEvents(input, lineupBefore, events);
-  const plan = planSegment(lineupBefore, primary, attacking, random);
+  let anchors = anchorsBefore;
+  for (const event of events)
+    if (event.type === 'tactical_change')
+      anchors = {
+        ...anchors,
+        [event.side]: reshape(anchors[event.side], event.formation),
+      };
+  const plan = planSegment(lineupBefore, anchors, primary, attacking, random);
   const direction = attackDirection(attacking);
+  const lineX = attackedGoalX(attacking);
   const involvedKey =
     plan.involvedSlot === undefined
       ? undefined
       : playerKey(plan.involvedSide, plan.involvedSlot);
+  const roles = rolesOf(anchors[attacking]);
+  const play = plan.play;
 
   // Passing carriers from the attacking side, distinct from the protagonist.
+  // The official assistant, when there is one, plays the last pass.
   const protagonistSlot =
     plan.involvedSide === attacking ? plan.involvedSlot : undefined;
-  const carrierA = pickSlot(lineupBefore, attacking, BUILDERS, random, [
+  const assistSlot =
+    primary &&
+    (primary.type === 'goal' || primary.type === 'chance') &&
+    primary.assistId !== undefined
+      ? slotOf(lineupBefore, attacking, primary.assistId)
+      : undefined;
+  const carrierB =
+    assistSlot !== undefined && assistSlot !== protagonistSlot
+      ? assistSlot
+      : pickSlot(lineupBefore, attacking, roles.builders, random, [
+          protagonistSlot,
+        ]);
+  const carrierA = pickSlot(lineupBefore, attacking, roles.builders, random, [
     protagonistSlot,
-  ]);
-  const carrierB = pickSlot(lineupBefore, attacking, BUILDERS, random, [
-    protagonistSlot,
-    carrierA,
+    carrierB,
   ]);
   const receiver =
     protagonistSlot ??
-    pickSlot(lineupBefore, attacking, ATTACKERS, random, [carrierA, carrierB]);
+    pickSlot(lineupBefore, attacking, roles.attackers, random, [
+      carrierA,
+      carrierB,
+    ]);
   const keyA = playerKey(attacking, carrierA);
   const keyB = playerKey(attacking, carrierB);
   const keyReceiver = playerKey(attacking, receiver);
+  const keeperKey = playerKey(defending, 0);
 
-  const openBall = point(50 - direction * 8, 14 + random() * 36);
-  const poseOpen = openPlayPose(attacking, openBall, 0.35, random);
+  const isShot =
+    plan.overlay?.kind === 'goal' || plan.overlay?.kind === 'chance';
+  const counter = play === 'counter';
+  const openBall = point(
+    50 - direction * (counter ? 24 : 8),
+    14 + random() * 36,
+  );
+  const poseOpen = openPlayPose(
+    anchors,
+    attacking,
+    openBall,
+    counter ? 0.05 : 0.35,
+    random,
+  );
   const poseBuild = openPlayPose(
+    anchors,
     attacking,
     plan.spot,
-    plan.overlay?.kind === 'goal' || plan.overlay?.kind === 'chance'
-      ? 0.85
-      : 0.55,
+    isShot ? (counter ? 0.6 : 0.85) : 0.55,
     random,
   );
   poseBuild[keyReceiver] = offset(plan.spot, -direction * 1.4, 0.6);
 
-  const poseAction: Record<string, StagePoint> = { ...poseBuild };
-  const poseRest: Record<string, StagePoint> = { ...poseBuild };
-  const defending = opposite(attacking);
-  const keeperKey = playerKey(defending, 0);
-  const isShot =
-    plan.overlay?.kind === 'goal' || plan.overlay?.kind === 'chance';
-  const target = isShot
-    ? shotTarget(attacking, plan.overlay, random)
-    : undefined;
-
+  const extraPoses: Array<Readonly<{ p: number; pose: Pose }>> = [];
+  const actions: StageAction[] = [];
   const ballKeys: BallKey[] = [{ p: 0, point: previousRest.ball, arc: 0 }];
+  const feet = (pose: Pose, key: string) => offset(pose[key]!, direction, 0);
+  let poseAction: Record<string, StagePoint> = { ...poseBuild };
+  let poseRest: Record<string, StagePoint> = { ...poseBuild };
 
-  if (isShot && target) {
-    poseAction[keyReceiver] = offset(plan.spot, direction * 1.6, 0.4);
-    const keeperDiveY =
-      plan.overlay?.kind === 'goal'
-        ? target.y + (target.y < 32 ? 4 : -4)
-        : target.y;
-    poseAction[keeperKey] = point(
-      attackedGoalX(attacking) - direction * 1.6,
-      keeperDiveY,
-    );
-    poseRest[keeperKey] = poseAction[keeperKey]!;
-    if (plan.overlay?.kind === 'goal') {
-      const corner = point(
-        attackedGoalX(attacking) - direction * 6,
-        plan.spot.y < 32 ? 6 : 58,
+  if (isShot) {
+    const finish: Finish =
+      plan.overlay?.kind === 'chance' ? plan.overlay.outcome : 'goal';
+    let shotAt: number = PHASES.build;
+
+    // --- How the ball gets to the finisher. --------------------------------
+    if (play === 'cross') {
+      const wideY = random() < 0.5 ? 5.5 : 58.5;
+      const wide = point(lineX - direction * (6 + random() * 4), wideY);
+      poseOpen[keyB] = point(
+        wide.x - direction * 20,
+        wideY + (wideY < 32 ? 4 : -4),
       );
+      const poseWide = blendPose(poseOpen, poseBuild, 0.6);
+      poseWide[keyB] = offset(wide, -direction * 1.2, 0);
+      poseBuild[keyB] = offset(wide, -direction * 0.6, 0);
+      extraPoses.push({ p: 0.48, pose: poseWide });
+      shotAt = 0.62;
+      ballKeys.push(
+        { p: 0.14, point: feet(poseOpen, keyA), arc: 0.06 },
+        { p: PHASES.open, point: feet(poseOpen, keyB), arc: 0.12 },
+        { p: 0.48, point: wide, arc: 0 },
+        { p: shotAt, point: plan.spot, arc: 0.75 },
+      );
+      actions.push(
+        { p: 0.14, playerKey: keyA, kind: 'pass' },
+        { p: 0.48, playerKey: keyB, kind: 'pass' },
+      );
+    } else if (play === 'individual') {
+      const start = poseOpen[keyReceiver]!;
+      const mid = point(
+        lerp(start.x, plan.spot.x, 0.5),
+        lerp(start.y, plan.spot.y, 0.5) + (random() < 0.5 ? -5 : 5),
+      );
+      const poseDribble = blendPose(poseOpen, poseBuild, 0.5);
+      poseDribble[keyReceiver] = offset(mid, -direction * 1.2, 0);
+      extraPoses.push({ p: PHASES.carry, pose: poseDribble });
+      ballKeys.push(
+        { p: 0.14, point: feet(poseOpen, keyA), arc: 0.06 },
+        { p: PHASES.open, point: feet(poseOpen, keyReceiver), arc: 0.1 },
+        { p: PHASES.carry, point: mid, arc: 0 },
+        { p: PHASES.build, point: plan.spot, arc: 0 },
+      );
+      actions.push({ p: 0.14, playerKey: keyA, kind: 'pass' });
+    } else if (play === 'defensive_error') {
+      const culprit = pickSlot(
+        lineupBefore,
+        defending,
+        rolesOf(anchors[defending]).defenders,
+        random,
+      );
+      const keyCulprit = playerKey(defending, culprit);
+      const loss = point(
+        lineX - direction * (20 + random() * 8),
+        32 + (random() - 0.5) * 24,
+      );
+      poseOpen[keyCulprit] = offset(loss, direction * 1.2, 0);
+      poseOpen[keyReceiver] = offset(loss, -direction * 5, 2);
+      poseBuild[keyCulprit] = offset(loss, -direction * 1, 3);
+      ballKeys.push(
+        { p: 0.14, point: offset(loss, direction * 9, 4), arc: 0.05 },
+        { p: PHASES.open, point: loss, arc: 0.08 },
+        { p: 0.42, point: offset(loss, -direction * 2.5, 1), arc: 0 },
+        { p: PHASES.build, point: plan.spot, arc: 0 },
+      );
+      actions.push({ p: 0.36, playerKey: keyReceiver, kind: 'tackle' });
+    } else {
+      ballKeys.push(
+        { p: 0.14, point: feet(poseOpen, keyA), arc: 0.06 },
+        { p: PHASES.open, point: feet(poseOpen, keyB), arc: 0.1 },
+        {
+          p: PHASES.carry,
+          point: offset(poseBuild[keyReceiver]!, -direction * 4, 0),
+          arc: counter ? 0.55 : 0.08,
+        },
+        { p: PHASES.build, point: plan.spot, arc: 0 },
+      );
+      actions.push(
+        { p: 0.14, playerKey: keyA, kind: 'pass' },
+        { p: PHASES.open, playerKey: keyB, kind: 'pass' },
+      );
+    }
+    actions.push({
+      p: shotAt,
+      playerKey: keyReceiver,
+      kind: play === 'cross' ? 'header' : 'shot',
+    });
+
+    // --- How it ends. --------------------------------------------------------
+    poseAction = { ...poseBuild };
+    poseRest = { ...poseBuild };
+    poseAction[keyReceiver] = offset(plan.spot, direction * 1.6, 0.4);
+    let target = shotTarget(attacking, finish, random);
+    let rest = target;
+    let arc = finish === 'over' ? 1 : 0.35;
+    let restArc = 0;
+    const keeperHome = poseBuild[keeperKey]!;
+    const dive = (toY: number) => {
+      poseAction[keeperKey] = point(lineX - direction * 1.6, toY);
+      poseRest[keeperKey] = poseAction[keeperKey]!;
+      actions.push({
+        p: shotAt + 0.06,
+        until: 0.94,
+        playerKey: keeperKey,
+        kind: 'dive',
+        lean: toY < keeperHome.y ? -1 : 1,
+      });
+    };
+
+    if (finish === 'goal') {
+      // Beaten: the keeper goes the right way but short of the ball.
+      dive(target.y + (target.y < 32 ? 4 : -4) * 0.5);
+      const corner = point(lineX - direction * 6, plan.spot.y < 32 ? 6 : 58);
       poseRest[keyReceiver] = corner;
-      const mates = ATTACKERS.filter((slot) => slot !== receiver).slice(0, 3);
+      const mates = roles.attackers
+        .filter((slot) => slot !== receiver && lineupBefore[attacking][slot])
+        .slice(0, 4);
       mates.forEach((slot, index) => {
-        if (!lineupBefore[attacking][slot]) return;
-        poseRest[playerKey(attacking, slot)] = offset(
+        const key = playerKey(attacking, slot);
+        poseRest[key] = offset(
           corner,
-          -direction * (2.5 + index * 1.5),
-          (index - 1) * 2.4,
+          -direction * (2.5 + index * 1.4),
+          (index - 1.5) * 2.2,
         );
+        actions.push({
+          p: PHASES.action + 0.1,
+          until: 1,
+          playerKey: key,
+          kind: 'celebrate',
+        });
+      });
+      actions.push({
+        p: PHASES.action + 0.05,
+        until: 1,
+        playerKey: keyReceiver,
+        kind: 'celebrate',
       });
     } else {
       poseRest[keyReceiver] = offset(plan.spot, direction * 2.4, 0);
+      if (finish === 'saved') {
+        dive(target.y);
+        rest = offset(poseRest[keeperKey]!, -direction * 0.8, 0);
+      } else if (finish === 'blocked') {
+        const block = point(
+          lerp(plan.spot.x, lineX, 0.3),
+          lerp(plan.spot.y, 32, 0.3),
+        );
+        const blocker =
+          rolesOf(anchors[defending]).defenders.find(
+            (slot) => lineupBefore[defending][slot],
+          ) ?? 2;
+        const keyBlocker = playerKey(defending, blocker);
+        poseBuild[keyBlocker] = offset(block, direction * 2.5, 0.8);
+        poseAction[keyBlocker] = offset(block, direction * 0.4, 0);
+        poseRest[keyBlocker] = poseAction[keyBlocker]!;
+        actions.push({
+          p: shotAt + 0.04,
+          playerKey: keyBlocker,
+          kind: 'tackle',
+        });
+        target = block;
+        arc = 0.08;
+        rest = offset(block, -direction * 6, random() < 0.5 ? -7 : 7);
+        restArc = 0.3;
+      } else if (finish === 'post') {
+        dive(target.y + (target.y < 32 ? 1.5 : -1.5));
+        arc = 0.3;
+        rest = offset(target, -direction * 8, target.y < 32 ? -5 : 5);
+        restArc = 0.25;
+      } else if (finish === 'wide') {
+        dive(target.y < 32 ? PITCH.goalTop + 1 : PITCH.goalBottom - 1);
+      }
+      actions.push({
+        p: PHASES.action + 0.08,
+        until: 1,
+        playerKey: keyReceiver,
+        kind: 'despair',
+      });
     }
-    const rest =
-      plan.overlay?.kind === 'chance' && plan.overlay.outcome === 'saved'
-        ? offset(poseRest[keeperKey]!, direction * -0.8, 0)
-        : target;
     ballKeys.push(
-      { p: 0.14, point: offset(poseOpen[keyA]!, direction, 0), arc: 0.06 },
-      {
-        p: PHASES.open,
-        point: offset(poseOpen[keyB]!, direction, 0),
-        arc: 0.1,
-      },
-      {
-        p: PHASES.carry,
-        point: offset(poseBuild[keyReceiver]!, -direction * 4, 0),
-        arc: 0.08,
-      },
-      { p: PHASES.build, point: plan.spot, arc: 0 },
-      {
-        p: PHASES.action,
-        point: target,
-        arc:
-          plan.overlay?.kind === 'chance' && plan.overlay.outcome === 'over'
-            ? 1
-            : 0.35,
-      },
-      { p: 1, point: rest, arc: 0 },
+      { p: PHASES.action, point: target, arc },
+      { p: 1, point: rest, arc: restArc },
     );
   } else if (primary?.type === 'card' || primary?.type === 'injury') {
     const fouled = keyReceiver;
     poseBuild[fouled] = offset(plan.spot, -direction * 0.8, 0);
+    poseAction = { ...poseBuild };
+    poseRest = { ...poseBuild };
     if (involvedKey) {
       poseBuild[involvedKey] = offset(plan.spot, direction * 1.8, 1.2);
       poseAction[involvedKey] = offset(plan.spot, direction * 0.4, 0.6);
@@ -622,49 +1002,66 @@ function buildSegment(
         primary.type === 'card' && primary.card === 'red'
           ? point(plan.spot.x, PITCH.bottom + 1)
           : offset(plan.spot, direction * 1.2, -1.6);
+      if (primary.type === 'card') {
+        actions.push(
+          { p: PHASES.build + 0.05, playerKey: involvedKey, kind: 'tackle' },
+          {
+            p: PHASES.action - 0.03,
+            until: 0.95,
+            playerKey: fouled,
+            kind: 'fall',
+          },
+        );
+      } else {
+        // The injured athlete stays down where the duel happened.
+        poseRest[involvedKey] = poseAction[involvedKey]!;
+        actions.push({
+          p: PHASES.action - 0.03,
+          until: 1,
+          playerKey: involvedKey,
+          kind: 'fall',
+        });
+      }
     }
     poseAction[fouled] = offset(plan.spot, 0, -0.4);
     poseRest[fouled] = offset(plan.spot, -direction * 0.6, 0.8);
     ballKeys.push(
-      { p: 0.14, point: offset(poseOpen[keyA]!, direction, 0), arc: 0.06 },
-      {
-        p: PHASES.open,
-        point: offset(poseOpen[keyB]!, direction, 0),
-        arc: 0.1,
-      },
+      { p: 0.14, point: feet(poseOpen, keyA), arc: 0.06 },
+      { p: PHASES.open, point: feet(poseOpen, keyB), arc: 0.1 },
       { p: PHASES.build, point: plan.spot, arc: 0.05 },
       { p: PHASES.action, point: offset(plan.spot, direction * 2, 1), arc: 0 },
       { p: 1, point: offset(plan.spot, direction * 2.4, 1.2), arc: 0 },
+    );
+    actions.push(
+      { p: 0.14, playerKey: keyA, kind: 'pass' },
+      { p: PHASES.open, playerKey: keyB, kind: 'pass' },
     );
   } else if (primary?.type === 'substitution' && involvedKey) {
     poseAction[involvedKey] = point(BENCH.x - 1.5, PITCH.bottom - 0.5);
     poseRest[involvedKey] = point(BENCH.x + 1.5, PITCH.bottom - 0.8);
     ballKeys.push(
-      { p: 0.14, point: offset(poseOpen[keyA]!, direction, 0), arc: 0.06 },
-      {
-        p: PHASES.open,
-        point: offset(poseOpen[keyB]!, direction, 0),
-        arc: 0.1,
-      },
+      { p: 0.14, point: feet(poseOpen, keyA), arc: 0.06 },
+      { p: PHASES.open, point: feet(poseOpen, keyB), arc: 0.1 },
       { p: PHASES.build, point: point(plan.spot.x, PITCH.bottom - 3), arc: 0 },
       { p: PHASES.action, point: plan.spot, arc: 0.1 },
       { p: 1, point: plan.spot, arc: 0 },
     );
+    actions.push({ p: 0.14, playerKey: keyA, kind: 'pass' });
   } else {
     // Open play: tactical tweak or the run to full time.
     ballKeys.push(
-      { p: 0.14, point: offset(poseOpen[keyA]!, direction, 0), arc: 0.06 },
-      {
-        p: PHASES.open,
-        point: offset(poseOpen[keyB]!, direction, 0),
-        arc: 0.1,
-      },
+      { p: 0.14, point: feet(poseOpen, keyA), arc: 0.06 },
+      { p: PHASES.open, point: feet(poseOpen, keyB), arc: 0.1 },
       {
         p: PHASES.build,
         point: offset(poseBuild[keyReceiver]!, direction, 0),
         arc: 0.12,
       },
       { p: 1, point: offset(poseBuild[keyReceiver]!, direction, 0), arc: 0 },
+    );
+    actions.push(
+      { p: 0.14, playerKey: keyA, kind: 'pass' },
+      { p: PHASES.open, playerKey: keyB, kind: 'pass' },
     );
   }
 
@@ -694,16 +1091,21 @@ function buildSegment(
     poseKeys: [
       { p: 0, pose: previousRest.pose },
       { p: PHASES.open, pose: poseOpen },
+      ...extraPoses,
       { p: PHASES.build, pose: poseBuild },
       { p: PHASES.action, pose: poseAction },
       { p: 1, pose: poseRest },
-    ],
+    ].sort((left, right) => left.p - right.p),
     ballKeys,
     overlay,
     lineupBefore,
     lineupAfter,
     involvedKey,
     shot: isShot ? { from: plan.spot } : null,
+    anchors,
+    actions: actions.sort((left, right) => left.p - right.p),
+    play,
+    durationMs: last ? PLAY_MS.none : playDurationMs(events),
   };
 }
 
@@ -728,8 +1130,12 @@ export function buildChoreography(input: MatchReplayInput): StageChoreography {
   const eventsAt = (minute: number) =>
     input.timeline.filter((_, index) => eventMinutes[index] === minute);
 
-  const kickoff = kickoffPose();
   const firstLineup = applyEvents(input, initialLineup(input), eventsAt(0));
+  const firstAnchors: Anchors = {
+    home: anchorsForCodes(codesOf(firstLineup.home)),
+    away: anchorsForCodes(codesOf(firstLineup.away)),
+  };
+  const kickoff = kickoffPose(firstAnchors);
   const segments: StageSegment[] = [
     {
       step: 0,
@@ -744,6 +1150,10 @@ export function buildChoreography(input: MatchReplayInput): StageChoreography {
       lineupAfter: firstLineup,
       involvedKey: undefined,
       shot: null,
+      anchors: firstAnchors,
+      actions: [],
+      play: undefined,
+      durationMs: 0,
     },
   ];
   for (let step = 1; step < minutes.length; step += 1) {
@@ -756,6 +1166,8 @@ export function buildChoreography(input: MatchReplayInput): StageChoreography {
         eventsAt(minutes[step]!),
         restOf(previous),
         previous.lineupAfter,
+        previous.anchors,
+        step === minutes.length - 1,
       ),
     );
   }

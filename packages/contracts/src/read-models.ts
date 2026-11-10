@@ -340,6 +340,10 @@ export const postMatchReadModelSchema = z.strictObject({
         id: entityIdSchema,
         name: nonEmptyTextSchema,
         side: z.enum(['home', 'away']),
+        /** Presentation hints for the 3D stage; absent in older saves. */
+        position: z.string().min(1).max(4).optional(),
+        shirtNumber: z.number().int().min(1).max(99).optional(),
+        started: z.boolean().optional(),
       }),
     )
     .max(80)

@@ -96,7 +96,7 @@ function SecureEnvironment() {
         weight="duotone"
         aria-hidden="true"
       />
-      <p className="font-pixel text-xs leading-relaxed text-ink">
+      <p className="font-pixel text-xs leading-relaxed text-card-foreground">
         Ambiente seguro
       </p>
       <p className="text-sm text-muted-foreground">
@@ -286,7 +286,7 @@ export function LicenseCheckout({
     >
       <h2
         id="perfil-checkout"
-        className="text-center font-pixel text-[.6rem] leading-relaxed text-muted-foreground"
+        className="text-center font-pixel text-[.82rem] leading-relaxed text-muted-foreground"
       >
         Pagamento PIX
       </h2>
@@ -320,7 +320,7 @@ export function LicenseCheckout({
             <p className="text-xs text-muted-foreground">
               Licença completa · pagamento único
             </p>
-            <p className="font-pixel text-2xl text-ink sm:text-3xl">
+            <p className="font-pixel text-2xl text-card-foreground sm:text-3xl">
               {formatCents(state.order.amountCents)}
             </p>
           </div>
@@ -356,7 +356,7 @@ export function LicenseCheckout({
             <div className="grid gap-2">
               <label
                 htmlFor="pix-brcode"
-                className="text-center font-pixel text-[.6rem] text-ink"
+                className="text-center font-pixel text-[.82rem] text-card-foreground"
               >
                 PIX copia e cola
               </label>
@@ -366,7 +366,7 @@ export function LicenseCheckout({
                 rows={3}
                 value={state.order.brCode}
                 onFocus={(event) => event.currentTarget.select()}
-                className="w-full resize-none border-2 border-ink/30 bg-chalk/40 p-2 font-mono text-[.65rem] break-all text-ink"
+                className="w-full resize-none border-2 border-ink/30 bg-chalk/40 p-2 font-mono text-[.86rem] break-all text-ink"
               />
               <Button
                 variant="play"
@@ -517,7 +517,7 @@ export function LicenseUpsell({
 
   if (paid)
     return (
-      <div role="status" className="grid gap-3 text-ink">
+      <div role="status" className="grid gap-3 text-card-foreground">
         <p className="flex items-start gap-2 text-sm">
           <SealCheck
             className="mt-0.5 size-6 shrink-0 text-primary"
@@ -558,7 +558,7 @@ export function LicenseUpsell({
     );
 
   return (
-    <div className="grid gap-4 text-ink">
+    <div className="grid gap-4 text-card-foreground">
       <div className="flex items-center gap-3">
         <PixelStar size={24} className="shrink-0" />
         <h3 className="font-pixel text-sm leading-relaxed">Seja licenciado</h3>

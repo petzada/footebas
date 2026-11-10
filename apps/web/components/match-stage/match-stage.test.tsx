@@ -9,46 +9,46 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StageOverlay } from './choreography';
 import { MatchStage, type MatchStageProps } from './match-stage';
 import { SIMPLE_VISUAL_KEY } from './stage-mode';
+import type { StadiumStageOptions } from './stadium/stage';
 import { stageMatch } from './test-fixture';
-import type { ThreeStageOptions } from './three-scene';
 
-/** Phaser is never rendered in jsdom: this fake records what the stage asks. */
-const fake = vi.hoisted(() => {
-  const state = {
-    games: [] as Array<{
-      config: Record<string, unknown>;
-      destroy: ReturnType<typeof vi.fn>;
-      loop: { sleep: ReturnType<typeof vi.fn>; wake: ReturnType<typeof vi.fn> };
-      scene?: { update: (time: number, delta: number) => void };
-      canvas: HTMLCanvasElement;
-    }>,
-    failNext: false,
-    /** Three.js stages created through the mocked `createThreeStage`. */
-    stages: [] as Array<{
-      options: ThreeStageOptions;
-      wake: ReturnType<typeof vi.fn>;
-      sleep: ReturnType<typeof vi.fn>;
-      dispose: ReturnType<typeof vi.fn>;
-    }>,
-    threeFailNext: false,
-    sounds: [] as string[],
-  };
-  return state;
-});
+/** WebGL never runs in jsdom: this fake records what the stage is asked. */
+const fake = vi.hoisted(() => ({
+  stages: [] as Array<{
+    options: StadiumStageOptions;
+    wake: ReturnType<typeof vi.fn>;
+    sleep: ReturnType<typeof vi.fn>;
+    setQuality: ReturnType<typeof vi.fn>;
+    dispose: ReturnType<typeof vi.fn>;
+  }>,
+  failNext: false,
+  sounds: [] as string[],
+  cues: [] as string[],
+}));
 
-vi.mock('./three-scene', () => ({
-  STADIUM_ASSETS: {},
-  createThreeStage: vi.fn(async (options: ThreeStageOptions) => {
-    if (fake.threeFailNext) throw new Error('404 football_field.glb');
+vi.mock('./stadium/stage', () => ({
+  STAND_MODEL_URL: '',
+  createStadiumStage: vi.fn(async (options: StadiumStageOptions) => {
+    if (fake.failNext) throw new Error('WebGL context lost');
     const stage = {
       options,
       wake: vi.fn(),
       sleep: vi.fn(),
+      setQuality: vi.fn(),
       dispose: vi.fn(),
     };
     fake.stages.push(stage);
     options.onReady();
     return stage;
+  }),
+}));
+
+vi.mock('@/lib/audio/stadium-audio', () => ({
+  createStadiumAudio: () => ({
+    setExcitement: vi.fn(),
+    cue: (kind: string) => fake.cues.push(kind),
+    setActive: vi.fn(),
+    dispose: vi.fn(),
   }),
 }));
 
@@ -62,50 +62,6 @@ vi.mock('@/lib/retro/use-sound', () => ({
   }),
 }));
 
-vi.mock('phaser', () => {
-  const chain = (): unknown => {
-    const proxy: unknown = new Proxy(() => undefined, {
-      get: (_target, property) =>
-        property === 'then' ? undefined : (proxy as object),
-      apply: () => proxy,
-      set: () => true,
-    });
-    return proxy;
-  };
-  class Scene {
-    add = chain();
-    textures = chain();
-  }
-  class Game {
-    config: Record<string, unknown>;
-    timer?: ReturnType<typeof setTimeout>;
-    destroy = vi.fn(() => clearTimeout(this.timer));
-    loop = { sleep: vi.fn(), wake: vi.fn() };
-    scale = { on: vi.fn() };
-    canvas = document.createElement('canvas');
-    scene?: { create: () => void; update: (t: number, d: number) => void };
-    constructor(config: Record<string, unknown>) {
-      if (fake.failNext) throw new Error('WebGL context lost');
-      this.config = config;
-      (config.parent as HTMLElement).appendChild(this.canvas);
-      const SceneClass = config.scene as new () => {
-        create: () => void;
-        update: (t: number, d: number) => void;
-      };
-      this.scene = new SceneClass();
-      fake.games.push(this as never);
-      this.timer = setTimeout(() => this.scene?.create(), 0);
-    }
-  }
-  const Phaser = {
-    Game,
-    Scene,
-    AUTO: 0,
-    Scale: { FIT: 3, CENTER_HORIZONTALLY: 2 },
-  };
-  return { ...Phaser, default: Phaser };
-});
-
 function renderStage(overrides: Partial<MatchStageProps> = {}) {
   const props: MatchStageProps = {
     match: stageMatch(),
@@ -114,7 +70,6 @@ function renderStage(overrides: Partial<MatchStageProps> = {}) {
     speed: 1,
     reducedMotion: false,
     canvasSupport: 'webgl',
-    lowEndDevice: false,
     fallback: <div data-testid="schematic-pitch">2D</div>,
     ...overrides,
   };
@@ -130,271 +85,223 @@ function stageMode() {
   return screen.getByTestId('match-stage').getAttribute('data-stage-mode');
 }
 
-async function waitForMode(mode: 'three' | 'phaser') {
-  await waitFor(() => expect(stageMode()).toBe(mode));
+async function waitForStadium() {
+  await waitFor(() => expect(fake.stages).toHaveLength(1));
   await waitFor(() =>
     expect(screen.queryByTestId('schematic-pitch')).toBeNull(),
   );
 }
 
 beforeEach(() => {
-  fake.games.length = 0;
   fake.stages.length = 0;
   fake.sounds.length = 0;
+  fake.cues.length = 0;
   fake.failNext = false;
-  fake.threeFailNext = false;
   window.localStorage.clear();
 });
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('MatchStage 3D level', () => {
-  it('lazy-loads the Three.js stadium on a capable device and labels it', async () => {
+describe('MatchStage 3D stadium', () => {
+  it('lazy-loads the stadium on a WebGL device and labels it', async () => {
     renderStage();
+    // The simple pitch holds the screen until the stadium is ready.
     expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
-    await waitForMode('three');
-    expect(fake.stages).toHaveLength(1);
-    expect(fake.games).toHaveLength(0);
-    expect(
-      screen.getByRole('group', {
-        name: /Animação da partida Clube Ferroviário contra Futebol do Bairro/,
-      }),
-    ).toBeTruthy();
+    await waitForStadium();
+    expect(stageMode()).toBe('three');
+    const figure = screen.getByTestId('three-stage');
+    expect(figure.getAttribute('aria-label')).toMatch(
+      /Clube Ferroviário contra Futebol do Bairro/,
+    );
+    // The canvas host is decorative: readers get the textual alternative.
     expect(
       screen.getByTestId('three-stage-host').getAttribute('aria-hidden'),
     ).toBe('true');
-    expect(screen.getByTestId('stage-scoreboard').textContent).toContain(
-      'CFC0-0FBA00',
+    expect(figure.querySelector('.sr-only')?.textContent).toMatch(/0 minutos/);
+  });
+
+  it('hands the stage the official kits and a starting quality level', async () => {
+    renderStage();
+    await waitForStadium();
+    const { options } = fake.stages[0]!;
+    expect(options.controller.kits.home.shirt).toMatch(/^#[0-9a-f]{6}$/);
+    expect(options.controller.kits.away.shirt).not.toBe(
+      options.controller.kits.home.shirt,
     );
+    expect(['high', 'medium', 'low']).toContain(options.quality);
   });
 
   it('keeps the official score independent of the animation', async () => {
-    const view = renderStage({ playing: true });
-    await waitForMode('three');
-    view.rerenderWith({ minute: 24, playing: true });
-    // No animation frame has run: the score still comes from the timeline.
+    const view = renderStage({ minute: 24 });
+    await waitForStadium();
+    // Minute 24 has the first goal: the score comes from the timeline.
     expect(screen.getByTestId('stage-scoreboard').textContent).toContain('1-0');
-    view.rerenderWith({ minute: 90, playing: false });
-    expect(screen.getByTestId('stage-scoreboard').textContent).toContain(
-      '1-1FBAFIM',
-    );
+    view.rerenderWith({ minute: 90 });
+    expect(screen.getByTestId('stage-scoreboard').textContent).toContain('1-1');
     expect(screen.getByTestId('whistle-board').textContent).toBe('FIM DE JOGO');
   });
 
   it('wakes the renderer on every replay change, sleeps when hidden and disposes on unmount', async () => {
     const view = renderStage();
-    await waitForMode('three');
+    await waitForStadium();
     const stage = fake.stages[0]!;
-    stage.wake.mockClear();
+    const wakes = stage.wake.mock.calls.length;
     view.rerenderWith({ minute: 9, playing: true });
-    expect(stage.wake).toHaveBeenCalled();
-    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
-    act(() => {
-      document.dispatchEvent(new Event('visibilitychange'));
+    expect(stage.wake.mock.calls.length).toBeGreaterThan(wakes);
+    expect(stage.options.controller.step).toBe(1);
+    expect(stage.options.controller.progress).toBe(0);
+
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: true,
     });
+    act(() => void document.dispatchEvent(new Event('visibilitychange')));
     expect(stage.sleep).toHaveBeenCalled();
-    hidden.mockReturnValue(false);
-    stage.wake.mockClear();
-    act(() => {
-      document.dispatchEvent(new Event('visibilitychange'));
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false,
     });
-    expect(stage.wake).toHaveBeenCalled();
+
     view.unmount();
-    expect(stage.dispose).toHaveBeenCalled();
+    expect(stage.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('swaps a re-planned timeline in place, without rebuilding the stadium', async () => {
+    const view = renderStage({ minute: 9 });
+    await waitForStadium();
+    const stage = fake.stages[0]!;
+    const before = stage.options.controller.choreography;
+    view.rerenderWith({
+      minute: 9,
+      match: stageMatch({
+        timeline: [
+          { type: 'goal', minute: 30, side: 'away', playerId: 'fba-9' },
+        ],
+      }),
+    });
+    expect(fake.stages).toHaveLength(1);
+    expect(stage.dispose).not.toHaveBeenCalled();
+    expect(stage.options.controller.choreography).not.toBe(before);
   });
 
   it('shows the GOOOL board when the scene reaches the goal and hides it after', async () => {
-    renderStage({ minute: 24 });
-    await waitForMode('three');
+    renderStage({ minute: 24, playing: true });
+    await waitForStadium();
+    const { options } = fake.stages[0]!;
+    expect(screen.queryByTestId('goal-banner')).toBeNull();
     const goal: StageOverlay = {
       kind: 'goal',
       side: 'home',
-      playerKey: 'home-9',
+      playerKey: 'home-8',
     };
-    act(() => fake.stages[0]!.options.onOverlay(goal));
-    expect(screen.getByTestId('goal-banner').textContent).toBe('GOOOL!');
-    act(() => fake.stages[0]!.options.onOverlay(null));
+    act(() => options.onOverlay(goal));
+    expect(screen.getByTestId('goal-banner').textContent).toContain('GOOOL!');
+    expect(screen.getByTestId('goal-banner').textContent).toContain(
+      'Clube Ferroviário',
+    );
+    act(() => options.onMode?.('replay'));
+    expect(screen.getByTestId('replay-badge').textContent).toContain('Replay');
+    act(() => {
+      options.onOverlay(null);
+      options.onMode?.('rest');
+    });
     expect(screen.queryByTestId('goal-banner')).toBeNull();
-    act(() =>
-      fake.stages[0]!.options.onOverlay({
-        kind: 'substitution',
-        side: 'home',
-        playerKey: 'home-10',
-        inNumber: 12,
-        outNumber: 11,
-      }),
-    );
-    expect(screen.getByTestId('substitution-board').textContent).toContain(
-      '▲ 12',
-    );
+    expect(screen.queryByTestId('replay-badge')).toBeNull();
   });
 
-  it('cues the goal sounds at the goal minute, after the action lands', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      const view = renderStage({ minute: 9, playing: true });
-      await waitForMode('three');
-      fake.sounds.length = 0;
-      view.rerenderWith({ minute: 24, playing: true });
-      expect(fake.sounds).toEqual([]);
-      act(() => {
-        vi.advanceTimersByTime(900);
-      });
-      expect(fake.sounds).toEqual(['goal', 'crowd']);
-      // Skipping to the result only whistles.
-      fake.sounds.length = 0;
-      view.rerenderWith({ minute: 90, playing: false });
-      act(() => {
-        vi.advanceTimersByTime(10);
-      });
-      expect(fake.sounds).toEqual(['whistle']);
-    } finally {
-      vi.useRealTimers();
-    }
+  it('lets the stadium make its own sound and stays quiet on the interface', async () => {
+    const view = renderStage({ minute: 23, playing: true });
+    await waitForStadium();
+    view.rerenderWith({ minute: 24, playing: true });
+    // Interface blips belong to the simple pitch only.
+    expect(fake.sounds).toEqual([]);
+    act(() => fake.stages[0]!.options.onCue?.({ kind: 'net', power: 1 }));
+    expect(fake.cues).toContain('net');
+    // The breaks are whistled from the official minute.
+    view.rerenderWith({ minute: 90, playing: true });
+    expect(fake.cues).toContain('whistle');
   });
 
-  it('drops to the Phaser scene when the stadium fails to load', async () => {
-    fake.threeFailNext = true;
+  it('steps the graphics down when the measured frame rate is low', async () => {
+    renderStage({ playing: true });
+    await waitForStadium();
+    const stage = fake.stages[0]!;
+    const start = stage.options.quality;
+    // Ten frames per second for long enough to close the probe window.
+    for (let frame = 0; frame < 60; frame += 1)
+      act(() => stage.options.onFrame?.(frame * 100));
+    if (start === 'low') expect(stage.setQuality).not.toHaveBeenCalled();
+    else
+      expect(stage.setQuality).toHaveBeenCalledWith(
+        start === 'high' ? 'medium' : 'low',
+      );
+    // Still the stadium: a slow device gets lighter graphics, not a fallback.
+    expect(stageMode()).toBe('three');
+  });
+
+  it('offers full screen and tells the screen when the stadium is on', async () => {
+    const onAnimatedChange = vi.fn();
+    renderStage({ bare: true, onAnimatedChange });
+    await waitForStadium();
+    expect(onAnimatedChange).toHaveBeenLastCalledWith(true);
+    // Bare: nothing is written over the pitch outside full screen.
+    expect(screen.queryByTestId('stage-scoreboard')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Tela cheia' })).toBeTruthy();
+  });
+});
+
+describe('MatchStage simple pitch', () => {
+  it('falls back when the stadium fails to start, without breaking the screen', async () => {
+    fake.failNext = true;
     renderStage();
-    await waitForMode('phaser');
+    await waitFor(() => expect(stageMode()).toBe('fallback'));
     expect(
-      screen.getByTestId('match-stage').getAttribute('data-stage-downgrade'),
-    ).toBe('three-load-error');
-    expect(fake.games).toHaveLength(1);
+      screen.getByTestId('match-stage').getAttribute('data-stage-reason'),
+    ).toBe('load-error');
+    expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toMatch(
+      /Não foi possível carregar o estádio 3D/,
+    );
+  });
+
+  it('keeps the simple pitch with reduced motion and never loads the stadium', async () => {
+    renderStage({ reducedMotion: true });
+    expect(stageMode()).toBe('fallback');
+    expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fake.stages).toHaveLength(0);
+  });
+
+  it('falls back without WebGL', () => {
+    renderStage({ canvasSupport: 'canvas' });
+    expect(stageMode()).toBe('fallback');
     expect(screen.getByRole('status').textContent).toMatch(
       /Estádio 3D indisponível/,
     );
+    expect(screen.queryByTestId('three-stage')).toBeNull();
   });
 
-  it('drops to the Phaser scene when the measured frame rate is low', async () => {
-    renderStage();
-    await waitForMode('three');
-    const { onFrame } = fake.stages[0]!.options;
-    // 10 fps for four seconds.
-    act(() => {
-      for (let now = 0; now <= 4000; now += 100) onFrame?.(now);
-    });
-    await waitForMode('phaser');
-    expect(
-      screen.getByTestId('match-stage').getAttribute('data-stage-downgrade'),
-    ).toBe('low-fps');
-    expect(fake.stages[0]!.dispose).toHaveBeenCalled();
-  });
-
-  it('skips 3D on a low-end device and without WebGL', async () => {
-    const weak = renderStage({ lowEndDevice: true });
-    await waitForMode('phaser');
-    expect(
-      screen.getByTestId('match-stage').getAttribute('data-stage-downgrade'),
-    ).toBe('low-end-device');
-    weak.unmount();
-    renderStage({ canvasSupport: 'canvas' });
-    await waitForMode('phaser');
-    expect(
-      screen.getByTestId('match-stage').getAttribute('data-stage-downgrade'),
-    ).toBe('no-webgl');
-    expect(fake.stages).toHaveLength(0);
-  });
-});
-
-describe('MatchStage Phaser level', () => {
-  const phaserProps = { canvasSupport: 'canvas' as const };
-
-  it('lazy-loads the Phaser stage and hides the canvas from readers', async () => {
-    renderStage(phaserProps);
-    await waitForMode('phaser');
-    expect(fake.games).toHaveLength(1);
-    expect(
-      screen.getByTestId('phaser-stage-host').getAttribute('aria-hidden'),
-    ).toBe('true');
-    expect(fake.games[0]!.canvas.getAttribute('aria-hidden')).toBe('true');
-  });
-
-  it('shows the official score before the animation reaches the goal', async () => {
-    const view = renderStage({ ...phaserProps, playing: true });
-    await waitForMode('phaser');
-    view.rerenderWith({ minute: 9, playing: true });
-    view.rerenderWith({ minute: 24, playing: true });
-    expect(screen.getByTestId('stage-scoreboard').textContent).toContain('1-0');
-    view.rerenderWith({ minute: 90, playing: false });
-    expect(screen.getByTestId('stage-scoreboard').textContent).toContain(
-      '1-1FBAFIM',
-    );
-    expect(() => fake.games[0]!.scene?.update(0, 16)).not.toThrow();
-  });
-
-  it('sleeps while the tab is hidden and destroys the game on unmount', async () => {
-    const view = renderStage(phaserProps);
-    await waitForMode('phaser');
-    const game = fake.games[0]!;
-    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
-    act(() => {
-      document.dispatchEvent(new Event('visibilitychange'));
-    });
-    expect(game.loop.sleep).toHaveBeenCalled();
-    hidden.mockReturnValue(false);
-    game.loop.wake.mockClear();
-    act(() => {
-      document.dispatchEvent(new Event('visibilitychange'));
-    });
-    expect(game.loop.wake).toHaveBeenCalled();
-    view.unmount();
-    expect(game.destroy).toHaveBeenCalledWith(true);
-  });
-
-  it('falls back when Phaser fails to start, without breaking the screen', async () => {
-    fake.failNext = true;
-    renderStage(phaserProps);
-    await waitFor(() =>
-      expect(
-        screen.getByTestId('match-stage').getAttribute('data-stage-reason'),
-      ).toBe('load-error'),
-    );
-    expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toMatch(
-      /Não foi possível carregar/,
-    );
-  });
-});
-
-describe('MatchStage 2D fallback', () => {
-  it('keeps the 2D pitch with reduced motion and never loads a stage', async () => {
-    renderStage({ reducedMotion: true });
-    expect(
-      screen.getByTestId('match-stage').getAttribute('data-stage-reason'),
-    ).toBe('reduced-motion');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
-    expect(fake.games).toHaveLength(0);
-    expect(fake.stages).toHaveLength(0);
-  });
-
-  it('falls back without WebGL or Canvas', () => {
-    renderStage({ canvasSupport: 'none' });
-    expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toMatch(
-      /Animação indisponível/,
-    );
+  it('plays the interface sounds of the minute, and only the final whistle on a skip', () => {
+    const view = renderStage({ reducedMotion: true, minute: 23 });
+    view.rerenderWith({ reducedMotion: true, minute: 24 });
+    expect(fake.sounds).toEqual(['goal', 'crowd']);
+    fake.sounds.length = 0;
+    view.rerenderWith({ reducedMotion: true, minute: 90 });
+    expect(fake.sounds).toEqual(['whistle']);
   });
 
   it('remembers the "visual simples" toggle', async () => {
-    const view = renderStage();
-    await waitForMode('three');
-    const toggle = screen.getByRole('button', { name: 'Visual simples' });
-    fireEvent.click(toggle);
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
-    expect(window.localStorage.getItem(SIMPLE_VISUAL_KEY)).toBe('1');
-    view.unmount();
-
     renderStage();
-    await waitFor(() =>
-      expect(
-        screen.getByTestId('match-stage').getAttribute('data-stage-reason'),
-      ).toBe('preference'),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Visual simples' }));
+    await waitForStadium();
+    const toggle = screen.getByRole('button', { name: 'Visual simples' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(toggle);
+    expect(stageMode()).toBe('fallback');
+    expect(window.localStorage.getItem(SIMPLE_VISUAL_KEY)).toBe('1');
+    expect(screen.getByTestId('schematic-pitch')).toBeTruthy();
+    fireEvent.click(toggle);
     expect(window.localStorage.getItem(SIMPLE_VISUAL_KEY)).toBeNull();
-    await waitForMode('three');
   });
 });

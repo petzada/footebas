@@ -143,7 +143,7 @@ function Scoreboard({ view }: { view: SeasonView }) {
         <>
           <div className="flex items-center gap-3">
             <ClubEmblem name={record.club.name} size={48} decorative />
-            <p className="font-pixel text-[.6rem] text-chalk sm:text-xs">
+            <p className="font-pixel text-[.82rem] text-chalk sm:text-xs">
               {record.club.name}
             </p>
           </div>
@@ -186,7 +186,7 @@ function Digit({
 }) {
   return (
     <div>
-      <dt className="font-pixel text-[.45rem] text-chalk/70">{label}</dt>
+      <dt className="font-pixel text-[.7rem] text-chalk/70">{label}</dt>
       <dd
         className={cn(
           'led text-lg sm:text-2xl',
@@ -213,7 +213,7 @@ function ResultBar({ record }: { record: SeasonClubRecord }) {
     <div
       role="img"
       aria-label={`${String(record.won)} vitórias, ${String(record.drawn)} empates e ${String(record.lost)} derrotas em ${String(record.played)} jogos`}
-      className="flex h-3 w-full gap-px border-2 border-ink bg-ink/60"
+      className="flex h-3 w-full gap-px border-2 border-white/15 bg-ink/60"
     >
       {parts.map(([name, count, color]) => (
         <span
@@ -269,7 +269,7 @@ export function PositionChart({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id="temporada-posicao"
-          className="flex items-center gap-2 font-pixel text-[.65rem]"
+          className="flex items-center gap-2 font-pixel text-[.86rem]"
         >
           <ChartLineUp aria-hidden="true" />
           Posição por rodada
@@ -279,7 +279,7 @@ export function PositionChart({
             <span className="sr-only">Competição</span>
             <select
               aria-label="Competição"
-              className="border-2 border-ink bg-popover px-2 py-1 font-pixel text-[.5rem]"
+              className="border-2 border-white/15 bg-popover px-2 py-1 font-pixel text-[.74rem]"
               value={index}
               onChange={(event) => setIndex(Number(event.target.value))}
             >
@@ -298,7 +298,7 @@ export function PositionChart({
         </p>
       ) : (
         <>
-          <p className="font-pixel text-[.5rem] text-muted-foreground">
+          <p className="font-pixel text-[.74rem] text-muted-foreground">
             {series?.competition} · {clubName}
           </p>
           <svg
@@ -388,13 +388,13 @@ function Honours({ view }: { view: SeasonView }) {
     >
       <h2
         id="temporada-honras"
-        className="flex items-center gap-2 font-pixel text-[.65rem]"
+        className="flex items-center gap-2 font-pixel text-[.86rem]"
       >
         <PixelTrophy size={16} />
         Campeões e premiações
       </h2>
       <div>
-        <h3 className="font-pixel text-[.5rem] text-muted-foreground">
+        <h3 className="font-pixel text-[.74rem] text-muted-foreground">
           Campeões
         </h3>
         {view.champions.length === 0 ? (
@@ -406,7 +406,7 @@ function Honours({ view }: { view: SeasonView }) {
             {view.champions.map((champion) => (
               <li
                 key={champion.competitionId}
-                className="flex items-center gap-3 border-2 border-ink bg-popover p-2"
+                className="flex items-center gap-3 border-2 border-white/15 bg-popover p-2"
               >
                 <ClubEmblem name={champion.club.name} size={28} decorative />
                 <span className="min-w-0 text-sm">
@@ -423,7 +423,7 @@ function Honours({ view }: { view: SeasonView }) {
         )}
       </div>
       <div>
-        <h3 className="font-pixel text-[.5rem] text-muted-foreground">
+        <h3 className="font-pixel text-[.74rem] text-muted-foreground">
           Premiações
         </h3>
         {view.awards.length === 0 ? (
@@ -443,7 +443,7 @@ function Honours({ view }: { view: SeasonView }) {
                   <Medal className="size-5 text-accent" aria-hidden="true" />
                 )}
                 <span className="min-w-0">
-                  <small className="block font-pixel text-[.45rem] text-muted-foreground">
+                  <small className="block font-pixel text-[.7rem] text-muted-foreground">
                     {AWARD_LABEL[award.kind]}
                   </small>
                   <strong className="block truncate">{award.playerName}</strong>
@@ -482,7 +482,7 @@ function LeaderTable({
 }) {
   return (
     <section aria-labelledby={id} className="panel-board p-3">
-      <h2 id={id} className="led px-1 text-[.65rem]">
+      <h2 id={id} className="led px-1 text-[.86rem]">
         {title}
       </h2>
       {leaders.length === 0 ? (
@@ -521,7 +521,7 @@ function LeaderTable({
                   <td className="py-1">
                     <span className="block truncate">{item.playerName}</span>
                     {item.club && (
-                      <span className="block truncate text-[.45rem] text-chalk/60">
+                      <span className="block truncate text-[.7rem] text-chalk/60">
                         {item.club.name}
                       </span>
                     )}
@@ -539,7 +539,7 @@ function LeaderTable({
         </table>
       )}
       {footnote && (
-        <p className="mt-2 px-1 font-pixel text-[.45rem] text-chalk/60">
+        <p className="mt-2 px-1 font-pixel text-[.7rem] text-chalk/60">
           {footnote}
         </p>
       )}
@@ -553,7 +553,7 @@ function History({ view }: { view: SeasonView }) {
       aria-labelledby="temporada-historico"
       className="panel flex flex-col gap-3 p-4"
     >
-      <h2 id="temporada-historico" className="font-pixel text-[.65rem]">
+      <h2 id="temporada-historico" className="font-pixel text-[.86rem]">
         Histórico de temporadas
       </h2>
       {view.history.length === 0 ? (

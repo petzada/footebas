@@ -159,7 +159,7 @@ function ClubCard({ career }: { career: CareerView }) {
 function ClubTitle({ career }: { career: CareerView }) {
   return (
     <>
-      <p className="truncate font-pixel text-[.5rem] text-muted-foreground">
+      <p className="truncate font-pixel text-[.74rem] text-muted-foreground">
         {career.careerName ? `${career.careerName} · ` : ''}
         {career.division ?? 'Temporada'} · Rodada {career.round}
       </p>
@@ -186,11 +186,11 @@ function CoachBadge({ career }: { career: CareerView }) {
     <div
       aria-label="Treinador"
       role="group"
-      className="flex min-w-0 items-center gap-3 border-2 border-ink bg-popover p-2.5"
+      className="flex min-w-0 items-center gap-3 border-2 border-white/15 bg-popover p-2.5"
     >
       {profile && <CoachAvatar avatar={profile.avatar} size={52} />}
       <div className="min-w-0 text-sm">
-        <p className="font-pixel text-[.5rem] text-muted-foreground">
+        <p className="font-pixel text-[.74rem] text-muted-foreground">
           Treinador
         </p>
         <p className="flex min-w-0 items-center gap-2 text-base font-extrabold">
@@ -226,7 +226,9 @@ function CardStat({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="font-pixel text-[.5rem] text-muted-foreground">{label}</dt>
+      <dt className="font-pixel text-[.74rem] text-muted-foreground">
+        {label}
+      </dt>
       {/* Wraps only at spaces: "R$ 38,6 mi" may take two lines at 320px, but
           "mi" is never split into "M / I". */}
       <dd className="font-pixel text-xs leading-relaxed break-normal min-[400px]:text-base sm:text-xl">
@@ -242,7 +244,9 @@ function CardStat({
 function CardMeter({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <dt className="font-pixel text-[.5rem] text-muted-foreground">{label}</dt>
+      <dt className="font-pixel text-[.74rem] text-muted-foreground">
+        {label}
+      </dt>
       <dd>
         <span className="font-pixel text-base leading-relaxed sm:text-xl">
           {value}%
@@ -303,7 +307,7 @@ function NextMatch({
     >
       <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
         <Badge variant="bulb">Próximo jogo</Badge>
-        <span className="font-pixel text-[.5rem] text-chalk/70">
+        <span className="font-pixel text-[.74rem] text-chalk/70">
           {fixture.competition}
           {fixture.date && ` · ${formatFixtureDate(fixture.date)}`} ·{' '}
           {away ? 'fora de casa' : 'em casa'}
@@ -331,7 +335,7 @@ function NextMatch({
         </button>
         <Button
           variant="outline"
-          className="col-span-2 h-auto min-h-12 min-w-0 px-2 text-[.5rem] leading-snug break-normal whitespace-normal min-[360px]:col-span-1 sm:text-[.6rem]"
+          className="col-span-2 h-auto min-h-12 min-w-0 px-2 text-[.74rem] leading-snug break-normal whitespace-normal min-[360px]:col-span-1 sm:text-[.82rem]"
           onClick={onInstant}
         >
           <Lightning weight="fill" data-icon="inline-start" />
@@ -339,7 +343,7 @@ function NextMatch({
         </Button>
         <Button
           variant="outline"
-          className="col-span-2 min-h-12 min-w-0 px-2 text-[.5rem] min-[360px]:col-span-1 sm:text-[.6rem]"
+          className="col-span-2 min-h-12 min-w-0 px-2 text-[.74rem] min-[360px]:col-span-1 sm:text-[.82rem]"
           onClick={onReview}
           aria-label="Revisar escalação e tática"
         >
@@ -356,7 +360,7 @@ function NextMatch({
         <MiniStat label="Formação" value={career.formation} />
       </div>
       <div className="flex flex-col gap-3 px-5 py-4">
-        <h3 className="flex items-center gap-2 font-pixel text-[.6rem] text-bulb">
+        <h3 className="flex items-center gap-2 font-pixel text-[.82rem] text-bulb">
           <PixelWhistle size={14} />
           Raio-X do rival
         </h3>
@@ -397,7 +401,7 @@ function RivalXray({
   const gap = opponent.approximateStrength - ours;
   const verdict =
     gap >= 4 ? 'mais forte' : gap <= -4 ? 'mais fraco' : 'parelho';
-  const label = 'pt-0.5 font-pixel text-[.45rem] text-chalk/70';
+  const label = 'pt-0.5 font-pixel text-[.7rem] text-chalk/70';
   return (
     <dl
       className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm"
@@ -419,7 +423,7 @@ function RivalXray({
               key={`${result}-${index}`}
               data-form={result}
               className={cn(
-                'px-border inline-flex size-5 items-center justify-center font-pixel text-[.5rem]',
+                'px-border inline-flex size-5 items-center justify-center font-pixel text-[.74rem]',
                 FORM_TONE[result],
               )}
             >
@@ -454,7 +458,7 @@ function TeamSide({ name }: { name: string }) {
   return (
     <div className="flex min-w-0 flex-col items-center gap-2 text-center">
       <ClubEmblem name={name} size={64} decorative />
-      <span className="w-full truncate font-pixel text-[.55rem] leading-relaxed sm:text-xs">
+      <span className="w-full truncate font-pixel text-[.78rem] leading-relaxed sm:text-xs">
         {name}
       </span>
     </div>
@@ -464,7 +468,7 @@ function TeamSide({ name }: { name: string }) {
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="font-pixel text-[.45rem] text-chalk/70">{label}</p>
+      <p className="font-pixel text-[.7rem] text-chalk/70">{label}</p>
       <p className="led text-sm sm:text-base">{value}</p>
     </div>
   );
@@ -505,7 +509,7 @@ function SideCard({
 }) {
   return (
     <section aria-labelledby={id} className="panel flex h-full flex-col p-4">
-      <h2 id={id} className="font-pixel text-[.65rem]">
+      <h2 id={id} className="font-pixel text-[.86rem]">
         {title}
       </h2>
       <div className="mt-3 flex-1">{children}</div>
@@ -617,7 +621,7 @@ function StandingsSummary({
           A tabela aparece depois da primeira rodada.
         </p>
       ) : (
-        <table className="teletext w-full text-[.5rem] sm:text-[.6rem]">
+        <table className="teletext w-full text-[.74rem] sm:text-[.82rem]">
           <caption className="sr-only">
             Classificação resumida
             {career.division ? ` · ${career.division}` : ''}
@@ -663,7 +667,7 @@ function StandingsSummary({
               return (
                 <tr
                   key={row.club}
-                  className={cn('border-t-2', isMine && 'bg-bulb/50')}
+                  className={cn('border-t-2', isMine && 'bg-bulb/15')}
                   {...(isMine ? { 'aria-current': 'true' as const } : {})}
                 >
                   <td className="relative py-1.5 pr-1.5 pl-2.5">
@@ -757,7 +761,7 @@ function Upcoming({
     >
       <ol className="flex flex-col gap-2 text-sm">
         {career.fixture && (
-          <li className="flex items-start gap-3 border-2 border-ink bg-bulb/40 p-2">
+          <li className="flex items-start gap-3 border-2 border-white/15 bg-bulb/15 p-2">
             <CalendarDots
               className="mt-0.5 size-5 shrink-0 text-primary"
               aria-hidden="true"
@@ -781,7 +785,7 @@ function Upcoming({
         ) : (
           entries.map((entry) => (
             <li key={entry.id} className="flex items-start gap-3 p-2">
-              <span className="w-12 shrink-0 pt-0.5 font-pixel text-[.5rem] text-primary">
+              <span className="w-12 shrink-0 pt-0.5 font-pixel text-[.74rem] text-primary">
                 {formatFixtureDate(entry.date).replace(/^\S+\s/, '')}
               </span>
               <span className="min-w-0">
@@ -829,7 +833,7 @@ function Inbox({
       <div className="flex items-center justify-between gap-2">
         <h2
           id="central-caixa"
-          className="flex items-center gap-2 font-pixel text-[.65rem]"
+          className="flex items-center gap-2 font-pixel text-[.86rem]"
         >
           <EnvelopeSimple aria-hidden="true" />
           Caixa de entrada
@@ -847,7 +851,7 @@ function Inbox({
           {decisions.map((item) => (
             <li
               key={item.id}
-              className="grid gap-2 border-2 border-ink bg-popover p-3 sm:grid-cols-[1fr_auto] sm:items-center"
+              className="grid gap-2 border-2 border-white/15 bg-popover p-3 sm:grid-cols-[1fr_auto] sm:items-center"
             >
               <div className="text-sm">
                 <Badge variant="outline" className="mr-2">
@@ -880,7 +884,7 @@ function News({ career, onOpen }: { career: CareerView; onOpen(): void }) {
     >
       <h2
         id="central-noticias"
-        className="flex items-center gap-2 font-pixel text-[.65rem]"
+        className="flex items-center gap-2 font-pixel text-[.86rem]"
       >
         <Newspaper aria-hidden="true" />
         Notícias
@@ -893,7 +897,7 @@ function News({ career, onOpen }: { career: CareerView; onOpen(): void }) {
         <ul className="mt-3 flex flex-1 flex-col gap-3">
           {news.map((item) => (
             <li key={item.id} className="border-l-4 border-accent pl-3">
-              <p className="font-pixel text-[.5rem] text-accent">{item.tag}</p>
+              <p className="font-pixel text-[.74rem] text-accent">{item.tag}</p>
               <p className="font-semibold leading-snug">{item.headline}</p>
               <p className="line-clamp-2 text-xs text-muted-foreground">
                 {item.detail}

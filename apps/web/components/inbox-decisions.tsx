@@ -154,7 +154,7 @@ export function InboxDecisions({
       <div className="flex items-center justify-between gap-2">
         <h2
           id="central-caixa"
-          className="flex items-center gap-2 font-pixel text-[.65rem]"
+          className="flex items-center gap-2 font-pixel text-[.86rem]"
         >
           <EnvelopeSimple aria-hidden="true" />
           {variant === 'full' ? 'Mensagens' : 'Caixa de entrada'}
@@ -277,7 +277,7 @@ function Envelope({
     <li
       aria-busy={busy}
       className={cn(
-        'grid gap-2 border-2 border-ink border-l-8 bg-popover p-3',
+        'grid gap-2 border-2 border-white/15 border-l-8 bg-popover p-3',
         tone(message),
         closed && !chosen && 'opacity-80',
       )}
@@ -291,11 +291,11 @@ function Envelope({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{KIND_LABEL[message.kind]}</Badge>
-            <span className="font-pixel text-[.45rem] text-muted-foreground">
+            <span className="font-pixel text-[.7rem] text-muted-foreground">
               {formatGameDate(message.occurredOn)}
             </span>
             {expiresOn && !closed && (
-              <span className="font-pixel text-[.45rem] text-accent">
+              <span className="font-pixel text-[.7rem] text-accent">
                 até {formatGameDate(expiresOn)}
               </span>
             )}
@@ -367,7 +367,7 @@ function Envelope({
             >
               <span>{option.label}</span>
               {option.effects.length > 0 && (
-                <span className="font-sans text-[.65rem] font-normal normal-case text-muted-foreground">
+                <span className="font-sans text-[.86rem] font-normal normal-case text-muted-foreground">
                   {option.effects.join(' · ')}
                 </span>
               )}

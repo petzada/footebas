@@ -80,7 +80,7 @@ export function AthleteCard({
       {/* Club stripe: artwork colors from the generic emblem. */}
       <div
         aria-hidden="true"
-        className="-mx-2 flex items-center justify-between px-2 py-1 font-pixel text-[.55rem]"
+        className="-mx-2 flex items-center justify-between px-2 py-1 font-pixel text-[.78rem]"
         style={{
           background: `repeating-linear-gradient(90deg, ${colors.primary} 0 12px, ${colors.secondary} 12px 16px)`,
           color: colors.ink,
@@ -101,7 +101,7 @@ export function AthleteCard({
           <h3 className="truncate text-sm font-extrabold leading-tight">
             {player.name}
           </h3>
-          <p className="truncate text-[.7rem] text-muted-foreground">
+          <p className="truncate text-[.92rem] text-muted-foreground">
             {player.age} anos · {player.primaryPosition}
             {player.secondaryPositions.length > 0 &&
               ` / ${player.secondaryPositions.join(', ')}`}
@@ -111,9 +111,9 @@ export function AthleteCard({
           {player.strength}
         </span>
       </div>
-      <dl className="grid gap-1 text-[.65rem]">
+      <dl className="grid gap-1 text-[.86rem]">
         <div className="grid grid-cols-[3.2rem_1fr] items-center gap-2">
-          <dt className="font-pixel text-[.5rem] uppercase">Força</dt>
+          <dt className="font-pixel text-[.74rem] uppercase">Força</dt>
           <dd>
             <Progress
               value={player.strength}
@@ -122,7 +122,7 @@ export function AthleteCard({
           </dd>
         </div>
         <div className="grid grid-cols-[3.2rem_1fr] items-center gap-2">
-          <dt className="font-pixel text-[.5rem] uppercase">Forma</dt>
+          <dt className="font-pixel text-[.74rem] uppercase">Forma</dt>
           <dd>
             <Progress
               value={player.condition}
@@ -132,7 +132,7 @@ export function AthleteCard({
           </dd>
         </div>
         <div className="grid grid-cols-[3.2rem_1fr] items-center gap-2">
-          <dt className="font-pixel text-[.5rem] uppercase">Potenc.</dt>
+          <dt className="font-pixel text-[.74rem] uppercase">Potenc.</dt>
           <dd
             className="relative"
             aria-label={`${band.label}: faixa estimada entre ${band.min} e ${band.max}`}
@@ -150,7 +150,7 @@ export function AthleteCard({
                 }}
               />
             </div>
-            <span className="mt-0.5 block font-pixel text-[.5rem] uppercase">
+            <span className="mt-0.5 block font-pixel text-[.74rem] uppercase">
               ≈ {band.min}–{band.max} · estimativa
             </span>
           </dd>
@@ -182,7 +182,7 @@ export function AthleteCard({
         </ul>
       )}
       {unavailable && (
-        <p className="flex items-center gap-1.5 font-pixel text-[.5rem] uppercase text-destructive">
+        <p className="flex items-center gap-1.5 font-pixel text-[.74rem] uppercase text-destructive">
           <PixelCard tone="red" size={10} />
           {player.suspended
             ? 'Suspenso'

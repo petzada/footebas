@@ -19,10 +19,12 @@ import {
 import { crestFor } from '@/lib/club-crests';
 
 /*
- * Landing arcade (docs/09 "Mapa de telas"): a public page that sells the game
- * in its own retro style (ADR 0012). Facts come from the codebase: the free
- * and licensed entitlements (lib/account-product), the default price
- * (apps/api/src/billing/service.ts: R$ 29,90) and the screens that exist.
+ * Landing (docs/09 "Mapa de telas"): a public page that sells the game in its
+ * own broadcast style (ADR 0018), desktop first. The hero picture is a stadium
+ * at night drawn in CSS (landing.css); no 3D engine loads here. Facts come
+ * from the codebase: the free and licensed entitlements (lib/account-product),
+ * the default price (apps/api/src/billing/service.ts: R$ 29,90) and the
+ * screens that exist.
  */
 
 /** The game lives on its own host (next.config.ts); the landing on lp. */
@@ -125,7 +127,7 @@ const CLUB_NAMES: Record<string, string> = {
   club_floresta: 'Floresta',
 };
 
-/** Pixel crest scaled with crisp edges; clubs without one show initials. */
+/** Club crest (pixel PNG from /public); clubs without one show initials. */
 function Crest({
   id,
   size = 48,
@@ -142,7 +144,7 @@ function Crest({
       <span
         role="img"
         aria-label={name}
-        className={`px-border grid place-items-center bg-chalk font-pixel text-[.5rem] text-ink ${className}`}
+        className={`px-border lp-display grid place-items-center bg-secondary text-[.74rem] text-chalk ${className}`}
         style={{ width: size, height: size }}
       >
         {name.slice(0, 3).toUpperCase()}
@@ -150,7 +152,7 @@ function Crest({
     );
   }
   return (
-    // Static pixel PNGs from /public: next/image would blur them and needs no
+    // Static crest PNGs from /public: next/image would blur them and needs no
     // optimization here (same choice as club-emblem.tsx).
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -161,6 +163,29 @@ function Crest({
       className={`pixelated object-contain ${className}`}
       style={{ width: size, height: size }}
     />
+  );
+}
+
+/** Small check mark for lists. */
+function Check() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width={16}
+      height={16}
+      className="lp-check"
+      aria-hidden
+      focusable="false"
+    >
+      <path
+        d="M3 8.5 6.5 12 13 4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -192,7 +217,7 @@ function useReveal(root: React.RefObject<HTMLElement | null>) {
   }, [root]);
 }
 
-/* ---------- Hero: a live pixel match ---------- */
+/* ---------- Hero: a stadium at night with broadcast graphics ---------- */
 
 interface Beat {
   readonly minute: number;
@@ -220,148 +245,244 @@ const DEMO_MATCH: readonly Beat[] = [
   { minute: 90, text: 'Fim de jogo. Três pontos e a torcida canta.' },
 ];
 
-function LiveMatch() {
+const HOME_ID = 'club_flamengo';
+const AWAY_ID = 'club_palmeiras';
+
+/** Athletes on the pitch plane: x%, y%, drift x, drift y (in cqw). */
+const HOME_SPOTS = [
+  [10, 46, 2.5, -0.8],
+  [24, 22, 3.6, 1.2],
+  [24, 70, 3.4, -1.5],
+  [40, 36, 2.8, 1],
+  [40, 62, 3.2, -1],
+  [56, 48, 2.2, 1.8],
+] as const;
+const AWAY_SPOTS = [
+  [90, 46, -2.2, 0.8],
+  [76, 24, -3.4, 1.5],
+  [76, 68, -3.2, -1.2],
+  [62, 34, -2.8, -1],
+  [62, 62, -3, 1.2],
+  [47, 54, -2, -1.8],
+] as const;
+
+/** Words running on the LED boards around the pitch. */
+const BOARD_WORDS = [
+  'Footebas',
+  'Série A',
+  'Série B',
+  'Série C',
+  'Copa do Brasil',
+  'Libertadores',
+  'Ranking global',
+] as const;
+
+function shortName(id: string) {
+  return (CLUB_NAMES[id] ?? id).slice(0, 3).toUpperCase();
+}
+
+function StadiumStage() {
   const [step, setStep] = useState(0);
   const beat = DEMO_MATCH[step] ?? DEMO_MATCH[0]!;
-  const home = DEMO_MATCH.slice(0, step + 1).reduce(
-    (score, b) => b.home ?? score,
-    0,
-  );
-  const away = DEMO_MATCH.slice(0, step + 1).reduce(
-    (score, b) => b.away ?? score,
-    0,
-  );
+  const played = DEMO_MATCH.slice(0, step + 1);
+  const home = played.reduce((score, b) => b.home ?? score, 0);
+  const away = played.reduce((score, b) => b.away ?? score, 0);
   useEffect(() => {
     const id = window.setInterval(
       () => setStep((current) => (current + 1) % DEMO_MATCH.length),
-      2600,
+      3200,
     );
     return () => window.clearInterval(id);
   }, []);
-  const lines = DEMO_MATCH.slice(Math.max(0, step - 2), step + 1);
+  const scorer =
+    beat.tone === 'goal'
+      ? CLUB_NAMES[beat.home !== undefined ? HOME_ID : AWAY_ID]
+      : undefined;
 
   return (
-    <div
-      className="panel-board relative overflow-hidden p-3 sm:p-4"
-      aria-label="Demonstração de uma partida do Footebas"
-    >
-      <div className="lp-crowd" aria-hidden />
-      <div className="lp-crowd" data-row="2" aria-hidden />
-      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div className="flex flex-col items-center gap-1">
-          <Crest id="club_flamengo" size={56} />
-          <span className="font-pixel text-[.5rem] text-chalk/80">
-            Flamengo
-          </span>
+    <figure className="lp-stage-glow lp-enter m-0 min-w-0">
+      <div
+        className="lp-stage stage-frame"
+        role="img"
+        aria-label="Demonstração de uma partida do Footebas: estádio à noite, gramado em 3D e placar de transmissão"
+      >
+        <div className="lp-sky" />
+        {[10, 32, 68, 90].map((left, i) => (
+          <span
+            key={left}
+            className="lp-flood"
+            style={
+              {
+                left: `${left}%`,
+                '--delay': `${i * -1.1}s`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+        <div className="lp-stands" />
+        <div className="lp-boards">
+          <div className="lp-boards-track">
+            {[
+              ...BOARD_WORDS,
+              ...BOARD_WORDS,
+              ...BOARD_WORDS,
+              ...BOARD_WORDS,
+            ].map((word, i) => (
+              <span key={i}>{word}</span>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-col items-center">
-          <div className="flex items-center gap-2 text-3xl sm:text-4xl">
-            <span key={`h${home}`} className="led lp-digit">
-              {home}
-            </span>
-            <span className="led text-xl">×</span>
-            <span key={`a${away}`} className="led lp-digit">
-              {away}
+        <div className="lp-field">
+          <div className="lp-pitch">
+            {HOME_SPOTS.map(([x, y, dx, dy], i) => (
+              <span
+                key={`h${i}`}
+                className="lp-player"
+                style={
+                  {
+                    left: `${x}%`,
+                    top: `${y}%`,
+                    '--shirt': i % 2 ? '#d63a31' : '#1b1f27',
+                    '--shorts': '#f1f4f8',
+                    '--dx': `${dx}cqw`,
+                    '--dy': `${dy}cqw`,
+                    '--dur': `${2.6 + (i % 3) * 0.7}s`,
+                    '--delay': `${i * -0.4}s`,
+                  } as React.CSSProperties
+                }
+              >
+                <i />
+              </span>
+            ))}
+            {AWAY_SPOTS.map(([x, y, dx, dy], i) => (
+              <span
+                key={`a${i}`}
+                className="lp-player"
+                style={
+                  {
+                    left: `${x}%`,
+                    top: `${y}%`,
+                    '--shirt': '#1f9d55',
+                    '--shorts': '#f1f4f8',
+                    '--dx': `${dx}cqw`,
+                    '--dy': `${dy}cqw`,
+                    '--dur': `${2.8 + (i % 3) * 0.6}s`,
+                    '--delay': `${i * -0.5}s`,
+                  } as React.CSSProperties
+                }
+              >
+                <i />
+              </span>
+            ))}
+            <span className="lp-ball">
+              <i />
             </span>
           </div>
-          <span className="font-pixel text-[.55rem] text-bulb">
-            {beat.minute}&apos;
-          </span>
         </div>
-        <div className="flex flex-col items-center gap-1">
-          <Crest id="club_palmeiras" size={56} />
-          <span className="font-pixel text-[.5rem] text-chalk/80">
-            Palmeiras
-          </span>
-        </div>
-      </div>
+        <div className="lp-vignette" />
 
-      <div
-        className="pitch relative mt-3 h-36 w-full overflow-hidden"
-        style={{ outline: '2px solid rgb(244 239 226 / 0.6)' }}
-        aria-hidden
-      >
-        <div className="lp-floodlight" />
-        {[
-          [10, 46, 20, -6],
-          [24, 22, 30, 10],
-          [24, 70, 28, -12],
-          [40, 36, 22, 8],
-          [40, 60, 26, -8],
-          [56, 48, 18, 14],
-        ].map(([x, y, dx, dy], i) => (
-          <span
-            key={`h${i}`}
-            className="lp-player"
-            style={
-              {
-                left: `${x}%`,
-                top: `${y}%`,
-                background: i % 2 ? '#c8322b' : '#15201a',
-                '--shorts': '#f4efe2',
-                '--dx': `${dx}px`,
-                '--dy': `${dy}px`,
-                '--dur': `${2.2 + (i % 3) * 0.6}s`,
-                '--delay': `${i * -0.4}s`,
-              } as React.CSSProperties
-            }
-          />
-        ))}
-        {[
-          [88, 46, -18, 6],
-          [74, 24, -28, 12],
-          [74, 68, -26, -10],
-          [60, 34, -22, -8],
-          [60, 62, -24, 10],
-          [46, 52, -16, -14],
-        ].map(([x, y, dx, dy], i) => (
-          <span
-            key={`a${i}`}
-            className="lp-player"
-            style={
-              {
-                left: `${x}%`,
-                top: `${y}%`,
-                background: '#1f7a3a',
-                '--shorts': '#f4efe2',
-                '--dx': `${dx}px`,
-                '--dy': `${dy}px`,
-                '--dur': `${2.4 + (i % 3) * 0.5}s`,
-                '--delay': `${i * -0.5}s`,
-              } as React.CSSProperties
-            }
-          />
-        ))}
-        <span className="lp-ball" />
-      </div>
-
-      <ul className="match-feed mt-3 flex flex-col gap-1 text-[.55rem] leading-relaxed sm:text-[.6rem]">
-        {lines.map((line) => (
-          <li
-            key={line.minute}
-            className={`lp-line flex items-center gap-2 ${
-              line.tone === 'goal' ? 'text-bulb' : 'text-chalk/85'
-            }`}
-          >
-            <span className="w-7 shrink-0 text-chalk/60">
-              {line.minute}&apos;
+        <div className="lp-hud">
+          <div className="lp-hud-top">
+            <div className="hud-scorebug">
+              <span>
+                <span className="flex items-center gap-1.5">
+                  <Crest id={HOME_ID} size={18} />
+                  {shortName(HOME_ID)}
+                </span>
+              </span>
+              <span className="hud-scorebug-score">
+                <span className="flex items-center gap-1.5">
+                  <span key={`h${home}`} className="lp-digit">
+                    {home}
+                  </span>
+                  <span>–</span>
+                  <span key={`a${away}`} className="lp-digit">
+                    {away}
+                  </span>
+                </span>
+              </span>
+              <span>
+                <span className="flex items-center gap-1.5">
+                  {shortName(AWAY_ID)}
+                  <Crest id={AWAY_ID} size={18} />
+                </span>
+              </span>
+              <span className="hud-scorebug-clock">{beat.minute}&apos;</span>
+            </div>
+            <span className="hud-chip hud-chip-live">
+              <span className="hud-dot" />
+              Ao vivo
             </span>
-            {line.tone === 'card' && <PixelCard size={12} />}
-            {line.tone === 'goal' && <PixelStar size={12} />}
-            <span className="truncate">{line.text}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-pixel text-[.5rem] text-chalk/70">
-        <span>0,5× · 1× · 2× · 4×</span>
-        <span>Pausa quando quiser</span>
-        <span className="text-bulb">Pular para o resultado</span>
+          </div>
+          {scorer && (
+            <div key={step} className="lp-hud-goal">
+              <div className="hud-goal">
+                <span className="hud-goal-word">Gol!</span>
+                <span className="hud-goal-team">{scorer}</span>
+              </div>
+            </div>
+          )}
+          <div className="lp-hud-caption">
+            <p key={step} className="hud-caption hud-rise">
+              {beat.tone === 'card' && <span className="hud-card" />}
+              {beat.text}
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
+      <figcaption className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        <span className="hud-chip">0,5× · 1× · 2× · 4×</span>
+        <span className="hud-chip">Pausa quando quiser</span>
+        <span className="hud-chip">Tela cheia</span>
+        <span
+          className="hud-chip"
+          style={
+            { '--hud-accent': 'var(--grass-light)' } as React.CSSProperties
+          }
+        >
+          Pular para o resultado
+        </span>
+      </figcaption>
+    </figure>
   );
 }
 
 /* ---------- Sections ---------- */
+
+/** Facts already stated on this page, as broadcast-style big numbers. */
+const STATS = [
+  { n: '3D', label: 'Partida ao vivo, em tempo real' },
+  { n: '3', label: 'Divisões nacionais: Séries A, B e C' },
+  { n: '2', label: 'Janelas de mercado por temporada' },
+  { n: '4', label: 'Personalidades de treinador' },
+  { n: 'R$ 0', label: 'Para jogar o jogo completo' },
+] as const;
+
+const LED_WORDS = [
+  'Manager de futebol brasileiro',
+  'Grátis',
+  'Direto no navegador',
+  'Partida 3D ao vivo',
+  'Séries A, B e C com elencos de 2026',
+  'Copa do Brasil',
+  'Libertadores',
+  'Ranking global',
+] as const;
+
+function LedBand() {
+  return (
+    <div className="lp-led">
+      <p className="sr-only">{LED_WORDS.join(' · ')}</p>
+      <div className="lp-led-track" aria-hidden>
+        {[...LED_WORDS, ...LED_WORDS, ...LED_WORDS, ...LED_WORDS].map(
+          (word, i) => (
+            <span key={i}>{word}</span>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Marquee({ ids, dir }: { ids: readonly string[]; dir?: 'reverse' }) {
   const doubled = [...ids, ...ids];
@@ -371,12 +492,10 @@ function Marquee({ ids, dir }: { ids: readonly string[]; dir?: 'reverse' }) {
         {doubled.map((id, i) => (
           <span
             key={`${id}-${i}`}
-            className="sticker flex w-24 shrink-0 flex-col items-center gap-1 px-2 py-2"
+            className="sticker flex w-28 shrink-0 flex-col items-center gap-2 px-2 py-3"
           >
             <Crest id={id} size={44} />
-            <span className="w-full truncate text-center font-pixel text-[.45rem] text-ink">
-              {CLUB_NAMES[id] ?? id}
-            </span>
+            <span className="lp-crest-name">{CLUB_NAMES[id] ?? id}</span>
           </span>
         ))}
       </div>
@@ -390,34 +509,34 @@ const BENEFITS: ReadonlyArray<{
   icon: ReactNode;
 }> = [
   {
-    title: 'Partida ao vivo',
-    text: 'Placar grande, narração e campo animado. Pause para mexer na tática ou pule direto para o resultado.',
-    icon: <PixelWhistle size={28} />,
+    title: 'Partida 3D ao vivo',
+    text: 'Assista ao jogo em 3D, em tempo real, com placar de transmissão, narração, torcida e replay dos gols. Pause para mexer na tática, abra em tela cheia ou pule direto para o resultado.',
+    icon: <PixelWhistle size={30} />,
   },
   {
     title: 'Campeonato Brasileiro',
     text: 'Séries A, B e C com acesso e rebaixamento, Copa do Brasil, estaduais e Libertadores com os gigantes do continente.',
-    icon: <PixelTrophy size={28} />,
+    icon: <PixelTrophy size={30} />,
   },
   {
     title: 'Mercado com janelas',
     text: 'Duas janelas por temporada. Compre, venda, empreste e receba propostas da IA pelos seus craques.',
-    icon: <PixelCoin size={28} />,
+    icon: <PixelCoin size={30} />,
   },
   {
     title: 'Escritório de verdade',
     text: 'Negocie patrocínios, cuide do sócio-torcedor, feche contratos e segure o caixa no azul.',
-    icon: <PixelCard size={28} />,
+    icon: <PixelCard size={30} />,
   },
   {
     title: 'Treinador com personalidade',
     text: 'Motivador, Disciplinador, Diplomata ou Estrategista: cada estilo muda o vestiário, a imprensa e o jogo.',
-    icon: <PixelHeart size={28} />,
+    icon: <PixelHeart size={30} />,
   },
   {
     title: 'Ranking global grátis',
     text: 'Suas conquistas validadas pelo servidor entram no ranking de treinadores. Sem pagar nada.',
-    icon: <PixelStar size={28} />,
+    icon: <PixelStar size={30} />,
   },
 ];
 
@@ -444,26 +563,33 @@ const STEPS = [
   },
 ] as const;
 
+const SECTION = 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8';
+
 export function LandingPage() {
   const root = useRef<HTMLDivElement>(null);
   useReveal(root);
   const title = 'FOOTEBAS';
 
   return (
-    <div ref={root} className="min-h-dvh">
+    <div ref={root} className="lp-root min-h-dvh">
       {/* Header */}
-      <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pt-4 sm:px-6">
+      <header
+        className={`${SECTION} flex items-center justify-between gap-3 pt-5`}
+      >
         <Brand />
-        <nav aria-label="Principal" className="flex items-center gap-3">
-          <a
-            href="#licenca"
-            className="hidden font-pixel text-[.5rem] uppercase text-chalk underline underline-offset-4 sm:inline"
-          >
+        <nav aria-label="Principal" className="flex items-center gap-6">
+          <a href="#beneficios" className="lp-nav-link hidden md:inline">
+            Recursos
+          </a>
+          <a href="#como" className="lp-nav-link hidden md:inline">
+            Como funciona
+          </a>
+          <a href="#licenca" className="lp-nav-link hidden sm:inline">
             Licença
           </a>
           <a
             href={GAME_URL}
-            className="btn-px btn-chalk inline-flex min-h-10 items-center px-3 text-[.55rem]"
+            className="btn-px btn-chalk inline-flex min-h-11 items-center px-5 text-base"
           >
             Entrar
           </a>
@@ -471,25 +597,12 @@ export function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto grid max-w-6xl gap-8 px-4 pb-12 pt-8 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:pt-14">
-        <div className="relative min-w-0">
-          <span
-            className="lp-float absolute right-2 -top-8 hidden sm:block"
-            style={{ '--delay': '0.9s' } as React.CSSProperties}
-          >
-            <PixelTrophy size={32} />
-          </span>
-          <p className="ticker block w-full max-w-full px-3 py-2 text-[.5rem] sm:text-[.55rem]">
-            <span className="ticker-text">
-              Manager de futebol brasileiro · grátis · direto no celular ·
-              Séries A, B e C com elencos de 2026 · Copa do Brasil ·
-              Libertadores ·
-            </span>
-          </p>
-          <h1
-            className="lp-title mt-5 font-pixel text-4xl leading-none text-chalk drop-shadow-[0_4px_0_rgb(21_32_26)] sm:text-6xl lg:text-[3.25rem] xl:text-6xl"
-            aria-label={title}
-          >
+      <section
+        className={`lp-hero ${SECTION} grid gap-10 pb-12 pt-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-12 lg:pb-16 lg:pt-16`}
+      >
+        <div className="min-w-0">
+          <p className="lp-kicker lp-enter">Sua carreira, sua história</p>
+          <h1 className="lp-wordmark mt-4" aria-label={title}>
             {[...title].map((letter, i) => (
               <span
                 key={i}
@@ -500,18 +613,28 @@ export function LandingPage() {
               </span>
             ))}
           </h1>
-          <p className="lp-cursor mt-4 font-pixel text-[.7rem] leading-relaxed text-bulb sm:text-sm">
-            Sua carreira, sua história
+          <p
+            className="lp-headline lp-enter mt-5"
+            style={{ '--delay': '0.35s' } as React.CSSProperties}
+          >
+            Assista às suas partidas <em>em 3D, em tempo real</em>, no navegador
           </p>
-          <p className="mt-4 max-w-prose text-base leading-relaxed text-chalk sm:text-lg">
-            Escolha seu clube brasileiro favorito, monte o elenco, negocie no
-            mercado e conquiste campeonatos. Rodadas rápidas, no navegador, com
-            a cara dos managers que você jogava na lan house.
+          <p
+            className="lp-lead lp-enter mt-5"
+            style={{ '--delay': '0.45s' } as React.CSSProperties}
+          >
+            O manager de futebol brasileiro para você escolher seu clube, montar
+            o elenco, negociar no mercado e conquistar as Séries A, B e C, a
+            Copa do Brasil e a Libertadores. Com ranking global de treinadores,
+            e grátis.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div
+            className="lp-enter mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
+            style={{ '--delay': '0.55s' } as React.CSSProperties}
+          >
             <a
               href={GAME_URL}
-              className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-6 text-[.7rem] sm:text-xs"
+              className="play-button lp-cta inline-flex min-h-16 items-center justify-center gap-3 px-8"
             >
               <span className="lp-nudge inline-flex">
                 <PixelArrow size={18} />
@@ -520,27 +643,54 @@ export function LandingPage() {
             </a>
             <a
               href="#licenca"
-              className="btn-px btn-board inline-flex min-h-12 items-center justify-center gap-2 px-5 text-[.6rem]"
+              className="btn-px btn-board lp-cta-secondary inline-flex min-h-14 items-center justify-center gap-2 px-6"
             >
-              <PixelCoin size={16} />
+              <PixelCoin size={18} />
               Ver a licença
             </a>
           </div>
-          <ul className="mx-auto mt-6 grid w-fit grid-cols-2 gap-x-8 gap-y-2 text-center font-pixel text-[.5rem] leading-relaxed text-chalk/85">
-            <li>Sem instalar</li>
-            <li>Sem assinatura</li>
-            <li>Sem anúncios</li>
-            <li>Sem pay-to-win</li>
+          <ul
+            className="lp-trust lp-enter mt-7"
+            style={{ '--delay': '0.65s' } as React.CSSProperties}
+          >
+            {[
+              'Sem instalar',
+              'Sem assinatura',
+              'Sem anúncios',
+              'Sem pay-to-win',
+            ].map((item) => (
+              <li key={item}>
+                <Check />
+                {item}
+              </li>
+            ))}
           </ul>
         </div>
-        <LiveMatch />
+        <StadiumStage />
+      </section>
+
+      <LedBand />
+
+      {/* Numbers */}
+      <section aria-label="O jogo em números" className={`${SECTION} pt-10`}>
+        <ul className="lp-stats lp-reveal">
+          {STATS.map((stat) => (
+            <li key={stat.label}>
+              <span className="lp-stat-n">{stat.n}</span>
+              <span className="lp-stat-label">{stat.label}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* Crest shelf */}
-      <section aria-label="Clubes do jogo" className="flex flex-col gap-3 py-4">
+      <section
+        aria-label="Clubes do jogo"
+        className="flex flex-col gap-3 pb-4 pt-12"
+      >
         <Marquee ids={SERIE_A} />
         <Marquee ids={SERIE_BC} dir="reverse" />
-        <p className="px-4 text-center font-pixel text-[.5rem] leading-relaxed text-chalk/80">
+        <p className="lp-note px-4 pt-2 text-center">
           Todos os clubes das Séries A, B e C de 2026, mais os estrangeiros da
           Libertadores
         </p>
@@ -549,36 +699,31 @@ export function LandingPage() {
       {/* Benefits */}
       <section
         aria-labelledby="beneficios"
-        className="mx-auto max-w-6xl px-4 py-12 sm:px-6"
+        className={`${SECTION} scroll-mt-6 py-16`}
       >
-        <div className="lp-reveal panel-chalk p-4 sm:p-6">
-          <h2
-            id="beneficios"
-            className="font-pixel text-sm leading-relaxed text-chalk sm:text-lg"
-          >
+        <div className="lp-reveal flex flex-col gap-4">
+          <p className="lp-kicker">Recursos</p>
+          <h2 id="beneficios" className="lp-h2">
             Por que jogar Footebas
           </h2>
-          <p className="mt-2 max-w-prose text-sm text-chalk/85 sm:text-base">
+          <p className="lp-lead">
             Um manager completo, não uma demo capada. Tudo abaixo está liberado
             no plano grátis.
           </p>
         </div>
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {BENEFITS.map((benefit, i) => (
             <li
               key={benefit.title}
-              className="lp-reveal lp-sticker sticker flex flex-col gap-3 p-5"
+              className="lp-reveal lp-card panel flex flex-col gap-4 p-6"
               style={{ transitionDelay: `${i * 60}ms` }}
             >
-              <div className="flex items-center gap-3">
-                <span className="px-border grid size-11 place-items-center bg-board">
-                  {benefit.icon}
-                </span>
-                <h3 className="font-pixel text-[.6rem] leading-relaxed text-ink sm:text-[.65rem]">
-                  {benefit.title}
-                </h3>
-              </div>
-              <p className="text-sm leading-relaxed text-ink/85">
+              <span className="lp-card-index" aria-hidden>
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <span className="lp-icon">{benefit.icon}</span>
+              <h3 className="lp-h3">{benefit.title}</h3>
+              <p className="text-base leading-relaxed text-muted-foreground">
                 {benefit.text}
               </p>
             </li>
@@ -587,30 +732,28 @@ export function LandingPage() {
       </section>
 
       {/* Club life: a scoreboard of what you manage */}
-      <section
-        aria-labelledby="clube"
-        className="mx-auto max-w-6xl px-4 pb-12 sm:px-6"
-      >
-        <div className="lp-reveal panel-board grid gap-6 p-5 sm:p-8 lg:grid-cols-[1fr_1fr]">
+      <section aria-labelledby="clube" className={`${SECTION} pb-16`}>
+        <div className="lp-reveal panel-board grid gap-8 p-6 sm:p-10 lg:grid-cols-2 lg:gap-12">
           <div>
-            <h2 id="clube" className="led text-sm leading-relaxed sm:text-base">
+            <p className="lp-kicker">Gestão</p>
+            <h2 id="clube" className="lp-h2 mt-4">
               Seu clube, rodada a rodada
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-chalk/85 sm:text-base">
+            <p className="lp-lead mt-4">
               Da Central você vê o próximo jogo, a tabela e a caixa de entrada
               com decisões que não esperam: proposta por um titular, patrocínio
               na mesa, o presidente cobrando acesso. No Mapa do clube, cada
-              prédio em pixel art abre uma tela: CT, estádio, sede e imprensa.
+              prédio abre uma tela: CT, estádio, sede e imprensa.
             </p>
-            <ul className="mt-5 flex flex-col gap-3 font-pixel text-[.5rem] text-chalk/90">
+            <ul className="mt-7 flex flex-col gap-4">
               {[
                 ['Força do elenco', '72%', 'bulb'],
                 ['Moral do vestiário', '84%', ''],
                 ['Caixa do clube', '58%', ''],
                 ['Entrosamento', '66%', 'bulb'],
               ].map(([label, w, tone]) => (
-                <li key={label} className="flex flex-col gap-1">
-                  <span className="flex justify-between">
+                <li key={label} className="flex flex-col gap-1.5">
+                  <span className="lp-meter-label">
                     <span>{label}</span>
                     <span className="text-bulb">{w}</span>
                   </span>
@@ -625,11 +768,9 @@ export function LandingPage() {
               ))}
             </ul>
           </div>
-          <div className="flex flex-col gap-3">
-            <table className="teletext w-full text-chalk">
-              <caption className="pb-2 text-left text-bulb">
-                Série B · rodada 31
-              </caption>
+          <div className="flex flex-col gap-5">
+            <table className="teletext lp-table w-full text-chalk">
+              <caption>Série B · rodada 31</caption>
               <tbody>
                 {[
                   ['1', 'club_coritiba', 'Coritiba', '61'],
@@ -639,17 +780,17 @@ export function LandingPage() {
                   ['5', 'club_novorizontino', 'Novorizontino', '52'],
                 ].map(([pos, id, name, pts]) => (
                   <tr key={id}>
-                    <td className="w-6 px-1">{pos}</td>
-                    <td className="w-8 px-1">
-                      <Crest id={id!} size={18} />
+                    <td className="w-8 text-muted-foreground">{pos}</td>
+                    <td className="w-10">
+                      <Crest id={id!} size={22} />
                     </td>
-                    <td className="px-1">{name}</td>
-                    <td className="px-1 text-right text-bulb">{pts}</td>
+                    <td>{name}</td>
+                    <td className="text-right text-lg text-bulb">{pts}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="font-pixel text-[.5rem] leading-relaxed text-chalk/70">
+            <p className="lp-note">
               Quatro sobem. Você está no G4 e falta um jogo. Vai pular ou
               assistir ao vivo?
             </p>
@@ -660,26 +801,26 @@ export function LandingPage() {
       {/* How it works */}
       <section
         aria-labelledby="como"
-        className="mx-auto max-w-6xl px-4 pb-12 sm:px-6"
+        className={`${SECTION} scroll-mt-6 pb-16`}
       >
-        <h2
-          id="como"
-          className="lp-reveal font-pixel text-sm leading-relaxed text-chalk drop-shadow-[0_2px_0_rgb(21_32_26)] sm:text-lg"
-        >
-          Do login ao apito inicial
-        </h2>
-        <ol className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="lp-reveal flex flex-col gap-4">
+          <p className="lp-kicker">Como funciona</p>
+          <h2 id="como" className="lp-h2">
+            Do login ao apito inicial
+          </h2>
+        </div>
+        <ol className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step, i) => (
             <li
               key={step.n}
-              className="lp-reveal panel flex flex-col gap-2 p-5"
+              className="lp-reveal lp-card panel flex flex-col gap-3 p-6"
               style={{ transitionDelay: `${i * 80}ms` }}
             >
-              <span className="led text-xl">{step.n}</span>
-              <h3 className="font-pixel text-[.6rem] leading-relaxed">
-                {step.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-ink/85">{step.text}</p>
+              <span className="led lp-step-n">{step.n}</span>
+              <h3 className="lp-h3">{step.title}</h3>
+              <p className="text-base leading-relaxed text-muted-foreground">
+                {step.text}
+              </p>
             </li>
           ))}
         </ol>
@@ -689,78 +830,55 @@ export function LandingPage() {
       <section
         id="licenca"
         aria-labelledby="licenca-titulo"
-        className="mx-auto max-w-6xl scroll-mt-6 px-4 pb-12 sm:px-6"
+        className={`${SECTION} scroll-mt-6 pb-16`}
       >
-        <div className="lp-reveal relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0" aria-hidden>
-            {Array.from({ length: 14 }, (_, i) => (
-              <span
-                key={i}
-                className="lp-confetti"
-                style={
-                  {
-                    left: `${(i * 7.3) % 100}%`,
-                    background: ['#ffd23f', '#f4efe2', '#c8322b', '#7cc4ea'][
-                      i % 4
-                    ],
-                    '--dur': `${3.5 + (i % 4)}s`,
-                    '--delay': `${(i % 7) * -0.9}s`,
-                  } as React.CSSProperties
-                }
-              />
-            ))}
+        <div className="lp-reveal">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <p className="lp-kicker">Planos</p>
+            <p className="lp-h2">Comece grátis.</p>
+            <p className="lp-lead">
+              Você pode apoiar o jogo com a licença e recebe benefícios por
+              isso.
+            </p>
           </div>
-          <p className="mb-5 text-center font-pixel text-[.55rem] leading-relaxed text-chalk drop-shadow-[0_2px_0_rgb(21_32_26)] sm:text-[.65rem]">
-            Comece grátis. Você pode apoiar o jogo com a licença e recebe
-            benefícios por isso.
-          </p>
-          <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
-            <div className="panel flex flex-col gap-4 p-5 sm:p-6">
-              <div className="flex items-center gap-3">
-                <h2
-                  id="licenca-titulo"
-                  className="font-pixel text-[.7rem] leading-relaxed sm:text-sm"
-                >
-                  Grátis
-                </h2>
-              </div>
-              <p
-                className="led text-2xl text-ink"
-                style={{ textShadow: 'none' }}
-              >
-                R$ 0
-              </p>
-              <ul className="flex flex-col gap-2 text-sm leading-relaxed text-ink/90">
-                <li>✔ Jogo completo</li>
-                <li>✔ {FREE_ENTITLEMENTS.maxCareers} carreira ativa</li>
-                <li>✔ Começa na Série C</li>
-                <li>✔ Partidas ao vivo e ranking global</li>
+          <div className="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-[1fr_1.1fr]">
+            <div className="panel flex flex-col gap-5 p-6 sm:p-8">
+              <h2 id="licenca-titulo" className="lp-h3">
+                Grátis
+              </h2>
+              <p className="led lp-price lp-price-free">R$ 0</p>
+              <ul className="lp-list text-card-foreground">
+                {[
+                  'Jogo completo',
+                  `${String(FREE_ENTITLEMENTS.maxCareers)} carreira ativa`,
+                  'Começa na Série C',
+                  'Partidas ao vivo e ranking global',
+                ].map((benefit) => (
+                  <li key={benefit}>
+                    <Check />
+                    {benefit}
+                  </li>
+                ))}
               </ul>
               <a
                 href={GAME_URL}
-                className="btn-px btn-grass mt-auto inline-flex min-h-12 items-center justify-center px-4 text-[.6rem]"
+                className="btn-px btn-grass mt-auto inline-flex min-h-14 items-center justify-center px-5 text-lg"
               >
                 Jogar de graça
               </a>
             </div>
 
-            <div className="panel-board relative flex flex-col gap-4 p-5 sm:p-6">
-              <span className="lp-tag absolute right-4 top-0 inline-flex items-center gap-2 border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.5rem] uppercase text-bulb-foreground">
-                <span className="lp-coin inline-flex">
-                  <PixelCoin size={12} />
-                </span>
+            <div className="panel-board lp-featured flex flex-col gap-5 p-6 sm:p-8">
+              <span className="lp-tag">
+                <PixelCoin size={14} />
                 Pagamento único
               </span>
               <div className="flex items-center gap-3">
                 <PixelStar size={28} />
-                <h2 className="led text-sm leading-relaxed sm:text-base">
-                  Licença Footebas
-                </h2>
+                <h2 className="lp-h3 text-bulb">Licença Footebas</h2>
               </div>
-              <p className="led text-3xl sm:text-4xl">
-                {formatCents(LICENSE_PRICE_CENTS)}
-              </p>
-              <ul className="flex flex-col gap-2 text-sm leading-relaxed text-chalk">
+              <p className="led lp-price">{formatCents(LICENSE_PRICE_CENTS)}</p>
+              <ul className="lp-list text-chalk">
                 {[
                   'Jogo completo',
                   `Até ${String(LICENSED_ENTITLEMENTS.maxCareers)} carreiras ativas`,
@@ -768,30 +886,30 @@ export function LandingPage() {
                   'Sem assinatura',
                   'Reembolso integral em até 7 dias',
                 ].map((benefit) => (
-                  <li key={benefit} className="flex gap-2">
-                    <PixelStar size={14} className="mt-1" />
+                  <li key={benefit}>
+                    <PixelStar size={16} />
                     {benefit}
                   </li>
                 ))}
               </ul>
               <a
                 href={GAME_URL}
-                className="play-button mt-auto inline-flex min-h-14 items-center justify-center gap-3 px-5 text-[.65rem]"
+                className="play-button mt-auto inline-flex min-h-14 items-center justify-center gap-3 px-5 text-lg"
               >
                 <PixelCoin size={18} />
                 Quero meus benefícios
               </a>
             </div>
           </div>
-          <p className="mt-4 text-center text-xs whitespace-nowrap text-chalk/80">
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             Ficou com dúvidas? Fale com o nosso suporte
           </p>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
-        <div className="lp-reveal panel-chalk flex flex-col items-center gap-4 p-6 text-center sm:p-10">
+      <section className={`${SECTION} pb-8`}>
+        <div className="lp-reveal lp-final panel-board flex flex-col items-center gap-5 px-6 py-12 text-center sm:py-16">
           <div className="flex items-center gap-3">
             <Crest id="club_gremio" size={40} />
             <Crest id="club_corinthians" size={40} />
@@ -799,16 +917,14 @@ export function LandingPage() {
             <Crest id="club_cruzeiro" size={40} />
             <Crest id="club_santos" size={40} />
           </div>
-          <h2 className="font-pixel text-sm leading-relaxed text-chalk sm:text-xl">
-            Qual clube você vai levar ao título?
-          </h2>
-          <p className="max-w-prose text-sm text-chalk/85 sm:text-base">
+          <h2 className="lp-h2">Qual clube você vai levar ao título?</h2>
+          <p className="lp-lead">
             A carreira começa em um minuto e fica salva na nuvem. Primeiro jogo
             hoje.
           </p>
           <a
             href={GAME_URL}
-            className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-8 text-[.7rem] sm:text-xs"
+            className="play-button lp-cta inline-flex min-h-16 items-center justify-center gap-3 px-10"
           >
             <PixelArrow size={18} />
             Começar carreira
@@ -816,14 +932,14 @@ export function LandingPage() {
         </div>
       </section>
 
-      <p className="mx-auto max-w-2xl px-4 pb-8 text-center text-xs leading-relaxed text-chalk/70 sm:px-6">
+      <p className="mx-auto max-w-2xl px-4 pb-8 text-center text-xs leading-relaxed text-muted-foreground sm:px-6">
         Escudos e nomes dos clubes pertencem aos seus donos e aparecem apenas
         para identificar as equipes do jogo.
       </p>
 
-      <footer className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">
-        <div className="panel-wood flex flex-col items-center gap-5 px-4 py-8 text-center font-pixel text-[.5rem] text-chalk sm:py-10">
-          <span className="text-[.65rem] sm:text-sm">Footebas</span>
+      <footer className={`${SECTION} pb-12`}>
+        <div className="panel-wood lp-footer lp-display flex flex-col items-center gap-5 px-4 py-8 text-center text-sm text-chalk sm:py-10">
+          <span className="text-xl">Footebas</span>
           <nav
             aria-label="Documentos legais"
             className="flex flex-wrap justify-center gap-x-8 gap-y-3"
@@ -838,9 +954,9 @@ export function LandingPage() {
               Entrar no jogo
             </a>
           </nav>
-          <span className="text-chalk/80">Feito no Brasil</span>
+          <span className="text-muted-foreground">Feito no Brasil</span>
         </div>
-        <p className="mx-auto mt-5 max-w-2xl text-center text-xs leading-relaxed text-chalk/70">
+        <p className="mx-auto mt-5 max-w-2xl text-center text-xs leading-relaxed text-muted-foreground">
           Footebas é operado por Marct Soluções Digitais · CNPJ
           63.940.273/0001-36
         </p>

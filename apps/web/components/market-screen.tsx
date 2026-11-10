@@ -172,28 +172,28 @@ export function MarketScreen({
             wrap only at the space ("R$ 38,6" / "mi"), never mid-word. */}
         <dl className="grid grid-cols-3 gap-2 text-center">
           <div className="min-w-0">
-            <dt className="font-pixel text-[.5rem] uppercase text-chalk/80">
+            <dt className="font-pixel text-[.74rem] uppercase text-chalk/80">
               Caixa
             </dt>
-            <dd className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
+            <dd className="led text-[.86rem] break-normal min-[400px]:text-sm sm:text-base">
               {formatBrl(market.club?.cash ?? 0)}
             </dd>
           </div>
           <div className="min-w-0">
-            <dt className="font-pixel text-[.5rem] uppercase text-chalk/80">
+            <dt className="font-pixel text-[.74rem] uppercase text-chalk/80">
               Folha/mês
             </dt>
-            <dd className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
+            <dd className="led text-[.86rem] break-normal min-[400px]:text-sm sm:text-base">
               {formatBrl(market.club?.monthlyWageBill ?? 0)}
             </dd>
           </div>
           <div className="min-w-0">
-            <dt className="font-pixel text-[.5rem] uppercase text-chalk/80">
+            <dt className="font-pixel text-[.74rem] uppercase text-chalk/80">
               Elenco
             </dt>
             <dd
               className={cn(
-                'led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base',
+                'led text-[.86rem] break-normal min-[400px]:text-sm sm:text-base',
                 squadFull && 'text-destructive',
               )}
             >
@@ -213,7 +213,7 @@ export function MarketScreen({
               : `Janela fechada. ${market.window.nextName} abre em ${formatDate(market.window.nextOpensOn)}`
           }
         >
-          <span className="font-pixel text-[.55rem] uppercase">
+          <span className="font-pixel text-[.78rem] uppercase">
             {windowOpen ? 'Janela aberta' : 'Janela fechada'}
           </span>
           <span className="led text-lg">
@@ -272,14 +272,14 @@ export function MarketScreen({
                   </Button>
                 </div>
                 <details className="group">
-                  <summary className="flex min-h-11 cursor-pointer items-center font-pixel text-[.55rem]">
+                  <summary className="flex min-h-11 cursor-pointer items-center font-pixel text-[.78rem]">
                     Mais filtros
                   </summary>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <label className="grid gap-1 text-xs">
                       Posição
                       <select
-                        className="min-h-10 border-2 border-ink bg-popover px-2 text-sm"
+                        className="min-h-10 border-2 border-white/15 bg-popover px-2 text-sm"
                         value={query.position ?? ''}
                         onChange={(event) =>
                           setQuery({
@@ -451,7 +451,7 @@ export function MarketScreen({
                         <span className="led bg-board px-1.5 py-1 text-base">
                           {result.strength}
                         </span>
-                        <span className="font-pixel text-[.45rem]">
+                        <span className="font-pixel text-[.7rem]">
                           {formatBrl(result.value)}
                         </span>
                       </span>
@@ -609,7 +609,7 @@ function OfferForm({
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-pixel text-[.6rem] uppercase">{target.name}</h3>
+          <h3 className="font-pixel text-[.82rem] uppercase">{target.name}</h3>
           <p className="text-xs text-muted-foreground">
             {target.position} · força {target.strength} · valor{' '}
             {formatBrl(target.value)} · salário {formatBrl(target.wage)}/mês
@@ -731,7 +731,7 @@ function OfferList({
     <section aria-labelledby={`propostas-${title}`} className="panel p-3">
       <h3
         id={`propostas-${title}`}
-        className="font-pixel text-[.6rem] uppercase"
+        className="font-pixel text-[.82rem] uppercase"
       >
         {title}
       </h3>
@@ -743,8 +743,8 @@ function OfferList({
           <li
             key={offer.id}
             className={cn(
-              'grid gap-1 border-2 border-ink p-2 text-xs',
-              offer.awaiting === 'manager' ? 'bg-bulb/30' : 'bg-popover',
+              'grid gap-1 border-2 border-white/15 p-2 text-xs',
+              offer.awaiting === 'manager' ? 'bg-bulb/15' : 'bg-popover',
             )}
           >
             <div className="flex items-start justify-between gap-2">
@@ -778,7 +778,7 @@ function OfferList({
               + {formatBrl(offer.wage)}/mês
               {offer.counterOf && ' · contraproposta'}
             </p>
-            <p className="font-pixel text-[.5rem] uppercase">
+            <p className="font-pixel text-[.74rem] uppercase">
               {offer.awaiting === 'manager'
                 ? 'Você decide'
                 : offer.awaiting === 'counterpart'
@@ -900,11 +900,11 @@ function OwnSquadPanel({
           );
         }}
       >
-        <h3 className="font-pixel text-[.6rem] uppercase">Anunciar atleta</h3>
+        <h3 className="font-pixel text-[.82rem] uppercase">Anunciar atleta</h3>
         <label className="grid gap-1 text-xs">
           Atleta
           <select
-            className="min-h-10 border-2 border-ink bg-popover px-2 text-sm"
+            className="min-h-10 border-2 border-white/15 bg-popover px-2 text-sm"
             value={playerId}
             onChange={(event) => {
               setPlayerId(event.target.value);
@@ -979,7 +979,7 @@ function OwnSquadPanel({
       </form>
       <div className="flex flex-col gap-3">
         <section aria-labelledby="anuncios" className="panel p-3">
-          <h3 id="anuncios" className="font-pixel text-[.6rem] uppercase">
+          <h3 id="anuncios" className="font-pixel text-[.82rem] uppercase">
             Anunciados
           </h3>
           {market.listings.length === 0 && (
@@ -1013,7 +1013,7 @@ function OwnSquadPanel({
           </ul>
         </section>
         <section aria-labelledby="emprestimos" className="panel p-3">
-          <h3 id="emprestimos" className="font-pixel text-[.6rem] uppercase">
+          <h3 id="emprestimos" className="font-pixel text-[.82rem] uppercase">
             Empréstimos ativos
           </h3>
           {market.loans.length === 0 && (

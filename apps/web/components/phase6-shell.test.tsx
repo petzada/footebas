@@ -79,7 +79,7 @@ describe('Fase 6 · shell mobile-first', () => {
       expect(button.className).toMatch(/min-h-14/);
       expect(button.className).toMatch(/min-w-11/);
       expect(button.className).toMatch(/whitespace-nowrap/);
-      expect(button.className).toMatch(/text-\[\.45rem\]/);
+      expect(button.className).toMatch(/text-\[.7rem\]/);
       // D2: below 376px only the icon shows; the label is the name.
       expect(button.getAttribute('aria-label')).toBe(button.textContent);
       expect(button.querySelector('span')?.className).toMatch(
@@ -249,8 +249,8 @@ describe('Fase 6 · shell mobile-first', () => {
     const table = within(dialog).getByRole('button', { name: 'Classificação' });
     expect(table.className).toMatch(/break-normal/);
     expect(table.className).not.toMatch(/hyphens|break-words/);
-    expect(table.className).toMatch(/text-\[\.4rem\]/);
-    expect(table.className).toMatch(/min-\[360px\]:text-\[\.45rem\]/);
+    expect(table.className).toMatch(/text-\[.68rem\]/);
+    expect(table.className).toMatch(/min-\[360px\]:text-\[.7rem\]/);
     expect(13 * 0.4 * 16).toBeLessThanOrEqual((320 - 2 * 12 - 2 * 8) / 3 - 4);
     // Focus lands on the current screen and the grid answers the arrows.
     const current = within(dialog).getByRole('button', { name: 'Central' });

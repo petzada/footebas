@@ -9,22 +9,22 @@ import { cn } from '@/lib/utils';
 
 /*
  * Generic coach avatars, drawn by the game (no photos, no real people).
- * Each id (`avatar-01` … `avatar-12`) is a fixed pixel-art seed with its
+ * Each id (`avatar-01` … `avatar-12`) is a fixed portrait seed with its
  * own backdrop, so the same choice always looks the same.
  */
 const BACKDROPS: Readonly<Record<CoachAvatarId, string>> = {
-  'avatar-01': '246630',
-  'avatar-02': 'ffd23f',
-  'avatar-03': '7cc4ea',
-  'avatar-04': 'c8322b',
-  'avatar-05': 'a0672f',
-  'avatar-06': '2f7d3a',
-  'avatar-07': '7cc4ea',
-  'avatar-08': 'ffd23f',
-  'avatar-09': '246630',
-  'avatar-10': 'c8322b',
-  'avatar-11': 'a0672f',
-  'avatar-12': '2f7d3a',
+  'avatar-01': '1f3a5c',
+  'avatar-02': '4d3c14',
+  'avatar-03': '1b4a54',
+  'avatar-04': '5a2a2e',
+  'avatar-05': '2e2f5e',
+  'avatar-06': '12543a',
+  'avatar-07': '1b4a54',
+  'avatar-08': '4d3c14',
+  'avatar-09': '1f3a5c',
+  'avatar-10': '5a2a2e',
+  'avatar-11': '2e2f5e',
+  'avatar-12': '12543a',
 };
 
 export function avatarNumber(avatar: CoachAvatarId): number {
@@ -54,7 +54,7 @@ export function CoachAvatar({
         width={size}
         height={size}
         className={cn(
-          'px-border inline-block shrink-0 bg-chalk object-cover',
+          'px-border inline-block shrink-0 overflow-hidden bg-muted object-cover',
           className,
         )}
         style={{ width: size, height: size }}
@@ -64,7 +64,10 @@ export function CoachAvatar({
   return (
     <span
       data-avatar={avatar}
-      className={cn('px-border inline-block shrink-0 bg-chalk', className)}
+      className={cn(
+        'px-border inline-block shrink-0 overflow-hidden bg-muted',
+        className,
+      )}
       style={{ width: size, height: size }}
     >
       <PixelAvatar
