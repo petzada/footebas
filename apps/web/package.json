@@ -13,11 +13,10 @@
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "stadium:convert": "node scripts/convert-stadium.mjs"
+    "stadium:convert": "node scripts/convert-stadium.mjs",
+    "kits:generate": "node scripts/generate-club-kits.mjs"
   },
   "dependencies": {
-    "@dicebear/core": "9.2.4",
-    "@dicebear/pixel-art": "9.2.4",
     "@fontsource/barlow": "5.2.8",
     "@fontsource/barlow-condensed": "5.2.8",
     "@footebas/engine": "workspace:*",

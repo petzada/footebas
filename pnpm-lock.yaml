@@ -87,12 +87,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@dicebear/core':
-        specifier: 9.2.4
-        version: 9.2.4
-      '@dicebear/pixel-art':
-        specifier: 9.2.4
-        version: 9.2.4(@dicebear/core@9.2.4)
       '@fontsource/barlow':
         specifier: 5.2.8
         version: 5.2.8
@@ -744,16 +738,6 @@ packages:
   '@csstools/css-tokenizer@3.0.4':
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
-
-  '@dicebear/core@9.2.4':
-    resolution: {integrity: sha512-hz6zArEcUwkZzGOSJkWICrvqnEZY7BKeiq9rqKzVJIc1tRVv0MkR0FGvIxSvXiK9TTIgKwu656xCWAGAl6oh+w==}
-    engines: {node: '>=18.0.0'}
-
-  '@dicebear/pixel-art@9.2.4':
-    resolution: {integrity: sha512-4Ao45asieswUdlCTBZqcoF/0zHR3OWUWB0Mvhlu9b1Fbc6IlPBiOfx2vsp6bnVGVnMag58tJLecx2omeXdECBQ==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      '@dicebear/core': ^9.0.0
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
@@ -6930,14 +6914,6 @@ snapshots:
       '@csstools/css-tokenizer': 3.0.4
 
   '@csstools/css-tokenizer@3.0.4': {}
-
-  '@dicebear/core@9.2.4':
-    dependencies:
-      '@types/json-schema': 7.0.15
-
-  '@dicebear/pixel-art@9.2.4(@dicebear/core@9.2.4)':
-    dependencies:
-      '@dicebear/core': 9.2.4
 
   '@dimforge/rapier3d-compat@0.12.0': {}
 

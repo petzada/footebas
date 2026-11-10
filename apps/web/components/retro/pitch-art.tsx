@@ -32,7 +32,7 @@ export function PitchArt({ className }: { className?: string }) {
           y={index * stripe}
           width={PITCH_WIDTH}
           height={stripe}
-          fill={index % 2 ? 'var(--grass)' : 'var(--grass-light)'}
+          fill={index % 2 ? 'var(--pitch)' : 'var(--pitch-alt)'}
         />
       ))}
       <g fill="none" stroke={CHALK} strokeWidth={line}>

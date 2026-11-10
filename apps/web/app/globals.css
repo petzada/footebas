@@ -76,6 +76,9 @@
   --grass: #1fb866;
   --grass-deep: #0f7a43;
   --grass-light: #4be08f;
+  /* The turf itself, for pitch drawings (darker than the brand green). */
+  --pitch: #178a4c;
+  --pitch-alt: #137a43;
   --board: #0a0f16;
   --board-foreground: #eef2f6;
   --bulb: #f6c443;
@@ -442,7 +445,11 @@ h3 {
         rgb(255 255 255 / 0.7) 14.2% 14.7%,
         transparent 14.9%
       ),
-      repeating-linear-gradient(90deg, #178a4c 0 18%, #137a43 18% 36%);
+      repeating-linear-gradient(
+        90deg,
+        var(--pitch) 0 18%,
+        var(--pitch-alt) 18% 36%
+      );
   }
   .pitch::before,
   .pitch::after {

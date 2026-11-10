@@ -6,6 +6,8 @@
 import type * as ThreeTypes from 'three';
 import { LEG, hipHeight, type Pose } from './pose';
 
+export { physiqueFor } from '@/lib/physique';
+
 type Three = typeof ThreeTypes;
 
 export interface AthleteLook {
@@ -24,36 +26,6 @@ export interface AthleteLook {
 export const ATHLETE_SCALE = 1.16;
 /** Height of the top of the head, for labels and markers. */
 export const ATHLETE_HEIGHT = 1.86 * ATHLETE_SCALE;
-
-const SKIN = ['#f1c9a5', '#e0ac7e', '#c68a5c', '#a56b43', '#7b4b2a', '#5a3620'];
-const HAIR = ['#17120f', '#2a1b12', '#4a2f1b', '#8a5a2b', '#c9a15a', '#d8d2c8'];
-const BOOTS = [
-  '#111316',
-  '#f4f4f0',
-  '#ff5a1f',
-  '#18c2ff',
-  '#e7ff54',
-  '#111316',
-];
-
-function hash(text: string): number {
-  let value = 2_166_136_261;
-  for (let index = 0; index < text.length; index += 1) {
-    value ^= text.charCodeAt(index);
-    value = Math.imul(value, 16_777_619);
-  }
-  return value >>> 0;
-}
-
-/** Stable skin, hair and boots for an athlete id. Pure. */
-export function physiqueFor(id: string) {
-  const value = hash(id);
-  return {
-    skin: SKIN[value % SKIN.length]!,
-    hair: HAIR[(value >>> 5) % HAIR.length]!,
-    boots: BOOTS[(value >>> 11) % BOOTS.length]!,
-  };
-}
 
 const NUMBER_GRID = 10;
 
