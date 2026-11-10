@@ -2126,7 +2126,7 @@ function ClubScene({
     <svg
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
       role="group"
-      aria-label={`Mapa pixel do ${club}`}
+      aria-label={`Mapa do ${club}`}
       className="cm-scene block h-auto w-full select-none"
     >
       <style>{SCENE_CSS}</style>
