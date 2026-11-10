@@ -1,5 +1,7 @@
 'use client';
 
+import { StadiumShowcase } from '@/components/stadium-showcase';
+import { clubIdFromName } from '@/lib/club-kits';
 import { Children, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
@@ -596,6 +598,28 @@ export function ClubScreen(props: Phase4ScreenProps) {
           <TabsTrigger value="board">Diretoria</TabsTrigger>
         </TabsList>
         <TabsContent value="stadium" className="mt-4 grid gap-4 lg:grid-cols-2">
+          {/* The club's own ground, alive: decorative, the numbers are below. */}
+          <StadiumShowcase
+            className="px-border lg:col-span-2"
+            club={{
+              id: clubIdFromName(props.career.club),
+              name: props.career.club,
+            }}
+            occupancy={
+              props.career.world.stadium.averageCrowd /
+              Math.max(1, props.career.world.stadium.capacity)
+            }
+          >
+            <div className="flex h-52 flex-col justify-end p-4 sm:h-72 sm:p-6 lg:h-[22rem]">
+              <p className="led text-2xl leading-none sm:text-4xl">
+                {props.career.world.stadium.name}
+              </p>
+              <p className="mt-2 font-pixel text-[.82rem] text-chalk/85 sm:text-sm">
+                {props.career.world.stadium.capacity.toLocaleString('pt-BR')}{' '}
+                lugares · {props.career.club}
+              </p>
+            </div>
+          </StadiumShowcase>
           <Card>
             <CardHeader>
               <CardTitle className="font-display text-base uppercase">

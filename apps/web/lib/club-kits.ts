@@ -176,6 +176,16 @@ const KNOWN_KITS: Readonly<Record<string, readonly [string, string]>> = {
   club_vitoria: ['#d5101a', '#15171a'],
 };
 
+/** Catalogue id of a club from its display name ("São Paulo" -> club_sao_paulo). */
+export function clubIdFromName(name: string): string {
+  return `club_${name
+    .normalize('NFD')
+    .replace(/[^A-Za-z0-9 ]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/ +/g, '_')}`;
+}
+
 /** Home kit of a club. Pure: the same club always gets the same colours. */
 export function clubKit(club: Readonly<{ id: string; name?: string }>): Kit {
   const crest = KNOWN_KITS[club.id] ?? CREST_KITS[club.id];

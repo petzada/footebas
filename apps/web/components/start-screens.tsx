@@ -1,5 +1,6 @@
 'use client';
 
+import { StadiumShowcase } from '@/components/stadium-showcase';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -87,8 +88,10 @@ function StartFrame({
   onSignOut?: (() => void) | undefined;
 }) {
   return (
-    <main className="min-h-dvh px-4 pb-10 pt-4 sm:px-6">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+    <main className="relative isolate min-h-dvh px-4 pb-10 pt-4 sm:px-6">
+      {/* The stadium at night behind the title screen (decorative). */}
+      <StadiumShowcase className="!absolute inset-0 -z-10" />
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
         <Brand />
         <div className="flex items-center gap-2">
           <MuteButton />
@@ -158,11 +161,11 @@ export function StartScreen({
     <StartFrame onSignOut={onSignOut}>
       <ScreenTransition
         id="inicio"
-        className="mx-auto mt-6 grid max-w-5xl items-start gap-6 lg:mt-12 lg:grid-cols-[1.1fr_.9fr]"
+        className="mx-auto mt-6 grid max-w-6xl items-start gap-6 lg:mt-[12vh] lg:grid-cols-[1.1fr_.9fr]"
       >
         <section
           aria-labelledby="inicio-titulo"
-          className="panel-board relative overflow-hidden px-4 pb-6 pt-6 text-center sm:px-8"
+          className="panel-board hero-glass relative overflow-hidden px-4 pb-6 pt-6 text-center sm:px-8"
         >
           <TitleMarquee />
           <p className="led mt-4 text-[.78rem] tracking-[.3em] sm:text-xs">
@@ -201,7 +204,7 @@ export function StartScreen({
             className="mt-7 flex items-center justify-center gap-3 font-pixel text-[.82rem] text-chalk sm:text-xs"
           >
             <PixelArrow size={14} className="blink" />
-            Press start
+            Entre em campo
             <PixelArrow size={14} className="blink -scale-x-100" />
           </p>
           <div className="mx-auto mt-3 grid w-full max-w-sm gap-4">
@@ -256,7 +259,7 @@ function TitleMarquee() {
   return (
     <div
       aria-hidden="true"
-      className="-mx-4 -mt-6 overflow-hidden border-b-4 border-wood-deep bg-wood py-1 font-pixel text-[.78rem] text-chalk sm:-mx-8"
+      className="-mx-4 -mt-6 overflow-hidden border-b border-white/10 bg-black/40 py-1.5 font-pixel text-[.78rem] text-bulb sm:-mx-8"
     >
       <span className="ticker-text">
         Bem-vindo ao estádio · Temporada aberta · Monte seu elenco · Pule para o

@@ -1,5 +1,5 @@
 import type { CareerView, MatchUpdate } from '@/lib/career-api';
-import { matchKits } from '@/lib/club-kits';
+import { clubIdFromName, matchKits } from '@/lib/club-kits';
 import {
   statisticsFromTimeline,
   type MatchReplayInput,
@@ -88,13 +88,7 @@ export function replayFromFeed(
   }
 
   // The local port only knows club names: derive the ids the crests use.
-  const clubId = (name: string) =>
-    `club_${name
-      .normalize('NFD')
-      .replace(/[^A-Za-z0-9 ]/g, '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '_')}`;
+  const clubId = clubIdFromName;
   const kits = matchKits(
     { id: clubId(career.club), name: career.club },
     { id: clubId(career.opponent.club), name: career.opponent.club },
