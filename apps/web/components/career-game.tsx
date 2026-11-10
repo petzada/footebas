@@ -1,5 +1,6 @@
 'use client';
 
+import { StadiumShowcase } from '@/components/stadium-showcase';
 import React, {
   useCallback,
   useEffect,
@@ -805,7 +806,9 @@ function Onboarding(props: {
   onSignOut?: () => void;
 }) {
   return (
-    <main className="grid min-h-dvh place-items-center px-4 py-8">
+    <main className="relative isolate grid min-h-dvh place-items-center px-4 py-8">
+      {/* The stadium at night behind the sign-in (decorative). */}
+      <StadiumShowcase className="!absolute inset-0 -z-10" />
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
           <Brand size="lg" />

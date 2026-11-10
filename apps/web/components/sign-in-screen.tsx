@@ -1,5 +1,6 @@
 'use client';
 
+import { StadiumShowcase } from '@/components/stadium-showcase';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowRight,
@@ -29,7 +30,9 @@ import { authErrorMessage, type AuthPort } from '@/lib/auth';
 /** Full-page frame shared by the sign-in, loading and callback states. */
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="grid min-h-dvh place-items-center px-4 py-8">
+    <main className="relative isolate grid min-h-dvh place-items-center px-4 py-8">
+      {/* The stadium at night behind the sign-in (decorative). */}
+      <StadiumShowcase className="!absolute inset-0 -z-10" />
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
           <Brand size="lg" />
