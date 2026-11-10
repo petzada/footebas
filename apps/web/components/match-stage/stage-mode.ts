@@ -1,34 +1,24 @@
 export type CanvasSupport = 'webgl' | 'canvas' | 'none';
 
 export type StageFallbackReason =
-  'pending' | 'preference' | 'reduced-motion' | 'no-canvas' | 'load-error';
-
-/** Why the 3D stadium gave way to the Phaser 2D scene. */
-export type StageDowngradeReason =
-  'no-webgl' | 'low-end-device' | 'low-fps' | 'three-load-error';
+  'pending' | 'preference' | 'reduced-motion' | 'no-webgl' | 'load-error';
 
 /**
- * Three levels, best first: Three.js stadium → Phaser 2D scene → React 2D
- * pitch. Each level only needs what the one below can also live without.
+ * Two levels: the 3D stadium (which adapts its own graphics quality to the
+ * device) and the simple React pitch, for whoever asked for less motion or
+ * cannot run WebGL.
  */
 export type StageMode =
   | Readonly<{ mode: 'three' }>
-  | Readonly<{ mode: 'phaser'; reason: StageDowngradeReason | null }>
   | Readonly<{ mode: 'fallback'; reason: StageFallbackReason }>;
 
 export interface StageModeInput {
   readonly reducedMotion: boolean;
   /** `undefined` until the client has checked (server render, first paint). */
   readonly canvasSupport: CanvasSupport | undefined;
-  /** The Phaser scene failed to load or start. */
+  /** The 3D stage failed to load or start. */
   readonly loadFailed: boolean;
   readonly simplePreference: boolean;
-  /** Few cores or little memory: skip the 3D stadium up front. */
-  readonly lowEndDevice?: boolean;
-  /** The Three.js stage failed to load, start or fetch the model. */
-  readonly threeFailed?: boolean;
-  /** Measured frame rate too low in the first seconds of 3D. */
-  readonly lowFps?: boolean;
 }
 
 /** Picks the stage level. Pure. */
@@ -38,14 +28,9 @@ export function selectStageMode(input: StageModeInput): StageMode {
     return { mode: 'fallback', reason: 'reduced-motion' };
   if (input.canvasSupport === undefined)
     return { mode: 'fallback', reason: 'pending' };
-  if (input.canvasSupport === 'none')
-    return { mode: 'fallback', reason: 'no-canvas' };
+  if (input.canvasSupport !== 'webgl')
+    return { mode: 'fallback', reason: 'no-webgl' };
   if (input.loadFailed) return { mode: 'fallback', reason: 'load-error' };
-  if (input.canvasSupport === 'canvas')
-    return { mode: 'phaser', reason: 'no-webgl' };
-  if (input.lowEndDevice) return { mode: 'phaser', reason: 'low-end-device' };
-  if (input.threeFailed) return { mode: 'phaser', reason: 'three-load-error' };
-  if (input.lowFps) return { mode: 'phaser', reason: 'low-fps' };
   return { mode: 'three' };
 }
 
@@ -69,34 +54,6 @@ export function canvasSupportSnapshot(): CanvasSupport {
   return cachedSupport;
 }
 
-export interface DeviceHints {
-  readonly cores: number | undefined;
-  readonly memoryGb: number | undefined;
-}
-
-/** Pure rule: two cores or less, or 2 GB or less, is a weak device. */
-export function isLowEndDevice(hints: DeviceHints): boolean {
-  if (hints.cores !== undefined && hints.cores <= 2) return true;
-  if (hints.memoryGb !== undefined && hints.memoryGb <= 2) return true;
-  return false;
-}
-
-export function detectLowEndDevice(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const hints = navigator as Navigator & { deviceMemory?: number };
-  return isLowEndDevice({
-    cores: hints.hardwareConcurrency || undefined,
-    memoryGb: hints.deviceMemory,
-  });
-}
-
-let cachedLowEnd: boolean | undefined;
-
-export function lowEndDeviceSnapshot(): boolean {
-  cachedLowEnd ??= detectLowEndDevice();
-  return cachedLowEnd;
-}
-
 export type FpsVerdict = 'pending' | 'ok' | 'low';
 
 export interface FpsProbeOptions {
@@ -116,7 +73,7 @@ export interface FpsProbeOptions {
 export function createFpsProbe(options: FpsProbeOptions = {}) {
   const warmUpMs = options.warmUpMs ?? 600;
   const windowMs = options.windowMs ?? 2500;
-  const minimumFps = options.minimumFps ?? 24;
+  const minimumFps = options.minimumFps ?? 28;
   const idleGapMs = options.idleGapMs ?? 250;
   let start: number | undefined;
   let last: number | undefined;

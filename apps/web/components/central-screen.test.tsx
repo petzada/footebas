@@ -113,7 +113,7 @@ describe('Central', () => {
     const instant = within(match).getByRole('button', {
       name: /resultado instantâneo/i,
     });
-    expect(instant.className).toMatch(/text-\[\.5rem\]/);
+    expect(instant.className).toMatch(/text-\[.74rem\]/);
     expect(instant.className).toMatch(/whitespace-normal/);
     expect(instant.className).not.toMatch(/truncate/);
     fireEvent.click(

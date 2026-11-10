@@ -87,7 +87,7 @@ export function CareerPaywall({
           embedded
         />
       ) : (
-        <div className="grid gap-4 py-2 text-ink">
+        <div className="grid gap-4 py-2 text-card-foreground">
           <LockKey
             className="mx-auto size-14 text-primary"
             weight="duotone"

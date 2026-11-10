@@ -69,6 +69,12 @@ import {
 } from '@/components/match-replay-viewer';
 import { MatchStage } from '@/components/match-stage/match-stage';
 import {
+  LIVE_EVENT_MS,
+  LIVE_MINUTE_MS,
+  holdAfterRevealMs,
+  revealDelayMs,
+} from '@/lib/match-pace';
+import {
   describeReplayEvent,
   type MatchReplayInput,
 } from '@/lib/match-replay-model';
@@ -926,9 +932,6 @@ function Onboarding(props: {
   );
 }
 
-/** Real time of one match minute and of one narrated play at 1× (decision 18). */
-const LIVE_MINUTE_MS = 650;
-const LIVE_EVENT_MS = 900;
 const LIVE_SPEEDS: readonly MatchSpeed[] = [0.5, 1, 2, 4];
 
 function liveStatistics(replay: MatchReplayInput | undefined, minute: number) {
@@ -965,7 +968,7 @@ function StatBar(props: {
         <span className="text-xl tabular-nums text-bulb sm:text-2xl">
           {show(props.home)}
         </span>
-        <span className="truncate text-[.55rem] uppercase text-chalk/80">
+        <span className="truncate text-[.78rem] uppercase text-chalk/80">
           {props.label}
         </span>
         <span className="text-xl tabular-nums text-bulb sm:text-2xl">
@@ -1045,6 +1048,7 @@ function Matchday(props: {
     if (paused) stopSounds();
   }, [paused]);
   const minute = Math.max(clock, update.minute);
+  const [stageAnimated, setStageAnimated] = useState(false);
   const advance = useEffectEvent(() => void props.onNext());
   // The final whistle stops the match and opens the summary (no 2D replay).
   const finish = useEffectEvent(() => props.onFinished());
@@ -1053,18 +1057,38 @@ function Matchday(props: {
   }, [update.done]);
 
   // The clock walks minute by minute up to the next play, then reveals it.
+  // With the 3D stadium on, the play is shown first: its line and the score
+  // only appear when the ball gets there, and the clock waits for the replay.
+  const holdUntil = useRef(0);
+  const revealedMinute = useRef(-1);
   useEffect(() => {
     const target = update.nextMinute;
     if (paused || target === undefined) return;
+    const timeline = stageAnimated ? (replay?.timeline ?? []) : [];
     const timer =
       minute < target
         ? window.setTimeout(
             () => setClock(Math.min(target, minute + 1)),
-            LIVE_MINUTE_MS / speed,
+            Math.max(
+              LIVE_MINUTE_MS / speed,
+              holdUntil.current - performance.now(),
+            ),
           )
-        : window.setTimeout(advance, LIVE_EVENT_MS / speed);
+        : window.setTimeout(
+            () => {
+              if (revealedMinute.current !== target)
+                holdUntil.current =
+                  performance.now() +
+                  holdAfterRevealMs(timeline, target) / speed;
+              revealedMinute.current = target;
+              advance();
+            },
+            (revealedMinute.current === target
+              ? LIVE_EVENT_MS
+              : revealDelayMs(timeline, target)) / speed,
+          );
     return () => window.clearTimeout(timer);
-  }, [minute, paused, speed, update]);
+  }, [minute, paused, replay, speed, stageAnimated, update]);
 
   const perform = async (action: () => Promise<MatchUpdate>) => {
     try {
@@ -1094,313 +1118,336 @@ function Matchday(props: {
 
   return (
     <div
-      className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-3 overflow-x-clip"
+      className="mx-auto grid w-full min-w-0 max-w-[110rem] grid-cols-1 gap-3 overflow-x-clip lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-4 2xl:grid-cols-[minmax(0,1fr)_24rem]"
       data-testid="live-match"
     >
-      <section
-        aria-label="Placar ao vivo"
-        className="panel-board min-w-0 px-3 py-3"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <Badge>{status}</Badge>
-          <span className="font-pixel text-[.55rem] text-chalk/80">
-            {update.progress}%
-          </span>
-        </div>
-        <p
-          aria-label={`${home} ${update.score.replace('×', 'a')} ${away}`}
-          className="scoreboard-digits mt-2 whitespace-nowrap text-center text-[clamp(2rem,12vw,6rem)] leading-none text-bulb"
-          data-testid="live-scoreboard"
+      <div className="flex min-w-0 flex-col gap-3">
+        <section
+          aria-label="Placar ao vivo"
+          className="panel-board min-w-0 px-3 py-3 sm:px-5"
         >
-          {update.score}
-        </p>
-        <div
-          className="mt-3 grid min-w-0 grid-cols-2 gap-3"
-          data-testid="live-teams"
-        >
-          {[home, away].map((club) => (
-            <div
-              key={club}
-              className="flex min-w-0 flex-col items-center gap-1 text-center"
+          <div className="flex items-center justify-between gap-2">
+            <Badge>{status}</Badge>
+            <span className="font-pixel text-[.78rem] text-chalk/80">
+              {update.progress}%
+            </span>
+          </div>
+          {/* Broadcast score bar: home, score, away on one line. */}
+          <div className="mt-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-6">
+            <p
+              aria-label={`${home} ${update.score.replace('×', 'a')} ${away}`}
+              className="scoreboard-digits order-2 whitespace-nowrap text-center text-[clamp(2.25rem,9vw,4.5rem)] leading-none text-bulb"
+              data-testid="live-scoreboard"
             >
-              <ClubEmblem name={club} size={64} decorative />
-              <span className="w-full truncate font-pixel text-[.55rem] text-chalk">
-                {club}
-              </span>
-            </div>
-          ))}
-        </div>
-        <p
-          aria-live="polite"
-          aria-atomic="true"
-          className="mt-3 min-h-[3.25rem] text-balance border-t border-chalk/20 pt-2 text-center text-sm font-medium text-chalk"
-          data-testid="live-narration"
-        >
-          {update.message}
-        </p>
-      </section>
-
-      <div className="w-full min-w-0 max-w-full" data-testid="live-pitch">
-        {replay && !update.done ? (
-          <MatchStage
-            bare
-            fallback={
-              <SchematicPitch
-                caption={false}
-                match={replay}
-                minute={minute}
-                reducedMotion={reducedMotion}
-              />
-            }
-            match={replay}
-            minute={minute}
-            playing={!paused}
-            reducedMotion={reducedMotion}
-            speed={speed}
-          />
-        ) : null}
-      </div>
-
-      <div
-        className="flex min-w-0 flex-wrap items-center gap-2"
-        data-testid="live-controls"
-      >
-        {!update.done && (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              className="min-h-11 min-w-11"
-              aria-label={paused ? 'Retomar partida' : 'Pausar partida'}
-              onClick={() => {
-                if (halfTimeStop) setDismissedPauseId(update.id);
-                setManualPaused(halfTimeStop ? false : !manualPaused);
-              }}
-            >
-              {paused ? <Play /> : <Pause />}
-            </Button>
-            <ToggleGroup
-              aria-label="Velocidade da partida"
-              type="single"
-              value={String(speed)}
-              onValueChange={(value) =>
-                value && setSpeed(Number(value) as MatchSpeed)
-              }
-            >
-              {LIVE_SPEEDS.map((value) => (
-                <ToggleGroupItem
-                  key={value}
-                  value={String(value)}
-                  className="min-h-11 min-w-11"
-                  aria-label={`Velocidade ${String(value).replace('.', ',')} vezes`}
+              {update.score}
+            </p>
+            <div className="contents" data-testid="live-teams">
+              {[home, away].map((club, index) => (
+                <div
+                  key={club}
+                  className={
+                    index === 0
+                      ? 'order-1 flex min-w-0 flex-col items-center gap-1 text-center sm:flex-row-reverse sm:justify-start sm:gap-3 sm:text-right'
+                      : 'order-3 flex min-w-0 flex-col items-center gap-1 text-center sm:flex-row sm:justify-start sm:gap-3 sm:text-left'
+                  }
                 >
-                  {String(value).replace('.', ',')}×
-                </ToggleGroupItem>
+                  <ClubEmblem name={club} size={56} decorative />
+                  <span className="w-full truncate font-pixel text-[.82rem] text-chalk sm:w-auto sm:text-lg">
+                    {club}
+                  </span>
+                </div>
               ))}
-            </ToggleGroup>
-          </>
-        )}
-        {update.done ? (
-          <Button className="min-h-12 w-full" onClick={props.onFinished}>
-            Ver resumo da partida
-            <Trophy data-icon="inline-end" />
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="ml-auto"
-            onClick={props.onSkip}
+            </div>
+          </div>
+          <p
+            aria-live="polite"
+            aria-atomic="true"
+            className="mt-3 min-h-[2.75rem] text-balance border-t border-chalk/15 pt-2 text-center text-sm font-medium text-chalk sm:text-base"
+            data-testid="live-narration"
           >
-            Pular para o resultado
-            <ArrowRight data-icon="inline-end" />
-          </Button>
-        )}
-      </div>
-
-      {halfTimeStop && (
-        <div className="panel min-w-0 p-3 text-center" role="status">
-          <p className="text-sm font-medium">
-            Intervalo. Faça substituições e ajustes ou siga para o segundo
-            tempo.
+            {update.message}
           </p>
-          <Button
-            size="sm"
-            className="mt-2"
-            onClick={() => {
-              setDismissedPauseId(update.id);
-              setManualPaused(false);
-            }}
-          >
-            Começar o segundo tempo
-            <Play data-icon="inline-end" />
-          </Button>
-        </div>
-      )}
+        </section>
 
-      {paused && !update.done && (
-        <Card className="min-w-0" data-testid="live-interventions">
-          <CardHeader>
-            <CardTitle className="font-display text-sm uppercase">
-              Ajustes aos {minute}&apos;
-            </CardTitle>
-            <CardDescription>
-              O que já aconteceu não muda; a mudança vale a partir daqui.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="outgoing">Sai</FieldLabel>
-                <select
-                  id="outgoing"
-                  className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
-                  value={outgoing}
-                  onChange={(event) => setOutgoing(event.target.value)}
-                >
-                  <option value="">Escolha um titular</option>
-                  {starters.map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="incoming">Entra</FieldLabel>
-                <select
-                  id="incoming"
-                  className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
-                  value={incoming}
-                  onChange={(event) => setIncoming(event.target.value)}
-                >
-                  <option value="">Escolha o banco</option>
-                  {bench.map((player) => (
-                    <option key={player.id} value={player.id}>
-                      {player.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </FieldGroup>
-            <Button
-              variant="outline"
-              onClick={() =>
-                perform(async () => {
-                  const next = await props.api.makeSubstitution({
-                    outgoingId: outgoing,
-                    incomingId: incoming,
-                    minute,
-                  });
-                  setOutgoing('');
-                  setIncoming('');
-                  return next;
-                })
+        <div className="w-full min-w-0 max-w-full" data-testid="live-pitch">
+          {replay && !update.done ? (
+            <MatchStage
+              bare
+              fallback={
+                <SchematicPitch
+                  caption={false}
+                  match={replay}
+                  minute={minute}
+                  reducedMotion={reducedMotion}
+                />
               }
-            >
-              <UserSwitch data-icon="inline-start" />
-              Confirmar substituição
-            </Button>
-            <Field>
-              <FieldLabel htmlFor="live-mentality">
-                Mentalidade em jogo
-              </FieldLabel>
-              <select
-                id="live-mentality"
-                className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
-                value={liveMentality}
-                onChange={(event) =>
-                  setLiveMentality(event.target.value as Mentality)
+              fullscreenControls={
+                <button
+                  aria-label={paused ? 'Retomar partida' : 'Pausar partida'}
+                  className="hud-button"
+                  onClick={() => {
+                    if (halfTimeStop) setDismissedPauseId(update.id);
+                    setManualPaused(halfTimeStop ? false : !manualPaused);
+                  }}
+                  type="button"
+                >
+                  {paused ? <Play /> : <Pause />}
+                </button>
+              }
+              liveCaption={update.message}
+              liveScore={update.score}
+              match={replay}
+              minute={minute}
+              onAnimatedChange={setStageAnimated}
+              playing={!paused}
+              reducedMotion={reducedMotion}
+              speed={speed}
+            />
+          ) : null}
+        </div>
+
+        <div
+          className="flex min-w-0 flex-wrap items-center gap-2"
+          data-testid="live-controls"
+        >
+          {!update.done && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-11 min-w-11"
+                aria-label={paused ? 'Retomar partida' : 'Pausar partida'}
+                onClick={() => {
+                  if (halfTimeStop) setDismissedPauseId(update.id);
+                  setManualPaused(halfTimeStop ? false : !manualPaused);
+                }}
+              >
+                {paused ? <Play /> : <Pause />}
+              </Button>
+              <ToggleGroup
+                aria-label="Velocidade da partida"
+                type="single"
+                value={String(speed)}
+                onValueChange={(value) =>
+                  value && setSpeed(Number(value) as MatchSpeed)
                 }
               >
-                {Object.entries(TACTIC_LABEL.mentality).map(
-                  ([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ),
-                )}
-              </select>
-            </Field>
-            <Button
-              variant="outline"
-              onClick={() =>
-                perform(async () => {
-                  const next = await props.api.changeMatchTactics(
-                    { mentality: liveMentality },
-                    minute,
-                  );
-                  const career = await props.api.getCareer();
-                  if (career) props.onCareerChange(career);
-                  return next;
-                })
-              }
-            >
-              <Strategy data-icon="inline-start" />
-              Aplicar ajuste
+                {LIVE_SPEEDS.map((value) => (
+                  <ToggleGroupItem
+                    key={value}
+                    value={String(value)}
+                    className="min-h-11 min-w-11"
+                    aria-label={`Velocidade ${String(value).replace('.', ',')} vezes`}
+                  >
+                    {String(value).replace('.', ',')}×
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </>
+          )}
+          {update.done ? (
+            <Button className="min-h-12 w-full" onClick={props.onFinished}>
+              Ver resumo da partida
+              <Trophy data-icon="inline-end" />
             </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="ml-auto"
+              onClick={props.onSkip}
+            >
+              Pular para o resultado
+              <ArrowRight data-icon="inline-end" />
+            </Button>
+          )}
+        </div>
+
+        {halfTimeStop && (
+          <div className="panel min-w-0 p-3 text-center" role="status">
+            <p className="text-sm font-medium">
+              Intervalo. Faça substituições e ajustes ou siga para o segundo
+              tempo.
+            </p>
+            <Button
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                setDismissedPauseId(update.id);
+                setManualPaused(false);
+              }}
+            >
+              Começar o segundo tempo
+              <Play data-icon="inline-end" />
+            </Button>
+          </div>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-col gap-3">
+        {paused && !update.done && (
+          <Card className="min-w-0" data-testid="live-interventions">
+            <CardHeader>
+              <CardTitle className="font-display text-sm uppercase">
+                Ajustes aos {minute}&apos;
+              </CardTitle>
+              <CardDescription>
+                O que já aconteceu não muda; a mudança vale a partir daqui.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="outgoing">Sai</FieldLabel>
+                  <select
+                    id="outgoing"
+                    className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+                    value={outgoing}
+                    onChange={(event) => setOutgoing(event.target.value)}
+                  >
+                    <option value="">Escolha um titular</option>
+                    {starters.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="incoming">Entra</FieldLabel>
+                  <select
+                    id="incoming"
+                    className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+                    value={incoming}
+                    onChange={(event) => setIncoming(event.target.value)}
+                  >
+                    <option value="">Escolha o banco</option>
+                    {bench.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </FieldGroup>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  perform(async () => {
+                    const next = await props.api.makeSubstitution({
+                      outgoingId: outgoing,
+                      incomingId: incoming,
+                      minute,
+                    });
+                    setOutgoing('');
+                    setIncoming('');
+                    return next;
+                  })
+                }
+              >
+                <UserSwitch data-icon="inline-start" />
+                Confirmar substituição
+              </Button>
+              <Field>
+                <FieldLabel htmlFor="live-mentality">
+                  Mentalidade em jogo
+                </FieldLabel>
+                <select
+                  id="live-mentality"
+                  className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+                  value={liveMentality}
+                  onChange={(event) =>
+                    setLiveMentality(event.target.value as Mentality)
+                  }
+                >
+                  {Object.entries(TACTIC_LABEL.mentality).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </Field>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  perform(async () => {
+                    const next = await props.api.changeMatchTactics(
+                      { mentality: liveMentality },
+                      minute,
+                    );
+                    const career = await props.api.getCareer();
+                    if (career) props.onCareerChange(career);
+                    return next;
+                  })
+                }
+              >
+                <Strategy data-icon="inline-start" />
+                Aplicar ajuste
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        <section
+          aria-label="Estatísticas da partida"
+          className="panel-board grid min-w-0 gap-4 p-4"
+          data-testid="live-stats"
+        >
+          <StatBar
+            label="Posse"
+            home={stats.possession.home}
+            away={stats.possession.away}
+            format={(value) => `${String(Math.round(value))}%`}
+          />
+          <StatBar
+            label="Finalizações"
+            home={stats.home.shots}
+            away={stats.away.shots}
+          />
+          <StatBar
+            label="xG"
+            home={stats.home.xg}
+            away={stats.away.xg}
+            format={(value) => value.toFixed(1)}
+          />
+          <StatBar
+            label="Cartões"
+            home={stats.home.cards}
+            away={stats.away.cards}
+          />
+        </section>
+
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle className="font-display text-sm uppercase">
+              Lance a lance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ol
+              aria-label="Feed da partida"
+              className="match-feed scrollbar-px flex max-h-72 flex-col gap-3 overflow-y-auto lg:max-h-[28rem]"
+              data-testid="live-feed"
+            >
+              {props.feed
+                .slice()
+                .reverse()
+                .map((event) => (
+                  <li
+                    key={event.id}
+                    className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2 text-sm"
+                  >
+                    <strong className="font-display text-primary">
+                      {event.minute}&apos;
+                    </strong>
+                    <span className="min-w-0 break-words">{event.message}</span>
+                  </li>
+                ))}
+            </ol>
           </CardContent>
         </Card>
-      )}
-
-      <section
-        aria-label="Estatísticas da partida"
-        className="panel-board grid min-w-0 gap-4 p-4"
-        data-testid="live-stats"
-      >
-        <StatBar
-          label="Posse"
-          home={stats.possession.home}
-          away={stats.possession.away}
-          format={(value) => `${String(Math.round(value))}%`}
-        />
-        <StatBar
-          label="Finalizações"
-          home={stats.home.shots}
-          away={stats.away.shots}
-        />
-        <StatBar
-          label="xG"
-          home={stats.home.xg}
-          away={stats.away.xg}
-          format={(value) => value.toFixed(1)}
-        />
-        <StatBar
-          label="Cartões"
-          home={stats.home.cards}
-          away={stats.away.cards}
-        />
-      </section>
-
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle className="font-display text-sm uppercase">
-            Lance a lance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ol
-            aria-label="Feed da partida"
-            className="match-feed flex max-h-72 flex-col gap-3 overflow-y-auto"
-            data-testid="live-feed"
-          >
-            {props.feed
-              .slice()
-              .reverse()
-              .map((event) => (
-                <li
-                  key={event.id}
-                  className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2 text-sm"
-                >
-                  <strong className="font-display text-primary">
-                    {event.minute}&apos;
-                  </strong>
-                  <span className="min-w-0 break-words">{event.message}</span>
-                </li>
-              ))}
-          </ol>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -1452,7 +1499,7 @@ function Result({
       >
         <div className="flex items-center justify-between gap-2">
           <Badge>Fim de jogo</Badge>
-          <span className="font-pixel text-[.55rem] text-chalk/80">
+          <span className="font-pixel text-[.78rem] text-chalk/80">
             {outcome.summary}
           </span>
         </div>
@@ -1470,7 +1517,7 @@ function Result({
                 className="flex min-w-0 flex-col items-center gap-1 text-center"
               >
                 <ClubEmblem name={club} size={64} decorative />
-                <span className="w-full truncate font-pixel text-[.55rem] text-chalk">
+                <span className="w-full truncate font-pixel text-[.78rem] text-chalk">
                   {club}
                 </span>
               </div>

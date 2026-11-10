@@ -100,7 +100,7 @@ export function NewsList({
       <div className="flex items-center justify-between gap-2">
         <h2
           id="inbox-noticias"
-          className="flex items-center gap-2 font-pixel text-[.65rem]"
+          className="flex items-center gap-2 font-pixel text-[.86rem]"
         >
           <Newspaper aria-hidden="true" />
           Notícias
@@ -122,7 +122,7 @@ export function NewsList({
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{item.tag}</Badge>
                 {item.date && (
-                  <span className="font-pixel text-[.45rem] text-muted-foreground">
+                  <span className="font-pixel text-[.7rem] text-muted-foreground">
                     {formatGameDate(item.date)}
                   </span>
                 )}

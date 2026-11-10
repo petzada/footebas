@@ -76,7 +76,7 @@ export function CountryFlag({
     <span
       style={{ width, height, lineHeight: `${height}px` }}
       className={cn(
-        'px-border inline-block shrink-0 bg-chalk text-center font-pixel text-[.4rem] text-ink',
+        'px-border inline-block shrink-0 bg-chalk text-center font-pixel text-[.68rem] text-ink',
         className,
       )}
       data-testid="country-flag"

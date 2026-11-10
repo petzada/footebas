@@ -3,20 +3,22 @@ import { createMatchReplayFrame } from '@/lib/match-replay-model';
 import {
   PHASES,
   PITCH,
+  anchorsForCodes,
   buildChoreography,
   playerKey,
   sampleStage,
   sampleStageNormalized,
   stepForMinute,
 } from './choreography';
+import { matchKits } from '@/lib/club-kits';
+import { PLAY_MS } from '@/lib/match-pace';
 import {
-  SEGMENT_MS,
   advanceController,
-  pixelScaleFor,
+  segmentDurationMs,
   syncController,
   type StageController,
-} from './match-scene';
-import { stageTheme } from './theme';
+} from './controller';
+import { GOAL_CUT, actionClock, directionAt } from './direction';
 import { deepFreeze, stageMatch } from './test-fixture';
 
 const keyframes = [0, 0.15, PHASES.open, PHASES.build, PHASES.action, 1];
@@ -25,7 +27,7 @@ function controllerFor(minute = 0): StageController {
   const choreography = buildChoreography(stageMatch());
   return {
     choreography,
-    colors: { home: '#f7c948', away: '#1f4f9a' },
+    kits: matchKits({ id: 'cfc' }, { id: 'fba' }),
     step: stepForMinute(choreography, minute),
     progress: 1,
     paused: false,
@@ -189,17 +191,210 @@ describe('match stage choreography', () => {
   });
 });
 
+describe('formations and plays', () => {
+  it('lines the teams up by position, mirrored for the visitors', () => {
+    const anchors = anchorsForCodes([
+      'GK',
+      'RB',
+      'CB',
+      'CB',
+      'LB',
+      'CM',
+      'CM',
+      'RW',
+      'LW',
+      'ST',
+      'ST',
+    ]);
+    expect(anchors).toHaveLength(11);
+    expect(anchors[0]).toEqual({ x: 7, y: 32 });
+    // Two centre-backs and two strikers split around the axis of the pitch.
+    expect(anchors[2]!.y + anchors[3]!.y).toBe(64);
+    expect(anchors[9]!.y + anchors[10]!.y).toBe(64);
+    // The right-back is on the other side of the left-back.
+    expect(anchors[1]!.y).toBeGreaterThan(32);
+    expect(anchors[4]!.y).toBeLessThan(32);
+
+    const kickoff = sampleStage(buildChoreography(stageMatch()), 0, 1);
+    const home = kickoff.players.find((p) => p.key === 'home-1')!;
+    const away = kickoff.players.find((p) => p.key === 'away-1')!;
+    expect(away.x).toBeCloseTo(PITCH.width - home.x, 1);
+    expect(away.y).toBeCloseTo(PITCH.height - home.y, 1);
+  });
+
+  it('puts the keeper in goal whatever order the source lists the squad in', () => {
+    const base = stageMatch();
+    const shuffled = stageMatch({
+      home: {
+        ...base.home,
+        players: base.home.players.map((player, index) => ({
+          ...player,
+          position: index === 4 ? 'GK' : index === 0 ? 'ST' : 'CM',
+        })),
+      },
+    });
+    const frame = sampleStage(buildChoreography(shuffled), 0, 1);
+    const keeper = frame.players.find((p) => p.key === 'home-0')!;
+    expect(keeper.number).toBe(5);
+    expect(keeper.x).toBeLessThan(12);
+  });
+
+  it('reshapes a side when the manager changes the formation', () => {
+    const choreography = buildChoreography(
+      stageMatch({
+        timeline: [
+          {
+            type: 'tactical_change',
+            minute: 30,
+            side: 'home',
+            formation: '3-5-2',
+            mentality: 'attacking',
+          },
+        ],
+      }),
+    );
+    const before = choreography.segments[0]!.anchors.home;
+    const after = choreography.segments[1]!.anchors.home;
+    expect(after).not.toEqual(before);
+    expect(after[0]).toEqual(before[0]);
+    expect(choreography.segments[1]!.anchors.away).toEqual(
+      choreography.segments[0]!.anchors.away,
+    );
+  });
+
+  it('stages each kind of play and ending the engine reports', () => {
+    const match = stageMatch({
+      timeline: [
+        {
+          type: 'chance',
+          minute: 10,
+          side: 'home',
+          xg: 0.2,
+          playerId: 'cfc-9',
+          assistId: 'cfc-7',
+          play: 'cross',
+          outcome: 'saved',
+        },
+        {
+          type: 'chance',
+          minute: 20,
+          side: 'away',
+          xg: 0.1,
+          playerId: 'fba-10',
+          play: 'long_shot',
+          outcome: 'woodwork',
+        },
+        {
+          type: 'chance',
+          minute: 30,
+          side: 'home',
+          xg: 0.3,
+          playerId: 'cfc-11',
+          play: 'individual',
+          outcome: 'blocked',
+        },
+      ],
+    });
+    const choreography = buildChoreography(match);
+    const [, cross, post, blocked] = choreography.segments;
+
+    // The named athletes take the shot and the last pass.
+    expect(cross!.involvedKey).toBe('home-8');
+    expect(cross!.play).toBe('cross');
+    expect(cross!.overlay).toMatchObject({ kind: 'chance', outcome: 'saved' });
+    expect(cross!.actions.map((action) => action.kind)).toEqual(
+      expect.arrayContaining(['pass', 'header', 'dive']),
+    );
+    expect(
+      cross!.actions.find((action) => action.kind === 'header')?.playerKey,
+    ).toBe('home-8');
+    // A cross is lofted from the wing: the ball leaves the grass.
+    expect(sampleStage(choreography, 1, 0.55).ball.height).toBeGreaterThan(0.3);
+
+    // Off the post: the ball meets the frame of the goal and comes back out.
+    expect(post!.overlay).toMatchObject({ kind: 'chance', outcome: 'post' });
+    const hit = sampleStage(choreography, 2, PHASES.action);
+    expect([PITCH.goalTop, PITCH.goalBottom]).toContain(hit.ball.y);
+    expect(Math.abs(hit.ball.x - PITCH.left)).toBeLessThan(1);
+    expect(sampleStage(choreography, 2, 1).ball.x).toBeGreaterThan(
+      PITCH.left + 4,
+    );
+
+    // Blocked: it never reaches the goal line.
+    expect(blocked!.overlay).toMatchObject({ outcome: 'blocked' });
+    expect(sampleStage(choreography, 3, 1).ball.x).toBeLessThan(PITCH.right);
+    expect(
+      blocked!.actions.some(
+        (action) =>
+          action.kind === 'tackle' && action.playerKey.startsWith('away'),
+      ),
+    ).toBe(true);
+  });
+
+  it('gives every highlight a length and celebrates goals', () => {
+    const choreography = buildChoreography(stageMatch());
+    const goal = choreography.segments[stepForMinute(choreography, 24)]!;
+    const card = choreography.segments[stepForMinute(choreography, 41)]!;
+    expect(goal.durationMs).toBe(PLAY_MS.goal);
+    expect(card.durationMs).toBe(PLAY_MS.card);
+    expect(
+      goal.actions.filter((action) => action.kind === 'celebrate').length,
+    ).toBeGreaterThan(1);
+    expect(
+      card.actions.some(
+        (action) => action.kind === 'fall' && action.until !== undefined,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('broadcast direction', () => {
+  it('plays ordinary highlights straight through', () => {
+    const choreography = buildChoreography(stageMatch());
+    const chance = choreography.segments[stepForMinute(choreography, 9)];
+    expect(directionAt(chance, 0.4)).toEqual({ p: 0.4, mode: 'live' });
+    expect(directionAt(chance, 1)).toEqual({ p: 1, mode: 'rest' });
+    expect(actionClock(chance)).toBe(PHASES.action);
+  });
+
+  it('shows a goal live, celebrates it and replays it in slow motion', () => {
+    const choreography = buildChoreography(stageMatch());
+    const goal = choreography.segments[stepForMinute(choreography, 24)];
+    expect(directionAt(goal, 0).mode).toBe('live');
+    // Live reaches past the ball in the net before the cut.
+    expect(directionAt(goal, GOAL_CUT.live - 0.001).p).toBeGreaterThan(
+      PHASES.action,
+    );
+    expect(directionAt(goal, 0.6).mode).toBe('celebration');
+    const replayStart = directionAt(goal, GOAL_CUT.celebration);
+    const replayEnd = directionAt(goal, GOAL_CUT.replay - 0.001);
+    expect(replayStart).toEqual({ p: GOAL_CUT.replayFrom, mode: 'replay' });
+    // The replay rewinds to before the shot and runs through the goal again.
+    expect(replayStart.p).toBeLessThan(PHASES.build);
+    expect(replayEnd.p).toBeGreaterThan(PHASES.action);
+    expect(directionAt(goal, 1)).toEqual({ p: 1, mode: 'rest' });
+    // The ball hits the net before the live part ends.
+    expect(actionClock(goal)).toBeLessThan(GOAL_CUT.live);
+  });
+});
+
 describe('stage controller', () => {
   it('advances by real time scaled by speed and stops at rest', () => {
-    const controller = controllerFor();
+    const controller = controllerFor(9);
+    const duration = segmentDurationMs(
+      controller.choreography,
+      controller.step,
+    );
+    expect(duration).toBe(PLAY_MS.chance);
     controller.progress = 0;
-    for (let frame = 0; frame < 5; frame += 1)
-      advanceController(controller, SEGMENT_MS / 20);
+    // Frames longer than 100 ms are clamped (a resumed tab never jumps).
+    for (let frame = 0; frame < 50; frame += 1)
+      advanceController(controller, duration / 200);
     expect(controller.progress).toBeCloseTo(0.25);
     controller.speed = 4;
-    advanceController(controller, 50);
-    expect(controller.progress).toBeCloseTo(0.45);
-    for (let frame = 0; frame < 20; frame += 1)
+    advanceController(controller, duration / 80);
+    expect(controller.progress).toBeCloseTo(0.3);
+    for (let frame = 0; frame < 200; frame += 1)
       advanceController(controller, 100);
     expect(controller.progress).toBe(1);
     expect(advanceController(controller, 16)).toBe(false);
@@ -224,12 +419,5 @@ describe('stage controller', () => {
     const paused = controllerFor(24);
     syncController(paused, { minute: 24, playing: false, speed: 1 });
     expect(paused.paused).toBe(true);
-  });
-
-  it('caps the device pixel ratio at 2', () => {
-    expect(pixelScaleFor(360, 3, stageTheme)).toBe(2);
-    expect(pixelScaleFor(360, 1, stageTheme)).toBe(1);
-    expect(pixelScaleFor(2000, 3, stageTheme)).toBe(4);
-    expect(pixelScaleFor(0, 1, stageTheme)).toBe(1);
   });
 });

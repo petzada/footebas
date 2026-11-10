@@ -17,6 +17,7 @@ import {
   type ReplaySide,
 } from '@/lib/match-replay-model';
 import { MatchStage } from '@/components/match-stage/match-stage';
+import { minuteDwellMs } from '@/lib/match-pace';
 
 export interface MatchReplayViewerProps {
   readonly match: MatchReplayInput;
@@ -225,11 +226,17 @@ export function MatchReplayViewer({
 
   useEffect(() => {
     if (!playing || frame.complete) return;
+    // A minute with a play holds the screen for as long as its highlight.
+    const wait = match.timeline.some(
+      (event) => Math.floor(event.minute) === minute,
+    )
+      ? minuteDwellMs(match.timeline, minute)
+      : 1_100;
     const timeout = window.setTimeout(() => {
       const next = nextReplayMinute(match, minute);
       setMinute(next);
       if (next >= duration) setPlaying(false);
-    }, 1_100 / speed);
+    }, wait / speed);
     return () => window.clearTimeout(timeout);
   }, [duration, frame.complete, match, minute, playing, speed]);
 
@@ -259,7 +266,7 @@ export function MatchReplayViewer({
       <div className="border-b border-white/10 bg-[linear-gradient(110deg,#0d291e_0%,#0a1b15_55%,#182217_100%)] px-4 py-4 sm:px-6">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-[.68rem] font-bold uppercase tracking-[.22em] text-[#a9c3b6]">
+            <p className="text-[.88rem] font-bold uppercase tracking-[.22em] text-[#a9c3b6]">
               Central da partida · reprodução oficial
             </p>
             <h2
@@ -326,7 +333,7 @@ export function MatchReplayViewer({
           />
 
           <div className="rounded-xl border border-white/10 bg-[#0c2119] p-3">
-            <div className="mb-2 flex items-center justify-between text-[.68rem] font-bold uppercase tracking-[.15em] text-[#a9c3b6]">
+            <div className="mb-2 flex items-center justify-between text-[.88rem] font-bold uppercase tracking-[.15em] text-[#a9c3b6]">
               <span>Momento · últimos 15 min</span>
               <span>
                 {frame.telemetry.momentum.home}% /{' '}

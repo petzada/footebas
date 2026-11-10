@@ -1,28 +1,25 @@
 /**
- * Pure geometry for the 3D stage: maps the renderer-agnostic normalized
- * frame (`sampleStageNormalized`, 0..1 over the 100x64 pitch box) onto the
- * converted stadium model, and drives the TV camera.
+ * Pure geometry for the 3D stage: maps the renderer-agnostic normalized frame
+ * (`sampleStageNormalized`, 0..1 over the 100x64 pitch box) onto the stadium
+ * and drives the broadcast cameras.
  *
  * World frame (metres): +X runs goal to goal (home goal at -X), +Z towards
- * the near touchline (where the camera sits), +Y up, grass at y = 0. The GLB
- * produced by `scripts/convert-stadium.mjs` is baked into this same frame.
+ * the near touchline (where the main camera sits), +Y up, grass at y = 0.
  */
 import { PITCH, type NormalizedStagePoint } from './choreography';
 
 export const FIELD = {
-  /** Painted line box of the model, in metres. */
+  /** Painted line box, in metres (official 105 x 68). */
   lineLength: 105,
-  lineWidth: 67.35,
-  /** Whole grass island (lines plus the margin), in metres. */
-  islandLength: 114.38,
-  islandWidth: 76.26,
-  islandDepth: 10.48,
+  lineWidth: 68,
+  /** Grass beyond the lines before the boards. */
+  margin: 7,
   /** Goal mouth. */
   goalWidth: 7.32,
   goalHeight: 2.44,
-  goalDepth: 2,
+  goalDepth: 2.2,
   /** Max ball lift (normalized height 1) in metres. */
-  ballLift: 6,
+  ballLift: 6.5,
 } as const;
 
 /** Metres per pitch unit along each axis (lines at 2..98 and 2..62). */
@@ -55,6 +52,11 @@ export function pitchToWorld(
   };
 }
 
+/** Pitch units (100x64 box) to world metres, for anchors and spots. */
+export function unitsToWorld(x: number, y: number): WorldPoint {
+  return pitchToWorld({ u: x / PITCH.width, v: y / PITCH.height });
+}
+
 /** World x of the goal line a side attacks (home attacks +X). */
 export function goalLineX(side: 'home' | 'away'): number {
   return side === 'home' ? FIELD.lineLength / 2 : -FIELD.lineLength / 2;
@@ -68,53 +70,130 @@ export interface CameraRig {
 }
 
 export type CameraShot =
+  /** Main gantry camera: pans along the near touchline after the ball. */
   | Readonly<{ kind: 'follow'; focus: WorldPoint; zoom: number }>
-  | Readonly<{ kind: 'goal'; side: 'home' | 'away'; intensity: number }>;
+  /** Push in towards the net as the ball goes in. */
+  | Readonly<{ kind: 'goal'; side: 'home' | 'away'; intensity: number }>
+  /** Slow aerial orbit: before kickoff, at the breaks and at full time. */
+  | Readonly<{ kind: 'aerial'; angle: number }>
+  /** Low shot of an athlete from `angle` around him (celebrations). */
+  | Readonly<{ kind: 'hero'; focus: WorldPoint; angle: number }>
+  /** Behind-the-goal replay camera. */
+  | Readonly<{ kind: 'replay'; side: 'home' | 'away'; focus: WorldPoint }>
+  /** Tight shot of one athlete (cards, injuries, substitutions). */
+  | Readonly<{ kind: 'close'; focus: WorldPoint }>;
 
 const FOLLOW = {
-  height: 36,
-  distance: 62,
-  fov: 34,
-  zoomFov: 26,
-  panLimit: 34,
-  lookLimit: 46,
+  height: 25,
+  distance: 64,
+  fov: 22,
+  zoomFov: 15,
+  panLimit: 36,
+  lookLimit: 48,
 } as const;
 
-/**
- * Where the broadcast camera wants to be for a shot. `follow` pans along the
- * near touchline after the ball; `goal` pushes in towards the net.
- */
+/** Where a camera wants to be for a shot. Pure. */
 export function cameraFor(shot: CameraShot): CameraRig {
-  if (shot.kind === 'goal') {
-    const goalX = goalLineX(shot.side);
-    const t = clamp(shot.intensity, 0, 1);
-    const toward = Math.sign(goalX);
-    return {
-      position: {
-        x: round(goalX * (0.5 + 0.1 * t) - toward * 4),
-        y: round(FOLLOW.height - 12 * t),
-        z: round(FOLLOW.distance - 18 * t),
-      },
-      target: { x: round(goalX * 0.9), y: round(1.2 - 0.4 * t), z: 0 },
-      fov: round(FOLLOW.fov - (FOLLOW.fov - 24) * t),
-    };
+  switch (shot.kind) {
+    case 'goal': {
+      const goalX = goalLineX(shot.side);
+      const t = clamp(shot.intensity, 0, 1);
+      const toward = Math.sign(goalX);
+      return {
+        position: {
+          x: round(goalX * (0.5 + 0.1 * t) - toward * 4),
+          y: round(FOLLOW.height - 12 * t),
+          z: round(FOLLOW.distance - 22 * t),
+        },
+        target: { x: round(goalX * 0.92), y: round(1.4 - 0.4 * t), z: 0 },
+        fov: round(FOLLOW.fov - (FOLLOW.fov - 20) * t),
+      };
+    }
+    case 'aerial':
+      return {
+        position: {
+          x: round(Math.cos(shot.angle) * 96),
+          y: 46,
+          z: round(Math.sin(shot.angle) * 82),
+        },
+        target: { x: 0, y: 2, z: 0 },
+        fov: 34,
+      };
+    case 'hero':
+      return {
+        position: {
+          x: round(shot.focus.x + Math.cos(shot.angle) * 11.5),
+          y: 2.3,
+          z: round(shot.focus.z + Math.sin(shot.angle) * 11.5),
+        },
+        target: { x: shot.focus.x, y: 1.25, z: shot.focus.z },
+        fov: 27,
+      };
+    case 'replay': {
+      const goalX = goalLineX(shot.side);
+      const toward = Math.sign(goalX);
+      return {
+        position: {
+          x: round(goalX + toward * 13),
+          y: 5.4,
+          z: round(clamp(shot.focus.z * 0.35, -9, 9) + 5.5),
+        },
+        target: {
+          x: round(goalX - toward * 7),
+          y: 1.3,
+          z: round(clamp(shot.focus.z * 0.6, -14, 14)),
+        },
+        fov: 27,
+      };
+    }
+    case 'close':
+      return {
+        position: {
+          x: round(clamp(shot.focus.x * 0.82, -44, 44)),
+          y: 6.5,
+          z: round(shot.focus.z + 21),
+        },
+        target: { x: shot.focus.x, y: 1.2, z: shot.focus.z },
+        fov: 19,
+      };
+    case 'follow': {
+      const zoom = clamp(shot.zoom, 0, 1);
+      const panX = clamp(
+        shot.focus.x * 0.58,
+        -FOLLOW.panLimit,
+        FOLLOW.panLimit,
+      );
+      const lookX = clamp(
+        shot.focus.x * 0.88,
+        -FOLLOW.lookLimit,
+        FOLLOW.lookLimit,
+      );
+      return {
+        position: {
+          x: round(panX),
+          y: round(FOLLOW.height - 5 * zoom),
+          z: round(FOLLOW.distance - 9 * zoom),
+        },
+        target: {
+          x: round(lookX),
+          y: 0,
+          z: round(clamp(shot.focus.z * 0.42, -16, 16)),
+        },
+        fov: round(FOLLOW.fov - (FOLLOW.fov - FOLLOW.zoomFov) * zoom),
+      };
+    }
   }
-  const zoom = clamp(shot.zoom, 0, 1);
-  const panX = clamp(shot.focus.x * 0.6, -FOLLOW.panLimit, FOLLOW.panLimit);
-  const lookX = clamp(shot.focus.x * 0.85, -FOLLOW.lookLimit, FOLLOW.lookLimit);
-  return {
-    position: {
-      x: round(panX),
-      y: round(FOLLOW.height - 6 * zoom),
-      z: round(FOLLOW.distance - 10 * zoom),
-    },
-    target: {
-      x: round(lookX),
-      y: 0,
-      z: round(clamp(shot.focus.z * 0.35, -12, 12)),
-    },
-    fov: round(FOLLOW.fov - (FOLLOW.fov - FOLLOW.zoomFov) * zoom),
-  };
+}
+
+/** Shots of the same family glide into each other; others are hard cuts. */
+export function isCut(
+  from: CameraShot['kind'],
+  to: CameraShot['kind'],
+): boolean {
+  if (from === to) return false;
+  const gantry = (kind: CameraShot['kind']) =>
+    kind === 'follow' || kind === 'goal';
+  return !(gantry(from) && gantry(to));
 }
 
 function dampValue(from: number, to: number, factor: number): number {
@@ -144,7 +223,7 @@ export function dampCamera(
   from: CameraRig,
   goal: CameraRig,
   deltaMs: number,
-  halfLifeMs = 420,
+  halfLifeMs = 380,
 ): CameraRig {
   const delta = clamp(deltaMs, 0, 1000);
   const factor =
@@ -171,19 +250,4 @@ export function cameraSettled(
     distance(current.target, goal.target) < epsilon &&
     Math.abs(current.fov - goal.fov) < epsilon
   );
-}
-
-/** Low-resolution render size for the retro look (pixel-doubled by CSS). */
-export function renderSizeFor(cssWidth: number): Readonly<{
-  width: number;
-  height: number;
-}> {
-  const width = cssWidth >= 640 ? 480 : cssWidth >= 420 ? 400 : 320;
-  return { width, height: Math.round(width * 0.625) };
-}
-
-/** Running-cycle frame (0..frames-1) from distance covered, in metres. */
-export function runFrame(distanceMoved: number, frames = 3): number {
-  if (distanceMoved < 0.05) return 0;
-  return Math.floor(distanceMoved / 0.9) % frames;
 }

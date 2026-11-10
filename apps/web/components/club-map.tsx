@@ -156,10 +156,10 @@ export function ClubMapScreen({
       <AdvanceBar career={career} onNarrate={onNarrate} onInstant={onInstant} />
       <section aria-labelledby="mapa-ilustrado" className="panel p-3 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="mapa-ilustrado" className="font-pixel text-[.65rem]">
+          <h2 id="mapa-ilustrado" className="font-pixel text-[.86rem]">
             Seu clube
           </h2>
-          <span className="border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.5rem]">
+          <span className="border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.74rem]">
             Toque num prédio
           </span>
         </div>
@@ -230,10 +230,10 @@ function AdvanceBar({
       <div className="flex min-w-0 items-center gap-3">
         <ClubEmblem name={career.opponent.club} size={40} decorative />
         <p className="min-w-0 text-sm">
-          <span className="led block text-[.5rem] tracking-[.2em]">
+          <span className="led block text-[.74rem] tracking-[.2em]">
             Próximo jogo
           </span>
-          <strong className="block truncate font-pixel text-[.65rem] leading-relaxed sm:text-xs">
+          <strong className="block truncate font-pixel text-[.86rem] leading-relaxed sm:text-xs">
             {career.club} × {career.opponent.club}
           </strong>
         </p>
@@ -242,7 +242,7 @@ function AdvanceBar({
         <div className="grid min-w-0 grid-cols-2 gap-3 sm:flex">
           <button
             type="button"
-            className="btn-px btn-play flex min-h-11 min-w-0 items-center justify-center gap-1 px-1.5 text-[.5rem] leading-tight break-words whitespace-normal sm:px-4 sm:text-[.65rem]"
+            className="btn-px btn-play flex min-h-11 min-w-0 items-center justify-center gap-1 px-1.5 text-[.74rem] leading-tight break-words whitespace-normal sm:px-4 sm:text-[.86rem]"
             onClick={onNarrate}
           >
             <PixelBall size={14} />
@@ -250,7 +250,7 @@ function AdvanceBar({
           </button>
           <Button
             variant="outline"
-            className="h-auto min-h-11 min-w-0 gap-1 px-1.5 text-[.5rem] leading-tight break-words whitespace-normal sm:px-4 sm:text-[.65rem]"
+            className="h-auto min-h-11 min-w-0 gap-1 px-1.5 text-[.74rem] leading-tight break-words whitespace-normal sm:px-4 sm:text-[.86rem]"
             onClick={onInstant}
           >
             <Lightning weight="fill" data-icon="inline-start" />
@@ -332,7 +332,7 @@ function BuildingSheet({
         <header className="flex items-center justify-between gap-2">
           <h3
             id={titleId}
-            className="flex min-w-0 items-center gap-2 font-pixel text-[.6rem] leading-relaxed"
+            className="flex min-w-0 items-center gap-2 font-pixel text-[.82rem] leading-relaxed"
           >
             <Icon
               weight="fill"

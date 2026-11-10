@@ -115,7 +115,7 @@ export function BottomSheet({
             id={titleId}
             className={cn(
               'min-w-0 flex-1 text-sm leading-relaxed break-words sm:text-base',
-              light ? 'font-pixel text-ink' : 'led',
+              light ? 'font-pixel text-card-foreground' : 'led',
             )}
           >
             {title}

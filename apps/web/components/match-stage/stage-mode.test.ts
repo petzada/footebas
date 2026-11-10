@@ -3,46 +3,32 @@ import {
   SIMPLE_VISUAL_KEY,
   createFpsProbe,
   detectCanvasSupport,
-  isLowEndDevice,
   readSimplePreference,
   selectStageMode,
   writeSimplePreference,
 } from './stage-mode';
+import { QUALITY, lowerQuality, pickQuality } from './stadium/quality';
 
 const capable = {
   reducedMotion: false,
   canvasSupport: 'webgl' as const,
   loadFailed: false,
   simplePreference: false,
-  lowEndDevice: false,
-  threeFailed: false,
-  lowFps: false,
 };
 
 describe('selectStageMode', () => {
-  it('uses the 3D stadium when WebGL is available on a capable device', () => {
+  it('uses the 3D stadium whenever WebGL is available', () => {
     expect(selectStageMode(capable)).toEqual({ mode: 'three' });
   });
 
   it.each([
-    [{ canvasSupport: 'canvas' as const }, 'no-webgl'],
-    [{ lowEndDevice: true }, 'low-end-device'],
-    [{ threeFailed: true }, 'three-load-error'],
-    [{ lowFps: true }, 'low-fps'],
-  ])('drops to the Phaser 2D scene for %o', (override, reason) => {
-    expect(selectStageMode({ ...capable, ...override })).toEqual({
-      mode: 'phaser',
-      reason,
-    });
-  });
-
-  it.each([
-    [{ reducedMotion: true }, 'reduced-motion'],
-    [{ canvasSupport: 'none' as const }, 'no-canvas'],
     [{ canvasSupport: undefined }, 'pending'],
+    [{ canvasSupport: 'none' as const }, 'no-webgl'],
+    [{ canvasSupport: 'canvas' as const }, 'no-webgl'],
     [{ loadFailed: true }, 'load-error'],
+    [{ reducedMotion: true }, 'reduced-motion'],
     [{ simplePreference: true }, 'preference'],
-  ])('falls back to the 2D pitch for %o', (override, reason) => {
+  ])('falls back to the simple pitch for %o', (override, reason) => {
     expect(selectStageMode({ ...capable, ...override })).toEqual({
       mode: 'fallback',
       reason,
@@ -52,29 +38,73 @@ describe('selectStageMode', () => {
   it('honours the user preference above everything else', () => {
     expect(
       selectStageMode({
+        ...capable,
+        simplePreference: true,
         reducedMotion: true,
         canvasSupport: 'none',
-        loadFailed: true,
-        simplePreference: true,
       }),
     ).toEqual({ mode: 'fallback', reason: 'preference' });
   });
-
-  it('keeps reduced motion above the 3D level', () => {
-    expect(
-      selectStageMode({ ...capable, reducedMotion: true, lowFps: true }),
-    ).toEqual({ mode: 'fallback', reason: 'reduced-motion' });
-  });
 });
 
-describe('device capability', () => {
-  it('flags few cores or little memory as low-end', () => {
-    expect(isLowEndDevice({ cores: 8, memoryGb: 8 })).toBe(false);
-    expect(isLowEndDevice({ cores: 2, memoryGb: 8 })).toBe(true);
-    expect(isLowEndDevice({ cores: 8, memoryGb: 2 })).toBe(true);
-    expect(isLowEndDevice({ cores: undefined, memoryGb: undefined })).toBe(
-      false,
+describe('graphics quality', () => {
+  const desktop = {
+    cores: 16,
+    memoryGb: 8,
+    coarsePointer: false,
+    width: 1600,
+  };
+
+  it('gives a strong desktop every effect and a phone a lighter stadium', () => {
+    expect(
+      pickQuality({ ...desktop, renderer: 'NVIDIA GeForce RTX 4060' }),
+    ).toBe('high');
+    expect(pickQuality({ ...desktop, coarsePointer: true })).toBe('medium');
+    expect(pickQuality({ ...desktop, width: 600 })).toBe('medium');
+    expect(pickQuality({ ...desktop, cores: 6 })).toBe('medium');
+  });
+
+  it('starts integrated graphics one level down and weak devices at the bottom', () => {
+    expect(
+      pickQuality({
+        ...desktop,
+        renderer: 'ANGLE (Intel, Intel(R) UHD Graphics Direct3D11)',
+      }),
+    ).toBe('medium');
+    expect(
+      pickQuality({
+        ...desktop,
+        renderer: 'ANGLE (Intel, Intel(R) Arc(TM) A770)',
+      }),
+    ).toBe('high');
+    expect(pickQuality({ ...desktop, cores: 4 })).toBe('low');
+    expect(pickQuality({ ...desktop, memoryGb: 2 })).toBe('low');
+    expect(pickQuality({ ...desktop, renderer: 'Google SwiftShader' })).toBe(
+      'low',
     );
+    // Unknown hardware is treated as an ordinary desktop.
+    expect(
+      pickQuality({
+        cores: undefined,
+        memoryGb: undefined,
+        coarsePointer: false,
+        width: 1600,
+      }),
+    ).toBe('high');
+  });
+
+  it('steps down one level at a time and stops at the bottom', () => {
+    expect(lowerQuality('high')).toBe('medium');
+    expect(lowerQuality('medium')).toBe('low');
+    expect(lowerQuality('low')).toBeNull();
+  });
+
+  it('spends less on every level down', () => {
+    expect(QUALITY.high.pixelRatio).toBeGreaterThan(QUALITY.low.pixelRatio);
+    expect(QUALITY.high.crowd).toBeGreaterThan(QUALITY.medium.crowd);
+    expect(QUALITY.medium.crowd).toBeGreaterThan(QUALITY.low.crowd);
+    expect(QUALITY.low.shadows).toBe(false);
+    expect(QUALITY.low.post).toBe(false);
   });
 });
 

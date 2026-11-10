@@ -1,3 +1,4 @@
+import { matchKits } from './club-kits';
 import type {
   AutoPickStrategy,
   CareerApiPort,
@@ -289,7 +290,14 @@ interface PostMatchModel {
   awayClub: ClubSummary;
   score: { home: number; away: number };
   timeline: ReplayEvent[];
-  participants?: { id: string; name: string; side: Side }[];
+  participants?: {
+    id: string;
+    name: string;
+    side: Side;
+    position?: string;
+    shirtNumber?: number;
+    started?: boolean;
+  }[];
 }
 interface WorldModel {
   aggregateVersion: number;
@@ -1173,38 +1181,65 @@ export class HttpCareerApi implements CareerApiPort {
 
   #replay(post: PostMatchModel, squad?: SquadModel): MatchReplayInput {
     const names = this.#names(post, squad);
-    const team = (side: Side, club: ClubSummary) => ({
-      id: club.id,
-      name: club.name,
-      abbreviation: club.shortName.slice(0, 3).toUpperCase(),
-      color: side === 'home' ? '#1f9d55' : '#d64545',
-      players: [
-        ...new Set(
-          post.timeline.flatMap((event) =>
-            event.side !== side
-              ? []
-              : event.type === 'substitution'
-                ? [event.playerInId, event.playerOutId]
-                : event.type === 'chance' || event.type === 'goal'
-                  ? [event.playerId, event.assistId].filter(
-                      (id): id is string => id !== undefined,
-                    )
-                  : 'playerId' in event
-                    ? [event.playerId]
-                    : [],
-          ),
-        ),
+    const kits = matchKits(post.homeClub, post.awayClub);
+    const known = new Map(
+      (post.participants ?? []).map((participant) => [
+        participant.id,
+        participant,
+      ]),
+    );
+    const team = (side: Side, club: ClubSummary) => {
+      const ids = [
+        // Participants first: the server lists them in line-up order.
         ...(post.participants ?? [])
           .filter((participant) => participant.side === side)
           .map(({ id }) => id),
-      ]
-        .filter((id, index, all) => all.indexOf(id) === index)
-        .map((id, index) => ({
-          id,
-          name: names.get(id) ?? 'Atleta',
-          number: index + 1,
-        })),
-    });
+        ...post.timeline.flatMap((event) =>
+          event.side !== side
+            ? []
+            : event.type === 'substitution'
+              ? [event.playerInId, event.playerOutId]
+              : event.type === 'chance' || event.type === 'goal'
+                ? [event.playerId, event.assistId].filter(
+                    (id): id is string => id !== undefined,
+                  )
+                : 'playerId' in event
+                  ? [event.playerId]
+                  : [],
+        ),
+      ].filter((id, index, all) => all.indexOf(id) === index);
+      const taken = new Set(
+        ids.flatMap((id) => known.get(id)?.shirtNumber ?? []),
+      );
+      let spare = 1;
+      const nextSpare = () => {
+        while (taken.has(spare)) spare += 1;
+        taken.add(spare);
+        return spare;
+      };
+      return {
+        id: club.id,
+        name: club.name,
+        abbreviation: club.shortName.slice(0, 3).toUpperCase(),
+        color: kits[side].shirt,
+        kit: kits[side],
+        keeperKit: side === 'home' ? kits.homeKeeper : kits.awayKeeper,
+        players: ids.map((id) => {
+          const participant = known.get(id);
+          return {
+            id,
+            name: names.get(id) ?? 'Atleta',
+            number: participant?.shirtNumber ?? nextSpare(),
+            ...(participant?.position === undefined
+              ? {}
+              : { position: participant.position }),
+            ...(participant?.started === undefined
+              ? {}
+              : { started: participant.started }),
+          };
+        }),
+      };
+    };
     return {
       matchId: post.matchId,
       home: team('home', post.homeClub),

@@ -1,16 +1,27 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createStadiumAudio,
+  type StadiumAudio,
+} from '@/lib/audio/stadium-audio';
+import { clubKit, matchKits } from '@/lib/club-kits';
 import type { MatchReplayInput } from '@/lib/match-replay-model';
 import {
   buildChoreography,
   stepForMinute,
   type StageOverlay,
 } from './choreography';
-import { syncController, type StageController } from './match-scene';
+import { syncController, type StageController } from './controller';
+import type { DirectionMode } from './direction';
+import { momentsBetween } from './moments';
 import { createFpsProbe } from './stage-mode';
-import { stageTheme } from './theme';
-import { createThreeStage, type ThreeStageHandle } from './three-scene';
+import {
+  detectQuality,
+  lowerQuality,
+  type QualityTier,
+} from './stadium/quality';
+import { createStadiumStage, type StadiumStageHandle } from './stadium/stage';
 
 export interface ThreeMatchStageProps {
   readonly match: MatchReplayInput;
@@ -18,18 +29,33 @@ export interface ThreeMatchStageProps {
   readonly playing: boolean;
   readonly speed: number;
   readonly onReady?: () => void;
-  /** Three failed to load, start or fetch the stadium: drop a level. */
+  /** Three failed to load or start: the simple pitch takes over. */
   readonly onError?: (error: unknown) => void;
-  /** Frame rate measured below the floor in the first seconds. */
-  readonly onLowFps?: () => void;
 }
 
-const pixelFont = { fontFamily: 'var(--font-pixel)' };
+function kitsOf(match: MatchReplayInput) {
+  const derived = matchKits(match.home, match.away);
+  return {
+    ...derived,
+    home: match.home.kit ?? derived.home,
+    away: match.away.kit ?? derived.away,
+    homeKeeper: match.home.keeperKit ?? derived.homeKeeper,
+    awayKeeper: match.away.keeperKit ?? derived.awayKeeper,
+  };
+}
+
+const OUTCOME_LABEL = {
+  saved: 'DEFESA!',
+  wide: 'PRA FORA',
+  over: 'POR CIMA',
+  blocked: 'TRAVADO',
+  post: 'NA TRAVE!',
+} as const;
 
 /**
  * Loaded on demand by `MatchStage` (next/dynamic, ssr: false). Three.js and
- * the GLTF loader are imported inside `createThreeStage`, so neither ships
- * in the initial bundle. Owns the HTML letterboards drawn over the canvas.
+ * the stadium are imported inside `createStadiumStage`, so none of it ships in
+ * the initial bundle. Owns the broadcast graphics drawn over the canvas.
  */
 export default function ThreeMatchStage({
   match,
@@ -38,46 +64,57 @@ export default function ThreeMatchStage({
   speed,
   onReady,
   onError,
-  onLowFps,
 }: ThreeMatchStageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<StageController | null>(null);
-  const handleRef = useRef<ThreeStageHandle | null>(null);
-  const callbacks = useRef({ onReady, onError, onLowFps });
+  const handleRef = useRef<StadiumStageHandle | null>(null);
+  const audioRef = useRef<StadiumAudio | null>(null);
+  const callbacks = useRef({ onReady, onError });
   const choreography = useMemo(() => buildChoreography(match), [match]);
-  const live = useRef({ minute, playing, speed });
+  const live = useRef({ minute, playing, speed, match, choreography });
   const [overlay, setOverlay] = useState<StageOverlay | null>(null);
+  const [mode, setMode] = useState<DirectionMode>('rest');
+  const [quality, setQuality] = useState<QualityTier>('medium');
+  // The stadium is built once per fixture; a re-planned timeline (substitution
+  // or tactical change at a break) only swaps the choreography in place.
+  const fixture = `${match.home.id}|${match.away.id}`;
 
   useEffect(() => {
-    callbacks.current = { onReady, onError, onLowFps };
-    live.current = { minute, playing, speed };
+    callbacks.current = { onReady, onError };
+    live.current = { minute, playing, speed, match, choreography };
   });
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     let disposed = false;
+    const current = live.current;
     const controller: StageController = {
-      choreography,
-      colors: { home: match.home.color, away: match.away.color },
-      step: stepForMinute(choreography, live.current.minute),
+      choreography: current.choreography,
+      kits: kitsOf(current.match),
+      step: stepForMinute(current.choreography, current.minute),
       progress: 1,
-      paused: false,
-      speed: live.current.speed,
+      paused: !current.playing,
+      speed: current.speed,
     };
     controllerRef.current = controller;
-    const probe = createFpsProbe();
-    let reportedLowFps = false;
+    const audio = createStadiumAudio();
+    audioRef.current = audio;
+    let tier = detectQuality();
+    setQuality(tier);
+    let probe = createFpsProbe();
 
     const onVisibility = () => {
+      audio.setActive(!document.hidden && !controller.paused);
       if (document.hidden) handleRef.current?.sleep();
       else handleRef.current?.wake();
     };
 
-    createThreeStage({
+    createStadiumStage({
       host,
       controller,
-      theme: stageTheme,
+      match: current.match,
+      quality: tier,
       onReady: () => {
         if (!disposed) callbacks.current.onReady?.();
       },
@@ -87,12 +124,20 @@ export default function ThreeMatchStage({
       onOverlay: (next) => {
         if (!disposed) setOverlay(next);
       },
+      onMode: (next) => {
+        if (!disposed) setMode(next);
+      },
+      onCue: (cue) => audio.cue(cue.kind, cue.power),
+      onExcitement: (level) => audio.setExcitement(level),
       onFrame: (now) => {
-        if (reportedLowFps || document.hidden) return;
-        if (probe.sample(now) === 'low') {
-          reportedLowFps = true;
-          callbacks.current.onLowFps?.();
-        }
+        if (document.hidden || probe.sample(now) !== 'low') return;
+        // Too slow for this level: step the graphics down and measure again.
+        const lower = lowerQuality(tier);
+        probe = createFpsProbe({ warmUpMs: 1200 });
+        if (!lower) return;
+        tier = lower;
+        handleRef.current?.setQuality(lower);
+        if (!disposed) setQuality(lower);
       },
     })
       .then((handle) => {
@@ -115,50 +160,118 @@ export default function ThreeMatchStage({
       controllerRef.current = null;
       handleRef.current?.dispose();
       handleRef.current = null;
+      audio.dispose();
+      audioRef.current = null;
     };
-  }, [choreography, match.home.color, match.away.color]);
+  }, [fixture]);
 
+  const previousMinute = useRef(minute);
   useEffect(() => {
     const controller = controllerRef.current;
+    const from = previousMinute.current;
+    previousMinute.current = minute;
     if (!controller) return;
+    controller.choreography = choreography;
     syncController(controller, { minute, playing, speed });
+    audioRef.current?.setActive(playing || minute >= choreography.duration);
+    const moments = momentsBetween(match, from, minute);
+    if (moments.includes('half-time') || moments.includes('full-time'))
+      audioRef.current?.cue('whistle');
     handleRef.current?.wake();
-  }, [choreography, minute, playing, speed]);
+  }, [choreography, match, minute, playing, speed]);
 
-  const teamColor = overlay ? match[overlay.side].color : undefined;
+  const team = overlay ? match[overlay.side] : undefined;
+  const accent = team ? (team.kit ?? clubKit(team)).shirt : undefined;
 
   return (
     <div
       aria-hidden="true"
       className="absolute inset-0 overflow-hidden [&_canvas]:block"
+      data-quality={quality}
       data-testid="three-stage-host"
       ref={hostRef}
     >
+      {mode === 'replay' ? (
+        <div
+          className="hud-rise pointer-events-none absolute left-3 top-3 z-10 sm:left-5 sm:top-5"
+          data-testid="replay-badge"
+        >
+          <span className="hud-chip hud-chip-live">
+            <span className="hud-dot" />
+            Replay
+          </span>
+        </div>
+      ) : null}
       {overlay?.kind === 'goal' ? (
         <div
-          className="px-rise pointer-events-none absolute inset-x-0 top-[18%] flex justify-center"
+          className="pointer-events-none absolute inset-x-0 top-[14%] z-10 flex justify-center"
           data-testid="goal-banner"
         >
-          <span
-            className="px-border inline-block bg-[var(--ink)] px-4 py-2 text-xl text-[var(--chalk)] sm:text-3xl"
-            style={{ ...pixelFont, color: teamColor }}
+          <div
+            className="hud-goal"
+            style={{ ['--hud-accent' as string]: accent }}
           >
-            GOOOL!
+            <span className="hud-goal-word">GOOOL!</span>
+            <span className="hud-goal-team">{team?.name}</span>
+          </div>
+        </div>
+      ) : null}
+      {overlay?.kind === 'chance' ? (
+        <div
+          className="hud-rise pointer-events-none absolute inset-x-0 top-[14%] z-10 flex justify-center"
+          data-testid="chance-banner"
+        >
+          <span
+            className="hud-chip hud-chip-lg"
+            style={{ ['--hud-accent' as string]: accent }}
+          >
+            {OUTCOME_LABEL[overlay.outcome]}
+          </span>
+        </div>
+      ) : null}
+      {overlay?.kind === 'card' ? (
+        <div
+          className="hud-rise pointer-events-none absolute inset-x-0 bottom-[12%] z-10 flex justify-center"
+          data-testid="card-board"
+        >
+          <span
+            className="hud-lower"
+            style={{ ['--hud-accent' as string]: accent }}
+          >
+            <span
+              className={
+                overlay.card === 'red' ? 'hud-card hud-card-red' : 'hud-card'
+              }
+            />
+            {overlay.card === 'red' ? 'Cartão vermelho' : 'Cartão amarelo'}
+            <span className="hud-lower-team">{team?.abbreviation}</span>
+          </span>
+        </div>
+      ) : null}
+      {overlay?.kind === 'injury' ? (
+        <div className="hud-rise pointer-events-none absolute inset-x-0 bottom-[12%] z-10 flex justify-center">
+          <span
+            className="hud-lower"
+            style={{ ['--hud-accent' as string]: accent }}
+          >
+            Atendimento médico
+            <span className="hud-lower-team">{team?.abbreviation}</span>
           </span>
         </div>
       ) : null}
       {overlay?.kind === 'substitution' ? (
         <div
-          className="px-rise pointer-events-none absolute inset-x-0 bottom-[10%] flex justify-center"
+          className="hud-rise pointer-events-none absolute inset-x-0 bottom-[12%] z-10 flex justify-center"
           data-testid="substitution-board"
         >
           <span
-            className="px-border inline-flex items-center gap-3 bg-[var(--board)] px-3 py-1.5 text-[.65rem] text-[var(--board-foreground)] sm:text-xs"
-            style={pixelFont}
+            className="hud-lower"
+            style={{ ['--hud-accent' as string]: accent }}
           >
-            <span style={{ color: teamColor }}>■</span>
-            <span className="text-[#39d36b]">▲ {overlay.inNumber}</span>
-            <span className="text-[#ff5a4f]">▼ {overlay.outNumber}</span>
+            Substituição
+            <span className="hud-sub-in">▲ {overlay.inNumber}</span>
+            <span className="hud-sub-out">▼ {overlay.outNumber}</span>
+            <span className="hud-lower-team">{team?.abbreviation}</span>
           </span>
         </div>
       ) : null}

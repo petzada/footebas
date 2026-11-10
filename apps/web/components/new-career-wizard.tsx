@@ -264,13 +264,15 @@ export function NewCareerWizard({
                 key={item.id}
                 aria-current={index === step ? 'step' : undefined}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2 font-pixel text-[.6rem]',
-                  index === step ? 'panel text-ink' : 'text-chalk/80',
+                  'flex items-center gap-3 px-3 py-2 font-pixel text-[.82rem]',
+                  index === step
+                    ? 'panel text-card-foreground'
+                    : 'text-chalk/80',
                 )}
               >
                 <span
                   className={cn(
-                    'grid size-7 place-items-center border-2 border-ink text-[.6rem]',
+                    'grid size-7 place-items-center border-2 border-ink text-[.82rem]',
                     index < step
                       ? 'bg-primary text-primary-foreground'
                       : index === step
@@ -292,7 +294,7 @@ export function NewCareerWizard({
           className="panel grid min-w-0 gap-5 p-4 sm:p-6"
         >
           <div className="grid gap-2">
-            <div className="flex items-center justify-between gap-3 font-pixel text-[.55rem] text-muted-foreground">
+            <div className="flex items-center justify-between gap-3 font-pixel text-[.78rem] text-muted-foreground">
               <span>
                 Nova carreira · {step + 1} de {STEPS.length}
               </span>
@@ -704,14 +706,14 @@ function ClubStep({
                   size={56}
                   decorative
                 />
-                <strong className="block w-full min-w-0 font-pixel text-[.55rem] leading-relaxed break-words [overflow-wrap:anywhere]">
+                <strong className="block w-full min-w-0 font-pixel text-[.78rem] leading-relaxed break-words [overflow-wrap:anywhere]">
                   {item.name}
                 </strong>
               </span>
               <span className="block min-w-0 truncate text-xs text-muted-foreground">
                 {item.note}
               </span>
-              <span className="mx-auto mt-1 flex max-w-full flex-wrap items-center justify-center gap-x-1.5 bg-board px-2 py-1 font-pixel text-[.5rem] text-chalk">
+              <span className="mx-auto mt-1 flex max-w-full flex-wrap items-center justify-center gap-x-1.5 bg-board px-2 py-1 font-pixel text-[.74rem] text-chalk">
                 <span className="sr-only">Força </span>
                 <span className="led text-sm" aria-hidden="true">
                   {item.strength}
@@ -723,7 +725,7 @@ function ClubStep({
                 </span>
               </span>
               {blocked && (
-                <span className="mx-auto mt-1 bg-bulb px-2 py-0.5 font-pixel text-[.5rem] text-bulb-foreground">
+                <span className="mx-auto mt-1 bg-bulb px-2 py-0.5 font-pixel text-[.74rem] text-bulb-foreground">
                   Licença
                 </span>
               )}
@@ -821,7 +823,7 @@ function ClubSheet({
           </>
         ) : (
           <>
-            <p className="flex items-start gap-2 text-xs text-ink">
+            <p className="flex items-start gap-2 text-xs text-card-foreground">
               <Lock
                 className="mt-0.5 size-4 shrink-0 text-primary"
                 weight="fill"
@@ -906,7 +908,7 @@ function SquadPreview({
         )}
       >
         <span>{club.note}</span>
-        <span className="font-pixel text-[.5rem]">
+        <span className="font-pixel text-[.74rem]">
           Força <span className={cn(digits, 'text-sm')}>{club.strength}</span>
         </span>
         <span>{club.squadSize} atletas</span>
@@ -916,7 +918,7 @@ function SquadPreview({
           <div key={group.group} className="grid min-w-0 gap-1">
             <h4
               className={cn(
-                'flex items-baseline justify-between font-pixel text-[.5rem]',
+                'flex items-baseline justify-between font-pixel text-[.74rem]',
                 softer,
               )}
             >
@@ -935,7 +937,7 @@ function SquadPreview({
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <span
                       className={cn(
-                        'w-9 shrink-0 font-pixel text-[.5rem]',
+                        'w-9 shrink-0 font-pixel text-[.74rem]',
                         softer,
                       )}
                     >
@@ -1279,7 +1281,7 @@ function CountryFlagIcon({ code, size = 28 }: { code: string; size?: number }) {
   return (
     <span
       aria-hidden="true"
-      className="grid shrink-0 place-items-center border-2 border-ink bg-chalk-deep font-pixel text-[.5rem] text-ink"
+      className="grid shrink-0 place-items-center border-2 border-ink bg-chalk-deep font-pixel text-[.74rem] text-ink"
       style={{ width: size, height: Math.round(size * 0.75) }}
     >
       {code}
@@ -1426,7 +1428,7 @@ function NameStep({
         aria-labelledby="resumo-carreira"
         className="panel-board grid min-w-0 gap-3 p-4"
       >
-        <h2 id="resumo-carreira" className="font-pixel text-[.65rem] text-bulb">
+        <h2 id="resumo-carreira" className="font-pixel text-[.86rem] text-bulb">
           Resumo
         </h2>
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4">

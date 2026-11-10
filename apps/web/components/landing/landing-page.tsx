@@ -142,7 +142,7 @@ function Crest({
       <span
         role="img"
         aria-label={name}
-        className={`px-border grid place-items-center bg-chalk font-pixel text-[.5rem] text-ink ${className}`}
+        className={`px-border grid place-items-center bg-chalk font-pixel text-[.74rem] text-ink ${className}`}
         style={{ width: size, height: size }}
       >
         {name.slice(0, 3).toUpperCase()}
@@ -250,7 +250,7 @@ function LiveMatch() {
       <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="flex flex-col items-center gap-1">
           <Crest id="club_flamengo" size={56} />
-          <span className="font-pixel text-[.5rem] text-chalk/80">
+          <span className="font-pixel text-[.74rem] text-chalk/80">
             Flamengo
           </span>
         </div>
@@ -264,13 +264,13 @@ function LiveMatch() {
               {away}
             </span>
           </div>
-          <span className="font-pixel text-[.55rem] text-bulb">
+          <span className="font-pixel text-[.78rem] text-bulb">
             {beat.minute}&apos;
           </span>
         </div>
         <div className="flex flex-col items-center gap-1">
           <Crest id="club_palmeiras" size={56} />
-          <span className="font-pixel text-[.5rem] text-chalk/80">
+          <span className="font-pixel text-[.74rem] text-chalk/80">
             Palmeiras
           </span>
         </div>
@@ -335,7 +335,7 @@ function LiveMatch() {
         <span className="lp-ball" />
       </div>
 
-      <ul className="match-feed mt-3 flex flex-col gap-1 text-[.55rem] leading-relaxed sm:text-[.6rem]">
+      <ul className="match-feed mt-3 flex flex-col gap-1 text-[.78rem] leading-relaxed sm:text-[.82rem]">
         {lines.map((line) => (
           <li
             key={line.minute}
@@ -352,7 +352,7 @@ function LiveMatch() {
           </li>
         ))}
       </ul>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-pixel text-[.5rem] text-chalk/70">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 font-pixel text-[.74rem] text-chalk/70">
         <span>0,5× · 1× · 2× · 4×</span>
         <span>Pausa quando quiser</span>
         <span className="text-bulb">Pular para o resultado</span>
@@ -374,7 +374,7 @@ function Marquee({ ids, dir }: { ids: readonly string[]; dir?: 'reverse' }) {
             className="sticker flex w-24 shrink-0 flex-col items-center gap-1 px-2 py-2"
           >
             <Crest id={id} size={44} />
-            <span className="w-full truncate text-center font-pixel text-[.45rem] text-ink">
+            <span className="w-full truncate text-center font-pixel text-[.7rem] text-card-foreground">
               {CLUB_NAMES[id] ?? id}
             </span>
           </span>
@@ -457,13 +457,13 @@ export function LandingPage() {
         <nav aria-label="Principal" className="flex items-center gap-3">
           <a
             href="#licenca"
-            className="hidden font-pixel text-[.5rem] uppercase text-chalk underline underline-offset-4 sm:inline"
+            className="hidden font-pixel text-[.74rem] uppercase text-chalk underline underline-offset-4 sm:inline"
           >
             Licença
           </a>
           <a
             href={GAME_URL}
-            className="btn-px btn-chalk inline-flex min-h-10 items-center px-3 text-[.55rem]"
+            className="btn-px btn-chalk inline-flex min-h-10 items-center px-3 text-[.78rem]"
           >
             Entrar
           </a>
@@ -479,7 +479,7 @@ export function LandingPage() {
           >
             <PixelTrophy size={32} />
           </span>
-          <p className="ticker block w-full max-w-full px-3 py-2 text-[.5rem] sm:text-[.55rem]">
+          <p className="ticker block w-full max-w-full px-3 py-2 text-[.74rem] sm:text-[.78rem]">
             <span className="ticker-text">
               Manager de futebol brasileiro · grátis · direto no celular ·
               Séries A, B e C com elencos de 2026 · Copa do Brasil ·
@@ -500,7 +500,7 @@ export function LandingPage() {
               </span>
             ))}
           </h1>
-          <p className="lp-cursor mt-4 font-pixel text-[.7rem] leading-relaxed text-bulb sm:text-sm">
+          <p className="lp-cursor mt-4 font-pixel text-[.92rem] leading-relaxed text-bulb sm:text-sm">
             Sua carreira, sua história
           </p>
           <p className="mt-4 max-w-prose text-base leading-relaxed text-chalk sm:text-lg">
@@ -511,7 +511,7 @@ export function LandingPage() {
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <a
               href={GAME_URL}
-              className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-6 text-[.7rem] sm:text-xs"
+              className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-6 text-[.92rem] sm:text-xs"
             >
               <span className="lp-nudge inline-flex">
                 <PixelArrow size={18} />
@@ -520,13 +520,13 @@ export function LandingPage() {
             </a>
             <a
               href="#licenca"
-              className="btn-px btn-board inline-flex min-h-12 items-center justify-center gap-2 px-5 text-[.6rem]"
+              className="btn-px btn-board inline-flex min-h-12 items-center justify-center gap-2 px-5 text-[.82rem]"
             >
               <PixelCoin size={16} />
               Ver a licença
             </a>
           </div>
-          <ul className="mx-auto mt-6 grid w-fit grid-cols-2 gap-x-8 gap-y-2 text-center font-pixel text-[.5rem] leading-relaxed text-chalk/85">
+          <ul className="mx-auto mt-6 grid w-fit grid-cols-2 gap-x-8 gap-y-2 text-center font-pixel text-[.74rem] leading-relaxed text-chalk/85">
             <li>Sem instalar</li>
             <li>Sem assinatura</li>
             <li>Sem anúncios</li>
@@ -540,7 +540,7 @@ export function LandingPage() {
       <section aria-label="Clubes do jogo" className="flex flex-col gap-3 py-4">
         <Marquee ids={SERIE_A} />
         <Marquee ids={SERIE_BC} dir="reverse" />
-        <p className="px-4 text-center font-pixel text-[.5rem] leading-relaxed text-chalk/80">
+        <p className="px-4 text-center font-pixel text-[.74rem] leading-relaxed text-chalk/80">
           Todos os clubes das Séries A, B e C de 2026, mais os estrangeiros da
           Libertadores
         </p>
@@ -574,11 +574,11 @@ export function LandingPage() {
                 <span className="px-border grid size-11 place-items-center bg-board">
                   {benefit.icon}
                 </span>
-                <h3 className="font-pixel text-[.6rem] leading-relaxed text-ink sm:text-[.65rem]">
+                <h3 className="font-pixel text-[.82rem] leading-relaxed text-card-foreground sm:text-[.86rem]">
                   {benefit.title}
                 </h3>
               </div>
-              <p className="text-sm leading-relaxed text-ink/85">
+              <p className="text-sm leading-relaxed text-card-foreground/85">
                 {benefit.text}
               </p>
             </li>
@@ -602,7 +602,7 @@ export function LandingPage() {
               na mesa, o presidente cobrando acesso. No Mapa do clube, cada
               prédio em pixel art abre uma tela: CT, estádio, sede e imprensa.
             </p>
-            <ul className="mt-5 flex flex-col gap-3 font-pixel text-[.5rem] text-chalk/90">
+            <ul className="mt-5 flex flex-col gap-3 font-pixel text-[.74rem] text-chalk/90">
               {[
                 ['Força do elenco', '72%', 'bulb'],
                 ['Moral do vestiário', '84%', ''],
@@ -649,7 +649,7 @@ export function LandingPage() {
                 ))}
               </tbody>
             </table>
-            <p className="font-pixel text-[.5rem] leading-relaxed text-chalk/70">
+            <p className="font-pixel text-[.74rem] leading-relaxed text-chalk/70">
               Quatro sobem. Você está no G4 e falta um jogo. Vai pular ou
               assistir ao vivo?
             </p>
@@ -676,10 +676,12 @@ export function LandingPage() {
               style={{ transitionDelay: `${i * 80}ms` }}
             >
               <span className="led text-xl">{step.n}</span>
-              <h3 className="font-pixel text-[.6rem] leading-relaxed">
+              <h3 className="font-pixel text-[.82rem] leading-relaxed">
                 {step.title}
               </h3>
-              <p className="text-sm leading-relaxed text-ink/85">{step.text}</p>
+              <p className="text-sm leading-relaxed text-card-foreground/85">
+                {step.text}
+              </p>
             </li>
           ))}
         </ol>
@@ -710,7 +712,7 @@ export function LandingPage() {
               />
             ))}
           </div>
-          <p className="mb-5 text-center font-pixel text-[.55rem] leading-relaxed text-chalk drop-shadow-[0_2px_0_rgb(21_32_26)] sm:text-[.65rem]">
+          <p className="mb-5 text-center font-pixel text-[.78rem] leading-relaxed text-chalk drop-shadow-[0_2px_0_rgb(21_32_26)] sm:text-[.86rem]">
             Comece grátis. Você pode apoiar o jogo com a licença e recebe
             benefícios por isso.
           </p>
@@ -719,18 +721,18 @@ export function LandingPage() {
               <div className="flex items-center gap-3">
                 <h2
                   id="licenca-titulo"
-                  className="font-pixel text-[.7rem] leading-relaxed sm:text-sm"
+                  className="font-pixel text-[.92rem] leading-relaxed sm:text-sm"
                 >
                   Grátis
                 </h2>
               </div>
               <p
-                className="led text-2xl text-ink"
+                className="led text-2xl text-card-foreground"
                 style={{ textShadow: 'none' }}
               >
                 R$ 0
               </p>
-              <ul className="flex flex-col gap-2 text-sm leading-relaxed text-ink/90">
+              <ul className="flex flex-col gap-2 text-sm leading-relaxed text-card-foreground/90">
                 <li>✔ Jogo completo</li>
                 <li>✔ {FREE_ENTITLEMENTS.maxCareers} carreira ativa</li>
                 <li>✔ Começa na Série C</li>
@@ -738,14 +740,14 @@ export function LandingPage() {
               </ul>
               <a
                 href={GAME_URL}
-                className="btn-px btn-grass mt-auto inline-flex min-h-12 items-center justify-center px-4 text-[.6rem]"
+                className="btn-px btn-grass mt-auto inline-flex min-h-12 items-center justify-center px-4 text-[.82rem]"
               >
                 Jogar de graça
               </a>
             </div>
 
             <div className="panel-board relative flex flex-col gap-4 p-5 sm:p-6">
-              <span className="lp-tag absolute right-4 top-0 inline-flex items-center gap-2 border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.5rem] uppercase text-bulb-foreground">
+              <span className="lp-tag absolute right-4 top-0 inline-flex items-center gap-2 border-2 border-ink bg-bulb px-2 py-1 font-pixel text-[.74rem] uppercase text-bulb-foreground">
                 <span className="lp-coin inline-flex">
                   <PixelCoin size={12} />
                 </span>
@@ -776,7 +778,7 @@ export function LandingPage() {
               </ul>
               <a
                 href={GAME_URL}
-                className="play-button mt-auto inline-flex min-h-14 items-center justify-center gap-3 px-5 text-[.65rem]"
+                className="play-button mt-auto inline-flex min-h-14 items-center justify-center gap-3 px-5 text-[.86rem]"
               >
                 <PixelCoin size={18} />
                 Quero meus benefícios
@@ -808,7 +810,7 @@ export function LandingPage() {
           </p>
           <a
             href={GAME_URL}
-            className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-8 text-[.7rem] sm:text-xs"
+            className="play-button inline-flex min-h-14 items-center justify-center gap-3 px-8 text-[.92rem] sm:text-xs"
           >
             <PixelArrow size={18} />
             Começar carreira
@@ -822,8 +824,8 @@ export function LandingPage() {
       </p>
 
       <footer className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">
-        <div className="panel-wood flex flex-col items-center gap-5 px-4 py-8 text-center font-pixel text-[.5rem] text-chalk sm:py-10">
-          <span className="text-[.65rem] sm:text-sm">Footebas</span>
+        <div className="panel-wood flex flex-col items-center gap-5 px-4 py-8 text-center font-pixel text-[.74rem] text-chalk sm:py-10">
+          <span className="text-[.86rem] sm:text-sm">Footebas</span>
           <nav
             aria-label="Documentos legais"
             className="flex flex-wrap justify-center gap-x-8 gap-y-3"

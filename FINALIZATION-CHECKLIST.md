@@ -38,8 +38,9 @@ que não depende destes itens; cada item diz o que destrava.
 
 7. **Escudos dos clubes** (`apps/web/public/crests`, recortados das folhas em `public/images`): são marcas registradas;
    decidir com revisão jurídica se ficam no lançamento público ou voltam ao emblema genérico.
-8. **Modelo 3D do estádio** (`football-field`, `football-court`): confirmar a origem e a licença de uso comercial (e
-   se exige crédito ao autor) antes do lançamento.
+8. **Modelo 3D do estádio** (`football-court`, de onde sai `apps/web/public/assets/stadium/stand.glb`): confirmar a
+   origem e a licença de uso comercial (e se exige crédito ao autor) antes do lançamento. Sem licença, basta apagar o
+   `stand.glb`: a partida desenha arquibancadas por código (ADR 0018 §7).
 9. Matriz de celulares reais, leitor de tela e medições de LCP em aparelho.
 10. Revisão jurídica/comercial: marca, uso de nomes reais de clubes e atletas, termos, privacidade, suporte e
     tributação da licença.

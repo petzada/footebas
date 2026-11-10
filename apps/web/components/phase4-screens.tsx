@@ -715,7 +715,7 @@ export function ClubScreen(props: Phase4ScreenProps) {
           </Card>
         </TabsContent>
         <TabsContent value="youth" className="mt-4">
-          <div className="mb-3 rounded-md border bg-muted p-3 text-sm text-ink">
+          <div className="mb-3 rounded-md border bg-muted p-3 text-sm text-card-foreground">
             <strong>Identidade do conteúdo:</strong> todos os atletas abaixo são{' '}
             <Badge variant="outline">gerados pelo universo</Badge>. Força e
             dimensões ocultas aparecem apenas como estimativas textuais.
@@ -1034,7 +1034,7 @@ function HistoryTab({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[.65rem] font-bold uppercase tracking-wide text-muted-foreground">
+      <p className="text-[.86rem] font-bold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
       <p className="mt-1 font-display text-xs font-bold uppercase">{value}</p>

@@ -93,7 +93,7 @@ export function TickerProvider({
             data-tone={current.tone}
             aria-label={`Fechar aviso: ${current.text}`}
             className={cn(
-              'ticker px-rise pointer-events-auto block w-full py-2.5 text-left text-[.6rem] leading-relaxed',
+              'ticker px-rise pointer-events-auto block w-full py-2.5 text-left text-[.82rem] leading-relaxed',
               current.tone === 'error' && 'text-chalk',
             )}
             onClick={dismiss}

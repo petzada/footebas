@@ -1,7 +1,7 @@
 /**
  * Match moments derived from the official timeline as the replay minute
  * advances: whistles, goals, cards, substitutions, chances. Pure and
- * presentation-only; drives sounds and camera cues, never the result.
+ * presentation-only; drives sounds, never the result.
  */
 import type { MatchReplayInput } from '@/lib/match-replay-model';
 import type { SoundName } from '@/lib/retro/sound';
@@ -45,24 +45,22 @@ export function momentsBetween(
 
 export interface MomentCue {
   readonly sound: SoundName;
-  /** Fraction of the segment at which the cue lands (0 = immediately). */
-  readonly at: number;
 }
 
 const CUES: Readonly<Record<StageMoment, readonly MomentCue[]>> = {
-  kickoff: [{ sound: 'whistle', at: 0 }],
-  'half-time': [{ sound: 'whistle', at: 0 }],
-  'full-time': [{ sound: 'whistle', at: 0 }],
-  goal: [
-    { sound: 'goal', at: 0.72 },
-    { sound: 'crowd', at: 0.8 },
-  ],
-  card: [{ sound: 'whistle', at: 0.72 }],
-  substitution: [{ sound: 'confirm', at: 0.72 }],
-  chance: [{ sound: 'crowd', at: 0.78 }],
+  kickoff: [{ sound: 'whistle' }],
+  'half-time': [{ sound: 'whistle' }],
+  'full-time': [{ sound: 'whistle' }],
+  goal: [{ sound: 'goal' }, { sound: 'crowd' }],
+  card: [{ sound: 'whistle' }],
+  substitution: [{ sound: 'confirm' }],
+  chance: [{ sound: 'crowd' }],
 };
 
-/** Sound cues for a list of moments, in order. */
+/**
+ * Interface sounds for a list of moments, in order. Only used by the simple
+ * pitch: the 3D stage has its own stadium sound, in step with the picture.
+ */
 export function cuesFor(moments: readonly StageMoment[]): readonly MomentCue[] {
   return moments.flatMap((moment) => CUES[moment]);
 }

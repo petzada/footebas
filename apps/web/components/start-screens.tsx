@@ -165,7 +165,7 @@ export function StartScreen({
           className="panel-board relative overflow-hidden px-4 pb-6 pt-6 text-center sm:px-8"
         >
           <TitleMarquee />
-          <p className="led mt-4 text-[.55rem] tracking-[.3em] sm:text-xs">
+          <p className="led mt-4 text-[.78rem] tracking-[.3em] sm:text-xs">
             Modo carreira
           </p>
           <h2
@@ -198,7 +198,7 @@ export function StartScreen({
           )}
           <p
             aria-hidden="true"
-            className="mt-7 flex items-center justify-center gap-3 font-pixel text-[.6rem] text-chalk sm:text-xs"
+            className="mt-7 flex items-center justify-center gap-3 font-pixel text-[.82rem] text-chalk sm:text-xs"
           >
             <PixelArrow size={14} className="blink" />
             Press start
@@ -256,7 +256,7 @@ function TitleMarquee() {
   return (
     <div
       aria-hidden="true"
-      className="-mx-4 -mt-6 overflow-hidden border-b-4 border-wood-deep bg-wood py-1 font-pixel text-[.55rem] text-chalk sm:-mx-8"
+      className="-mx-4 -mt-6 overflow-hidden border-b-4 border-wood-deep bg-wood py-1 font-pixel text-[.78rem] text-chalk sm:-mx-8"
     >
       <span className="ticker-text">
         Bem-vindo ao estádio · Temporada aberta · Monte seu elenco · Pule para o
@@ -279,7 +279,7 @@ function LatestCareer({
   const { play } = useSound();
   return (
     <section aria-labelledby="ultima-carreira" className="panel grid gap-3 p-4">
-      <p className="font-pixel text-[.55rem] text-muted-foreground">
+      <p className="font-pixel text-[.78rem] text-muted-foreground">
         Continuar?
       </p>
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
@@ -344,7 +344,7 @@ function Counters({ stats }: { stats: PublicStats }) {
     <section aria-labelledby="contadores-titulo" className="panel-board p-4">
       <h2
         id="contadores-titulo"
-        className="mb-3 flex items-center gap-2 font-pixel text-[.6rem] text-chalk"
+        className="mb-3 flex items-center gap-2 font-pixel text-[.82rem] text-chalk"
       >
         <PixelTrophy size={14} />
         No gramado agora
@@ -355,7 +355,7 @@ function Counters({ stats }: { stats: PublicStats }) {
             key={label}
             className="flex flex-col items-center border-2 border-wood-deep px-1 py-3"
           >
-            <dt className="order-2 mt-1 font-pixel text-[.5rem] text-chalk/80">
+            <dt className="order-2 mt-1 font-pixel text-[.74rem] text-chalk/80">
               {label}
             </dt>
             <dd className="led order-1 text-lg sm:text-2xl">
@@ -488,7 +488,7 @@ export function LoadCareerScreen({
           </Button>
           <div className="panel-board mt-2 flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-end">
             <div>
-              <p className="led text-[.55rem] tracking-[.3em]">Vestiário</p>
+              <p className="led text-[.78rem] tracking-[.3em]">Vestiário</p>
               <h1
                 id="carregar-titulo"
                 className="mt-1 font-pixel text-base leading-relaxed sm:text-2xl"
@@ -519,7 +519,7 @@ export function LoadCareerScreen({
             <p
               role="status"
               aria-live="polite"
-              className="mt-6 flex items-center gap-2 font-pixel text-[.6rem]"
+              className="mt-6 flex items-center gap-2 font-pixel text-[.82rem]"
             >
               <CircleNotch className="size-5 animate-spin text-bulb" />
               Buscando suas carreiras…
@@ -616,7 +616,7 @@ function PlanNotice({
       )}
       <p className="text-muted-foreground">
         {limit !== undefined && (
-          <strong className="font-pixel text-[.6rem] text-ink">
+          <strong className="font-pixel text-[.82rem] text-card-foreground">
             {used} de {limit} {limit === 1 ? 'carreira' : 'carreiras'} ·{' '}
           </strong>
         )}
@@ -675,7 +675,7 @@ function CareerRow({
       className={cn('panel overflow-hidden', locked && 'bg-secondary')}
       data-locked={locked ? 'true' : undefined}
     >
-      <div className="flex items-center justify-between border-b-2 border-ink bg-board px-3 py-1 font-pixel text-[.55rem] text-bulb">
+      <div className="flex items-center justify-between border-b-2 border-ink bg-board px-3 py-1 font-pixel text-[.78rem] text-bulb">
         <span className="flex items-center gap-2">
           Save {String(slot).padStart(2, '0')}
           {locked && (
@@ -721,7 +721,7 @@ function CareerRow({
             )}
           </p>
           {locked && (
-            <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-ink">
+            <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-card-foreground">
               <Lock
                 className="mt-0.5 shrink-0 text-primary"
                 weight="fill"

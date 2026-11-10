@@ -189,10 +189,10 @@ export function RankingScreen({
         </TabsList>
         {scope === 'monthly' && (
           <label className="mt-2 flex items-center justify-end gap-2 text-xs">
-            <span className="font-pixel text-[.5rem]">Mês</span>
+            <span className="font-pixel text-[.74rem]">Mês</span>
             <select
               aria-label="Mês do ranking"
-              className="min-h-11 border-2 border-ink bg-popover px-2 font-pixel text-[.5rem]"
+              className="min-h-11 border-2 border-ink bg-popover px-2 font-pixel text-[.74rem]"
               value={period}
               onChange={(event) => setPeriod(event.target.value)}
             >
@@ -324,18 +324,18 @@ function MyPosition({
       role="group"
       className="border-2 border-chalk/40 bg-ink/40 px-3 py-2 text-right"
     >
-      <p className="font-pixel text-[.45rem] text-chalk/70">Sua posição</p>
+      <p className="font-pixel text-[.7rem] text-chalk/70">Sua posição</p>
       {entry?.position ? (
         <>
           <p className="led text-lg">
             {formatCount(entry.position)}º
             {entry.total ? (
-              <span className="ml-1 text-[.5rem] text-chalk/80">
+              <span className="ml-1 text-[.74rem] text-chalk/80">
                 de {formatCount(entry.total)}
               </span>
             ) : null}
           </p>
-          <p className="font-pixel text-[.45rem] text-chalk/80">
+          <p className="font-pixel text-[.7rem] text-chalk/80">
             {formatCount(value)} {measureUnit(scope, value)}
             {scope === 'best_season' && entry.season
               ? ` · temporada ${String(entry.season)}`
@@ -377,7 +377,7 @@ function Board({
         className="panel-chalk flex flex-col items-center gap-3 p-6 text-center"
       >
         <PixelTrophy size={40} />
-        <h3 className="font-pixel text-[.65rem]">O pódio está vazio</h3>
+        <h3 className="font-pixel text-[.86rem]">O pódio está vazio</h3>
         <p className="max-w-sm text-sm text-chalk/90">
           {scope === 'monthly'
             ? `Ninguém entrou no quadro de ${periodLabel(view.period).toLowerCase()} ainda. O primeiro título ou acesso do mês acende seu nome aqui.`
@@ -401,7 +401,7 @@ function Board({
   return (
     <section aria-label={`Ranking ${label}`} className="panel-board p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <p className="font-pixel text-[.5rem] text-chalk/70">
+        <p className="font-pixel text-[.74rem] text-chalk/70">
           {periodLabel(view.period)} · {formatCount(view.total)}{' '}
           {view.total === 1 ? 'participante' : 'participantes'}
         </p>
@@ -461,7 +461,7 @@ function Board({
                     <span className="min-w-0">
                       <span className="block truncate">{row.displayName}</span>
                       {scope === 'best_season' && row.season ? (
-                        <span className="block text-[.7rem] opacity-80">
+                        <span className="block text-[.92rem] opacity-80">
                           Temporada {row.season}
                         </span>
                       ) : null}
@@ -472,7 +472,7 @@ function Board({
                 <td className="py-1.5 pr-1 text-right tabular-nums">
                   {formatCount(measureOf(scope, row))}
                   {scope === 'titles' ? (
-                    <span className="block text-[.7rem] opacity-80">
+                    <span className="block text-[.92rem] opacity-80">
                       {formatCount(row.points)} pts
                     </span>
                   ) : null}

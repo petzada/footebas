@@ -1,4 +1,9 @@
-import '@fontsource/press-start-2p/latin-400.css';
+import '@fontsource/barlow/latin-400.css';
+import '@fontsource/barlow/latin-500.css';
+import '@fontsource/barlow/latin-600.css';
+import '@fontsource/barlow-condensed/latin-600.css';
+import '@fontsource/barlow-condensed/latin-700.css';
+import '@fontsource/barlow-condensed/latin-800.css';
 import './globals.css';
 import { RumRuntime } from '@/components/rum-runtime';
 
@@ -6,7 +11,7 @@ const OG_IMAGE = {
   url: 'https://lp.footebas.com.br/og.png',
   width: 1200,
   height: 630,
-  alt: 'Footebas: manager de futebol brasileiro em pixel art, grátis e no celular',
+  alt: 'Footebas: manager de futebol brasileiro com partidas em 3D, grátis e no navegador',
 };
 
 export const metadata = {
@@ -18,7 +23,7 @@ export const metadata = {
     siteName: 'Footebas',
     title: 'Footebas — Sua carreira, sua história',
     description:
-      'Manager de futebol brasileiro: Séries A, B e C reais, Copa do Brasil e Libertadores. Grátis, no celular, com partida ao vivo em pixel art.',
+      'Manager de futebol brasileiro: Séries A, B e C reais, Copa do Brasil e Libertadores. Grátis, no navegador, com partida ao vivo em 3D.',
     locale: 'pt_BR',
     type: 'website',
     images: [OG_IMAGE],
@@ -32,8 +37,8 @@ export const metadata = {
   },
 };
 
-// One retro theme (ADR 0012): the browser chrome matches the grass.
-export const viewport = { themeColor: '#2f7d3a', colorScheme: 'light' };
+// One dark theme (ADR 0018): the browser chrome matches the night sky.
+export const viewport = { themeColor: '#090d13', colorScheme: 'dark' };
 
 export default function RootLayout({
   children,

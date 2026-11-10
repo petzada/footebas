@@ -122,12 +122,12 @@ export function OfficeScreen({
           it never runs into the next column. */}
       <header className="panel-board grid grid-cols-3 gap-2 p-3 text-center">
         <div className="min-w-0">
-          <p className="font-pixel text-[.5rem] uppercase text-chalk/80">
+          <p className="font-pixel text-[.74rem] uppercase text-chalk/80">
             Caixa
           </p>
           <p
             className={cn(
-              'led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base',
+              'led text-[.86rem] break-normal min-[400px]:text-sm sm:text-base',
               (office.club?.cash ?? 0) < 0 && 'text-destructive',
             )}
           >
@@ -135,12 +135,12 @@ export function OfficeScreen({
           </p>
         </div>
         <div className="min-w-0">
-          <p className="font-pixel text-[.5rem] uppercase text-chalk/80">
+          <p className="font-pixel text-[.74rem] uppercase text-chalk/80">
             Patrocínio
             <wbr />
             /mês
           </p>
-          <p className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
+          <p className="led text-[.86rem] break-normal min-[400px]:text-sm sm:text-base">
             {formatBrl(
               office.sponsorship.contract?.monthlyValue ??
                 office.sponsorship.fallbackMonthly,
@@ -148,10 +148,10 @@ export function OfficeScreen({
           </p>
         </div>
         <div className="min-w-0">
-          <p className="font-pixel text-[.5rem] uppercase text-chalk/80">
+          <p className="font-pixel text-[.74rem] uppercase text-chalk/80">
             Sócios
           </p>
-          <p className="led text-[.65rem] break-normal min-[400px]:text-sm sm:text-base">
+          <p className="led text-[.86rem] break-normal min-[400px]:text-sm sm:text-base">
             {(office.membership?.members ?? 0).toLocaleString('pt-BR')}
           </p>
         </div>
@@ -177,7 +177,7 @@ export function OfficeScreen({
             >
               <h3
                 id="patrocinios"
-                className="font-pixel text-[.6rem] uppercase text-chalk"
+                className="font-pixel text-[.82rem] uppercase text-chalk"
               >
                 Patrocínio · {String(pending)} proposta(s) em aberto
               </h3>
@@ -212,7 +212,10 @@ export function OfficeScreen({
             </section>
             <div className="flex flex-col gap-3">
               <section aria-labelledby="empregos" className="panel p-3">
-                <h3 id="empregos" className="font-pixel text-[.6rem] uppercase">
+                <h3
+                  id="empregos"
+                  className="font-pixel text-[.82rem] uppercase"
+                >
                   Empregos
                 </h3>
                 {office.proposals.jobs.length === 0 && (
@@ -238,14 +241,14 @@ export function OfficeScreen({
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[.6rem] text-muted-foreground">
+                <p className="mt-2 text-[.82rem] text-muted-foreground">
                   Aceitar um convite fica na Diretoria (Estádio › Diretoria).
                 </p>
               </section>
               <section aria-labelledby="por-atletas" className="panel p-3">
                 <h3
                   id="por-atletas"
-                  className="font-pixel text-[.6rem] uppercase"
+                  className="font-pixel text-[.82rem] uppercase"
                 >
                   Propostas por atletas
                 </h3>
@@ -267,7 +270,7 @@ export function OfficeScreen({
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[.6rem] text-muted-foreground">
+                <p className="mt-2 text-[.82rem] text-muted-foreground">
                   Decida no Mercado › Propostas.
                 </p>
               </section>
@@ -311,12 +314,12 @@ export function OfficeScreen({
 
         <TabsContent value="contracts">
           <section aria-labelledby="contratos" className="panel p-3">
-            <h3 id="contratos" className="font-pixel text-[.6rem] uppercase">
+            <h3 id="contratos" className="font-pixel text-[.82rem] uppercase">
               Contratos do elenco
             </h3>
             <table className="mt-2 w-full text-left text-xs">
               <thead>
-                <tr className="font-pixel text-[.45rem] uppercase text-muted-foreground">
+                <tr className="font-pixel text-[.7rem] uppercase text-muted-foreground">
                   <th className="py-1">Atleta</th>
                   <th>Termina</th>
                   <th className="text-right">Salário</th>
@@ -403,7 +406,7 @@ function SponsorOfferCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h4 className="font-pixel text-[.6rem] uppercase">
+          <h4 className="font-pixel text-[.82rem] uppercase">
             {offer.sponsorName}
           </h4>
           <p className="text-xs text-muted-foreground">
@@ -428,17 +431,17 @@ function SponsorOfferCard({
         </span>
         <span className="text-xs">por mês</span>
       </p>
-      <dl className="grid grid-cols-3 gap-1 text-[.65rem]">
+      <dl className="grid grid-cols-3 gap-1 text-[.86rem]">
         <div className="bg-muted p-1">
-          <dt className="font-pixel text-[.45rem] uppercase">Título</dt>
+          <dt className="font-pixel text-[.7rem] uppercase">Título</dt>
           <dd>{formatBrl(offer.bonuses.title)}</dd>
         </div>
         <div className="bg-muted p-1">
-          <dt className="font-pixel text-[.45rem] uppercase">Continental</dt>
+          <dt className="font-pixel text-[.7rem] uppercase">Continental</dt>
           <dd>{formatBrl(offer.bonuses.continental)}</dd>
         </div>
         <div className="bg-muted p-1">
-          <dt className="font-pixel text-[.45rem] uppercase">Multa</dt>
+          <dt className="font-pixel text-[.7rem] uppercase">Multa</dt>
           <dd>{formatBrl(offer.terminationFee)}</dd>
         </div>
       </dl>
@@ -531,7 +534,10 @@ function SponsorContractPanel({ office }: { office: OfficeView }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
       <section aria-labelledby="contrato-vigente" className="panel p-3">
-        <h3 id="contrato-vigente" className="font-pixel text-[.6rem] uppercase">
+        <h3
+          id="contrato-vigente"
+          className="font-pixel text-[.82rem] uppercase"
+        >
           Contrato vigente
         </h3>
         {contract ? (
@@ -579,7 +585,7 @@ function SponsorContractPanel({ office }: { office: OfficeView }) {
       <section aria-labelledby="historico-patrocinio" className="panel p-3">
         <h3
           id="historico-patrocinio"
-          className="font-pixel text-[.6rem] uppercase"
+          className="font-pixel text-[.82rem] uppercase"
         >
           Histórico
         </h3>
@@ -631,7 +637,7 @@ function MembershipPanel({
           void onSave({ monthlyPrice: price, tier });
         }}
       >
-        <h3 className="font-pixel text-[.6rem] uppercase">Sócio-torcedor</h3>
+        <h3 className="font-pixel text-[.82rem] uppercase">Sócio-torcedor</h3>
         <label className="grid gap-1 text-xs">
           <span className="flex justify-between">
             Mensalidade
@@ -669,7 +675,7 @@ function MembershipPanel({
                 className="min-h-12 flex-col gap-0 px-1"
               >
                 <span>{MEMBERSHIP_TIER_LABEL[item.tier]}</span>
-                <span className="font-sans text-[.55rem] normal-case">
+                <span className="font-sans text-[.78rem] normal-case">
                   custo {formatBrl(item.costPerMember)}/sócio
                 </span>
               </ToggleGroupItem>
@@ -685,7 +691,7 @@ function MembershipPanel({
         aria-labelledby="socios-hoje"
         className="panel-board grid content-start gap-2 p-3 text-chalk"
       >
-        <h3 id="socios-hoje" className="font-pixel text-[.6rem] uppercase">
+        <h3 id="socios-hoje" className="font-pixel text-[.82rem] uppercase">
           Com a configuração atual
         </h3>
         <p className="led text-2xl">
@@ -725,7 +731,7 @@ function MembershipPanel({
             </dd>
           </div>
         </dl>
-        <p className="text-[.6rem] text-chalk/70">
+        <p className="text-[.82rem] text-chalk/70">
           Os números mudam depois de salvar; preço maior nunca aumenta sócios.
         </p>
       </section>
@@ -767,8 +773,8 @@ function FinancePanel({
   );
   return (
     <section aria-label={title} className="panel grid gap-2 p-3">
-      <h3 className="font-pixel text-[.6rem] uppercase">{title}</h3>
-      <h4 className="font-pixel text-[.5rem] uppercase text-primary">
+      <h3 className="font-pixel text-[.82rem] uppercase">{title}</h3>
+      <h4 className="font-pixel text-[.74rem] uppercase text-primary">
         Receitas
       </h4>
       <ul role="list" className="grid gap-1">
@@ -776,7 +782,7 @@ function FinancePanel({
           (key) => bar(INCOME_LABEL[key], finances.income[key], 'grass'),
         )}
       </ul>
-      <h4 className="font-pixel text-[.5rem] uppercase text-destructive">
+      <h4 className="font-pixel text-[.74rem] uppercase text-destructive">
         Despesas
       </h4>
       <ul role="list" className="grid gap-1">
@@ -786,11 +792,11 @@ function FinancePanel({
       </ul>
       <dl className="grid grid-cols-3 gap-1 text-center text-xs">
         <div className="bg-muted p-1">
-          <dt className="font-pixel text-[.45rem] uppercase">Receitas</dt>
+          <dt className="font-pixel text-[.7rem] uppercase">Receitas</dt>
           <dd className="font-bold">{formatBrl(finances.totalIncome)}</dd>
         </div>
         <div className="bg-muted p-1">
-          <dt className="font-pixel text-[.45rem] uppercase">Despesas</dt>
+          <dt className="font-pixel text-[.7rem] uppercase">Despesas</dt>
           <dd className="font-bold">{formatBrl(finances.totalExpenses)}</dd>
         </div>
         <div
@@ -801,12 +807,12 @@ function FinancePanel({
               : 'bg-destructive text-chalk',
           )}
         >
-          <dt className="font-pixel text-[.45rem] uppercase">Saldo</dt>
+          <dt className="font-pixel text-[.7rem] uppercase">Saldo</dt>
           <dd className="led">{formatBrl(finances.net)}</dd>
         </div>
       </dl>
       {pendingGate !== undefined && (
-        <p className="text-[.6rem] text-muted-foreground">
+        <p className="text-[.82rem] text-muted-foreground">
           Bilheteria do mês aberto ainda não fechada: {formatBrl(pendingGate)}.
         </p>
       )}
@@ -843,7 +849,7 @@ function CoachPanel({
           <div>
             <h3
               id="carreira-treinador"
-              className="font-pixel text-[.6rem] uppercase"
+              className="font-pixel text-[.82rem] uppercase"
             >
               {coach.managerName}
             </h3>
@@ -861,9 +867,7 @@ function CoachPanel({
             </p>
           </div>
           <span className="ml-auto grid text-center">
-            <span className="font-pixel text-[.45rem] uppercase">
-              Prestígio
-            </span>
+            <span className="font-pixel text-[.7rem] uppercase">Prestígio</span>
             <span className="led bg-board px-1 text-base">
               {Math.round(coach.prestige)}
             </span>
@@ -894,7 +898,7 @@ function CoachPanel({
       </section>
       <div className="flex flex-col gap-3">
         <section aria-labelledby="conquistas" className="panel p-3">
-          <h3 id="conquistas" className="font-pixel text-[.6rem] uppercase">
+          <h3 id="conquistas" className="font-pixel text-[.82rem] uppercase">
             Conquistas
           </h3>
           {coach.achievements.length === 0 && (
@@ -914,7 +918,7 @@ function CoachPanel({
           </ul>
         </section>
         <section aria-labelledby="passagens" className="panel p-3">
-          <h3 id="passagens" className="font-pixel text-[.6rem] uppercase">
+          <h3 id="passagens" className="font-pixel text-[.82rem] uppercase">
             Passagens
           </h3>
           <ul role="list" className="mt-2 flex flex-col gap-1 text-xs">

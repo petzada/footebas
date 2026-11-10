@@ -43,7 +43,7 @@ export function ScreenSkeleton({
           />
         ))}
       </div>
-      <p className="flex items-center justify-center gap-2 font-pixel text-[.55rem] text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
+      <p className="flex items-center justify-center gap-2 font-pixel text-[.78rem] text-chalk drop-shadow-[0_1px_0_rgb(0_0_0/0.6)]">
         <span aria-hidden="true" className="blink">
           ▶
         </span>

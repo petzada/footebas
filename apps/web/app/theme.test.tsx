@@ -23,45 +23,61 @@ function block(selector: string): string {
   return css.slice(start, css.indexOf('\n}', start));
 }
 
-describe('tokens Futebol Retrô (ADR 0012)', () => {
-  it('é um tema só: sem variante .dark, sem bootstrap de tema', () => {
-    expect(css).not.toMatch(/\.dark\b/);
+describe('tokens Transmissão (ADR 0018)', () => {
+  it('é um tema só, escuro: sem variante .dark, sem bootstrap de tema', () => {
+    expect(css).not.toMatch(/\.dark/);
     expect(css).not.toMatch(/@custom-variant\s+dark/);
-    expect(block(':root')).toMatch(/color-scheme:\s*light/);
+    expect(block(':root')).toMatch(/color-scheme:\s*dark/);
     const html = RootLayout({ children: null });
     expect(html.props.className).toBeUndefined();
     expect(JSON.stringify(html.props.children)).not.toMatch(/footebas-theme/);
-    expect(viewport.themeColor.toLowerCase()).toBe('#2f7d3a');
-    expect(manifest().theme_color?.toLowerCase()).toBe('#2f7d3a');
+    expect(viewport.themeColor.toLowerCase()).toBe('#090d13');
+    expect(viewport.colorScheme).toBe('dark');
+    expect(manifest().theme_color?.toLowerCase()).toBe('#090d13');
   });
 
-  it('usa gramado, giz, placar e madeira; o vidro e os pastéis saíram', () => {
+  it('usa noite, painel grafite, verde de gramado e dourado de placar', () => {
     const tokens = block(':root');
-    expect(tokens).toMatch(/--grass:\s*#2f7d3a/);
-    expect(tokens).toMatch(/--chalk:\s*#f4efe2/);
-    expect(tokens).toMatch(/--board:\s*#121a15/);
-    expect(tokens).toMatch(/--bulb:\s*#ffd23f/);
-    expect(tokens).toMatch(/--wood:\s*#a0672f/);
-    expect(tokens).toMatch(/--ink:\s*#15201a/);
-    expect(css).not.toMatch(/backdrop-filter|--glass-|#bee3f0|#f9e2e7/);
-    expect(css).toMatch(/body::before\s*{[^}]*repeating-linear-gradient/s);
+    expect(tokens).toMatch(/--background:\s*#090d13/);
+    expect(tokens).toMatch(/--card:\s*#141b25/);
+    expect(tokens).toMatch(/--grass:\s*#1fb866/);
+    expect(tokens).toMatch(/--chalk:\s*#eef2f6/);
+    expect(tokens).toMatch(/--board:\s*#0a0f16/);
+    expect(tokens).toMatch(/--bulb:\s*#f6c443/);
+    expect(tokens).toMatch(/--ink:\s*#06090d/);
+    // The pastel glass of ISOPOP and the CRT scanlines of the retro theme left.
+    expect(css).not.toMatch(/--glass-|#bee3f0|#f9e2e7|body::after/);
+    expect(css).toMatch(/body::before\s*{[^}]*radial-gradient/s);
   });
 
-  it('desenha bordas pixel em degraus com box-shadow e sem raio', () => {
+  it('desenha superfícies com fio de luz, raio curto e botões que afundam', () => {
     const border = block('  .px-border');
-    expect(border).toMatch(/0 calc\(var\(--px\) \* -1\) 0 0 var\(--ink\)/);
-    expect(border).not.toMatch(/blur|border-radius/);
-    expect(css).toMatch(/--radius-xl:\s*0px/);
+    expect(border).toMatch(/border-radius:\s*var\(--radius-lg\)/);
+    expect(border).toMatch(/0 0 0 1px var\(--line-strong\)/);
+    expect(css).toMatch(/--radius-lg:\s*10px/);
     expect(css).toMatch(/\.panel-board\s*{/);
-    expect(css).toMatch(/\.btn-px:active[^{]*{[^}]*translateY\(var\(--px\)\)/s);
+    expect(css).toMatch(/\.btn-px:active[^{]*{[^}]*translateY\(1px\)/s);
+    expect(css).toMatch(/\.play-button::after\s*{[^}]*animation:\s*sheen/s);
   });
 
-  it('fonte pixelada só no display; corpo em system-ui com algarismos tabulares', () => {
-    expect(css).toMatch(/--font-pixel:\s*'Press Start 2P'/);
-    expect(css).toMatch(/--font-display:\s*var\(--font-pixel\)/);
-    expect(css).toMatch(/--font-sans:\s*\n?\s*system-ui/);
+  it('display condensado e corpo em Barlow, com algarismos tabulares', () => {
+    expect(css).toMatch(/--font-display:\s*'Barlow Condensed'/);
+    expect(css).toMatch(/--font-pixel:\s*var\(--font-display\)/);
+    expect(css).toMatch(/--font-sans:\s*'Barlow'/);
     expect(css).toMatch(/font-variant-numeric:\s*tabular-nums/);
-    expect(css).not.toMatch(/Archivo|Rajdhani/);
+    expect(css).not.toMatch(/Press Start 2P|Archivo|Rajdhani/);
+  });
+
+  it('traz os grafismos de transmissão do estádio 3D', () => {
+    for (const name of [
+      'stage-frame',
+      'hud-scorebug',
+      'hud-goal',
+      'hud-lower',
+      'hud-chip',
+    ])
+      expect(css).toContain(`.${name} {`);
+    expect(css).toMatch(/\.stage-frame:fullscreen/);
   });
 
   it('desliga animações e o letreiro com prefers-reduced-motion', () => {

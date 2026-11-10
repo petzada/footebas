@@ -31,7 +31,7 @@ const TabsTrigger = React.forwardRef<
     className={cn(
       // Pixel glyphs are 1em wide: on phones the label may wrap at spaces
       // (never mid-word) instead of overflowing its column; 44px tall.
-      'inline-flex min-h-11 min-w-0 items-center justify-center px-1.5 py-1.5 text-center font-pixel text-[.5rem] leading-tight break-normal uppercase min-[400px]:text-[.55rem] sm:px-3 sm:text-[.6rem] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-board data-[state=active]:text-bulb',
+      'inline-flex min-h-11 min-w-0 items-center justify-center px-1.5 py-1.5 text-center font-pixel text-[.74rem] leading-tight break-normal uppercase min-[400px]:text-[.78rem] sm:px-3 sm:text-[.82rem] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-board data-[state=active]:text-bulb',
       className,
     )}
     {...props}
