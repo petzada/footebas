@@ -3,10 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "description": "Footebas — simulador de gestão de futebol determinístico e server-authoritative.",
-  "packageManager": "pnpm@10.6.2",
+  "packageManager": "pnpm@12.22.0",
   "engines": {
-    "node": ">=22.14.0 <25",
-    "pnpm": "10.6.2"
+    "node": ">=22.14.0 <27",
+    "pnpm": ">=12"
   },
   "scripts": {
     "build": "turbo run build",
