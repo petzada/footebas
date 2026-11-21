@@ -1,22 +1,19 @@
 name: deploy-web
 
-# Builds the Next.js web for Cloudflare Workers with OpenNext on Linux (the
-# build creates symlinks that Windows refuses without Developer Mode). With a
-# CLOUDFLARE_API_TOKEN secret it deploys; without one it keeps the bundle as an
-# artifact so a maintainer can run `wrangler deploy` from a logged-in machine.
-# Deploy só pelo CI (AGENTS.md): o secret CLOUDFLARE_API_TOKEN e a variable
-# CLOUDFLARE_ACCOUNT_ID ficam em Settings do repositório. A API tem o seu
-# próprio workflow (deploy-api.yml).
+# Builda o web Next.js para Cloudflare Workers com OpenNext no Linux (o build cria symlinks
+# que o Windows recusa sem Developer Mode) e publica. Deploy só pelo CI (AGENTS.md): o secret
+# CLOUDFLARE_API_TOKEN e as variables CLOUDFLARE_ACCOUNT_ID e NEXT_PUBLIC_SUPABASE_ANON_KEY
+# ficam em Settings do repositório; sem eles o workflow falha. O bundle fica como artefato.
+# A API tem o seu próprio workflow (deploy-api.yml).
 
+# Deploy só depois do CI verde: dispara quando o workflow `ci` termina com sucesso num push
+# na main (ou pelo Run workflow). O filtro de caminhos roda no job `gate`.
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'apps/web/**'
-      - 'packages/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/deploy-web.yml'
 
 permissions:
   contents: read
@@ -26,7 +23,49 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Decide se publica: o commit mexeu no web e os secrets do Cloudflare existem. Sem secret o
+  # workflow FALHA (nada é publicado em silêncio).
+  gate:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      deploy: ${{ steps.changes.outputs.deploy }}
+      sha: ${{ steps.changes.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+      - name: Mudou algo que afeta o web?
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" != "workflow_dispatch" ] && git diff --quiet HEAD~1 HEAD -- 'apps/web/' 'packages/' 'pnpm-lock.yaml' '.github/workflows/deploy-web.yml'; then
+            echo "::notice::Nada que afete o web neste commit; deploy pulado."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Exigir CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID
+        if: steps.changes.outputs.deploy == 'true'
+        env:
+          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+          ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=""
+          [ "$HAS_TOKEN" = "true" ] || missing="$missing secret CLOUDFLARE_API_TOKEN;"
+          [ -n "$ACCOUNT_ID" ] || missing="$missing variable CLOUDFLARE_ACCOUNT_ID;"
+          if [ -n "$missing" ]; then
+            echo "::error title=deploy-web::Nada foi publicado. Cadastre em Settings > Secrets and variables > Actions:$missing"
+            exit 1
+          fi
+
   build:
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -34,16 +73,15 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://wjisqiiwsuykfbmqglfb.supabase.co' }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       NEXT_PUBLIC_AUTH_MODE: supabase
-      HAS_CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
       # Turbo Remote Cache (Vercel, gratuito): reaproveita o build dos pacotes entre
       # runs e com o pre-push local. Sem os valores, o turbo só usa o cache local.
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
         with:
-          version: 10.6.2
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -63,11 +101,7 @@ jobs:
           path: apps/web/.open-next
           include-hidden-files: true
           retention-days: 7
-      - name: Token ausente
-        if: ${{ env.HAS_CLOUDFLARE_TOKEN != 'true' }}
-        run: echo "::warning::CLOUDFLARE_API_TOKEN ausente; o bundle ficou como artefato e nada foi publicado."
       - name: Deploy to Cloudflare
-        if: ${{ env.HAS_CLOUDFLARE_TOKEN == 'true' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

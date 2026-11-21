@@ -4,42 +4,52 @@ on:
   push:
     branches: [main]
   pull_request:
-    # ready_for_review: tirar o PR de draft dispara os jobs pesados.
+    # ready_for_review: tirar o PR de draft dispara os jobs.
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Push novo no mesmo PR cancela o run anterior.
-# Turbo Remote Cache (Vercel, gratuito): o CI publica o build dos pacotes e o
-# pre-push local baixa em vez de recompilar. Sem os valores, só cache local.
+# Turbo Remote Cache (Vercel, gratuito): o CI publica o build dos pacotes e o pre-push local
+# baixa em vez de recompilar. Sem o secret TURBO_TOKEN e a variable TURBO_TEAM, só cache local.
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
+# Push novo no mesmo PR cancela o run anterior.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# Repositório privado: PR em draft não roda CI (os gates locais do lefthook cobrem o diff);
-# o CI completo roda quando o PR fica pronto, no push da main e no Run workflow.
+# PR em draft não roda CI (os gates locais do lefthook cobrem o diff); roda quando o PR fica
+# pronto, no push da main e no Run workflow. `verify` e `e2e` são os checks obrigatórios da
+# main: não renomeie.
 jobs:
-  verify:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+  # Formatação, typecheck, lint tipado, build, smoke e bundle.
+  static:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10.6.2
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
+      - uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.ts', 'apps/web/**/*.tsx', 'apps/web/**/*.css') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm smoke
       # Linha de base de tamanho do bundle (docs/10-latencia-e-escala.md, Onda 0).
       - name: Tamanho do bundle do web
         run: node tools/bundle-report.mjs apps/web/.next/static >> "$GITHUB_STEP_SUMMARY"
@@ -52,19 +62,55 @@ jobs:
           path: apps/web/.next/diagnostics/
           if-no-files-found: warn
           retention-days: 14
+      - name: Aviso de falha
+        if: failure()
+        run: echo "::error title=ci/static::Formatação, typecheck, lint, build ou smoke falhou em ${GITHUB_REF_NAME} (${GITHUB_SHA::7})."
 
-  # Playwright (Chromium) contra o web em modo dev com a API Fastify em memória
-  # (tools/e2e/playwright.config.ts sobe os dois servidores). Roda em paralelo
-  # ao verify.
-  e2e:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+  # Suíte completa do vitest (inclui os Monte Carlo do engine).
+  test:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          version: 10.6.2
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:ci
+      - name: Aviso de falha
+        if: failure()
+        run: echo "::error title=ci/test::Testes falharam em ${GITHUB_REF_NAME} (${GITHUB_SHA::7})."
+
+  # Check obrigatório: agrega static e test, equivalente ao antigo `pnpm check`.
+  verify:
+    if: always() && github.event.pull_request.draft != true
+    needs: [static, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: static e test verdes
+        env:
+          STATIC: ${{ needs.static.result }}
+          TEST: ${{ needs.test.result }}
+        run: |
+          echo "static=$STATIC test=$TEST"
+          if [ "$STATIC" != "success" ] || [ "$TEST" != "success" ]; then
+            echo "::error title=ci/verify::static=$STATIC test=$TEST"
+            exit 1
+          fi
+
+  # Playwright (Chromium) contra o web em modo dev com a API Fastify em memória
+  # (tools/e2e/playwright.config.ts sobe os dois servidores). Roda em paralelo aos outros.
+  e2e:
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -86,6 +132,12 @@ jobs:
       - name: Dependências de sistema do Chromium
         if: steps.browsers.outputs.cache-hit == 'true'
         run: pnpm --filter @footebas/e2e exec playwright install-deps chromium
+      - uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-dev-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-dev-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm e2e
       - name: Relatório do Playwright
         if: failure()
@@ -94,3 +146,6 @@ jobs:
           name: playwright-report
           path: tools/e2e/dist/
           retention-days: 14
+      - name: Aviso de falha
+        if: failure()
+        run: echo "::error title=ci/e2e::E2E falhou em ${GITHUB_REF_NAME} (${GITHUB_SHA::7})."
