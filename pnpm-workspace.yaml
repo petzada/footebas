@@ -2,3 +2,14 @@ packages:
   - apps/*
   - packages/*
   - tools/*
+
+# pnpm 12 falha o install se um build script não for decidido. Todos seguem bloqueados como
+# no pnpm 10 (os binários vêm dos optionalDependencies); mude para true só se algo quebrar.
+allowBuilds:
+  '@prisma/engines': false
+  esbuild: false
+  lefthook: false
+  prisma: false
+  sharp: false
+  unrs-resolver: false
+  workerd: false

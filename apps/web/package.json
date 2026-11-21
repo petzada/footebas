@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile node_modules/.cache/typecheck.tsbuildinfo --customConditions @footebas/source",
     "test": "vitest run",
     "clubs:generate": "node scripts/generate-club-previews.mjs",
     "cf:build": "opennextjs-cloudflare build",

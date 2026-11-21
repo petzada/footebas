@@ -9,22 +9,23 @@ Tudo roda em Cloudflare Workers (ADR 0005). Deploy em produção só com autoriz
 
 ## Pelo CI (padrão)
 
-Deploy em produção sai só do GitHub Actions, em push na `main` (ou "Run workflow"):
+Deploy em produção sai só do GitHub Actions, **depois do `ci` verde** num push na `main` (ou "Run workflow").
+Os deploys disparam por `workflow_run` do `ci`; o job `gate` confere se o commit tocou os caminhos abaixo:
 
-| Workflow         | Worker         | Dispara em                                     |
+| Workflow         | Worker         | Publica quando o commit toca                   |
 | ---------------- | -------------- | ---------------------------------------------- |
 | `deploy-web.yml` | `footebas-web` | `apps/web/**`, `packages/**`, `pnpm-lock.yaml` |
 | `deploy-api.yml` | `footebas-api` | `apps/api/**`, `packages/**`, `pnpm-lock.yaml` |
 
 Os dois precisam do secret **`CLOUDFLARE_API_TOKEN`** (token com "Workers Scripts: Edit" e "Workers Routes:
-Edit" na conta) e da variable **`CLOUDFLARE_ACCOUNT_ID`** (Settings → Secrets and variables → Actions). Sem o
-token, o `deploy-web` guarda o bundle como artefato e o `deploy-api` só valida o bundle com `--dry-run`; os dois
-avisam no log e nada é publicado. O `deploy-api` termina conferindo o `/health`.
+Edit" na conta) e da variable **`CLOUDFLARE_ACCOUNT_ID`** (Settings → Secrets and variables → Actions); o web
+precisa também da variable **`NEXT_PUBLIC_SUPABASE_ANON_KEY`**. Sem eles o workflow **falha** com a lista do que
+falta (nada é publicado em silêncio). O `deploy-api` termina conferindo o `/health`.
 
 ### Turbo Remote Cache
 
 O cache remoto da Vercel é gratuito: `turbo` publica o resultado de `build`, `typecheck` e `test`, e qualquer
-máquina com as mesmas variáveis baixa em vez de recompilar (inclusive o pre-push local, que depende de `^build`).
+máquina com as mesmas variáveis baixa em vez de recompilar (inclusive o typecheck do pre-push local).
 
 1. Crie o token em <https://vercel.com/account/tokens> e anote o slug do time (ou da conta pessoal).
 2. No repositório: secret `TURBO_TOKEN` e variable `TURBO_TEAM` (o `ci.yml` e os deploys já leem os dois).

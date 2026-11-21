@@ -64,8 +64,8 @@ Decisões de produto em [`docs/00-visao-e-decisoes.md`](docs/00-visao-e-decisoes
 
 **Pré-requisitos**
 
-- **Node.js 22.14.0** (versão de referência em `.nvmrc`)
-- **pnpm 10.6.2** via Corepack
+- **Node.js 22 ou mais novo** (o CI usa o major de `.nvmrc`; Node 26 local funciona)
+- **pnpm 12** (versão exata em `packageManager`; `npm i -g pnpm@12` ou Corepack)
 - Nenhum banco, container ou segredo para desenvolver: os testes usam a API em memória
 
 **Instalação**
@@ -98,7 +98,7 @@ pnpm lint
 pnpm check            # o mesmo que o CI: format, typecheck, lint tipado, testes, build e smoke
 ```
 
-O **lefthook** roda Prettier e oxlint no commit e typecheck + testes dos pacotes afetados no push. O CI completo (incluindo bundle e E2E com Playwright) roda quando o PR fica pronto e na `main`.
+O **lefthook** roda Prettier e oxlint no commit e o typecheck incremental dos pacotes afetados no push. Rode `pnpm test:related` antes de abrir PR. O CI completo (incluindo bundle e E2E com Playwright) roda quando o PR fica pronto e na `main`.
 
 ## Contribuição
 

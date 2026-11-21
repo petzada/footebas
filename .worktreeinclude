@@ -1,0 +1,4 @@
+# Arquivos locais que o Claude Code copia para cada worktree novo (não versionados).
+apps/web/.env.local
+apps/web/.env.development.local
+apps/web/.env.production.local

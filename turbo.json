@@ -14,7 +14,8 @@
       "env": ["FOOTEBAS_SKIP_SLOW"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^typecheck"],
+      "outputs": []
     }
   }
 }

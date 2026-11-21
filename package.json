@@ -3,10 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "description": "Footebas — simulador de gestão de futebol determinístico e server-authoritative.",
-  "packageManager": "pnpm@10.6.2",
+  "packageManager": "pnpm@12.21.0",
   "engines": {
-    "node": ">=22.14.0 <25",
-    "pnpm": "10.6.2"
+    "node": ">=22",
+    "pnpm": ">=12"
   },
   "scripts": {
     "build": "turbo run build",
@@ -16,13 +16,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
-    "prepare": "node -e \"try{if(require('fs').existsSync('.git'))require('child_process').execSync('lefthook install',{stdio:'inherit'})}catch(e){console.warn('lefthook install ignorado')}\"",
+    "prepare": "node -e \"try{if(require('fs').statSync('.git').isDirectory())require('child_process').execSync('lefthook install',{stdio:'inherit'})}catch{}\"",
     "smoke": "pnpm --filter @footebas/sim-lab smoke",
     "smoke:cloud": "pnpm --filter @footebas/cloud-smoke smoke",
     "test": "turbo run test",
     "test:ci": "turbo run test",
     "test:phase1": "pnpm --filter @footebas/sim-lab phase1-gate",
-    "test:related": "turbo run test --affected --concurrency=1",
+    "test:related": "node scripts/affected.mjs test --skip-slow --concurrency=1",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
