@@ -26,7 +26,7 @@ jobs:
   # Decide se publica: o commit mexeu no web e os secrets do Cloudflare existem. Sem secret o
   # workflow FALHA (nada é publicado em silêncio).
   gate:
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -42,9 +42,14 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
         run: |
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT" != "workflow_dispatch" ] && git diff --quiet HEAD~1 HEAD -- 'apps/web/' 'packages/' 'pnpm-lock.yaml' '.github/workflows/deploy-web.yml'; then
-            echo "::notice::Nada que afete o web neste commit; deploy pulado."
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          # Sempre publica a ponta da main depois do CI verde (deploy idempotente). Sem filtro de
+          # caminhos: com ele, um merge que só mexe em docs fazia o deploy de um merge anterior
+          # (CI cancelado ou instável) nunca sair. Re-run de commit velho não publica.
+          tip=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$tip" != "$sha" ]; then
+            echo "::warning::$sha não é a ponta da main ($tip); deploy pulado."
             echo "deploy=false" >> "$GITHUB_OUTPUT"
           else
             echo "deploy=true" >> "$GITHUB_OUTPUT"

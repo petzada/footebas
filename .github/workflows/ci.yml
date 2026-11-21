@@ -17,10 +17,10 @@ env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
-# Push novo no mesmo PR cancela o run anterior.
+# Push novo no mesmo PR cancela o run anterior; push na main nunca é cancelado.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # PR em draft não roda CI (os gates locais do lefthook cobrem o diff); roda quando o PR fica
 # pronto, no push da main e no Run workflow. `verify` e `e2e` são os checks obrigatórios da
@@ -86,7 +86,7 @@ jobs:
 
   # Check obrigatório: agrega static e test, equivalente ao antigo `pnpm check`.
   verify:
-    if: always() && github.event.pull_request.draft != true
+    if: ${{ !cancelled() && github.event.pull_request.draft != true }}
     needs: [static, test]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

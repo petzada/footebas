@@ -33,10 +33,11 @@ Monorepo pnpm + Turbo (`apps/web`, `apps/api`, `apps/worker`, `packages/*`). Pro
    acompanha o CI e corrige tudo num push só.
 3. CI verde e baixo risco: squash merge sozinho. Risco (auth, pagamento, dados de usuário, infra/CI, deleção):
    perguntar antes do merge.
-4. Migrations: expand automático; contract em dois tempos (PR posterior, depois do deploy sem uso e smoke verde,
+4. Migrations: nenhum workflow aplica `supabase/migrations` ainda; até existir, aplicar é ação do responsável
+   (o agente prepara e pede). Regra: expand primeiro; contract em dois tempos (PR posterior, depois do deploy sem uso e smoke verde,
    com snapshot antes de qualquer drop).
 5. Smoke falhou depois do deploy: corrigir pra frente; rollback só do app, nunca do banco.
-6. Nunca `--no-verify`, push direto na `main`, deploy do notebook (`wrangler deploy`, `cf:deploy`), banco ou
+6. Nunca `--no-verify` nem desligar hooks, force-push em branch compartilhada, push direto na `main`, deploy do notebook (`wrangler deploy`, `cf:deploy`), banco ou
    Docker local.
 
 ### PR na VM da nuvem
