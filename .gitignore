@@ -17,3 +17,8 @@ Thumbs.db
 tools/e2e/dist
 tools/e2e/test-results
 tools/e2e/playwright-report
+
+# Claude Code e caches de ferramentas
+.claude/worktrees/
+.claude/settings.local.json
+.eslintcache
