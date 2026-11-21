@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": {
+      "@footebas/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -14,7 +15,7 @@
     "generate": "tsx scripts/generate-catalog.ts",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run --config ../../vitest.config.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile node_modules/.cache/typecheck.tsbuildinfo --customConditions @footebas/source"
   },
   "dependencies": {
     "@footebas/domain": "workspace:*",

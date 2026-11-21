@@ -8,7 +8,7 @@
     "e2e:list": "playwright test --list",
     "e2e:install": "playwright install --with-deps chromium",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile node_modules/.cache/typecheck.tsbuildinfo --customConditions @footebas/source"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

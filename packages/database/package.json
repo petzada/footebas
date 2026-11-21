@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": {
+      "@footebas/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -13,7 +14,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run --config ../../vitest.config.ts src",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile node_modules/.cache/typecheck.tsbuildinfo --customConditions @footebas/source"
   },
   "dependencies": {
     "@footebas/domain": "workspace:*",
