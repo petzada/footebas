@@ -149,16 +149,30 @@ describe('Fase 6 · shell mobile-first', () => {
     expect(
       screen.queryByRole('navigation', { name: /navegação principal mobile/i }),
     ).toBeNull();
-    Object.defineProperty(window, 'scrollY', { value: 80, configurable: true });
-    // Scroll until the bar is back: on a slow runner the listener may not be
-    // attached yet when the first event fires, and the re-render may lag.
-    await waitFor(() => {
-      fireEvent.scroll(window);
-      expect(
-        screen.getByRole('navigation', { name: /navegação principal mobile/i }),
-      ).toBeTruthy();
-    });
-    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+    // findBy* runs outside act(), so the scroll listener (a passive effect)
+    // may attach only after the first scroll; it then takes the current
+    // scrollY as its baseline. Keep scrolling down, 40px per attempt, so the
+    // first event after it attaches is always past the 24px threshold.
+    const original = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    let y = 0;
+    try {
+      await waitFor(() => {
+        y += 40;
+        Object.defineProperty(window, 'scrollY', {
+          value: y,
+          configurable: true,
+        });
+        fireEvent.scroll(window);
+        expect(
+          screen.getByRole('navigation', {
+            name: /navegação principal mobile/i,
+          }),
+        ).toBeTruthy();
+      });
+    } finally {
+      // Back to jsdom's own scrollY, even when the test fails.
+      if (original) Object.defineProperty(window, 'scrollY', original);
+    }
   });
 
   it('cabeçalho: escudo + treinador e só ícones (som, início, sair)', async () => {

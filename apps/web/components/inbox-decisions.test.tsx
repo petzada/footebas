@@ -1,5 +1,11 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { InboxDecisions } from '@/components/inbox-decisions';
 import {
@@ -7,6 +13,21 @@ import {
   demoInboxView,
   type InboxPort,
 } from '@/lib/inbox-product';
+
+/**
+ * The region renders right away with an "Abrindo os envelopes…" status while
+ * `port.load()` is pending: wait for the loaded inbox, not just the region,
+ * or the assertions race the load on a busy runner.
+ */
+async function loadedInbox() {
+  const inbox = await screen.findByRole('region', {
+    name: /caixa de entrada/i,
+  });
+  await waitFor(() =>
+    expect(within(inbox).queryByText(/abrindo os envelopes/i)).toBeNull(),
+  );
+  return inbox;
+}
 
 describe('Caixa de entrada com decisões', () => {
   it('envia ResolveInboxDecision com a opção escolhida e mostra o efeito', async () => {
@@ -17,9 +38,7 @@ describe('Caixa de entrada com decisões', () => {
     render(
       <InboxDecisions port={port} navigate={vi.fn()} onResolved={onResolved} />,
     );
-    const inbox = await screen.findByRole('region', {
-      name: /caixa de entrada/i,
-    });
+    const inbox = await loadedInbox();
     expect(inbox.textContent).toMatch(/2 decisões/i);
     expect(within(inbox).getByText('Diretoria')).toBeTruthy();
     expect(within(inbox).getByText('Atletas')).toBeTruthy();
@@ -49,9 +68,7 @@ describe('Caixa de entrada com decisões', () => {
         limit={2}
       />,
     );
-    const inbox = await screen.findByRole('region', {
-      name: /caixa de entrada/i,
-    });
+    const inbox = await loadedInbox();
     const items = within(inbox).getAllByRole('listitem');
     expect(items).toHaveLength(2);
     expect(items[0]!.textContent).toMatch(/diretoria quer saber do reforço/i);
@@ -64,9 +81,7 @@ describe('Caixa de entrada com decisões', () => {
 
   it('desabilita mensagens expiradas com o motivo', async () => {
     render(<InboxDecisions port={createFakeInboxPort()} navigate={vi.fn()} />);
-    const inbox = await screen.findByRole('region', {
-      name: /caixa de entrada/i,
-    });
+    const inbox = await loadedInbox();
     const expired = within(inbox)
       .getByText(/coletiva: pressão por título/i)
       .closest('li')!;
@@ -83,9 +98,7 @@ describe('Caixa de entrada com decisões', () => {
     const fake = createFakeInboxPort();
     const remove = vi.fn(fake.remove);
     render(<InboxDecisions port={{ ...fake, remove }} navigate={vi.fn()} />);
-    const inbox = await screen.findByRole('region', {
-      name: /caixa de entrada/i,
-    });
+    const inbox = await loadedInbox();
     expect(
       within(inbox).queryByRole('button', {
         name: /excluir: a diretoria quer saber do reforço/i,

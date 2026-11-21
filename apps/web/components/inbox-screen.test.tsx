@@ -69,10 +69,23 @@ async function setup() {
   return { port, remove, onCareerChange, reportError };
 }
 
+/**
+ * The Mensagens region renders right away with an "Abrindo os envelopes…"
+ * status while `port.load()` is pending: wait for the loaded list, or the
+ * assertions race the load on a busy runner.
+ */
+async function loadedMessages() {
+  const messages = await screen.findByRole('region', { name: /mensagens/i });
+  await waitFor(() =>
+    expect(within(messages).queryByText(/abrindo os envelopes/i)).toBeNull(),
+  );
+  return messages;
+}
+
 describe('Caixa de entrada como tela própria (D6)', () => {
   it('lista todas as mensagens, pendentes primeiro, sem o "Ver todas" da Central', async () => {
     await setup();
-    const messages = await screen.findByRole('region', { name: /mensagens/i });
+    const messages = await loadedMessages();
     const items = within(messages).getAllByRole('listitem');
     expect(items).toHaveLength(4);
     expect(items[0]!.textContent).toMatch(/diretoria quer saber/i);
@@ -87,7 +100,7 @@ describe('Caixa de entrada como tela própria (D6)', () => {
 
   it('a lixeira só aparece no que não espera decisão', async () => {
     await setup();
-    const messages = await screen.findByRole('region', { name: /mensagens/i });
+    const messages = await loadedMessages();
     const trashes = within(messages).getAllByRole('button', {
       name: /^excluir:/i,
     });
@@ -101,7 +114,7 @@ describe('Caixa de entrada como tela própria (D6)', () => {
 
   it('Notícias mostra só o que não é mensagem da caixa e exclui pela lixeira', async () => {
     const { remove, onCareerChange } = await setup();
-    await screen.findByRole('region', { name: /mensagens/i });
+    await loadedMessages();
     const news = await screen.findByRole('region', { name: /notícias/i });
     const list = within(news).getByRole('list', {
       name: /notícias da carreira/i,
