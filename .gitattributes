@@ -1,0 +1,4 @@
+# Fim de linha: LF no repositório e no checkout (Windows inclusive). Binários detectados sozinhos.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
