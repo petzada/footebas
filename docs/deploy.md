@@ -10,12 +10,14 @@ Tudo roda em Cloudflare Workers (ADR 0005). Deploy em produção só com autoriz
 ## Pelo CI (padrão)
 
 Deploy em produção sai só do GitHub Actions, **depois do `ci` verde** num push na `main` (ou "Run workflow").
-Os deploys disparam por `workflow_run` do `ci`; o job `gate` confere se o commit tocou os caminhos abaixo:
+Os deploys disparam por `workflow_run` do `ci`, e o job `gate` publica só se o commit ainda for a ponta da `main`
+(re-run de commit velho não publica). Não há filtro de caminhos: todo merge verde republica web e API (deploy
+idempotente).
 
-| Workflow         | Worker         | Publica quando o commit toca                   |
-| ---------------- | -------------- | ---------------------------------------------- |
-| `deploy-web.yml` | `footebas-web` | `apps/web/**`, `packages/**`, `pnpm-lock.yaml` |
-| `deploy-api.yml` | `footebas-api` | `apps/api/**`, `packages/**`, `pnpm-lock.yaml` |
+| Workflow         | Worker         |
+| ---------------- | -------------- |
+| `deploy-web.yml` | `footebas-web` |
+| `deploy-api.yml` | `footebas-api` |
 
 Os dois precisam do secret **`CLOUDFLARE_API_TOKEN`** (token com "Workers Scripts: Edit" e "Workers Routes:
 Edit" na conta) e da variable **`CLOUDFLARE_ACCOUNT_ID`** (Settings → Secrets and variables → Actions); o web

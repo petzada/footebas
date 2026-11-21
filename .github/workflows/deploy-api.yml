@@ -1,14 +1,14 @@
 name: deploy-api
 
 # Publica o Worker `footebas-api` (apps/api/wrangler.jsonc) depois do CI verde num push na
-# main que toque a API ou os pacotes de que ela depende. Sem o secret CLOUDFLARE_API_TOKEN ou
+# main (a ponta da main, sem filtro de caminhos). Sem o secret CLOUDFLARE_API_TOKEN ou
 # a variable CLOUDFLARE_ACCOUNT_ID o workflow falha. Deploy só pelo CI (AGENTS.md).
 #
 # Secrets do Worker (SMOKE_TOKEN, ABACATEPAY_*) ficam no Cloudflare, não aqui; o
 # `wrangler deploy` preserva os já configurados.
 
 # Deploy só depois do CI verde: dispara quando o workflow `ci` termina com sucesso num push
-# na main (ou pelo Run workflow). O filtro de caminhos roda no job `gate`.
+# na main (ou pelo Run workflow na main). O job `gate` publica só a ponta da main.
 on:
   workflow_dispatch:
   workflow_run:
@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Decide se publica: o commit mexeu no api e os secrets do Cloudflare existem. Sem secret o
+  # Decide se publica: o commit é a ponta da main e os secrets do Cloudflare existem. Sem secret o
   # workflow FALHA (nada é publicado em silêncio).
   gate:
     if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')

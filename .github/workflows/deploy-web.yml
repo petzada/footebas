@@ -7,7 +7,7 @@ name: deploy-web
 # A API tem o seu próprio workflow (deploy-api.yml).
 
 # Deploy só depois do CI verde: dispara quando o workflow `ci` termina com sucesso num push
-# na main (ou pelo Run workflow). O filtro de caminhos roda no job `gate`.
+# na main (ou pelo Run workflow na main). O job `gate` publica só a ponta da main.
 on:
   workflow_dispatch:
   workflow_run:
@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Decide se publica: o commit mexeu no web e os secrets do Cloudflare existem. Sem secret o
+  # Decide se publica: o commit é a ponta da main e os secrets do Cloudflare existem. Sem secret o
   # workflow FALHA (nada é publicado em silêncio).
   gate:
     if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
