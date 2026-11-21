@@ -167,15 +167,27 @@ describe('partida ao vivo (decisões 18 e 19)', () => {
     const mobileNav = () =>
       screen.queryByRole('navigation', { name: /navegação principal mobile/i });
     expect(mobileNav()).toBeNull();
-    act(() => {
-      Object.defineProperty(window, 'scrollY', {
-        configurable: true,
-        value: 200,
-      });
-      window.dispatchEvent(new Event('scroll'));
-    });
-    expect(mobileNav()).toBeTruthy();
-    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    // findByTestId resolves outside act(), so the scroll listener (a passive
+    // effect) may attach only after the first scroll and take that scrollY
+    // as its baseline. Keep scrolling down, 40px a step, letting React commit
+    // between steps, until the bar is back.
+    const original = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    try {
+      for (let y = 40; y <= 400 && !mobileNav(); y += 40) {
+        act(() => {
+          Object.defineProperty(window, 'scrollY', {
+            configurable: true,
+            value: y,
+          });
+          window.dispatchEvent(new Event('scroll'));
+        });
+        if (!mobileNav()) await advance(50);
+      }
+      expect(mobileNav()).toBeTruthy();
+    } finally {
+      // Back to jsdom's own scrollY, even when the test fails.
+      if (original) Object.defineProperty(window, 'scrollY', original);
+    }
   });
 
   it('volta a mostrar a barra inferior ao trocar de tela', async () => {
