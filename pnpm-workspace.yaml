@@ -8,7 +8,6 @@ packages:
 allowBuilds:
   '@prisma/engines': false
   esbuild: false
-  lefthook: false
   prisma: false
   sharp: false
   unrs-resolver: false
