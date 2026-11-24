@@ -58,7 +58,7 @@ Decisões de produto em [`docs/00-visao-e-decisoes.md`](docs/00-visao-e-decisoes
 - **TypeScript** em monorepo **pnpm + Turborepo**
 - **Next.js** + **OpenNext** no front-end; **Cloudflare Workers**, **Durable Objects** e **Hyperdrive** na API
 - **Supabase (Postgres)** como banco de produção (acessado só pelo CI e pela produção)
-- **Vitest**, **Playwright** (E2E), **ESLint** tipado, **oxlint**, **Prettier**, lefthook e GitHub Actions
+- **Vitest**, **Playwright** (E2E), **ESLint** tipado, **oxlint**, **Prettier** e GitHub Actions
 
 ## Pré-requisitos e instalação
 
@@ -74,7 +74,7 @@ Decisões de produto em [`docs/00-visao-e-decisoes.md`](docs/00-visao-e-decisoes
 git clone https://github.com/petzada/footebas.git
 cd footebas
 corepack enable
-pnpm install --frozen-lockfile    # o prepare instala os hooks do lefthook
+pnpm install --frozen-lockfile
 ```
 
 ## Como utilizar
@@ -98,7 +98,7 @@ pnpm lint
 pnpm check            # o mesmo que o CI: format, typecheck, lint tipado, testes, build e smoke
 ```
 
-O **lefthook** roda Prettier e oxlint no commit e o typecheck incremental dos pacotes afetados no push. Rode `pnpm test:related` antes de abrir PR. O CI completo (incluindo bundle e E2E com Playwright) roda quando o PR fica pronto e na `main`.
+Rode `pnpm typecheck`, `pnpm lint` e `pnpm test:related` antes de abrir PR. O CI completo (incluindo bundle e E2E com Playwright) roda quando o PR fica pronto e na `main`.
 
 ## Contribuição
 
